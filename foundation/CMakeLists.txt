@@ -20,6 +20,8 @@ add_library(
 
         defer.h
 
+        graphics/types.h
+
         memory/dlmalloc_config.h
         memory/dlmalloc.c memory/dlmalloc.h
 )
