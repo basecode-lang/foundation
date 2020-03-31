@@ -177,7 +177,8 @@ namespace basecode::adt {
                     array.allocator,
                     new_capacity * sizeof(T),
                     alignof(T));
-                std::memcpy(new_data, array.data, array.size * sizeof(T));
+                if (array.data)
+                    std::memcpy(new_data, array.data, array.size * sizeof(T));
             }
 
             memory::deallocate(array.allocator, array.data);
