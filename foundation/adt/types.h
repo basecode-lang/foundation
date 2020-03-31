@@ -173,7 +173,7 @@ namespace basecode::adt {
 
             T* new_data{};
             if (new_capacity > 0) {
-                new_data = memory::allocate(
+                new_data = (T*) memory::allocate(
                     array.allocator,
                     new_capacity * sizeof(T),
                     alignof(T));
