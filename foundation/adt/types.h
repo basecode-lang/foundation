@@ -47,6 +47,7 @@ namespace basecode::adt {
     }
 
     namespace array {
+        template <typename T> u0 reserve(array_t<T>& array, u32 new_capacity);
 
         namespace internal {
             template <typename T>
