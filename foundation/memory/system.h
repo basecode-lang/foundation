@@ -63,18 +63,40 @@ namespace basecode::memory {
 
     ///////////////////////////////////////////////////////////////////////////
 
+    struct allocator_config_t {};
+
+    using init_callback_t       = u0  (*)(allocator_t*, allocator_config_t*);
+    using release_callback_t    = u0  (*)(allocator_t*);
+    using deallocate_callback_t = u0  (*)(allocator_t*, u0* mem);
+    using allocate_callback_t   = u0* (*)(allocator_t*, u32 size, u32 align);
+    using reallocate_callback_t = u0* (*)(allocator_t*, u0* mem, u32 new_size, u32 align);
+
     enum class allocator_type_t : u8 {
         system,
         dlmalloc,
     };
 
+    struct allocator_system_t final {
+        init_callback_t init{};
+        allocator_type_t type{};
+        release_callback_t release{};
+        allocate_callback_t  allocate{};
+        deallocate_callback_t deallocate{};
+        reallocate_callback_t reallocate{};
+    };
+
     struct allocator_t final {
         u32 total_allocated{};
         allocator_t* backing{};
-        allocator_type_t type{};
+        allocator_system_t* system{};
         union {
             mspace heap;
         } subclass{.heap = {}};
+    };
+
+    struct dl_allocator_config_t : allocator_config_t {
+        u0* base{};
+        u32 heap_size{};
     };
 
     ///////////////////////////////////////////////////////////////////////////
@@ -88,6 +110,21 @@ namespace basecode::memory {
     b8 set_page_executable(u0* ptr, usize size);
 
     u0 initialize(u32 heap_size = 32*1024*1024, u0* base = nullptr);
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    u0 init_allocator(
+        allocator_t* allocator,
+        allocator_type_t type,
+        allocator_config_t* config = nullptr);
+
+    u0 release_allocator(allocator_t* allocator);
+
+    u0 deallocate(allocator_t* allocator, u0* mem);
+
+    u0* allocate(allocator_t* allocator, u32 size, u32 align = sizeof(u32));
+
+    u0* reallocate(allocator_t* allocator, u0* mem, u32 new_size, u32 align = sizeof(u32));
 
 }
 
