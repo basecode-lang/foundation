@@ -32,6 +32,15 @@ namespace basecode::adt {
         u32 capacity{};
         memory::allocator_t* allocator{};
 
+        T* end()                        { return data + size; }
+        T* rend()                       { return data; }
+        T* begin()                      { return data; }
+        T* rbegin()                     { return data + size; }
+        const T* end() const            { return data + size; }
+        const T* rend() const           { return data; }
+        const T* begin() const          { return data; }
+        const T* rbegin() const         { return data + size; }
+
         T& operator[](usize index);
         const T& operator[](usize index) const;
     };
@@ -114,46 +123,6 @@ namespace basecode::adt {
         template <typename T>
         b8 empty(array_t<T>& array) {
             return array.size == 0;
-        }
-
-        template <typename T>
-        T* end(array_t<T>& array) {
-            return array.data + array.size;
-        }
-
-        template <typename T>
-        const T* end(array_t<T>& array) {
-            return array.data + array.size;
-        }
-
-        template <typename T>
-        T* begin(array_t<T>& array) {
-            return array.data;
-        }
-
-        template <typename T>
-        const T* begin(array_t<T>& array) {
-            return array.data;
-        }
-
-        template <typename T>
-        T* rend(array_t<T>& array) {
-            return array.data;
-        }
-
-        template <typename T>
-        const T* rend(array_t<T>& array) {
-            return array.data;
-        }
-
-        template <typename T>
-        T* rbegin(array_t<T>& array) {
-            return array.data + array.size;
-        }
-
-        template <typename T>
-        const T* rbegin(array_t<T>& array) {
-            return array.data + array.size;
         }
 
         template <typename T>
