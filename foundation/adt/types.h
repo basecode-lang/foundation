@@ -62,6 +62,13 @@ namespace basecode::adt {
         template <typename T> u0 reserve(array_t<T>& array, u32 new_capacity);
 
         template <typename T>
+        u0 init_array(
+                array_t<T>* array,
+                memory::allocator_t* allocator = context::current()->allocator) {
+            array->allocator = allocator;
+        }
+
+        template <typename T>
         u0 free_array(array_t<T>& array) {
             clear(array);
         }
