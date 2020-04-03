@@ -70,6 +70,7 @@ namespace basecode::array {
 
     template <typename T> u0 clear(array_t<T>& array);
     template <typename T> u0 append(array_t<T>& array, T&& value);
+    template <typename T> u0 append(array_t<T>& array, const T& value);
     template <typename T> u0 reserve(array_t<T>& array, u32 new_capacity);
 
     ///////////////////////////////////////////////////////////////////////////
@@ -111,8 +112,8 @@ namespace basecode::array {
             std::initializer_list<T> elements,
             memory::allocator_t* allocator = context::current()->allocator) {
         array_t<T> array(allocator);
-        for (const auto& e : elements)
-            array::append(array, e);
+        for (auto&& e : elements)
+            append(array, e);
         return array;
     }
 
