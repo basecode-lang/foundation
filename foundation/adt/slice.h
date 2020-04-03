@@ -58,6 +58,20 @@ namespace basecode::slice {
             .data = (const u8*) str.data()
         };
     }
+
+    [[maybe_unused]] inline static string_slice_t make(const u8* str, u32 length) {
+        return string_slice_t{
+            .length = length,
+            .data = str
+        };
+    }
+
+    [[maybe_unused]] inline static string_slice_t make(const char* str, u32 length) {
+        return string_slice_t{
+            .length = length,
+            .data = (const u8*) str
+        };
+    }
 }
 
 namespace fmt {
