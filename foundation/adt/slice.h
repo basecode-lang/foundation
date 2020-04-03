@@ -18,14 +18,32 @@
 
 #pragma once
 
+#include <cstring>
 #include <foundation/types.h>
 
 namespace basecode::slice {
-
     template<typename T>
     struct slice_t final {
-        T* data{};
         u32 length{};
+        const T* data{};
     };
 
+    using string_slice_t = slice_t<u8>;
+
+    [[maybe_unused]] inline static string_slice_t operator "" _ss(
+            const char* value) {
+        return string_slice_t{
+            .data = (const u8*) value,
+            .length = (u32) strlen(value)
+        };
+    }
+
+    [[maybe_unused]] inline static string_slice_t operator "" _ss(
+            const char* value,
+            std::size_t length) {
+        return string_slice_t{
+            .data = (const u8*) value,
+            .length = (u32) length
+        };
+    }
 }
