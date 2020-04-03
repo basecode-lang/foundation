@@ -31,6 +31,10 @@ namespace basecode::slice {
 
     using string_slice_t = slice_t<u8>;
 
+    template <typename T> inline b8 empty(slice_t<T>& slice) {
+        return slice.length == 0 || slice.data == nullptr;
+    }
+
     [[maybe_unused]] inline static string_slice_t operator "" _ss(
             const char* value) {
         return string_slice_t{
