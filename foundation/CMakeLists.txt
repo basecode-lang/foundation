@@ -28,6 +28,8 @@ add_library(
 
         context/system.cpp context/system.h
 
+        format/system.h
+
         graphics/types.h
 
         hashing/hashable.h
@@ -51,4 +53,5 @@ target_link_libraries(
 
         utf8proc
         blake3
+        fmt-header-only
 )

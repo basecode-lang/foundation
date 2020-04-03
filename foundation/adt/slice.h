@@ -20,6 +20,7 @@
 
 #include <cstring>
 #include <foundation/types.h>
+#include <foundation/format/system.h>
 
 namespace basecode::slice {
     template<typename T>
@@ -33,8 +34,8 @@ namespace basecode::slice {
     [[maybe_unused]] inline static string_slice_t operator "" _ss(
             const char* value) {
         return string_slice_t{
+            .length = (u32) strlen(value),
             .data = (const u8*) value,
-            .length = (u32) strlen(value)
         };
     }
 
@@ -42,8 +43,27 @@ namespace basecode::slice {
             const char* value,
             std::size_t length) {
         return string_slice_t{
+            .length = (u32) length,
             .data = (const u8*) value,
-            .length = (u32) length
         };
     }
+}
+
+namespace fmt {
+    using namespace basecode::slice;
+
+    template<>
+    struct formatter<string_slice_t> {
+        template<typename ParseContext>
+        constexpr auto parse(ParseContext& ctx) {
+            return ctx.begin();
+        }
+
+        template<typename FormatContext>
+        auto format(
+                string_slice_t slice,
+                FormatContext& ctx) {
+            return format_to_n(ctx.out(), slice.length, "{}", slice.data);
+        }
+    };
 }
