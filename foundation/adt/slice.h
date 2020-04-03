@@ -51,6 +51,13 @@ namespace basecode::slice {
             .data = (const u8*) value,
         };
     }
+
+    [[maybe_unused]] inline static string_slice_t make(const std::string& str) {
+        return string_slice_t{
+            .length = (u32) str.length(),
+            .data = (const u8*) str.data()
+        };
+    }
 }
 
 namespace fmt {
