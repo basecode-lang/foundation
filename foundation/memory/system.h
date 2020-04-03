@@ -19,7 +19,7 @@
 #pragma once
 
 #include <foundation/types.h>
-#include <foundation/context/context.h>
+#include <foundation/context/system.h>
 #include "dlmalloc_config.h"
 
 namespace basecode::memory {

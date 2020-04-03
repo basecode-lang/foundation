@@ -16,30 +16,19 @@
 //
 // ----------------------------------------------------------------------------
 
+#pragma once
+
 #include <cstdint>
-#include <cassert>
-#include "context.h"
+#include <cstddef>
 
-namespace basecode::context {
+namespace basecode::hashing::murmur {
 
-    static constexpr uint32_t stack_size = 512;
+    uint32_t hash32(const void* src, size_t len);
 
-    thread_local uint32_t t_index = stack_size;
-    thread_local context_t* t_stack[stack_size];
+    uint64_t hash64(const void* src, size_t len);
 
-    void pop() {
-        assert(t_index < stack_size);
-        t_index++;
-    }
+    uint32_t hash32(const void* src, size_t len, uint32_t seed);
 
-    context_t* current() {
-        assert(t_index < stack_size);
-        return t_stack[t_index];
-    }
-
-    void push(context_t* ctx) {
-        assert(t_index > 0);
-        t_stack[--t_index] = ctx;
-    }
+    uint64_t hash64(const void* src, size_t len, uint64_t seed);
 
 }

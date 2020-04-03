@@ -21,18 +21,34 @@ add_library(
         defer.h
         types.h
 
-        adt/types.h
-        adt/string/utf8.cpp adt/string/utf8.h
-        adt/string/ascii.cpp adt/string/ascii.h
+        adt/array.h
+        adt/slice.h
+        adt/utf8_string.h
+        adt/ascii_string.h
 
-        context/context.cpp context/context.h
+        context/system.cpp context/system.h
 
         graphics/types.h
 
+        hashing/hashable.h
+        hashing/crc.cpp hashing/crc.h
+        hashing/adler.cpp hashing/adler.h
+        hashing/murmur.cpp hashing/murmur.h
+        hashing/blake3.cpp hashing/blake3.h
+
+        memory/std_allocator.h
         memory/dlmalloc_config.h
         memory/system.cpp memory/system.h
         memory/dlmalloc.c memory/dlmalloc.h
 
-        # XXX: just for explanatory reasons
-        reasons.cpp reasons.h
+        profiler/system.cpp profiler/system.h
+        profiler/stopwatch.cpp profiler/stopwatch.h
+
+        timers/system.cpp timers/system.h
+)
+target_link_libraries(
+        ${PROJECT_NAME}
+
+        utf8proc
+        blake3
 )

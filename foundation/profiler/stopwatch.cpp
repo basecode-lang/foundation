@@ -16,9 +16,22 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "utf8.h"
+#include "system.h"
+#include "stopwatch.h"
 
-namespace basecode::string::utf8 {
+namespace basecode::profiler {
 
+    u0 stopwatch_t::stop() {
+        _end = get_time();
+    }
+
+    u0 stopwatch_t::start() {
+        _start = get_time();
+    }
+
+    s64 stopwatch_t::elapsed() const {
+        f64 delta = _end - _start;
+        return delta * get_calibration_multiplier();
+    }
 
 }

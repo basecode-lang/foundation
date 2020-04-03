@@ -16,8 +16,16 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "ascii.h"
+#include <blake3.h>
+#include "blake3.h"
 
-namespace basecode::string::ascii {
+namespace basecode::hashing::blake3 {
+
+    void hash256(const u8* src, usize len, u8* dest) {
+        blake3_hasher hasher{};
+        blake3_hasher_init(&hasher);
+        blake3_hasher_update(&hasher, src, len);
+        blake3_hasher_finalize(&hasher, dest, BLAKE3_OUT_LEN);
+    }
 
 }

@@ -16,11 +16,30 @@
 //
 // ----------------------------------------------------------------------------
 
-#pragma once
+#include <cstdint>
+#include <cassert>
+#include "system.h"
 
-#include <foundation/adt/types.h>
+namespace basecode::context {
 
-namespace basecode::string::ascii {
+    static constexpr uint32_t stack_size = 512;
+
+    thread_local uint32_t t_index = stack_size;
+    thread_local context_t* t_stack[stack_size];
+
+    void pop() {
+        assert(t_index < stack_size);
+        t_index++;
+    }
+
+    context_t* current() {
+        assert(t_index < stack_size);
+        return t_stack[t_index];
+    }
+
+    void push(context_t* ctx) {
+        assert(t_index > 0);
+        t_stack[--t_index] = ctx;
+    }
 
 }
-

@@ -18,9 +18,23 @@
 
 #pragma once
 
-#include <foundation/adt/types.h>
+#include <foundation/types.h>
 
-namespace basecode::string::utf8 {
+namespace basecode::profiler {
+
+    class stopwatch_t final {
+    public:
+        stopwatch_t() = default;
+
+        u0 stop();
+
+        u0 start();
+
+        [[nodiscard]] s64 elapsed() const;
+
+    private:
+        s64 _end;
+        s64 _start;
+    };
 
 }
-

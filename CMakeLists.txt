@@ -64,6 +64,23 @@ endif()
 #
 # -----------------------------------------------------------------------------
 
+# utf8proc
+add_subdirectory(ext/utf8proc-2.5.0 EXCLUDE_FROM_ALL)
+include_directories(ext/utf8proc-2.5.0)
+
+# blake3
+include_directories(ext/blake3-0.3.1)
+set(
+        BLAKE3_SOURCES
+        ext/blake3-0.3.1/blake3.c
+        ext/blake3-0.3.1/blake3_dispatch.c
+        ext/blake3-0.3.1/blake3_portable.c
+        ext/blake3-0.3.1/blake3_sse41_x86-64_unix.S
+        ext/blake3-0.3.1/blake3_avx2_x86-64_unix.S
+        ext/blake3-0.3.1/blake3_avx512_x86-64_unix.S
+)
+add_library(blake3 ${BLAKE3_SOURCES})
+
 # -----------------------------------------------------------------------------
 #
 # Project
