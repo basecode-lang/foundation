@@ -26,7 +26,7 @@ namespace basecode::memory {
     public:
         using value_type_t = T;
 
-        memory::allocator_t* backing{};
+        allocator_t* backing{};
 
         explicit std_allocator_t(
                 memory::allocator_t* allocator = context::current()->allocator) noexcept : backing(allocator) {
@@ -43,13 +43,14 @@ namespace basecode::memory {
         }
 
         value_type_t* allocate(std::size_t n) {
-            return static_cast<value_type_t*>(backing->allocate(
+            return (value_type_t*) memory::allocate(
+                backing,
                 n * sizeof(value_type_t),
-                alignof(value_type_t)));
+                alignof(value_type_t));
         }
 
-        void deallocate(value_type_t* p, std::size_t) noexcept {
-            backing->deallocate(p);
+        void deallocate(value_type_t* mem, std::size_t) noexcept {
+            memory::deallocate(backing, mem);
         }
     };
 
