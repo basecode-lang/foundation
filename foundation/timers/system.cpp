@@ -30,7 +30,25 @@ namespace basecode::timers {
     u0 shutdown() {
     }
 
-    timer_t* start_timer(
+    u0 update(u0* ctx) {
+        const auto ticks = profiler::get_time() * profiler::get_calibration_multiplier();
+        for (auto& timer : t_timers) {
+            if (!timer.active || ticks < timer.expiry)
+                continue;
+
+            auto kill = !timer.callback(
+                &timer,
+                timer.context ? timer.context : ctx);
+            if (kill) {
+                timer.active = false;
+                t_available_timer = &timer;
+            } else {
+                timer.expiry = ticks + timer.duration;
+            }
+        }
+    }
+
+    timer_t* start(
             s64 duration,
             timer_callback_t callback,
             u0* context) {
@@ -52,32 +70,14 @@ namespace basecode::timers {
         return timer;
     }
 
-    u0 update_timers(u0* ctx) {
-        const auto ticks = profiler::get_time() * profiler::get_calibration_multiplier();
-        for (auto& timer : t_timers) {
-            if (!timer.active || ticks < timer.expiry)
-                continue;
-
-            auto kill = !timer.callback(
-                &timer,
-                timer.context ? timer.context : ctx);
-            if (kill) {
-                timer.active = false;
-                t_available_timer = &timer;
-            } else {
-                timer.expiry = ticks + timer.duration;
-            }
-        }
+    u0 stop(timer_t* timer) {
+        if (!timer) return;
+        timer->active = false;
+        t_available_timer = timer;
     }
 
     init_result_t initialize() {
         return init_result_t::ok;
-    }
-
-    u0 stop_timer(timer_t* timer) {
-        if (!timer) return;
-        timer->active = false;
-        t_available_timer = timer;
     }
 
 }

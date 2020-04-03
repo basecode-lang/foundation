@@ -45,9 +45,9 @@ namespace basecode::timers {
     timer_t* start(
         s64 duration,
         timer_callback_t callback,
-        u0* context = nullptr);
+        u0* context = {});
 
-    u0 update(u0* ctx);
+    u0 update(u0* ctx = {});
 
     u0 stop(timer_t* timer);
 
