@@ -63,7 +63,11 @@ namespace fmt {
         auto format(
                 string_slice_t slice,
                 FormatContext& ctx) {
-            return format_to_n(ctx.out(), slice.length, "{}", slice.data);
+            return format_to_n(
+                ctx.out(),
+                slice.length,
+                "{}",
+                (const char*) slice.data);
         }
     };
 }
