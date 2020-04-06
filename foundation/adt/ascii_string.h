@@ -71,11 +71,15 @@ namespace basecode::string {
         u32 capacity{};
         memory::allocator_t* allocator{};
 
-        explicit ascii_t(memory::allocator_t* allocator);
+        explicit ascii_t(memory::allocator_t* allocator = context::current()->allocator);
 
         ascii_t(const ascii_t& other);
 
         ascii_t(ascii_t&& other) noexcept;
+
+        ascii_t(const char* value, memory::allocator_t* allocator = context::current()->allocator);
+
+        ascii_t(slice_t value, memory::allocator_t* allocator = context::current()->allocator);
 
         ~ascii_t();
 
@@ -201,6 +205,19 @@ namespace basecode::string {
 
     inline ascii_t::ascii_t(ascii_t&& other) noexcept {
         operator=(other);
+    }
+
+    inline ascii_t::ascii_t(const char* value, memory::allocator_t* allocator) : allocator(allocator) {
+        const auto n = strlen(value);
+        grow(*this, n);
+        std::memcpy(data, value, n * sizeof(u8));
+        length = n;
+    }
+
+    inline ascii_t::ascii_t(slice_t value, memory::allocator_t* allocator) : allocator(allocator) {
+        grow(*this, value.length);
+        std::memcpy(data, value.data, value.length * sizeof(u8));
+        length = value.length;
     }
 
     inline u8& ascii_t::operator[](u32 index) {
