@@ -29,71 +29,7 @@ namespace basecode::slice {
         const T* data{};
     };
 
-    using string_slice_t = slice_t<u8>;
-
     template <typename T> inline b8 empty(slice_t<T>& slice) {
         return slice.length == 0 || slice.data == nullptr;
     }
-
-    [[maybe_unused]] inline static string_slice_t operator "" _ss(
-            const char* value) {
-        return string_slice_t{
-            .length = (u32) strlen(value),
-            .data = (const u8*) value,
-        };
-    }
-
-    [[maybe_unused]] inline static string_slice_t operator "" _ss(
-            const char* value,
-            std::size_t length) {
-        return string_slice_t{
-            .length = (u32) length,
-            .data = (const u8*) value,
-        };
-    }
-
-    [[maybe_unused]] inline static string_slice_t make(const std::string& str) {
-        return string_slice_t{
-            .length = (u32) str.length(),
-            .data = (const u8*) str.data()
-        };
-    }
-
-    [[maybe_unused]] inline static string_slice_t make(const u8* str, u32 length) {
-        return string_slice_t{
-            .length = length,
-            .data = str
-        };
-    }
-
-    [[maybe_unused]] inline static string_slice_t make(const char* str, u32 length) {
-        return string_slice_t{
-            .length = length,
-            .data = (const u8*) str
-        };
-    }
-}
-
-namespace fmt {
-    using namespace basecode::slice;
-
-    template<>
-    struct formatter<string_slice_t> {
-        template<typename ParseContext>
-        constexpr auto parse(ParseContext& ctx) {
-            return ctx.begin();
-        }
-
-        template<typename FormatContext>
-        auto format(
-                string_slice_t slice,
-                FormatContext& ctx) {
-            auto it = format_to_n(
-                ctx.out(),
-                slice.length,
-                "{}",
-                (const char*) slice.data);
-            return it.out;
-        }
-    };
 }

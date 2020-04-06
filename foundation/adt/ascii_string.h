@@ -20,46 +20,268 @@
 
 #include <foundation/types.h>
 #include <foundation/memory/system.h>
+#include "slice.h"
 
-namespace basecode::ascii_string {
+namespace basecode::string {
+    using slice_t = slice::slice_t<u8>;
 
-    struct string_t final {
-        explicit string_t(memory::allocator_t* allocator);
+    [[maybe_unused]] inline static slice_t operator "" _ss(
+            const char* value) {
+        return slice_t{
+            .length = (u32) strlen(value),
+            .data = (const u8*) value,
+        };
+    }
 
-        ~string_t();
+    [[maybe_unused]] inline static slice_t operator "" _ss(
+            const char* value,
+            std::size_t length) {
+        return slice_t{
+            .length = (u32) length,
+            .data = (const u8*) value,
+        };
+    }
 
-        string_t(const string_t& other);
+    [[maybe_unused]] inline static slice_t make(const std::string& str) {
+        return slice_t{
+            .length = (u32) str.length(),
+            .data = (const u8*) str.data()
+        };
+    }
 
-        string_t(string_t&& other) noexcept;
+    [[maybe_unused]] inline static slice_t make(const u8* str, u32 length) {
+        return slice_t{
+            .length = length,
+            .data = str
+        };
+    }
 
+    [[maybe_unused]] inline static slice_t make(const char* str, u32 length) {
+        return slice_t{
+            .length = length,
+            .data = (const u8*) str
+        };
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    struct ascii_t final {
         u8* data{};
-        u32 size{};
+        u32 length{};
         u32 capacity{};
         memory::allocator_t* allocator{};
 
-        u8* end() { return data + size; }
+        explicit ascii_t(memory::allocator_t* allocator);
 
-        u8* rend() { return data; }
+        ascii_t(const ascii_t& other);
 
-        u8* begin() { return data; }
+        ascii_t(ascii_t&& other) noexcept;
 
-        u8* rbegin() { return data + size; }
+        ~ascii_t();
 
-        const u8* end() const { return data + size; }
+        inline u8* end() { return data + length; }
 
-        const u8* rend() const { return data; }
+        inline u8* rend() { return data; }
 
-        const u8* begin() const { return data; }
+        inline u8* begin() { return data; }
 
-        const u8* rbegin() const { return data + size; }
+        inline u8* rbegin() { return data + length; }
 
-        u8& operator[](usize index);
+        [[nodiscard]] inline const u8* end() const { return data + length; }
 
-        const u8& operator[](usize index) const;
+        [[nodiscard]] inline const u8* rend() const { return data; }
 
-        string_t& operator=(const string_t& other);
+        [[nodiscard]] inline const u8* begin() const { return data; }
 
-        string_t& operator=(string_t&& other) noexcept;
+        [[nodiscard]] inline const u8* rbegin() const { return data + length; }
+
+        inline u8& operator[](u32 index);
+
+        inline const u8& operator[](u32 index) const;
+
+        inline b8 operator<(const ascii_t& other) const;
+
+        inline b8 operator>(const ascii_t& other) const;
+
+        inline b8 operator==(const char* other) const;
+
+        inline b8 operator==(const ascii_t& other) const;
+
+        inline b8 operator==(const slice_t& other) const;
+
+        inline ascii_t& operator+(const ascii_t& other);
+
+        inline ascii_t& operator=(const ascii_t& other);
+
+        inline ascii_t& operator=(ascii_t&& other) noexcept;
     };
 
+    u0 append(ascii_t& str, u8 value);
+
+    u0 append(ascii_t& str, slice_t value);
+
+    u0 append(ascii_t& str, const ascii_t& value);
+
+    u0 append(ascii_t& str, const char* value, s32 len = -1);
+
+    u0 trim(ascii_t& str);
+
+    b8 empty(ascii_t& str);
+
+    u0 trunc(ascii_t& str, u32 new_length);
+
+    u0 ltrim(ascii_t& str);
+
+    u0 rtrim(ascii_t& str);
+
+    u0 clear(ascii_t& str);
+
+    u0 reset(ascii_t& str);
+
+    u0 upper(ascii_t& str);
+
+    u0 lower(ascii_t& str);
+
+    u8& back(ascii_t& str);
+
+    u0 shrink(ascii_t& str);
+
+    u0 insert(ascii_t& str, u32 pos, u8 value);
+
+    u0 insert(ascii_t& str, u32 pos, slice_t value);
+
+    u0 insert(ascii_t& str, u32 pos, const ascii_t& value);
+
+    u0 insert(ascii_t& str, u32 pos, const char* value, s32 len = -1);
+
+    u0 grow(ascii_t& str, u32 min_capacity = 8);
+
+    u0 resize(ascii_t& str, u32 new_length);
+
+    u0 reserve(ascii_t& str, u32 new_capacity);
+
+    u0 set_capacity(ascii_t& str, u32 new_capacity);
+
+    u8* erase(ascii_t& str, const u8* begin, const u8* end);
+
+    ascii_t::~ascii_t() {
+        clear(*this);
+    }
+
+    ascii_t::ascii_t(memory::allocator_t* allocator) : allocator(allocator) {
+        assert(allocator);
+    }
+
+    ascii_t::ascii_t(const ascii_t& other) {
+        operator=(other);
+    }
+
+    ascii_t::ascii_t(ascii_t&& other) noexcept {
+        operator=(other);
+    }
+
+    inline u8& ascii_t::operator[](u32 index) {
+        return data[index];
+    }
+
+    inline const u8& ascii_t::operator[](u32 index) const {
+        return data[index];
+    }
+
+    inline ascii_t& ascii_t::operator=(const ascii_t& other) {
+        if (this != &other) {
+            const auto n = other.length;
+            grow(*this, n);
+            std::memcpy(data, other.data, n * sizeof(u8));
+            length = n;
+        }
+        return *this;
+    }
+
+    inline ascii_t& ascii_t::operator=(ascii_t&& other) noexcept {
+        if (this != &other) {
+            assert(allocator == other.allocator);
+            memory::deallocate(allocator, data);
+            data = other.data;
+            length = other.length;
+            capacity = other.capacity;
+            other.data = {};
+            other.length = other.capacity = {};
+        }
+        return *this;
+    }
+
+    inline b8 ascii_t::operator<(const ascii_t& other) const {
+        return std::lexicographical_compare(
+            begin(),
+            end(),
+            other.begin(),
+            other.end());
+    }
+
+    inline b8 ascii_t::operator>(const ascii_t& other) const {
+        return !std::lexicographical_compare(
+            begin(),
+            end(),
+            other.begin(),
+            other.end());
+    }
+
+    inline ascii_t& ascii_t::operator+(const ascii_t& other) {
+        append(*this, other);
+        return *this;
+    }
+
+    inline b8 ascii_t::operator==(const char* other) const {
+        const auto n = strlen(other);
+        return length == n && std::memcmp(data, other, length) == 0;
+    }
+
+    inline b8 ascii_t::operator==(const ascii_t& other) const {
+        return length == other.length && std::memcmp(data, other.data, length) == 0;
+    }
+
+    inline b8 ascii_t::operator==(const slice_t& other) const {
+        return length == other.length && std::memcmp(data, other.data, length) == 0;
+    }
+}
+
+namespace fmt {
+    using namespace basecode::string;
+
+    template<>
+    struct formatter<slice_t> {
+        template<typename ParseContext>
+        constexpr auto parse(ParseContext& ctx) {
+            return ctx.begin();
+        }
+
+        template<typename FormatContext>
+        auto format(slice_t slice, FormatContext& ctx) {
+            auto it = format_to_n(
+                ctx.out(),
+                slice.length,
+                "{}",
+                (const char*) slice.data);
+            return it.out;
+        }
+    };
+
+    template<>
+    struct formatter<ascii_t> {
+        template<typename ParseContext>
+        constexpr auto parse(ParseContext& ctx) {
+            return ctx.begin();
+        }
+
+        template<typename FormatContext>
+        auto format(ascii_t str, FormatContext& ctx) {
+            auto it = format_to_n(
+                ctx.out(),
+                str.length,
+                "{}",
+                (const char*) str.data);
+            return it.out;
+        }
+    };
 }

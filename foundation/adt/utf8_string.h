@@ -22,43 +22,45 @@
 #include <foundation/types.h>
 #include <foundation/memory/system.h>
 
-namespace basecode::utf8_string {
-    struct string_t final {
-        explicit string_t(memory::allocator_t* allocator);
+namespace basecode::string {
+    using codepoint_t = s32;
 
-        ~string_t();
+    struct utf8_t final {
+        explicit utf8_t(memory::allocator_t* allocator);
 
-        string_t(const string_t& other);
+        ~utf8_t();
 
-        string_t(string_t&& other) noexcept;
+        utf8_t(const utf8_t& other);
+
+        utf8_t(utf8_t&& other) noexcept;
 
         u8* data{};
-        u32 size{};
+        u32 length{};
         u32 capacity{};
         memory::allocator_t* allocator{};
 
-        u8* end() { return data + size; }
+        u8* end() { return data + length; }
 
         u8* rend() { return data; }
 
         u8* begin() { return data; }
 
-        u8* rbegin() { return data + size; }
+        u8* rbegin() { return data + length; }
 
-        const u8* end() const { return data + size; }
+        const u8* end() const { return data + length; }
 
         const u8* rend() const { return data; }
 
         const u8* begin() const { return data; }
 
-        const u8* rbegin() const { return data + size; }
+        const u8* rbegin() const { return data + length; }
 
         u8& operator[](usize index);
 
         const u8& operator[](usize index) const;
 
-        string_t& operator=(const string_t& other);
+        utf8_t& operator=(const utf8_t& other);
 
-        string_t& operator=(string_t&& other) noexcept;
+        utf8_t& operator=(utf8_t&& other) noexcept;
     };
 }
