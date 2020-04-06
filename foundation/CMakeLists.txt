@@ -24,7 +24,7 @@ add_library(
         adt/array.h
         adt/slice.h
         adt/utf8_string.h
-        adt/ascii_string.h
+        adt/ascii_string.cpp adt/ascii_string.h
 
         context/system.cpp context/system.h
 
