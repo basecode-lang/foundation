@@ -42,21 +42,21 @@ namespace basecode::string {
         };
     }
 
-    [[maybe_unused]] inline static slice_t make(const std::string& str) {
+    [[maybe_unused]] inline static slice_t make_slice(const std::string& str) {
         return slice_t{
             .length = (u32) str.length(),
             .data = (const u8*) str.data()
         };
     }
 
-    [[maybe_unused]] inline static slice_t make(const u8* str, u32 length) {
+    [[maybe_unused]] inline static slice_t make_slice(const u8* str, u32 length) {
         return slice_t{
             .length = length,
             .data = str
         };
     }
 
-    [[maybe_unused]] inline static slice_t make(const char* str, u32 length) {
+    [[maybe_unused]] inline static slice_t make_slice(const char* str, u32 length) {
         return slice_t{
             .length = length,
             .data = (const u8*) str
@@ -116,6 +116,13 @@ namespace basecode::string {
         inline ascii_t& operator=(ascii_t&& other) noexcept;
     };
 
+    [[maybe_unused]] inline static slice_t make_slice(const ascii_t& str) {
+        return slice_t{
+            .length = str.length,
+            .data = str.data
+        };
+    }
+
     u0 append(ascii_t& str, u8 value);
 
     u0 append(ascii_t& str, slice_t value);
@@ -164,19 +171,35 @@ namespace basecode::string {
 
     u8* erase(ascii_t& str, const u8* begin, const u8* end);
 
-    ascii_t::~ascii_t() {
+    inline u0 free(ascii_t& str) {
+        clear(str);
+    }
+
+    inline u0 init(
+            ascii_t* str,
+            memory::allocator_t* allocator = context::current()->allocator) {
+        str->allocator = allocator;
+        str->data = {};
+        str->length = str->capacity = {};
+    }
+
+    inline ascii_t make(memory::allocator_t* allocator = context::current()->allocator) {
+        return ascii_t(allocator);
+    }
+
+    inline ascii_t::~ascii_t() {
         clear(*this);
     }
 
-    ascii_t::ascii_t(memory::allocator_t* allocator) : allocator(allocator) {
+    inline ascii_t::ascii_t(memory::allocator_t* allocator) : allocator(allocator) {
         assert(allocator);
     }
 
-    ascii_t::ascii_t(const ascii_t& other) {
+    inline ascii_t::ascii_t(const ascii_t& other) {
         operator=(other);
     }
 
-    ascii_t::ascii_t(ascii_t&& other) noexcept {
+    inline ascii_t::ascii_t(ascii_t&& other) noexcept {
         operator=(other);
     }
 
