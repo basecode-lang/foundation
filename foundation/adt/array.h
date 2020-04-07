@@ -162,6 +162,12 @@ namespace basecode::array {
         return array.data[0];
     }
 
+    template <typename T> T& append(array_t<T>& array) {
+        if (array.size + 1 > array.capacity)
+            grow(array);
+        return array.data[array.size++];
+    }
+
     template <typename T> const T& back(array_t<T>& array) {
         return array.data[array.size - 1];
     }
