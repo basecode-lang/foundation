@@ -101,7 +101,7 @@ namespace basecode::stack {
         memory::deallocate(stack.allocator, stack.data);
         stack.data = new_data;
         stack.capacity = new_capacity;
-        stack.sp = stack.data + stack.size;
+        stack.sp = stack.data + stack.capacity;
     }
 
     template <typename T> stack_t<T> make(
