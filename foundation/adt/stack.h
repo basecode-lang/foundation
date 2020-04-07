@@ -101,7 +101,7 @@ namespace basecode::stack {
         memory::deallocate(stack.allocator, stack.data);
         stack.data = new_data;
         stack.capacity = new_capacity;
-        stack.sp = stack.data + stack.capacity;
+        stack.sp = stack.data + stack.capacity - stack.size;
     }
 
     template <typename T> stack_t<T> make(
@@ -123,7 +123,7 @@ namespace basecode::stack {
 
     template <typename T> u0 reset(stack_t<T>& stack) {
         stack.size = {};
-        stack.sp = stack.data;
+        stack.sp = stack.data + stack.capacity;
         std::memset(stack.data, 0, sizeof(T) * stack.capacity);
     }
 
@@ -184,7 +184,7 @@ namespace basecode::stack {
         if (new_size > stack.capacity)
             grow(stack, new_size);
         stack.size = new_size;
-        stack.sp = stack.data + stack.size;
+        stack.sp = stack.data + stack.capacity - stack.size;
     }
 
     template <typename T> u0 insert(stack_t<T>& stack, u32 index, T& value) {
