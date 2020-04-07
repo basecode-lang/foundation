@@ -254,7 +254,7 @@ namespace basecode::array {
             return *this;
         if (!allocator)
             allocator = other.allocator;
-        reserve(*this, other.size, false);
+        reserve(*this, other.size * 2 + 8, false);
         std::memcpy(data, other.data, sizeof(T) * other.size);
         size = other.size;
         return *this;
