@@ -80,6 +80,14 @@ namespace basecode::array {
         reserve(array, new_capacity * 2 + 8);
     }
 
+    template <typename T> u0 init(
+            array_t<T>* array,
+            memory::allocator_t* allocator = context::current()->allocator) {
+        array->data = {};
+        array->allocator = allocator;
+        array->size = array->capacity = {};
+    }
+
     template <typename T> u0 reserve(
             array_t<T>& array,
             u32 new_capacity,
@@ -108,28 +116,6 @@ namespace basecode::array {
         memory::deallocate(array.allocator, array.data);
         array.data = new_data;
         array.capacity = new_capacity;
-    }
-
-    template <typename T> T* prepare_insert(array_t<T>& array, const T* it) {
-        const auto offset = it - array.data;
-        if (array.size == array.capacity)
-            reserve(array, array.size + 1);
-        if (offset < array.size) {
-            auto count = array.size - offset;
-            std::memmove(
-                array.data + offset + 1,
-                array.data + offset,
-                count * sizeof(T));
-        }
-        return offset;
-    }
-
-    template <typename T> u0 init(
-            array_t<T>* array,
-            memory::allocator_t* allocator = context::current()->allocator) {
-        array->data = {};
-        array->allocator = allocator;
-        array->size = array->capacity = {};
     }
 
     template <typename T> array_t<T> make(
@@ -184,14 +170,6 @@ namespace basecode::array {
         return array.data[0];
     }
 
-    template <typename T> T& emplace(array_t<T>& array) {
-        if (array.size + 1 > array.capacity)
-            grow(array);
-        new (array.data + array.size) T();
-        ++array.size;
-        return array.data[array.size - 1];
-    }
-
     template <typename T> u0 append(array_t<T>& array, T&& value) {
         if (array.size + 1 > array.capacity)
             grow(array);
@@ -218,6 +196,20 @@ namespace basecode::array {
                 return true;
         }
         return false;
+    }
+
+    template <typename T> T* prepare_insert(array_t<T>& array, const T* it) {
+        const auto offset = it - array.data;
+        if (array.size == array.capacity)
+            reserve(array, array.size + 1);
+        if (offset < array.size) {
+            auto count = array.size - offset;
+            std::memmove(
+                array.data + offset + 1,
+                array.data + offset,
+                count * sizeof(T));
+        }
+        return offset;
     }
 
     template <typename T> T* insert(array_t<T>& array, const T* it, T&& value) {
