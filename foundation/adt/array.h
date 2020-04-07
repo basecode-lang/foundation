@@ -96,6 +96,7 @@ namespace basecode::array {
                 array.allocator,
                 new_capacity * sizeof(T),
                 alignof(T));
+            std::memset(new_data, 0, new_capacity * sizeof(T));
             if (array.data && copy) {
                 std::memcpy(
                     new_data,
