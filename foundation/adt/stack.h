@@ -233,6 +233,8 @@ namespace basecode::stack {
     template<typename T> stack_t<T>& stack_t<T>::operator=(const stack_t<T>& other) {
         if (this == &other)
             return *this;
+        if (!allocator)
+            allocator = other.allocator;
         reserve(*this, other.size, false);
         std::memcpy(data, other.data, sizeof(T) * other.size);
         sp = data + size;

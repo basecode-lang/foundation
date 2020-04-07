@@ -251,6 +251,8 @@ namespace basecode::array {
     template<typename T> array_t<T>& array_t<T>::operator=(const array_t<T>& other) {
         if (this == &other)
             return *this;
+        if (!allocator)
+            allocator = other.allocator;
         reserve(*this, other.size, false);
         std::memcpy(data, other.data, sizeof(T) * other.size);
         size = other.size;
