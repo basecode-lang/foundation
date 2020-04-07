@@ -27,7 +27,7 @@
 namespace basecode::stack {
     template<typename T>
     struct stack_t final {
-        explicit stack_t(memory::allocator_t* allocator);
+        explicit stack_t(memory::allocator_t* allocator = context::current()->allocator);
 
         ~stack_t();
 
@@ -54,7 +54,7 @@ namespace basecode::stack {
 
     template <typename T> u0 clear(stack_t<T>&);
     template <typename T> u0 push(stack_t<T>&, T&&);
-    template <typename T> u0 reserve(stack_t<T>&, u32);
+    template <typename T> u0 reserve(stack_t<T>&, u32, b8 copy = true);
 
     ///////////////////////////////////////////////////////////////////////////
 
@@ -76,7 +76,7 @@ namespace basecode::stack {
     template <typename T> u0 reserve(
             stack_t<T>& stack,
             u32 new_capacity,
-            b8 copy = true) {
+            b8 copy) {
         if (stack.capacity == new_capacity)
             return;
 

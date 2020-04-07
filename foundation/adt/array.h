@@ -28,7 +28,7 @@
 namespace basecode::array {
     template<typename T>
     struct array_t final {
-        explicit array_t(memory::allocator_t* allocator);
+        explicit array_t(memory::allocator_t* allocator = context::current()->allocator);
 
         ~array_t();
 
