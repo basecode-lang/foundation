@@ -66,10 +66,10 @@ namespace basecode::array {
         array_t<T>& operator=(array_t&& other) noexcept;
     };
 
-    template <typename T> u0 clear(array_t<T>& array);
-    template <typename T> u0 append(array_t<T>& array, T&& value);
-    template <typename T> u0 append(array_t<T>& array, const T& value);
-    template <typename T> u0 reserve(array_t<T>& array, u32 new_capacity);
+    template <typename T> u0 clear(array_t<T>&);
+    template <typename T> u0 append(array_t<T>&, T&&);
+    template <typename T> u0 append(array_t<T>&, const T&);
+    template <typename T> u0 reserve(array_t<T>&, u32, b8);
 
     ///////////////////////////////////////////////////////////////////////////
 
