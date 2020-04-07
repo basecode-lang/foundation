@@ -164,6 +164,14 @@ namespace basecode::stack {
         return stack.size;
     }
 
+    template <typename T> decltype(auto) push(stack_t<T>& stack) {
+        if (stack.size + 1 > stack.capacity)
+            grow(stack);
+        --stack.sp;
+        ++stack.size;
+        return top(stack);
+    }
+
     template <typename T> u32 push(stack_t<T>& stack, T&& value) {
         if (stack.size + 1 > stack.capacity)
             grow(stack);
