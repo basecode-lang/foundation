@@ -69,7 +69,7 @@ namespace basecode::array {
     template <typename T> u0 clear(array_t<T>&);
     template <typename T> u0 append(array_t<T>&, T&&);
     template <typename T> u0 append(array_t<T>&, const T&);
-    template <typename T> u0 reserve(array_t<T>&, u32, b8);
+    template <typename T> u0 reserve(array_t<T>&, u32, b8 copy = true);
 
     ///////////////////////////////////////////////////////////////////////////
 
@@ -83,7 +83,7 @@ namespace basecode::array {
     template <typename T> u0 reserve(
             array_t<T>& array,
             u32 new_capacity,
-            b8 copy = true) {
+            b8 copy) {
         if (array.capacity == new_capacity)
             return;
 
