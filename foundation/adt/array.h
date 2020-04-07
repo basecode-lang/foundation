@@ -57,16 +57,14 @@ namespace basecode::array {
 
         const T* rbegin() const { return data + size; }
 
-        T& operator[](usize index);
+        T& operator[](u32 index);
 
-        const T& operator[](usize index) const;
+        const T& operator[](u32 index) const;
 
         array_t<T>& operator=(const array_t<T>& other);
 
         array_t<T>& operator=(array_t&& other) noexcept;
     };
-
-    ///////////////////////////////////////////////////////////////////////////
 
     template <typename T> u0 clear(array_t<T>& array);
     template <typename T> u0 append(array_t<T>& array, T&& value);
@@ -75,102 +73,22 @@ namespace basecode::array {
 
     ///////////////////////////////////////////////////////////////////////////
 
-    namespace internal {
-        template <typename T> u0 grow(array_t<T>& array, u32 new_capacity = 0) {
-            new_capacity = std::max(new_capacity, array.capacity);
-            reserve(array, new_capacity * 2 + 8);
-        }
-
-        template <typename T> T* prepare_insert(array_t<T>& array, const T* it) {
-            const auto offset = it - array.data;
-            if (array.size == array.capacity)
-                reserve(array, array.size + 1);
-            if (offset < array.size) {
-                auto count = array.size - offset;
-                std::memmove(
-                    array.data + offset + 1,
-                    array.data + offset,
-                    count * sizeof(T));
-            }
-            return offset;
-        }
+    template <typename T> u0 grow(
+            array_t<T>& array,
+            u32 new_capacity = 0) {
+        new_capacity = std::max(new_capacity, array.capacity);
+        reserve(array, new_capacity * 2 + 8);
     }
 
-    ///////////////////////////////////////////////////////////////////////////
-
-    template <typename T> inline u0 free(array_t<T>& array) {
-        clear(array);
-    }
-
-    template <typename T> u0 init(
-            array_t<T>* array,
-            memory::allocator_t* allocator = context::current()->allocator) {
-        array->allocator = allocator;
-    }
-
-    template <typename T> inline array_t<T> make(
-            std::initializer_list<T> elements,
-            memory::allocator_t* allocator = context::current()->allocator) {
-        array_t<T> array(allocator);
-        for (auto&& e : elements)
-            append(array, e);
-        return array;
-    }
-
-    template <typename T> inline array_t<T> make(
-            memory::allocator_t* allocator = context::current()->allocator) {
-        return array_t<T>(allocator);
-    }
-
-    template <typename T> u0 pop(array_t<T>& array) {
-        --array.size;
-    }
-
-    template <typename T> u0 trim(array_t<T>& array) {
-        reserve(array, array.size);
-    }
-
-    template <typename T> u0 reset(array_t<T>& array) {
-        array.size = 0;
-        std::memset(array.data, 0, sizeof(T) * array.capacity);
-    }
-
-    template <typename T> u0 clear(array_t<T>& array) {
-        memory::deallocate(array.allocator, array.data);
-        array.size = 0;
-        array.capacity = 0;
-        array.data = nullptr;
-    }
-
-    template <typename T> b8 empty(array_t<T>& array) {
-        return array.size == 0;
-    }
-
-    template <typename T> u0 append(array_t<T>& array, T&& value) {
-        if (array.size + 1 > array.capacity)
-            internal::grow(array);
-        array.data[array.size++] = value;
-    }
-
-    template <typename T> u0 resize(array_t<T>& array, u32 new_size) {
-        if (new_size > array.capacity)
-            internal::grow(array, new_size);
-        array.size = new_size;
-    }
-
-    template <typename T> u0 append(array_t<T>& array, const T& value) {
-        if (array.size + 1 > array.capacity)
-            internal::grow(array);
-        array.data[array.size++] = value;
-    }
-
-    template <typename T> u0 reserve(array_t<T>& array, u32 new_capacity) {
+    template <typename T> u0 reserve(
+            array_t<T>& array,
+            u32 new_capacity,
+            b8 copy = true) {
         if (array.capacity == new_capacity)
             return;
 
-        if (new_capacity < array.size) {
-            new_capacity = array.size * 2 + 8;
-        }
+        if (new_capacity < array.size)
+            new_capacity = array.size;
 
         T* new_data{};
         if (new_capacity > 0) {
@@ -178,7 +96,7 @@ namespace basecode::array {
                 array.allocator,
                 new_capacity * sizeof(T),
                 alignof(T));
-            if (array.data) {
+            if (array.data && copy) {
                 std::memcpy(
                     new_data,
                     array.data,
@@ -191,12 +109,96 @@ namespace basecode::array {
         array.capacity = new_capacity;
     }
 
+    template <typename T> T* prepare_insert(array_t<T>& array, const T* it) {
+        const auto offset = it - array.data;
+        if (array.size == array.capacity)
+            reserve(array, array.size + 1);
+        if (offset < array.size) {
+            auto count = array.size - offset;
+            std::memmove(
+                array.data + offset + 1,
+                array.data + offset,
+                count * sizeof(T));
+        }
+        return offset;
+    }
+
+    template <typename T> u0 init(
+            array_t<T>* array,
+            memory::allocator_t* allocator = context::current()->allocator) {
+        array->data = {};
+        array->allocator = allocator;
+        array->size = array->capacity = {};
+    }
+
+    template <typename T> array_t<T> make(
+            std::initializer_list<T> elements,
+            memory::allocator_t* allocator = context::current()->allocator) {
+            array_t<T> array(allocator);
+        for (auto&& e : elements)
+            append(array, e);
+        return array;
+    }
+
+    template <typename T> u0 pop(array_t<T>& array) {
+        --array.size;
+    }
+
+    template <typename T> u0 free(array_t<T>& array) {
+        clear(array);
+    }
+
+    template <typename T> u0 trim(array_t<T>& array) {
+        reserve(array, array.size);
+    }
+
     template <typename T> T& back(array_t<T>& array) {
         return array.data[array.size - 1];
     }
 
+    template <typename T> u0 reset(array_t<T>& array) {
+        array.size = {};
+        std::memset(array.data, 0, sizeof(T) * array.capacity);
+    }
+
+    template <typename T> u0 clear(array_t<T>& array) {
+        memory::deallocate(array.allocator, array.data);
+        array.data = {};
+        array.size = array.capacity = {};
+    }
+
+    template <typename T> b8 empty(array_t<T>& array) {
+        return array.size == 0;
+    }
+
     template <typename T> T& front(array_t<T>& array) {
         return array.data[0];
+    }
+
+    template <typename T> const T& back(array_t<T>& array) {
+        return array.data[array.size - 1];
+    }
+
+    template <typename T> const T& front(array_t<T>& array) {
+        return array.data[0];
+    }
+
+    template <typename T> u0 append(array_t<T>& array, T&& value) {
+        if (array.size + 1 > array.capacity)
+            grow(array);
+        array.data[array.size++] = value;
+    }
+
+    template <typename T> u0 resize(array_t<T>& array, u32 new_size) {
+        if (new_size > array.capacity)
+            grow(array, new_size);
+        array.size = new_size;
+    }
+
+    template <typename T> u0 append(array_t<T>& array, const T& value) {
+        if (array.size + 1 > array.capacity)
+            grow(array);
+        array.data[array.size++] = value;
     }
 
     template <typename T> b8 contains(array_t<T>& array, const T& value) {
@@ -209,33 +211,20 @@ namespace basecode::array {
         return false;
     }
 
-    template <typename T> const T& back(array_t<T>& array) {
-        return array.data[array.size - 1];
-    }
-
-    template <typename T> const T& front(array_t<T>& array) {
-        return array.data[0];
-    }
-
     template <typename T> T* insert(array_t<T>& array, const T* it, T&& value) {
-        const auto offset = internal::prepare_insert(array, it);
+        const auto offset = prepare_insert(array, it);
         array.data[offset] = value;
         ++array.size;
         return array.data + offset;
     }
 
-    template <typename T> inline slice::slice_t<T> make_slice(array_t<T>& array) {
-        return slice::slice_t{.data = array.data, .length = array.size};
-    }
-
-    template <typename T> inline slice::slice_t<T> make_slice(array_t<T>& array, u32 start, u32 end) {
-        return slice::slice_t{.data = array.data + start, .length = end - start};
+    template <typename T> array_t<T> make(memory::allocator_t* allocator = context::current()->allocator) {
+        return array_t<T>(allocator);
     }
 
     ///////////////////////////////////////////////////////////////////////////
 
-    template<typename T> inline array_t<T>::array_t(
-            memory::allocator_t* allocator) : allocator(allocator) {
+    template<typename T> inline array_t<T>::array_t(memory::allocator_t* allocator) : allocator(allocator) {
         assert(allocator);
     }
 
@@ -251,31 +240,44 @@ namespace basecode::array {
         operator=(other);
     }
 
-    template<typename T> T& array_t<T>::operator[](usize index) {
+    template<typename T> T& array_t<T>::operator[](u32 index) {
         return data[index];
     }
 
-    template<typename T> const T& array_t<T>::operator[](usize index) const {
+    template<typename T> const T& array_t<T>::operator[](u32 index) const {
         return data[index];
     }
 
     template<typename T> array_t<T>& array_t<T>::operator=(const array_t<T>& other) {
         if (this == &other)
             return *this;
-        const auto new_size = other.size;
-        array::resize(*this, new_size);
-        std::memcpy(data, other.data, sizeof(T) * new_size);
+        reserve(*this, other.size, false);
+        std::memcpy(data, other.data, sizeof(T) * other.size);
+        size = other.size;
         return *this;
     }
 
     template<typename T> array_t<T>& array_t<T>::operator=(array_t<T>&& other) noexcept {
         if (this == &other)
             return *this;
-        array::clear(*this);
+        clear(*this);
         data = other.data;
         size = other.size;
         capacity = other.capacity;
         other.data = other.size = other.capacity = {};
         return *this;
+    }
+}
+
+namespace basecode::slice {
+    template <typename T> inline slice_t<T> make(
+            array::array_t<T>& array,
+            u32 start,
+            u32 end) {
+        return slice_t{.data = array.data + start, .length = end - start};
+    }
+
+    template <typename T> inline slice_t<T> make(array::array_t<T>& array) {
+        return slice_t{.data = array.data, .length = array.size};
     }
 }
