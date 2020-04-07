@@ -142,7 +142,7 @@ namespace basecode::stack {
     }
 
     template <typename T> void pop(stack_t<T>& stack) {
-        if (stack.sp < stack.data + stack.size)
+        if (stack.sp < stack.data + stack.capacity)
             stack.sp++;
     }
 
