@@ -53,7 +53,7 @@ namespace basecode::stack {
     ///////////////////////////////////////////////////////////////////////////
 
     template <typename T> u0 clear(stack_t<T>&);
-    template <typename T> u0 push(stack_t<T>&, T&&);
+    template <typename T> u32 push(stack_t<T>&, T&&);
     template <typename T> u0 reserve(stack_t<T>&, u32, b8 copy = true);
 
     ///////////////////////////////////////////////////////////////////////////
