@@ -184,6 +184,14 @@ namespace basecode::array {
         return array.data[0];
     }
 
+    template <typename T> T& emplace(array_t<T>& array) {
+        if (array.size + 1 > array.capacity)
+            grow(array);
+        new (array.data + array.size) T();
+        ++array.size;
+        return array.data[array.size - 1];
+    }
+
     template <typename T> u0 append(array_t<T>& array, T&& value) {
         if (array.size + 1 > array.capacity)
             grow(array);
