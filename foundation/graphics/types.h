@@ -18,58 +18,56 @@
 
 #pragma once
 
-#include <cstdint>
+#include <foundation/types.h>
 
-#define COL32_R_SHIFT    0
-#define COL32_G_SHIFT    8
-#define COL32_B_SHIFT    16
-#define COL32_A_SHIFT    24
-#define COL32_A_MASK     0xFF000000
-#define COL32(R,G,B,A)   (((unsigned int)(A)<<COL32_A_SHIFT) | ((unsigned int)(B)<<COL32_B_SHIFT) | ((unsigned int)(G)<<COL32_G_SHIFT) | ((unsigned int)(R)<<COL32_R_SHIFT))
+#define COL32_R_SHIFT    ((u32)0)
+#define COL32_G_SHIFT    ((u32)8)
+#define COL32_B_SHIFT    ((u32)16)
+#define COL32_A_SHIFT    ((u32)24)
+#define COL32_A_MASK     0xff000000
+#define COL32(R,G,B,A)   (((u32)(A)<<COL32_A_SHIFT) | ((u32)(B)<<COL32_B_SHIFT) | ((u32)(G)<<COL32_G_SHIFT) | ((u32)(R)<<COL32_R_SHIFT))
 
 struct GLFWwindow;
 
 namespace basecode::graphics {
-
     struct size_t final {
-        float w{}, h{};
+        f32 w{}, h{};
     };
 
     struct point_t final {
-        float x{}, y{};
+        f32 x{}, y{};
     };
 
     struct rect_t final {
-        float x{}, y{};
-        float w{}, h{};
+        f32 x{}, y{};
+        f32 w{}, h{};
     };
 
     struct vector3_t final {
-        float x{}, y{}, z{};
+        f32 x{}, y{}, z{};
     };
 
     struct vector4_t final {
-        float x{}, y{}, z{}, w{};
+        f32 x{}, y{}, z{}, w{};
     };
 
     struct color_t final {
-        uint8_t r{}, g{}, b{}, a{};
+        u8 r{}, g{}, b{}, a{};
 
-        operator unsigned int() const {
+        operator u32() const {
             return COL32(r, g, b, a);
         }
     };
 
     struct window_t final {
-        int x = -1;
-        int y = -1;
-        int width = 1280;
-        int height = 1024;
-        int iconified = 0;
-        int maximized = 0;
-        int min_width = 800;
-        int min_height = 600;
+        s32         x = -1;
+        s32         y = -1;
+        s32         width = 1280;
+        s32         height = 1024;
+        s32         iconified = 0;
+        s32         maximized = 0;
+        s32         min_width = 800;
+        s32         min_height = 600;
         GLFWwindow* window{};
     };
-
 }

@@ -64,6 +64,9 @@ endif()
 #
 # -----------------------------------------------------------------------------
 
+# catch2
+include_directories(ext/catch2-2.8.0/single_include)
+
 # libfmt
 add_subdirectory(ext/fmt-6.1.2 EXCLUDE_FROM_ALL)
 
@@ -91,3 +94,4 @@ add_library(blake3 ${BLAKE3_SOURCES})
 # -----------------------------------------------------------------------------
 
 add_subdirectory(foundation)
+add_subdirectory(test)

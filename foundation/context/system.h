@@ -25,22 +25,16 @@ namespace basecode::memory {
 }
 
 namespace basecode::context {
+    struct context_t {
+        u0*                  user;
+        memory::allocator_t* allocator;
+    };
 
-    struct context_t;
-
-    ///////////////////////////////////////////////////////////////////////////
-
-    void pop();
+    u0 pop();
 
     context_t* current();
 
-    void push(context_t* ctx);
+    u0 push(context_t* ctx);
 
-    ///////////////////////////////////////////////////////////////////////////
-
-    struct context_t {
-        u0* user{};
-        memory::allocator_t* allocator{};
-    };
-
+    context_t make(memory::allocator_t* allocator);
 }

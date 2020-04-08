@@ -21,11 +21,7 @@ add_library(
         defer.h
         types.h
 
-        adt/array.h
-        adt/slice.h
-        adt/stack.h
-        adt/utf8_string.h
-        adt/ascii_string.cpp adt/ascii_string.h
+        array/array.h
 
         context/system.cpp context/system.h
 
@@ -46,6 +42,13 @@ add_library(
 
         profiler/system.cpp profiler/system.h
         profiler/stopwatch.cpp profiler/stopwatch.h
+
+        slice/slice.h
+
+        stack/stack.h
+
+        string/utf8_string.h
+        string/ascii_string.cpp string/ascii_string.h
 
         timers/system.cpp timers/system.h
 )
