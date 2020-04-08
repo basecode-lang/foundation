@@ -139,7 +139,7 @@ namespace basecode::stack {
 
     template <typename T> decltype(auto) top(stack_t<T>& stack) {
         if constexpr (std::is_pointer_v<T>) {
-            return (T) *stack.data[stack.size - 1];
+            return (T) stack.data[stack.size - 1];
         } else {
             return (T*) &stack.data[stack.size - 1];
         }
