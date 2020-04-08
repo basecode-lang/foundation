@@ -48,6 +48,7 @@ add_library(
         stack/stack.h
 
         string/utf8_string.h
+        string/intern.cpp string/intern.h
         string/ascii_string.cpp string/ascii_string.h
 
         timers/system.cpp timers/system.h
