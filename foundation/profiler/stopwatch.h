@@ -21,20 +21,14 @@
 #include <foundation/types.h>
 
 namespace basecode::profiler {
-
-    class stopwatch_t final {
-    public:
-        stopwatch_t() = default;
-
-        u0 stop();
-
-        u0 start();
-
-        [[nodiscard]] s64 elapsed() const;
-
-    private:
-        s64 _end;
-        s64 _start;
+    struct stopwatch_t final {
+        s64 end{};
+        s64 start{};
     };
 
+    u0 stop(stopwatch_t& w);
+
+    u0 start(stopwatch_t& w);
+
+    s64 elapsed(stopwatch_t& w);
 }
