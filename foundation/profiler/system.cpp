@@ -98,11 +98,11 @@ namespace basecode::profiler {
     u0 print_elapsed_time(string::slice_t label, s32 width, s64 elapsed) {
         fmt::print("{}", label);
         fmt::print("{:.<{}}", ".", width - label.length);
-        auto ms = elapsed / 1000;
-        if (ms >= 1000) {
-            fmt::print("{}ms\n", (f64) ms / 1000);
+        const auto us = elapsed / 1000;
+        if (us >= 1000) {
+            fmt::print("{}ms\n", (f64) us / 1000);
         } else {
-            fmt::print("{}us\n", elapsed);
+            fmt::print("{}us\n", us);
         }
     }
 }
