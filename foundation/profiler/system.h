@@ -23,13 +23,13 @@
 #if __APPLE__
 #   include <mach/mach_time.h>
 #endif
+#include <foundation/string/ascii_string.h>
 
 #if defined _WIN32 || defined __CYGWIN__ || ((defined __i386 || defined _M_IX86 || defined __x86_64__ || defined _M_X64) && !defined __ANDROID__) || __ARM_ARCH >= 6
 #  define HW_TIMER
 #endif
 
 namespace basecode::profiler {
-
     enum class init_result_t {
         ok,
         no_cpu_rtdscp_support,
@@ -72,5 +72,6 @@ namespace basecode::profiler {
 #endif
     }
 
+    u0 print_elapsed_time(string::slice_t label, s32 width, s64 elapsed);
 }
 
