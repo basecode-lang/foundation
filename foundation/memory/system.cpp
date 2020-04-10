@@ -68,7 +68,7 @@ namespace basecode::memory {
 
     u0 initialize(u32 heap_size, u0* base) {
         g_system.default_allocator = new (g_system.buffer) allocator_t;
-        dl_allocator_config_t config{
+        dl_config_t config{
             .base = base,
             .heap_size = heap_size
         };
@@ -86,6 +86,29 @@ namespace basecode::memory {
     }
 
     ///////////////////////////////////////////////////////////////////////////
+
+    namespace bump {
+        static u0 release(allocator_t* allocator) {
+            memory::deallocate(allocator->backing, allocator->subclass.bump.buf);
+        }
+
+        static u0 deallocate(allocator_t* allocator, u0* mem) {
+        }
+
+        static u0* allocate(allocator_t* allocator, u32 size, u32 align) {
+            return {};
+        }
+
+        static u0 init(allocator_t* allocator, allocator_config_t* config) {
+            auto bump_config = (bump_config_t*)config;
+            allocator->backing = bump_config->backing;
+            allocator->subclass.bump.page_size = bump_config->page_size;
+        }
+
+        static u0* reallocate(allocator_t* allocator, u0* mem, u32 new_size, u32 align) {
+            return {};
+        }
+    }
 
     namespace system {
         static u0 deallocate(allocator_t* allocator, u0* mem) {
@@ -133,7 +156,7 @@ namespace basecode::memory {
         }
 
         static u0 init(allocator_t* allocator, allocator_config_t* config) {
-            auto dl_config = (dl_allocator_config_t*) config;
+            auto dl_config = (dl_config_t*) config;
             if (dl_config->base) {
                 g_system.default_allocator->subclass.heap = create_mspace_with_base(
                     dl_config->base,
@@ -157,18 +180,27 @@ namespace basecode::memory {
 
     ///////////////////////////////////////////////////////////////////////////
 
+    allocator_system_t g_bump_system{
+        .init       = bump::init,
+        .type       = allocator_type_t::bump,
+        .release    = bump::release,
+        .allocate   = bump::allocate,
+        .deallocate = bump::deallocate,
+        .reallocate = bump::reallocate,
+    };
+
     allocator_system_t g_default_system{
-        .type = allocator_type_t::system,
-        .allocate = system::allocate,
+        .type       = allocator_type_t::system,
+        .allocate   = system::allocate,
         .deallocate = system::deallocate,
         .reallocate = system::reallocate,
     };
 
     allocator_system_t g_dlmalloc_system{
-        .init = dlmalloc::init,
-        .type = allocator_type_t::dlmalloc,
-        .release = dlmalloc::release,
-        .allocate = dlmalloc::allocate,
+        .init       = dlmalloc::init,
+        .type       = allocator_type_t::dlmalloc,
+        .release    = dlmalloc::release,
+        .allocate   = dlmalloc::allocate,
         .deallocate = dlmalloc::deallocate,
         .reallocate = dlmalloc::reallocate,
     };
@@ -181,6 +213,10 @@ namespace basecode::memory {
             allocator_config_t* config) {
         assert(allocator);
         switch (type) {
+            case allocator_type_t::bump: {
+                allocator->system = &g_bump_system;
+                break;
+            }
             case allocator_type_t::system: {
                 allocator->system = &g_default_system;
                 break;

@@ -63,7 +63,38 @@ namespace basecode::memory {
 
     ///////////////////////////////////////////////////////////////////////////
 
+    struct allocator_system_t;
     struct allocator_config_t {};
+
+    enum class allocator_type_t : u8 {
+        system,
+        bump,
+        dlmalloc,
+    };
+
+    struct allocator_t final {
+        allocator_system_t*     system{};
+        allocator_t*            backing{};
+        union {
+            mspace              heap;
+            struct {
+                u0*             buf{};
+                u32             offset{};
+                u32             page_size{};
+            }                   bump;
+        }                       subclass{.bump = {}};
+        u32                     total_allocated{};
+    };
+
+    struct dl_config_t : allocator_config_t {
+        u0*                     base{};
+        u32                     heap_size{};
+    };
+
+    struct bump_config_t : allocator_config_t {
+        allocator_t*            backing{};
+        u32                     page_size{};
+    };
 
     using init_callback_t       = u0  (*)(allocator_t*, allocator_config_t*);
     using release_callback_t    = u0  (*)(allocator_t*);
@@ -71,32 +102,13 @@ namespace basecode::memory {
     using allocate_callback_t   = u0* (*)(allocator_t*, u32 size, u32 align);
     using reallocate_callback_t = u0* (*)(allocator_t*, u0* mem, u32 new_size, u32 align);
 
-    enum class allocator_type_t : u8 {
-        system,
-        dlmalloc,
-    };
-
     struct allocator_system_t final {
-        init_callback_t init{};
-        allocator_type_t type{};
-        release_callback_t release{};
-        allocate_callback_t  allocate{};
-        deallocate_callback_t deallocate{};
-        reallocate_callback_t reallocate{};
-    };
-
-    struct allocator_t final {
-        u32 total_allocated{};
-        allocator_t* backing{};
-        allocator_system_t* system{};
-        union {
-            mspace heap;
-        } subclass{.heap = {}};
-    };
-
-    struct dl_allocator_config_t : allocator_config_t {
-        u0* base{};
-        u32 heap_size{};
+        init_callback_t         init{};
+        allocator_type_t        type{};
+        release_callback_t      release{};
+        allocate_callback_t     allocate{};
+        deallocate_callback_t   deallocate{};
+        reallocate_callback_t   reallocate{};
     };
 
     ///////////////////////////////////////////////////////////////////////////

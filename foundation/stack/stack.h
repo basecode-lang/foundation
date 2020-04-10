@@ -32,7 +32,9 @@ namespace basecode::stack {
         u32                     capacity{};
         memory::allocator_t*    allocator{};
 
-        explicit stack_t(memory::allocator_t* allocator = context::current()->allocator);
+        stack_t() = default;
+
+        explicit stack_t(memory::allocator_t* allocator);
 
         ~stack_t();
 
@@ -76,6 +78,8 @@ namespace basecode::stack {
             stack_t<T>& stack,
             u32 new_capacity,
             b8 copy) {
+        assert(stack.allocator);
+
         if (stack.capacity == new_capacity)
             return;
 
@@ -122,6 +126,7 @@ namespace basecode::stack {
     }
 
     template <typename T> u0 clear(stack_t<T>& stack) {
+        assert(stack.allocator);
         memory::deallocate(stack.allocator, stack.data);
         stack.data = {};
         stack.size = stack.capacity = {};

@@ -33,7 +33,9 @@ namespace basecode::array {
         u32                     capacity{};
         memory::allocator_t*    allocator{};
 
-        explicit array_t(memory::allocator_t* allocator = context::current()->allocator);
+        array_t() = default;
+
+        explicit array_t(memory::allocator_t* allocator);
 
         ~array_t();
 
@@ -92,6 +94,8 @@ namespace basecode::array {
             array_t<T>& array,
             u32 new_capacity,
             b8 copy) {
+        assert(array.allocator);
+
         if (array.capacity == new_capacity)
             return;
 
@@ -149,6 +153,7 @@ namespace basecode::array {
     }
 
     template <typename T> u0 clear(array_t<T>& array) {
+        assert(array.allocator);
         memory::deallocate(array.allocator, array.data);
         array.data = {};
         array.size = array.capacity = {};
@@ -245,7 +250,7 @@ namespace basecode::array {
     }
 
     template<typename T> inline array_t<T>::~array_t() {
-        array::clear(*this);
+        clear(*this);
     }
 
     template<typename T> inline array_t<T>::array_t(const array_t<T>& other) {
