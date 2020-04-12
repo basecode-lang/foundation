@@ -34,29 +34,46 @@ TEST_CASE("basecode::hashtable basics") {
     const auto three = "three"_ss;
     const auto four = "four"_ss;
     const auto five = "five"_ss;
+    const auto six = "six"_ss;
+    const auto seven = "seven"_ss;
 
     hashtable::insert(table, 1, one);
     hashtable::insert(table, 2, two);
     hashtable::insert(table, 3, three);
     hashtable::insert(table, 4, four);
     hashtable::insert(table, 5, five);
-    REQUIRE(table.size == 5);
-    REQUIRE(table.capacity == 8);
+    hashtable::insert(table, 6, six);
+    hashtable::insert(table, 7, seven);
+    REQUIRE(table.size == 7);
+    REQUIRE(table.capacity == 16);
 
     string::slice_t* s{};
 
     s = hashtable::find(table, 5);
+    REQUIRE(s);
     REQUIRE(*s == five);
 
     s = hashtable::find(table, 1);
+    REQUIRE(s);
     REQUIRE(*s == one);
 
+    s = hashtable::find(table, 7);
+    REQUIRE(s);
+    REQUIRE(*s == seven);
+
     s = hashtable::find(table, 3);
+    REQUIRE(s);
     REQUIRE(*s == three);
 
+    s = hashtable::find(table, 6);
+    REQUIRE(s);
+    REQUIRE(*s == six);
+
     s = hashtable::find(table, 2);
+    REQUIRE(s);
     REQUIRE(*s == two);
 
     s = hashtable::find(table, 4);
+    REQUIRE(s);
     REQUIRE(*s == four);
 }

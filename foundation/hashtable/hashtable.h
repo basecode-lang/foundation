@@ -38,6 +38,7 @@ namespace basecode::hashtable {
 
     template <typename K, typename V>
     struct table_t final {
+        u8*                     buf{};
         u32                     size{};
         K*                      keys{};
         V*                      values{};
@@ -51,7 +52,7 @@ namespace basecode::hashtable {
     template<typename K, typename V> u0 clear(table_t<K, V>&);
     template <typename K, typename V> u0 rehash(table_t<K, V>&, u32);
     template <typename K, typename V> inline b8 requires_rehash(table_t<K, V>&);
-    template <typename K, typename V> b8 find_free_bucket(table_t<K, V>&, u32, u32*);
+    b8 find_free_bucket(bucket_state_t*, u32, u32, u32*);
     template <typename K, typename V> b8 find_key(table_t<K, V>&, u32, u64, const K&, u32*);
 
     template <typename K, typename V>
@@ -72,10 +73,8 @@ namespace basecode::hashtable {
 
     template <typename K, typename V>
     u0 clear(table_t<K, V>& table) {
-        memory::deallocate(table.allocator, table.keys);
-        memory::deallocate(table.allocator, table.values);
-        memory::deallocate(table.allocator, table.buckets.hashes);
-        memory::deallocate(table.allocator, table.buckets.states);
+        memory::deallocate(table.allocator, table.buf);
+        table.buf = {};
         table.keys = {};
         table.values = {};
         table.buckets.hashes = {};
@@ -133,7 +132,11 @@ namespace basecode::hashtable {
         auto hash = hashing::hash64(key);
         auto bucket_index = hash % table.capacity;
         u32 found_index{};
-        assert(find_free_bucket(table, bucket_index, &found_index));
+        assert(find_free_bucket(
+            table.buckets.states,
+            table.capacity,
+            bucket_index,
+            &found_index));
 
         table.keys[found_index] = key;
         table.values[found_index] = value;
@@ -187,19 +190,19 @@ namespace basecode::hashtable {
         return false;
     }
 
-    template <typename K, typename V>
     b8 find_free_bucket(
-            table_t<K, V>& table,
+            bucket_state_t* states,
+            u32 states_size,
             u32 start,
             u32* found) {
-        for (u32 i = start; i < table.capacity; ++i) {
-            if (table.buckets.states[i] != bucket_state_t::filled) {
+        for (u32 i = start; i < states_size; ++i) {
+            if (states[i] != bucket_state_t::filled) {
                 *found = i;
                 return true;
             }
         }
         for (u32 i = 0; i < start; ++i) {
-            if (table.buckets.states[i] != bucket_state_t::filled) {
+            if (states[i] != bucket_state_t::filled) {
                 *found = i;
                 return true;
             }
@@ -216,17 +219,36 @@ namespace basecode::hashtable {
     u0 rehash(table_t<K, V>& table, u32 new_capacity) {
         new_capacity = std::max(std::max(new_capacity, table.size), (u32) 8);
 
-        if (table.capacity == 0) {
-            table.keys = (K*) memory::allocate(table.allocator, sizeof(K) * new_capacity, alignof(K));
-            table.values = (V*) memory::allocate(table.allocator, sizeof(V) * new_capacity, alignof(V));
-            table.buckets.states = (bucket_state_t*) memory::allocate(table.allocator, sizeof(bucket_state_t) * new_capacity);
-            table.buckets.hashes = (u64*) memory::allocate(table.allocator, sizeof(u64) * new_capacity, alignof(u64));
-        } else {
-            auto new_keys   = (K*) memory::allocate(table.allocator, sizeof(K) * new_capacity, alignof(K));
-            auto new_values = (V*) memory::allocate(table.allocator, sizeof(V) * new_capacity, alignof(V));
-            auto new_states = (bucket_state_t*) memory::allocate(table.allocator, sizeof(bucket_state_t) * new_capacity);
-            auto new_hashes = (u64*) memory::allocate(table.allocator, sizeof(u64) * new_capacity, alignof(u64));
+        const auto buf_size = ((sizeof(K) * new_capacity) + alignof(K))
+            + ((sizeof(V) * new_capacity) + alignof(V))
+            + ((sizeof(u64) * new_capacity) + alignof(u64))
+            + sizeof(bucket_state_t) * new_capacity;
+        auto new_buf = (u8*) memory::allocate(table.allocator, buf_size);
+        auto new_states = (bucket_state_t*) new_buf;
+        auto new_hashes = (u64*) memory::align_forward(
+            (u8*) new_states + (sizeof(bucket_state_t) * new_capacity),
+            sizeof(u64));
+        auto new_keys = (K*) memory::align_forward(
+            (u8*) new_hashes + (sizeof(u64) * new_capacity),
+            alignof(K));
+        auto new_values = (V*) memory::align_forward(
+            (u8*) new_keys + (sizeof(K) * new_capacity),
+            alignof(V));
 
+        std::memset(new_states, 0, buf_size);
+
+        if (table.capacity == 0) {
+            table.buf = new_buf;
+            table.capacity = new_capacity;
+
+            table.keys = new_keys;
+            table.values = new_values;
+            table.buckets.states = new_states;
+            table.buckets.hashes = new_hashes;
+            return;
+        }
+
+        if (table.capacity > 0) {
             u32 cursor{};
             for (u32 i = 0; i < table.capacity; ++i) {
                 if (table.buckets.states[i] != bucket_state_t::filled) {
@@ -234,31 +256,33 @@ namespace basecode::hashtable {
                     continue;
                 }
 
-                u32 found_index{};
                 u64 hash = table.buckets.hashes[i];
                 auto bucket_index = hash % new_capacity;
-                assert(find_free_bucket(table, bucket_index, &found_index));
+                u32 found_index{};
+                assert(find_free_bucket(
+                    new_states,
+                    new_capacity,
+                    bucket_index,
+                    &found_index));
 
                 new_keys[found_index]   = table.keys[cursor];
                 new_values[found_index] = table.values[cursor];
-                new_hashes[found_index] = hash;
                 new_states[found_index] = bucket_state_t::filled;
+                new_hashes[found_index] = table.buckets.hashes[cursor];
 
                 ++cursor;
             }
 
-            memory::deallocate(table.allocator, table.keys);
-            memory::deallocate(table.allocator, table.values);
-            memory::deallocate(table.allocator, table.buckets.hashes);
-            memory::deallocate(table.allocator, table.buckets.states);
+            memory::deallocate(table.allocator, table.buf);
+
+            table.buf = new_buf;
+            table.capacity = new_capacity;
 
             table.keys = new_keys;
             table.values = new_values;
             table.buckets.states = new_states;
             table.buckets.hashes = new_hashes;
         }
-
-        table.capacity = new_capacity;
     }
 
     template <typename K, typename V>
