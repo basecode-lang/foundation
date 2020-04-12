@@ -35,6 +35,8 @@ add_library(
         hashing/murmur.cpp hashing/murmur.h
         hashing/blake3.cpp hashing/blake3.h
 
+        hashtable/hashtable.h
+
         memory/std_allocator.h
         memory/dlmalloc_config.h
         memory/system.cpp memory/system.h

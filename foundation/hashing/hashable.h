@@ -19,9 +19,26 @@
 #pragma once
 
 #include <foundation/types.h>
+#include "murmur.h"
 
 namespace basecode::hashing {
 
-    template <typename K> u64 hash(const K& value);
+    template <typename K> u32 hash32(const K& value);
+    template <typename K> u64 hash64(const K& value);
 
+    inline u64 hash64(const u32& key) {
+        return murmur::hash64(&key, sizeof(key));
+    }
+
+    inline u64 hash64(const s32& key) {
+        return murmur::hash64(&key, sizeof(key));
+    }
+
+    inline u64 hash64(const s64& key) {
+        return murmur::hash64(&key, sizeof(key));
+    }
+
+    inline u64 hash64(const u64& key) {
+        return murmur::hash64(&key, sizeof(key));
+    }
 }

@@ -53,7 +53,6 @@
 #define SAFE_SCOPE(x) do { x } while(false)
 
 namespace basecode {
-
     using u0    = void;
     using u8    = uint8_t;
     using u16   = uint16_t;
@@ -67,5 +66,4 @@ namespace basecode {
     using f32   = float;
     using f64   = double;
     using usize = std::size_t;
-
 }
