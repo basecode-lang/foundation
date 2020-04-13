@@ -19,6 +19,8 @@
 #include <thread>
 #include <cpuid.h>
 #include <cassert>
+#include <foundation/format/system.h>
+#include <foundation/string/ascii_string_formatters.h>
 #include "system.h"
 
 namespace basecode::profiler {
@@ -96,13 +98,13 @@ namespace basecode::profiler {
     }
 
     u0 print_elapsed_time(string::slice_t label, s32 width, s64 elapsed) {
-        fmt::print("{}", label);
-        fmt::print("{:.<{}}", ".", width - label.length);
+        format::print("{}", label);
+        format::print("{:.<{}}", ".", width - label.length);
         const auto us = elapsed / 1000;
         if (us >= 1000) {
-            fmt::print("{}ms\n", (f64) us / 1000);
+            format::print("{}ms\n", (f64) us / 1000);
         } else {
-            fmt::print("{}us\n", us);
+            format::print("{}us\n", us);
         }
     }
 }

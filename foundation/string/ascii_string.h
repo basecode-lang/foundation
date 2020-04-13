@@ -24,7 +24,6 @@
 #include <foundation/types.h>
 #include <foundation/slice/slice.h>
 #include <foundation/memory/system.h>
-#include <foundation/format/system.h>
 
 namespace basecode::string {
     using slice_t = slice::slice_t<u8>;
@@ -179,6 +178,10 @@ namespace basecode::string {
 
     u8* erase(ascii_t& str, const u8* begin, const u8* end);
 
+    ascii_t random(
+        u32 length,
+        memory::allocator_t* allocator = context::current()->allocator);
+
     inline u0 free(ascii_t& str) {
         clear(str);
     }
@@ -288,44 +291,4 @@ namespace basecode::string {
     inline b8 ascii_t::operator==(const slice_t& other) const {
         return length == other.length && std::memcmp(data, other.data, length) == 0;
     }
-}
-
-namespace fmt {
-    using namespace basecode::string;
-
-    template<>
-    struct formatter<slice_t> {
-        template<typename ParseContext>
-        constexpr auto parse(ParseContext& ctx) {
-            return ctx.begin();
-        }
-
-        template<typename FormatContext>
-        auto format(slice_t slice, FormatContext& ctx) {
-            auto it = format_to_n(
-                ctx.out(),
-                slice.length,
-                "{}",
-                (const char*) slice.data);
-            return it.out;
-        }
-    };
-
-    template<>
-    struct formatter<ascii_t> {
-        template<typename ParseContext>
-        constexpr auto parse(ParseContext& ctx) {
-            return ctx.begin();
-        }
-
-        template<typename FormatContext>
-        auto format(ascii_t str, FormatContext& ctx) {
-            auto it = format_to_n(
-                ctx.out(),
-                str.length,
-                "{}",
-                (const char*) str.data);
-            return it.out;
-        }
-    };
 }

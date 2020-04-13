@@ -67,11 +67,11 @@ namespace basecode::stack {
     }
 
     template <typename T> u0 init(
-            stack_t<T>* stack,
+            stack_t<T>& stack,
             memory::allocator_t* allocator = context::current()->allocator) {
-        stack->data = {};
-        stack->allocator = allocator;
-        stack->size = stack->capacity = {};
+        stack.data = {};
+        stack.allocator = allocator;
+        stack.size = stack.capacity = {};
     }
 
     template <typename T> u0 reserve(

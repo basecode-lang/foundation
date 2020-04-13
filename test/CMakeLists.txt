@@ -12,6 +12,7 @@ add_executable(
         main.cpp
         array_tests.cpp
         stack_tests.cpp
+        intern_tests.cpp
         hashtable_tests.cpp
 )
 target_link_libraries(

@@ -83,11 +83,11 @@ namespace basecode::array {
     }
 
     template <typename T> u0 init(
-            array_t<T>* array,
+            array_t<T>& array,
             memory::allocator_t* allocator = context::current()->allocator) {
-        array->data = {};
-        array->allocator = allocator;
-        array->size = array->capacity = {};
+        array.data = {};
+        array.allocator = allocator;
+        array.size = array.capacity = {};
     }
 
     template <typename T> u0 reserve(

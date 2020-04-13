@@ -26,6 +26,10 @@ namespace basecode::slice {
         u32         length{};
         const T*    data{};
 
+        const T& operator[](u32 index) const {
+            return data[index];
+        }
+
         b8 operator<(const slice_t& other) const {
             if (this == &other) return false;
             if (length < other.length) return true;

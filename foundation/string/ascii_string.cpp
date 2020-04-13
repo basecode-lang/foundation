@@ -16,9 +16,15 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <random>
 #include "ascii_string.h"
 
 namespace basecode::string {
+    static auto s_chars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"_ss;
+
+    thread_local std::mt19937 t_rg{std::random_device{}()};
+    thread_local std::uniform_int_distribution<u32> t_pick(0, s_chars.length - 1);
+
     u0 append(ascii_t& str, u8 value) {
         if (str.length + 1 > str.capacity)
             grow(str);
@@ -111,6 +117,14 @@ namespace basecode::string {
 
     u0 insert(ascii_t& str, u32 pos, const ascii_t& value) {
         insert(str, pos, (const char*) value.data, value.length);
+    }
+
+    ascii_t random(u32 length, memory::allocator_t* allocator) {
+        ascii_t str(allocator);
+        reserve(str, length);
+        while(length--)
+            append(str, s_chars[t_pick(t_rg)]);
+        return str;
     }
 
     u0 insert(ascii_t& str, u32 pos, const char* value, s32 len) {

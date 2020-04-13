@@ -52,8 +52,8 @@ namespace basecode::hashtable {
     template<typename K, typename V> u0 clear(table_t<K, V>&);
     template <typename K, typename V> u0 rehash(table_t<K, V>&, u32);
     template <typename K, typename V> inline b8 requires_rehash(table_t<K, V>&);
-    b8 find_free_bucket(bucket_state_t*, u32, u32, u32*);
-    template <typename K, typename V> b8 find_key(table_t<K, V>&, u32, u64, const K&, u32*);
+    static inline b8 find_free_bucket(bucket_state_t*, u32, u32, u32*);
+    template <typename K, typename V> static inline b8 find_key(table_t<K, V>&, u32, u64, const K&, u32*);
 
     template <typename K, typename V>
     u0 init(
@@ -148,7 +148,7 @@ namespace basecode::hashtable {
     ///////////////////////////////////////////////////////////////////////////
 
     template <typename K, typename V>
-    b8 find_key(
+    static inline b8 find_key(
             table_t<K, V>& table,
             u32 start,
             u64 hash,
@@ -190,7 +190,7 @@ namespace basecode::hashtable {
         return false;
     }
 
-    b8 find_free_bucket(
+    static inline b8 find_free_bucket(
             bucket_state_t* states,
             u32 states_size,
             u32 start,

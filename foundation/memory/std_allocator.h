@@ -24,7 +24,7 @@ namespace basecode::memory {
     template<class T>
     class std_allocator_t {
     public:
-        using value_type_t = T;
+        using value_type = T;
 
         allocator_t* backing{};
 
@@ -42,14 +42,14 @@ namespace basecode::memory {
             assert(backing);
         }
 
-        value_type_t* allocate(std::size_t n) {
-            return (value_type_t*) memory::allocate(
+        value_type* allocate(std::size_t n) {
+            return (value_type*) memory::allocate(
                 backing,
-                n * sizeof(value_type_t),
-                alignof(value_type_t));
+                n * sizeof(value_type),
+                alignof(value_type));
         }
 
-        void deallocate(value_type_t* mem, std::size_t) noexcept {
+        void deallocate(value_type* mem, std::size_t) noexcept {
             memory::deallocate(backing, mem);
         }
     };

@@ -20,28 +20,34 @@
 
 #include <foundation/types.h>
 #include <foundation/array/array.h>
+#include <foundation/hashtable/hashtable.h>
 #include "ascii_string.h"
 
 namespace basecode::intern {
-    struct hash_t final {
-        u8 data[32]{};
+    struct hashed_entry_t final {
+        u64             hash;
+        string::slice_t slice;
+    };
+
+    struct interned_t final {
+        array::array_t<hashed_entry_t>  entries;
     };
 
     struct pool_t final {
         u8*                             buf{};
         u8*                             cursor{};
-        array::array_t<hash_t>          hashes;
-        array::array_t<string::slice_t> interned;
+        array::array_t<u64>             hashes;
+        array::array_t<interned_t>      interned;
         memory::allocator_t*            allocator;
 
         explicit pool_t(memory::allocator_t* allocator);
     };
 
-    u0 free(pool_t& intern);
+    u0 free(pool_t& pool);
 
-    u0 init(pool_t& intern, u32 buf_size = (64 * 1024) - 16);
+    u0 init(pool_t& pool, u32 buf_size = (64 * 1024) - 16);
 
-    string::slice_t intern(pool_t& intern, string::slice_t value);
+    string::slice_t intern(pool_t& pool, string::slice_t value);
 
     pool_t make(memory::allocator_t* allocator = context::current()->allocator);
 }

@@ -73,7 +73,7 @@ TEST_CASE("basecode::array erase") {
 
 TEST_CASE("array_t reserve space; fill") {
     array::array_t<s32> numbers;
-    array::init(&numbers);
+    array::init(numbers);
     array::reserve(numbers, 4096);
 
     REQUIRE(array::empty(numbers));

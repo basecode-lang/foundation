@@ -25,7 +25,7 @@ add_library(
 
         context/system.cpp context/system.h
 
-        format/system.h
+        format/system.cpp format/system.h
 
         graphics/types.h
 
@@ -51,6 +51,7 @@ add_library(
 
         string/utf8_string.h
         string/intern.cpp string/intern.h
+        string/ascii_string_formatters.h
         string/ascii_string.cpp string/ascii_string.h
 
         timers/system.cpp timers/system.h
