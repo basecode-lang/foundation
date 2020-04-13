@@ -132,11 +132,12 @@ namespace basecode::hashtable {
         auto hash = hashing::hash64(key);
         auto bucket_index = hash % table.capacity;
         u32 found_index{};
-        assert(find_free_bucket(
+        auto found = find_free_bucket(
             table.buckets.states,
             table.capacity,
             bucket_index,
-            &found_index));
+            &found_index);
+        assert(found);
 
         table.keys[found_index] = key;
         table.values[found_index] = value;
@@ -259,11 +260,12 @@ namespace basecode::hashtable {
                 u64 hash = table.buckets.hashes[i];
                 auto bucket_index = hash % new_capacity;
                 u32 found_index{};
-                assert(find_free_bucket(
+                auto found = find_free_bucket(
                     new_states,
                     new_capacity,
                     bucket_index,
-                    &found_index));
+                    &found_index);
+                assert(found);
 
                 new_keys[found_index]   = table.keys[cursor];
                 new_values[found_index] = table.values[cursor];
