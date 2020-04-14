@@ -16,27 +16,15 @@
 //
 // ----------------------------------------------------------------------------
 
-#pragma once
-
+#include <catch2/catch.hpp>
+#include <foundation/defer.h>
 #include <foundation/format/system.h>
-#include "ascii_string.h"
+#include <foundation/string/ascii_string.h>
+#include <foundation/string/ascii_string_formatters.h>
 
+using namespace basecode;
 using namespace basecode::string;
 
-template<>
-struct fmt::formatter<slice_t> : fmt::formatter<std::string_view> {
-    template<typename FormatContext>
-    auto format(const slice_t& slice, FormatContext& ctx) {
-        std::string_view temp((const char*) slice.data, slice.length);
-        return formatter<std::string_view>::format(temp, ctx);
-    }
-};
-
-template<>
-struct fmt::formatter<ascii_t> : fmt::formatter<std::string_view> {
-    template<typename FormatContext>
-    auto format(const ascii_t& str, FormatContext& ctx) {
-        std::string_view temp((const char*) str.data, str.length);
-        return formatter<std::string_view>::format(temp, ctx);
-    }
-};
+TEST_CASE("string::slice_t formatting") {
+    format::print("{:<20}", "test"_ss);
+}

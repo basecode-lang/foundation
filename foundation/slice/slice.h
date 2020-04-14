@@ -26,10 +26,6 @@ namespace basecode::slice {
         u32         length{};
         const T*    data{};
 
-        [[nodiscard]] u32 size() const {
-            return length;
-        }
-
         const T& operator[](u32 index) const {
             return data[index];
         }
