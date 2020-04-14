@@ -52,8 +52,8 @@ namespace basecode::hashtable {
     template<typename K, typename V> u0 clear(table_t<K, V>&);
     template <typename K, typename V> u0 rehash(table_t<K, V>&, u32);
     template <typename K, typename V> inline b8 requires_rehash(table_t<K, V>&);
-    static inline b8 find_free_bucket(bucket_state_t*, u32, u32, u32*);
-    template <typename K, typename V> static inline b8 find_key(table_t<K, V>&, u32, u64, const K&, u32*);
+    static b8 find_free_bucket(bucket_state_t*, u32, u32, u32*);
+    template <typename K, typename V> static b8 find_key(table_t<K, V>&, u32, u64, const K&, u32*);
 
     template <typename K, typename V>
     u0 init(
@@ -138,6 +138,7 @@ namespace basecode::hashtable {
             bucket_index,
             &found_index);
         assert(found);
+        (void) found;
 
         table.keys[found_index] = key;
         table.values[found_index] = value;
@@ -266,6 +267,7 @@ namespace basecode::hashtable {
                     bucket_index,
                     &found_index);
                 assert(found);
+                (void) found;
 
                 new_keys[found_index]   = table.keys[cursor];
                 new_values[found_index] = table.values[cursor];
