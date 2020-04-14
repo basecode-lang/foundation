@@ -68,7 +68,7 @@ endif()
 include_directories(ext/catch2-2.8.0/single_include)
 
 # libfmt
-add_subdirectory(ext/fmt-6.1.2 EXCLUDE_FROM_ALL)
+add_subdirectory(ext/fmt-6.2.0 EXCLUDE_FROM_ALL)
 
 # utf8proc
 add_subdirectory(ext/utf8proc-2.5.0 EXCLUDE_FROM_ALL)
