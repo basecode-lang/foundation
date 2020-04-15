@@ -57,6 +57,24 @@ namespace basecode::format {
     }
 
     template <typename... Args>
+    inline u0 print(
+            FILE* file,
+            fmt::string_view format_str,
+            const Args&... args) {
+        vprint(context::current()->allocator, file, format_str, fmt::make_format_args(args...));
+    }
+
+    template <typename... Args>
+    inline u0 print(
+            memory::allocator_t* allocator,
+            FILE* file,
+            fmt::string_view format_str,
+            const Args&... args) {
+        format::allocator_t alloc(allocator);
+        vprint(alloc, file, format_str, fmt::make_format_args(args...));
+    }
+
+    template <typename... Args>
     inline string::ascii_t format(
             fmt::string_view format_str,
             const Args&... args) {
