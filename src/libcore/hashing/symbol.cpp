@@ -16,21 +16,20 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
-#include <basecode/core/defer.h>
-#include <basecode/core/error/system.h>
-#include <basecode/core/format/system.h>
-#include <basecode/core/string/formatters.h>
-#include <basecode/core/string/ascii_string.h>
+#include "symbol.h"
 
-using namespace basecode;
-using namespace basecode::string;
+namespace basecode::hashing::symbol {
+    u64 hash64(const u8* src, usize len) {
+        u64 h{};
+        u64 g;
 
-TEST_CASE("string::slice_t formatting") {
-    format::print("{:<20}", "test with alignment\n"_ss);
-
-    source::buffer_t buf{};
-    source::buffer::init(buf);
-
-    error::print(stderr, buf, "test: {}", 10);
+        for (u64 i = 0; i < len; ++i) {
+            h = (h << 4) + *src++;
+            g = h & 0xf0000000;
+            if (g)
+                h ^= g >> 24;
+            h &= ~g;
+        }
+        return h;
+    }
 }

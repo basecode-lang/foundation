@@ -24,31 +24,49 @@
 #include "ascii_string.h"
 
 namespace basecode::intern {
-    struct hashed_entry_t final {
-        u64             hash;
-        string::slice_t slice;
+    enum class status_t : u8 {
+        ok,
+        not_found,
+        no_available_bucket
     };
 
-    struct interned_t final {
-        array::array_t<hashed_entry_t>  entries;
+    struct index_t final {
+        id_t*                           ids;
+        u64*                            hashes;
+        string::slice_t*                slices;
+    };
+
+    struct result_t final {
+        id_t                            id{};
+        u64                             hash{};
+        string::slice_t                 slice{};
+        status_t                        status{};
     };
 
     struct pool_t final {
-        u8*                             buf{};
-        u8*                             cursor{};
-        array::array_t<u64>             hashes;
-        array::array_t<interned_t>      interned;
+        id_t                            id;
+        u8*                             head;
+        u8*                             page;
+        u32                             size;
+        u8*                             index;
+        u16                             offset;
+        u32                             capacity;
         memory::allocator_t*            allocator;
-
-        explicit pool_t(memory::allocator_t* allocator);
+        u16                             end_offset;
     };
 
-    u0 free(pool_t& pool);
+    namespace pool {
+        u0 init(
+            pool_t& pool,
+            memory::allocator_t* allocator = context::current()->allocator);
 
-    u0 init(pool_t& pool, u32 buf_size = (64 * 1024) - 16);
+        u0 free(pool_t& pool);
 
-    string::slice_t intern(pool_t& pool, string::slice_t value);
+        result_t get(pool_t& pool, id_t id);
 
-    pool_t make(memory::allocator_t* allocator = context::current()->allocator);
+        result_t intern(pool_t& pool, string::slice_t value);
+
+        pool_t make(memory::allocator_t* allocator = context::current()->allocator);
+    }
 }
 

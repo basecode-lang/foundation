@@ -31,6 +31,7 @@ add_library(
         hashing/adler.cpp hashing/adler.h
         hashing/murmur.cpp hashing/murmur.h
         hashing/blake3.cpp hashing/blake3.h
+        hashing/symbol.cpp hashing/symbol.h
 
         hashtable/hashtable.h
 
