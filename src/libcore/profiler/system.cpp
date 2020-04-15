@@ -20,7 +20,7 @@
 #include <cpuid.h>
 #include <cassert>
 #include <basecode/core/format/system.h>
-#include <basecode/core/string/ascii_string_formatters.h>
+#include <basecode/core/string/formatters.h>
 #include "system.h"
 
 namespace basecode::profiler {

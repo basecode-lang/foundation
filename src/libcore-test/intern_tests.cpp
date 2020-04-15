@@ -21,7 +21,7 @@
 #include <basecode/core/array/array.h>
 #include <basecode/core/string/intern.h>
 #include <basecode/core/format/system.h>
-#include <basecode/core/string/ascii_string_formatters.h>
+#include <basecode/core/string/formatters.h>
 
 using namespace basecode;
 using namespace basecode::string;

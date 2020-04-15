@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstring>
 #include <basecode/core/types.h>
 
 namespace basecode::slice {

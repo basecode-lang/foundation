@@ -20,6 +20,8 @@ add_library(
 
         context/system.cpp context/system.h
 
+        error/system.cpp error/system.h
+
         format/system.cpp format/system.h
 
         graphics/types.h
@@ -42,11 +44,13 @@ add_library(
 
         slice/slice.h
 
+        source/buffer.cpp source/buffer.h
+
         stack/stack.h
 
+        string/formatters.h
         string/utf8_string.h
         string/intern.cpp string/intern.h
-        string/ascii_string_formatters.h
         string/ascii_string.cpp string/ascii_string.h
 
         timers/system.cpp timers/system.h

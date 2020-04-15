@@ -16,15 +16,26 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
-#include <basecode/core/defer.h>
+#pragma once
+
+#include <basecode/core/types.h>
 #include <basecode/core/format/system.h>
+#include <basecode/core/source/buffer.h>
 #include <basecode/core/string/formatters.h>
-#include <basecode/core/string/ascii_string.h>
 
-using namespace basecode;
-using namespace basecode::string;
-
-TEST_CASE("string::slice_t formatting") {
-    format::print("{:<20}", "test"_ss);
+namespace basecode::error {
+    template <typename ...Args>
+    inline u0 print(
+            FILE* file,
+            source::buffer_t& buf,
+            fmt::string_view message,
+            Args&&... args) {
+        format::print(
+            file,
+            "error({}:{}): {}\n",
+            buf.line + 1,
+            buf.column + 1,
+            format::format(message, std::forward<Args>(args)...));
+    }
 }
+

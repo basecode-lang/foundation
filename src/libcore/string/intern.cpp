@@ -18,7 +18,7 @@
 
 #include <basecode/core/format/system.h>
 #include <basecode/core/hashing/murmur.h>
-#include <basecode/core/string/ascii_string_formatters.h>
+#include <basecode/core/string/formatters.h>
 #include "intern.h"
 
 namespace basecode::hashing {

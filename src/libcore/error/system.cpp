@@ -16,15 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
-#include <basecode/core/defer.h>
-#include <basecode/core/format/system.h>
-#include <basecode/core/string/formatters.h>
-#include <basecode/core/string/ascii_string.h>
+#include "system.h"
 
-using namespace basecode;
-using namespace basecode::string;
-
-TEST_CASE("string::slice_t formatting") {
-    format::print("{:<20}", "test"_ss);
+namespace basecode::error {
 }
