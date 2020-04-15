@@ -93,5 +93,10 @@ add_library(blake3 ${BLAKE3_SOURCES})
 #
 # -----------------------------------------------------------------------------
 
-add_subdirectory(foundation)
-add_subdirectory(test)
+include_directories(
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_BINARY_DIR}/include
+)
+
+add_subdirectory(src/libcore)
+add_subdirectory(src/libcore-test)
