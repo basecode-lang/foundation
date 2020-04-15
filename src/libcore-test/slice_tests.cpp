@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
+#include <basecode/core/error/system.h>
 #include <basecode/core/format/system.h>
 #include <basecode/core/string/formatters.h>
 #include <basecode/core/string/ascii_string.h>
@@ -27,4 +28,9 @@ using namespace basecode::string;
 
 TEST_CASE("string::slice_t formatting") {
     format::print("{:<20}", "test"_ss);
+
+    source::buffer_t buf{};
+    source::buffer::init(buf);
+
+    error::print(stderr, buf, "test: {}", 10);
 }

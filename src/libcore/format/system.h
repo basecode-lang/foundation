@@ -33,6 +33,7 @@ namespace basecode::format {
         string::ascii_t str(buf.get_allocator().backing);
         string::reserve(str, buf.size());
         std::memcpy(str.data, buf.data(), buf.size());
+        str.length = buf.size();
         return str;
     }
 
@@ -52,8 +53,7 @@ namespace basecode::format {
             memory::allocator_t* allocator,
             fmt::string_view format_str,
             const Args&... args) {
-        format::allocator_t alloc(allocator);
-        vprint(alloc, stdout, format_str, fmt::make_format_args(args...));
+        vprint(allocator, stdout, format_str, fmt::make_format_args(args...));
     }
 
     template <typename... Args>
@@ -70,8 +70,7 @@ namespace basecode::format {
             FILE* file,
             fmt::string_view format_str,
             const Args&... args) {
-        format::allocator_t alloc(allocator);
-        vprint(alloc, file, format_str, fmt::make_format_args(args...));
+        vprint(allocator, file, format_str, fmt::make_format_args(args...));
     }
 
     template <typename... Args>
@@ -86,7 +85,6 @@ namespace basecode::format {
             memory::allocator_t* allocator,
             fmt::string_view format_str,
             const Args&... args) {
-        format::allocator_t alloc(allocator);
-        return vformat(alloc, format_str, fmt::make_format_args(args...));
+        return vformat(allocator, format_str, fmt::make_format_args(args...));
     }
 }

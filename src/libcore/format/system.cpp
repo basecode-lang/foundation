@@ -30,7 +30,7 @@ namespace basecode::format {
         std::fwrite(buf.data(), 1, buf.size(), file);
     }
 
-    string::ascii_t format(
+    string::ascii_t vformat(
             memory::allocator_t* allocator,
             fmt::string_view format_str,
             fmt::format_args args) {

@@ -30,12 +30,17 @@ namespace basecode::error {
             source::buffer_t& buf,
             fmt::string_view message,
             Args&&... args) {
+        const auto msg = format::format(
+            buf.allocator,
+            message,
+            std::forward<Args>(args)...);
         format::print(
+            buf.allocator,
             file,
             "error({}:{}): {}\n",
             buf.line + 1,
             buf.column + 1,
-            format::format(message, std::forward<Args>(args)...));
+            msg);
     }
 }
 
