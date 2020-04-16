@@ -18,5 +18,7 @@
 
 #include "system.h"
 
-namespace basecode::error {
+namespace basecode {
+    namespace error {
+    }
 }

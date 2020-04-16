@@ -18,13 +18,23 @@ add_library(
 
         array/array.h
 
+        bass/system.cpp bass/system.h
+
+        bitset/bitset.cpp bitset/bitset.h
+
         context/system.cpp context/system.h
+
+        cxx/scope.cpp
+        cxx/module.cpp
+        cxx/program.cpp
+        cxx/serializer.cpp
+        cxx/types.cpp cxx/types.h
 
         error/system.cpp error/system.h
 
         format/system.cpp format/system.h
 
-        graphics/types.h
+        gfx/types.h
 
         hashing/hashable.h
         hashing/crc.cpp hashing/crc.h
@@ -35,10 +45,18 @@ add_library(
 
         hashtable/hashtable.h
 
+        intern/intern.cpp intern/intern.h
+
         memory/std_allocator.h
         memory/dlmalloc_config.h
+        memory/proxy.cpp memory/proxy.h
         memory/system.cpp memory/system.h
         memory/dlmalloc.c memory/dlmalloc.h
+        memory/page_system.cpp memory/page_system.h
+        memory/bump_system.cpp memory/bump_system.h
+        memory/proxy_system.cpp memory/proxy_system.h
+        memory/default_system.cpp memory/default_system.h
+        memory/dlmalloc_system.cpp memory/dlmalloc_system.h
 
         profiler/system.cpp profiler/system.h
         profiler/stopwatch.cpp profiler/stopwatch.h
@@ -49,10 +67,7 @@ add_library(
 
         stack/stack.h
 
-        string/formatters.h
-        string/utf8_string.h
-        string/intern.cpp string/intern.h
-        string/ascii_string.cpp string/ascii_string.h
+        string/str.cpp string/str.h
 
         timers/system.cpp timers/system.h
 )

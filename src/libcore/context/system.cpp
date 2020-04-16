@@ -21,17 +21,17 @@
 
 namespace basecode::context {
 
-    static constexpr u32    stack_size = 512;
+    static constexpr u32        stack_size = 512;
 
-    thread_local u32        t_index = stack_size;
-    thread_local context_t* t_stack[stack_size];
+    thread_local u32            t_index = stack_size;
+    thread_local context_t*     t_stack[stack_size];
 
     u0 pop() {
         assert(t_index < stack_size);
         t_index++;
     }
 
-    context_t* current() {
+    context_t* top() {
         assert(t_index < stack_size);
         return t_stack[t_index];
     }
@@ -41,11 +41,10 @@ namespace basecode::context {
         t_stack[--t_index] = ctx;
     }
 
-    context_t make(memory::allocator_t* allocator) {
+    context_t make(alloc_t* alloc) {
         context_t ctx{};
         ctx.user = {};
-        ctx.allocator = allocator;
+        ctx.alloc = alloc;
         return ctx;
     }
-
 }

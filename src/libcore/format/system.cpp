@@ -20,7 +20,7 @@
 
 namespace basecode::format {
     u0 vprint(
-            memory::allocator_t* allocator,
+            alloc_t* allocator,
             FILE* file,
             fmt::string_view format_str,
             fmt::format_args args) {
@@ -30,8 +30,8 @@ namespace basecode::format {
         std::fwrite(buf.data(), 1, buf.size(), file);
     }
 
-    string::ascii_t vformat(
-            memory::allocator_t* allocator,
+    string_t vformat(
+            alloc_t* allocator,
             fmt::string_view format_str,
             fmt::format_args args) {
         format::allocator_t alloc(allocator);

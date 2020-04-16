@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <cassert>
+#include <basecode/core/context/system.h>
 #include "system.h"
 
 namespace basecode::memory {
@@ -26,10 +28,9 @@ namespace basecode::memory {
     public:
         using value_type = T;
 
-        allocator_t* backing{};
+        alloc_t* backing{};
 
-        explicit std_allocator_t(
-                memory::allocator_t* allocator = context::current()->allocator) noexcept : backing(allocator) {
+        explicit std_allocator_t(alloc_t* allocator = context::top()->alloc) noexcept : backing(allocator) {
             assert(backing);
         }
 
@@ -43,14 +44,11 @@ namespace basecode::memory {
         }
 
         value_type* allocate(std::size_t n) {
-            return (value_type*) memory::allocate(
-                backing,
-                n * sizeof(value_type),
-                alignof(value_type));
+            return (value_type*) memory::alloc(backing, n * sizeof(value_type), alignof(value_type));
         }
 
         void deallocate(value_type* mem, std::size_t) noexcept {
-            memory::deallocate(backing, mem);
+            memory::free(backing, mem);
         }
     };
 

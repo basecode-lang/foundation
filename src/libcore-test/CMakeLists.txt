@@ -5,10 +5,12 @@ add_executable(
         ${PROJECT_NAME}
 
         main.cpp
+        cxx_tests.cpp
         array_tests.cpp
         stack_tests.cpp
         slice_tests.cpp
         intern_tests.cpp
+        bitset_tests.cpp
         hashtable_tests.cpp
 )
 target_link_libraries(

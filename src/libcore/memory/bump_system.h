@@ -18,26 +18,31 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/format/system.h>
-#include <basecode/core/source/buffer.h>
+#include "system.h"
 
 namespace basecode {
-    namespace error {
-        template<typename ...Args>
-        inline u0 print(
-                FILE* file,
-                source::buffer_t& buf,
-                fmt::string_view fmt_msg,
-                Args&& ... args) {
-            const auto msg = format::format(buf.allocator, fmt_msg, std::forward<Args>(args)...);
-            format::print(
-                buf.allocator,
-                file,
-                "error({}:{}): {}\n",
-                buf.line + 1,
-                buf.column + 1,
-                msg);
+    struct bump_config_t : alloc_config_t {
+        alloc_t*                backing;
+    };
+
+    namespace memory::bump {
+        u0 reset(alloc_t* alloc);
+
+        alloc_system_t* system();
+
+        force_inline u0* buf(alloc_t* alloc) {
+            auto subclass = &alloc->subclass.bump;
+            return subclass->buf;
+        }
+
+        force_inline u16 offset(alloc_t* alloc) {
+            auto subclass = &alloc->subclass.bump;
+            return subclass->offset;
+        }
+
+        force_inline u16 end_offset(alloc_t* alloc) {
+            auto subclass = &alloc->subclass.bump;
+            return subclass->end_offset;
         }
     }
 }

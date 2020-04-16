@@ -16,20 +16,37 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/format/system.h>
 #include "system.h"
 #include "stopwatch.h"
 
-namespace basecode::profiler {
+namespace basecode::stopwatch {
     u0 stop(stopwatch_t& w) {
-        w.end = get_time();
+        w.end = profiler::get_time();
     }
 
     u0 start(stopwatch_t& w) {
-        w.start = get_time();
+        w.end = {};
+        w.start = profiler::get_time();
     }
 
     s64 elapsed(stopwatch_t& w) {
-        f64 delta = w.end - w.start;
-        return delta * get_calibration_multiplier();
+        auto delta = w.end - w.start;
+        return delta * profiler::get_calibration_multiplier();
+    }
+
+    u0 print_elapsed(string::slice_t label, s32 width, s64 elapsed) {
+        format::print("{}", label);
+        format::print("{:.<{}}", ".", width - label.length);
+        if (elapsed < 1000) {
+            format::print("{}ns\n", elapsed);
+        } else {
+            const auto us = elapsed / 1000;
+            if (us >= 1000) {
+                format::print("{}ms\n", (f64) us / 1000);
+            } else {
+                format::print("{}us\n", us);
+            }
+        }
     }
 }

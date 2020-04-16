@@ -20,21 +20,21 @@
 
 #include <basecode/core/types.h>
 
-namespace basecode::memory {
-    struct allocator_t;
-}
+namespace basecode {
+    struct alloc_t;
 
-namespace basecode::context {
     struct context_t {
-        u0*                  user;
-        memory::allocator_t* allocator;
+        u0*                 user;
+        alloc_t*            alloc;
     };
 
-    u0 pop();
+    namespace context {
+        u0 pop();
 
-    context_t* current();
+        context_t* top();
 
-    u0 push(context_t* ctx);
+        u0 push(context_t* ctx);
 
-    context_t make(memory::allocator_t* allocator);
+        context_t make(alloc_t* alloc);
+    }
 }

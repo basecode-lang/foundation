@@ -19,51 +19,80 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
 #include <basecode/core/array/array.h>
-#include <basecode/core/string/intern.h>
+#include <basecode/core/intern/intern.h>
 #include <basecode/core/format/system.h>
 #include <basecode/core/profiler/system.h>
-#include <basecode/core/string/formatters.h>
 #include <basecode/core/profiler/stopwatch.h>
 
 using namespace basecode;
-using namespace basecode::string;
+
+TEST_CASE("basecode::intern simple") {
+    intern::pool_t pool{};
+    intern::pool::init(pool);
+    defer(intern::pool::free(pool));
+
+    auto r1 = intern::pool::intern(pool, "test1"_ss);
+    REQUIRE(r1.status == intern::status_t::ok);
+    REQUIRE(r1.slice.data);
+    REQUIRE(r1.slice.length > 0);
+
+    auto r2 = intern::pool::intern(pool, "test2"_ss);
+    REQUIRE(r2.status == intern::status_t::ok);
+    REQUIRE(r2.slice.data);
+    REQUIRE(r2.slice.length > 0);
+
+    auto r3 = intern::pool::intern(pool, "test3"_ss);
+    REQUIRE(r3.status == intern::status_t::ok);
+    REQUIRE(r3.slice.data);
+    REQUIRE(r3.slice.length > 0);
+
+    auto r4 = intern::pool::intern(pool, "test1"_ss);
+    REQUIRE(r4.id == r1.id);
+    REQUIRE(r4.hash == r1.hash);
+    REQUIRE(r4.slice == r1.slice);
+    REQUIRE(r4.status == r1.status);
+}
 
 TEST_CASE("basecode::intern") {
     constexpr auto expected_intern_count = 200;
 
-    const auto allocated_before = context::current()->allocator->total_allocated;
+    const auto allocated_before = context::top()->alloc->total_allocated;
 
     intern::pool_t pool{};
     intern::pool::init(pool);
     defer(intern::pool::free(pool));
 
-    array::array_t<intern::result_t> interned_list;
+    array_t<intern::result_t> interned_list{};
     array::init(interned_list);
     array::reserve(interned_list, expected_intern_count, false);
     defer(array::free(interned_list));
 
     defer({
-        const auto memory_used = context::current()->allocator->total_allocated - allocated_before;
+        const auto memory_used = context::top()->alloc->total_allocated - allocated_before;
         format::print("memory_used = {}\n", memory_used);
     });
 
-    profiler::stopwatch_t intern_time{};
-    profiler::start(intern_time);
-
-    string::ascii_t str;
+    string_t str[expected_intern_count];
     for (u32 i = 0; i < expected_intern_count; ++i) {
-        string::reset(str);
-        string::append(str, "aaaaaAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBCCCCCCC");
-        str = str + string::random(2);
-        auto r = intern::pool::intern(pool, string::make_slice(str));
+        string::init(str[i], context::top()->alloc);
+        string::reserve(str[i], 64);
+        string::append(str[i], "aaaaaAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBCCCCCCC");
+        str[i] = str[i] + string::random(2);
+    }
+
+    stopwatch_t intern_time{};
+    stopwatch::start(intern_time);
+
+    for (u32 i = 0; i < expected_intern_count; ++i) {
+        auto r = intern::pool::intern(pool, slice::make(str[i]));
         REQUIRE(r.status == intern::status_t::ok);
         REQUIRE(r.slice.data);
         REQUIRE(r.slice.length > 0);
         array::append(interned_list, r);
     }
 
-    profiler::stop(intern_time);
-    profiler::print_elapsed_time("total intern time"_ss, 40, profiler::elapsed(intern_time));
+    stopwatch::stop(intern_time);
+    stopwatch::print_elapsed("total intern time"_ss, 40, stopwatch::elapsed(intern_time));
 
     REQUIRE(interned_list.size == expected_intern_count);
 
@@ -79,7 +108,7 @@ TEST_CASE("basecode::intern") {
 //        format::print("id = {:0>6}; hash = {}; slice = {}\n", r.id, r.hash, r.slice);
 //    }
 
-    id_t last_id{};
+    u32 last_id{};
     for (const auto& r : interned_list) {
         REQUIRE(last_id <= r.id);
         auto existing_slice = intern::pool::intern(pool, r.slice);

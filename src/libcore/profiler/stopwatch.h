@@ -19,16 +19,21 @@
 #pragma once
 
 #include <basecode/core/types.h>
+#include <basecode/core/slice/slice.h>
 
-namespace basecode::profiler {
+namespace basecode {
     struct stopwatch_t final {
-        s64 end{};
-        s64 start{};
+        s64             end;
+        s64             start;
     };
 
-    u0 stop(stopwatch_t& w);
+    namespace stopwatch {
+        u0 stop(stopwatch_t& w);
 
-    u0 start(stopwatch_t& w);
+        u0 start(stopwatch_t& w);
 
-    s64 elapsed(stopwatch_t& w);
+        s64 elapsed(stopwatch_t& w);
+
+        u0 print_elapsed(string::slice_t label, s32 width, s64 elapsed);
+    }
 }

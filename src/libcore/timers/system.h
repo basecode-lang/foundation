@@ -18,40 +18,34 @@
 
 #pragma once
 
-#include <basecode/core/profiler/system.h>
+namespace basecode {
 
-namespace basecode::timers {
-
-    struct timer_t;
-
-    using timer_callback_t = b8 (*)(timer_t*, u0*);
+    struct  timer_t;
+    using   timer_callback_t = b8 (*)(timer_t*, u0*);
 
     struct timer_t final {
-        b8 active;
-        u0* context;
-        s64 expiry;
-        s64 duration;
-        timer_callback_t callback;
+        u0*                 context;
+        timer_callback_t    callback;
+        s64                 expiry;
+        s64                 duration;
+        b8                  active;
     };
 
-    ///////////////////////////////////////////////////////////////////////////
+    namespace timer {
+        enum class status_t : u8 {
+            ok,
+            error
+        };
 
-    enum class init_result_t {
-        ok,
-    };
+        u0 shutdown();
 
-    u0 shutdown();
+        status_t initialize();
 
-    timer_t* start(
-        s64 duration,
-        timer_callback_t callback,
-        u0* context = {});
+        u0 stop(timer_t* timer);
 
-    u0 update(u0* ctx = {});
+        u0 update(s64 ticks, u0* ctx = {});
 
-    u0 stop(timer_t* timer);
-
-    init_result_t initialize();
-
+        timer_t* start(s64 ticks, s64 duration, timer_callback_t callback, u0* context = {});
+    }
 }
 

@@ -20,53 +20,51 @@
 
 #include <basecode/core/types.h>
 #include <basecode/core/array/array.h>
+#include <basecode/core/slice/slice.h>
 #include <basecode/core/hashtable/hashtable.h>
-#include "ascii_string.h"
 
 namespace basecode::intern {
     enum class status_t : u8 {
         ok,
+        no_bucket,
         not_found,
-        no_available_bucket
     };
 
     struct index_t final {
-        id_t*                           ids;
+        u32*                            ids;
         u64*                            hashes;
         string::slice_t*                slices;
     };
 
     struct result_t final {
-        id_t                            id{};
         u64                             hash{};
         string::slice_t                 slice{};
+        u32                             id{};
         status_t                        status{};
     };
 
     struct pool_t final {
-        id_t                            id;
-        u8*                             head;
-        u8*                             page;
-        u32                             size;
         u8*                             index;
-        u16                             offset;
+        alloc_t*                        alloc;
+        alloc_t                         page_alloc;
+        alloc_t                         bump_alloc;
+        u32                             id;
+        u32                             size;
         u32                             capacity;
-        memory::allocator_t*            allocator;
-        u16                             end_offset;
     };
 
     namespace pool {
-        u0 init(
-            pool_t& pool,
-            memory::allocator_t* allocator = context::current()->allocator);
-
         u0 free(pool_t& pool);
 
-        result_t get(pool_t& pool, id_t id);
+        u0 reset(pool_t& pool);
+
+        result_t get(pool_t& pool, u32 id);
 
         result_t intern(pool_t& pool, string::slice_t value);
 
-        pool_t make(memory::allocator_t* allocator = context::current()->allocator);
+        pool_t make(alloc_t* alloc = context::top()->alloc);
+
+        u0 init(pool_t& pool, alloc_t* alloc = context::top()->alloc);
     }
 }
 

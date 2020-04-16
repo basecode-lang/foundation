@@ -18,14 +18,13 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
-#include <basecode/core/string/ascii_string.h>
+#include <basecode/core/string/str.h>
 #include <basecode/core/hashtable/hashtable.h>
 
 using namespace basecode;
-using namespace basecode::string;
 
 TEST_CASE("basecode::hashtable basics") {
-    hashtable::table_t<s32, string::slice_t> table;
+    hashtable_t<s32, string::slice_t> table{};
     hashtable::init(table);
     defer(hashtable::free(table));
 

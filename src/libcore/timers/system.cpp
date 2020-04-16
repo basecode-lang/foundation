@@ -16,58 +16,22 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <cassert>
 #include <basecode/core/profiler/system.h>
 #include "system.h"
 
-namespace basecode::timers {
-
-    static constexpr u32 max_timers = 256;
-
-    thread_local timer_t t_timers[max_timers];
-    thread_local timer_t* t_available_timer = &t_timers[0];
+namespace basecode::timer {
+    static constexpr u32        timer_max_count = 256;
+    thread_local timer_t        t_timers[timer_max_count];
+    thread_local timer_t*       t_available_timer = &t_timers[0];
 
     u0 shutdown() {
+        t_available_timer = {};
+        for (u32 i = 0; i < timer_max_count; ++i)
+            t_timers[i].active = false;
     }
 
-    u0 update(u0* ctx) {
-        const auto ticks = profiler::get_time() * profiler::get_calibration_multiplier();
-        for (auto& timer : t_timers) {
-            if (!timer.active || ticks < timer.expiry)
-                continue;
-
-            auto kill = !timer.callback(
-                &timer,
-                timer.context ? timer.context : ctx);
-            if (kill) {
-                timer.active = false;
-                t_available_timer = &timer;
-            } else {
-                timer.expiry = ticks + timer.duration;
-            }
-        }
-    }
-
-    timer_t* start(
-            s64 duration,
-            timer_callback_t callback,
-            u0* context) {
-        assert(callback);
-        auto timer = t_available_timer;
-        timer->active = true;
-        timer->context = context;
-        timer->duration = duration;
-        timer->callback = callback;
-        timer->expiry = (profiler::get_time() * profiler::get_calibration_multiplier()) + duration;
-        t_available_timer = nullptr;
-        for (auto& t : t_timers) {
-            if (!t.active) {
-                t_available_timer = &t;
-                break;
-            }
-        }
-        assert(t_available_timer);
-        return timer;
+    status_t initialize() {
+        return status_t::ok;
     }
 
     u0 stop(timer_t* timer) {
@@ -76,8 +40,39 @@ namespace basecode::timers {
         t_available_timer = timer;
     }
 
-    init_result_t initialize() {
-        return init_result_t::ok;
+    u0 update(s64 ticks, u0* ctx) {
+        for (u32 i = 0; i < timer_max_count; ++i) {
+            auto timer = &t_timers[i];
+            if (!timer->active || ticks < timer->expiry || !timer->callback)
+                continue;
+
+            const auto effective_ctx = timer->context ? timer->context : ctx;
+            auto kill = !timer->callback(timer, effective_ctx);
+            if (kill) {
+                timer->active = false;
+                t_available_timer = timer;
+            } else {
+                timer->expiry = ticks + timer->duration;
+            }
+        }
     }
 
+    timer_t* start(s64 ticks, s64 duration, timer_callback_t callback, u0* context) {
+        if (!t_available_timer)
+            return {};
+        auto timer = t_available_timer;
+        timer->active = true;
+        timer->context = context;
+        timer->duration = duration;
+        timer->callback = callback;
+        timer->expiry = ticks + duration;
+        t_available_timer = {};
+        for (u32 i = 0; i < timer_max_count; ++i) {
+            if (!t_timers[i].active) {
+                t_available_timer = &t_timers[i];
+                break;
+            }
+        }
+        return timer;
+    }
 }

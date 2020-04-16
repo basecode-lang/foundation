@@ -23,55 +23,54 @@
 #if __APPLE__
 #   include <mach/mach_time.h>
 #endif
-#include <basecode/core/string/ascii_string.h>
 
 #if defined _WIN32 || defined __CYGWIN__ || ((defined __i386 || defined _M_IX86 || defined __x86_64__ || defined _M_X64) && !defined __ANDROID__) || __ARM_ARCH >= 6
 #  define HW_TIMER
 #endif
 
-namespace basecode::profiler {
-    enum class init_result_t {
-        ok,
-        no_cpu_rtdscp_support,
-        no_cpu_invariant_tsc_support
-    };
+namespace basecode {
 
-    u0 shutdown();
+    namespace profiler {
+        enum class status_t : u8 {
+            ok,
+            no_cpu_rtdscp_support,
+            no_cpu_invariant_tsc_support
+        };
 
-    init_result_t initialize();
+        u0 shutdown();
 
-    s64 get_timer_resolution();
+        status_t initialize();
 
-    f64 get_calibration_multiplier();
+        s64 get_timer_resolution();
 
-    [[maybe_unused]] static force_inline s64 get_time() {
-        using namespace std::chrono;
-
+        force_inline s64 get_time() {
+            using namespace std::chrono;
 #ifdef HW_TIMER
 #  if TARGET_OS_IOS == 1
-        return mach_absolute_time();
+            return mach_absolute_time();
 #  elif __ARM_ARCH >= 6
-        #    ifdef CLOCK_MONOTONIC_RAW
-        struct timespec ts;
-        clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
-        return s64(ts.tv_sec) * 1000000000ll + s64(ts.tv_nsec);
+#    ifdef CLOCK_MONOTONIC_RAW
+            struct timespec ts;
+            clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+            return s64(ts.tv_sec) * 1000000000ll + s64(ts.tv_nsec);
 #    else
-        return duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+            return duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
 #    endif
 #  elif defined _WIN32 || defined __CYGWIN__
-        unsigned int dontcare;
-        const auto t = s64(__rdtscp(&dontcare));
-        return t;
+            unsigned int dontcare;
+            const auto t = s64(__rdtscp(&dontcare));
+            return t;
 #  elif defined __i386 || defined _M_IX86 || defined __x86_64__ || defined _M_X64
-        u32 eax, edx;
-        asm volatile ( "rdtscp" : "=a" (eax), "=d" (edx)::"%ecx" );
-        return (u64(edx) << (u8) 32) + u64(eax);
+            u32 eax, edx;
+            asm volatile ( "rdtscp" : "=a" (eax), "=d" (edx)::"%ecx" );
+            return (u64(edx) << (u8) 32) + u64(eax);
 #  endif
 #else
-        return duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+            return duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
 #endif
-    }
+        }
 
-    u0 print_elapsed_time(string::slice_t label, s32 width, s64 elapsed);
+        f64 get_calibration_multiplier();
+    }
 }
 

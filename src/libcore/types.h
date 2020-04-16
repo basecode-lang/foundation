@@ -50,6 +50,7 @@
 #   endif
 #endif
 
+#define OK(x) (0 == (u32) x)
 #define SAFE_SCOPE(x) do { x } while(false)
 
 namespace basecode {
@@ -58,7 +59,7 @@ namespace basecode {
     using u16   = uint16_t;
     using u32   = uint32_t;
     using u64   = uint64_t;
-    using s8    = int8_t;
+    using s8    = char;
     using s16   = int16_t;
     using s32   = int32_t;
     using s64   = int64_t;
@@ -66,4 +67,27 @@ namespace basecode {
     using f32   = float;
     using f64   = double;
     using usize = std::size_t;
+
+    static inline u32 next_power_of_two(u32 n) {
+        --n;
+        n |= n >> (u32) 1;
+        n |= n >> (u32) 2;
+        n |= n >> (u32) 4;
+        n |= n >> (u32) 8;
+        n |= n >> (u32) 16;
+        ++n;
+        return n;
+    }
+
+    static inline u64 align(u64 value, u64 align) {
+        const u64 mod = value % align;
+        if (mod) value += (align - mod);
+        return value;
+    }
+
+    static inline bool is_power_of_two(int64_t x) {
+        if (x <= 0)
+            return false;
+        return !(x & (x-1));
+    }
 }

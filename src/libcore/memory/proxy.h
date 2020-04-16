@@ -16,19 +16,29 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
-#include <basecode/core/defer.h>
+#pragma once
+
 #include <basecode/core/string/str.h>
-#include <basecode/core/error/system.h>
-#include <basecode/core/format/system.h>
+#include <basecode/core/array/array.h>
+#include "system.h"
 
-using namespace basecode;
+namespace basecode::memory::proxy {
+    using proxy_list_t = array_t<alloc_t*>;
 
-TEST_CASE("string::slice_t formatting") {
-    format::print("{:<20}", "test with alignment\n"_ss);
+    enum class status_t : u8 {
+        ok,
+    };
 
-    source::buffer_t buf{};
-    source::buffer::init(buf);
+    u0 shutdown();
 
-    error::print(stderr, buf, "test: {}", 10);
+    u0 reset(b8 enforce = true);
+
+    const proxy_list_t& active();
+
+    u0 free(alloc_t* proxy, b8 enforce = true);
+
+    alloc_t* make(alloc_t* backing, string::slice_t name);
+
+    status_t initialize(alloc_t* alloc = context::top()->alloc);
 }
+

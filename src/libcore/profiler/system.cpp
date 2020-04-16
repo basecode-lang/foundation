@@ -20,12 +20,11 @@
 #include <cpuid.h>
 #include <cassert>
 #include <basecode/core/format/system.h>
-#include <basecode/core/string/formatters.h>
 #include "system.h"
 
 namespace basecode::profiler {
-    static s64 s_resolution = 0;
-    static f64 s_timer_multiplier = 1.0;
+    static s64      s_resolution = 0;
+    static f64      s_timer_multiplier = 1.0;
 
     static f64 calibrate() {
 #ifdef HW_TIMER
@@ -62,16 +61,16 @@ namespace basecode::profiler {
     u0 shutdown() {
     }
 
-    init_result_t initialize() {
+    status_t initialize() {
         u32 regs[4];
 
         cpuid(regs, 0x80000001);
         if (!(regs[3] & (1 << 27)))
-            return init_result_t::no_cpu_rtdscp_support;
+            return status_t::no_cpu_rtdscp_support;
 
         cpuid(regs, 0x80000007);
         if (!(regs[3] & (1 << 8)))
-            return init_result_t::no_cpu_invariant_tsc_support;
+            return status_t::no_cpu_invariant_tsc_support;
 
         s_timer_multiplier = calibrate();
 
@@ -86,7 +85,7 @@ namespace basecode::profiler {
 
         s_resolution = min_diff;
 
-        return init_result_t::ok;
+        return status_t::ok;
     }
 
     s64 get_timer_resolution() {
@@ -95,16 +94,5 @@ namespace basecode::profiler {
 
     f64 get_calibration_multiplier() {
         return s_timer_multiplier;
-    }
-
-    u0 print_elapsed_time(string::slice_t label, s32 width, s64 elapsed) {
-        format::print("{}", label);
-        format::print("{:.<{}}", ".", width - label.length);
-        const auto us = elapsed / 1000;
-        if (us >= 1000) {
-            format::print("{}ms\n", (f64) us / 1000);
-        } else {
-            format::print("{}us\n", us);
-        }
     }
 }

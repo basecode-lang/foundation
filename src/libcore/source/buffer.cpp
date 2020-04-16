@@ -21,28 +21,7 @@
 
 namespace basecode::source::buffer {
     u0 free(buffer_t& buf) {
-        memory::deallocate(buf.allocator, buf.data);
-    }
-
-    load_result_t load(
-            const string::ascii_t& path,
-            buffer_t& buf) {
-        auto file = fopen((const char*) path.data, "rb");
-        if (!file)
-            return load_result_t::unable_to_open_file;
-        defer(fclose(file));
-
-        fseek(file, 0, SEEK_END);
-        buf.length = ftell(file) + 1;
-        fseek(file, 0, SEEK_SET);
-
-        buf.data = (u8*) memory::allocate(
-            context::current()->allocator,
-            buf.length);
-        fread(buf.data, 1, buf.length, file);
-        buf.data[buf.length - 1] = 255;
-
-        return load_result_t::ok;
+        memory::free(buf.allocator, buf.data);
     }
 
     b8 has_more(buffer_t& buf) {
@@ -64,16 +43,33 @@ namespace basecode::source::buffer {
         buf.column = 0;
     }
 
-    buffer_t make(memory::allocator_t* allocator) {
+    buffer_t make(alloc_t* allocator) {
         buffer_t buf{};
         init(buf, allocator);
         return buf;
     }
 
-    u0 init(buffer_t& buf, memory::allocator_t* allocator) {
+    u0 init(buffer_t& buf, alloc_t* allocator) {
         buf.data = {};
         buf.allocator = allocator;
         buf.idx = buf.length = {};
         buf.column = buf.line = {};
+    }
+
+    status_t load(const string_t& path, buffer_t& buf) {
+        auto file = fopen((const char*) path.data, "rb");
+        if (!file)
+            return status_t::unable_to_open_file;
+        defer(fclose(file));
+
+        fseek(file, 0, SEEK_END);
+        buf.length = ftell(file) + 1;
+        fseek(file, 0, SEEK_SET);
+
+        buf.data = (u8*) memory::alloc(context::top()->alloc, buf.length);
+        fread(buf.data, 1, buf.length, file);
+        buf.data[buf.length - 1] = 255;
+
+        return status_t::ok;
     }
 }

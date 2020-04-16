@@ -16,19 +16,10 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
-#include <basecode/core/defer.h>
-#include <basecode/core/string/str.h>
-#include <basecode/core/error/system.h>
-#include <basecode/core/format/system.h>
+#pragma once
 
-using namespace basecode;
+#include "system.h"
 
-TEST_CASE("string::slice_t formatting") {
-    format::print("{:<20}", "test with alignment\n"_ss);
-
-    source::buffer_t buf{};
-    source::buffer::init(buf);
-
-    error::print(stderr, buf, "test: {}", 10);
+namespace basecode::memory::default_ {
+    alloc_system_t* system();
 }

@@ -19,7 +19,7 @@
 #pragma once
 
 #include <basecode/core/types.h>
-#include <basecode/core/string/ascii_string.h>
+#include <basecode/core/string/str.h>
 
 #define CURSOR(b)   (b.data[b.idx])
 #define PEEK(b, c)  (b.data[b.idx + c])
@@ -31,18 +31,14 @@ namespace basecode::source {
         u32                     line;
         u64                     length;
         u32                     column;
-        memory::allocator_t*    allocator;
+        alloc_t*                allocator;
     };
 
     namespace buffer {
-        enum class load_result_t : u8 {
+        enum class status_t : u8 {
             ok,
             unable_to_open_file,
         };
-
-        u0 init(
-            buffer_t& buf,
-            memory::allocator_t* allocator = context::current()->allocator);
 
         u0 free(buffer_t& buf);
 
@@ -54,9 +50,11 @@ namespace basecode::source {
 
         u0 next_line(buffer_t& buf);
 
-        load_result_t load(const string::ascii_t& path, buffer_t& buf);
+        status_t load(const string_t& path, buffer_t& buf);
 
-        buffer_t make(memory::allocator_t* allocator = context::current()->allocator);
+        buffer_t make(alloc_t* allocator = context::top()->alloc);
+
+        u0 init(buffer_t& buf, alloc_t* allocator = context::top()->alloc);
     }
 }
 

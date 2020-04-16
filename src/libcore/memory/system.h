@@ -19,124 +19,115 @@
 #pragma once
 
 #include <basecode/core/types.h>
-#include <basecode/core/context/system.h>
+#include <basecode/core/slice/slice.h>
 #include "dlmalloc_config.h"
 
-namespace basecode::memory {
+namespace basecode {
+    static constexpr u32 header_pad_value   = 0xffffffffu;
 
-    struct header_t final {
-        u32 size;
-    };
-
-    const u32 header_pad_value = 0xffffffffu;
-
-    inline header_t* header(u0* data) {
-        auto p = static_cast<u32*>(data);
-        while (p[-1] == header_pad_value)
-            --p;
-        return reinterpret_cast<header_t*>(p - 1);
-    }
-
-    inline u0* align_forward(u0* p, u32 align) {
-        auto pi = uintptr_t(p);
-        const u32 mod = pi % align;
-        if (mod)
-            pi += (align - mod);
-        return (u0*) pi;
-    }
-
-    inline u0* data_pointer(header_t* header, u32 align) {
-        u0* p = header + 1;
-        return align_forward(p, align);
-    }
-
-    inline u0 fill(header_t* header, u0* data, u32 size) {
-        header->size = size;
-        auto p = reinterpret_cast<u32*>(header + 1);
-        while (p < data)
-            *p++ = header_pad_value;
-    }
-
-    inline u32 size_with_padding(u32 size, u32 align) {
-        return size + align + sizeof(header_t);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-
-    struct allocator_system_t;
-    struct allocator_config_t {};
-
-    enum class allocator_type_t : u8 {
+    enum class alloc_type_t : u8 {
         system,
         bump,
+        page,
+        proxy,
         dlmalloc,
     };
 
-    struct allocator_t final {
-        allocator_system_t*     system{};
-        allocator_t*            backing{};
+    struct alloc_system_t;
+    struct alloc_config_t {};
+
+    struct alloc_header_t final {
+        u32                     size;
+    };
+
+    struct alloc_t final {
+        alloc_system_t*         system;
+        alloc_t*                backing;
         union {
             mspace              heap;
             struct {
-                u0*             buf{};
-                u32             offset{};
-                u32             page_size{};
+                u0*             buf;
+                u16             offset;
+                u16             end_offset;
             }                   bump;
-        }                       subclass{.bump = {}};
-        u32                     total_allocated{};
+            struct {
+                u0*             cursor;
+                u0*             tail;
+                u0*             head;
+                u32             size;
+                u32             count;
+            }                   page;
+        }                       subclass;
+        string::slice_t         name;
+        u32                     total_allocated;
     };
 
-    struct dl_config_t : allocator_config_t {
-        u0*                     base{};
-        u32                     heap_size{};
-    };
+    using init_callback_t       = u0  (*)(alloc_t*, alloc_config_t*);
+    using release_callback_t    = u0  (*)(alloc_t*);
+    using free_callback_t       = u0  (*)(alloc_t*, u0* mem, u32& freed_size);
+    using alloc_callback_t      = u0* (*)(alloc_t*, u32 size, u32 align, u32& allocated_size);
+    using realloc_callback_t    = u0* (*)(alloc_t*, u0* mem, u32 size, u32 align, u32& old_size, u32& new_size);
 
-    struct bump_config_t : allocator_config_t {
-        allocator_t*            backing{};
-        u32                     page_size{};
-    };
-
-    using init_callback_t       = u0  (*)(allocator_t*, allocator_config_t*);
-    using release_callback_t    = u0  (*)(allocator_t*);
-    using deallocate_callback_t = u0  (*)(allocator_t*, u0* mem);
-    using allocate_callback_t   = u0* (*)(allocator_t*, u32 size, u32 align);
-    using reallocate_callback_t = u0* (*)(allocator_t*, u0* mem, u32 new_size, u32 align);
-
-    struct allocator_system_t final {
+    struct alloc_system_t final {
         init_callback_t         init{};
-        allocator_type_t        type{};
+        alloc_type_t            type{};
+        free_callback_t         free{};
+        alloc_callback_t        alloc{};
         release_callback_t      release{};
-        allocate_callback_t     allocate{};
-        deallocate_callback_t   deallocate{};
-        reallocate_callback_t   reallocate{};
+        realloc_callback_t      realloc{};
     };
 
-    ///////////////////////////////////////////////////////////////////////////
+    namespace memory {
+        u0 shutdown();
 
-    u0 shutdown();
+        usize os_page_size();
 
-    usize os_page_size();
+        alloc_t* default_allocator();
 
-    allocator_t* default_allocator();
+        u0 free(alloc_t* allocator, u0* mem);
 
-    b8 set_page_executable(u0* ptr, usize size);
+        inline alloc_header_t* header(u0* data) {
+            auto p = static_cast<u32*>(data);
+            while (p[-1] == header_pad_value)
+                --p;
+            return reinterpret_cast<alloc_header_t*>(p - 1);
+        }
 
-    u0 initialize(u32 heap_size = 32*1024*1024, u0* base = nullptr);
+        inline u0* align_forward(u0* p, u32 align) {
+            auto pi = uintptr_t(p);
+            const u32 mod = pi % align;
+            if (mod)
+                pi += (align - mod);
+            return (u0*) pi;
+        }
 
-    ///////////////////////////////////////////////////////////////////////////
+        b8 set_page_executable(u0* ptr, usize size);
 
-    u0 init_allocator(
-        allocator_t* allocator,
-        allocator_type_t type,
-        allocator_config_t* config = nullptr);
+        u0 release(alloc_t* allocator, b8 enforce = true);
 
-    u0 release_allocator(allocator_t* allocator);
+        inline u32 size_with_padding(u32 size, u32 align) {
+            return size + align + sizeof(alloc_header_t);
+        }
 
-    u0 deallocate(allocator_t* allocator, u0* mem);
+        inline u0 fill(alloc_header_t* header, u0* data, u32 size) {
+            header->size = size;
+            auto p = reinterpret_cast<u32*>(header + 1);
+            while (p < data)
+                *p++ = header_pad_value;
+        }
 
-    u0* allocate(allocator_t* allocator, u32 size, u32 align = sizeof(u32));
+        inline u0* data_pointer(alloc_header_t* header, u32 align) {
+            u0* p = header + 1;
+            return align_forward(p, align);
+        }
 
-    u0* reallocate(allocator_t* allocator, u0* mem, u32 new_size, u32 align = sizeof(u32));
+        u0 initialize(u32 heap_size = 32 * 1024 * 1024, u0* base = {});
 
+        u0* realloc(alloc_t* allocator, u0* mem, u32 size, u32 align = sizeof(u32));
+
+        u0 init(alloc_t* allocator, alloc_type_t type, alloc_config_t* config = {});
+
+        u0* alloc(alloc_t* allocator, u32 size, u32 align = sizeof(u32), u32* alloc_size = {});
+    }
 }
 
