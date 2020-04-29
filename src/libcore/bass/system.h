@@ -19,10 +19,9 @@
 #pragma once
 
 #include <basecode/core/types.h>
-#include <basecode/core/array/array.h>
+#include <basecode/core/hashtable/hashtable.h>
 
 namespace basecode {
-
     namespace kind {
         [[maybe_unused]] static constexpr u8 none       = 0b000;
         [[maybe_unused]] static constexpr u8 blob       = 0b001;
@@ -48,15 +47,15 @@ namespace basecode {
         u16                     offset;
     };
 
-    using field_index_array_t = array_t<field_index_t>;
-
     struct field_dict_t final {
         u32                     values[32];
     };
 
+    using header_index_t = hashtable_t<u32, field_index_t>;
+
     struct bass_t final {
         alloc_t*                alloc;
-        field_index_array_t     index;
+        header_index_t          index;
         alloc_t                 page_alloc;
         alloc_t                 bump_alloc;
         u32                     id;

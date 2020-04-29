@@ -54,7 +54,7 @@ namespace basecode {
         }
 
         u0 free(bass_t& storage) {
-            array::free(storage.index);
+            hashtable::free(storage.index);
             memory::release(&storage.bump_alloc);
             memory::release(&storage.page_alloc);
         }
@@ -145,12 +145,12 @@ namespace basecode {
 
         cursor_t get_header(bass_t& storage, u32 id) {
             auto result = make_cursor(storage);
-            if (id > 0 && id < storage.id) {
-                const auto& index = storage.index[id - 1];
+            auto index = hashtable::find(storage.index, id);
+            if (index) {
                 result.last_offset = {};
-                result.page = index.page;
-                result.offset = index.offset;
-                result.start_offset = index.offset;
+                result.page = index->page;
+                result.offset = index->offset;
+                result.start_offset = index->offset;
                 result.header = (field_t*) result.page + result.offset;
                 result.end_offset = result.offset + result.header->value;
             }
@@ -179,7 +179,7 @@ namespace basecode {
         u0 init(bass_t& storage, alloc_t* alloc) {
             storage.id = 1;
             storage.alloc = memory::proxy::make(alloc, "bass::page"_ss);
-            array::init(storage.index, memory::proxy::make(alloc, "bass::index"_ss));
+            hashtable::init(storage.index, memory::proxy::make(alloc, "bass::index"_ss));
 
             page_config_t page_config{};
             page_config.backing = storage.alloc;
@@ -205,14 +205,9 @@ namespace basecode {
             result.header->value = node_size;
             result.header->kind = kind::header;
 
-            if (storage.index.size + 1 > storage.index.capacity
-            ||  storage.index.capacity < result.id) {
-                array::grow(storage.index, result.id);
-            }
-            auto& index = storage.index[result.id - 1];
-            index.page = result.page;
-            index.offset = result.offset;
-            ++storage.index.size;
+            auto index = hashtable::emplace(storage.index, result.id);
+            index->page = result.page;
+            index->offset = result.offset;
 
             result.start_offset = result.offset;
             result.end_offset = result.offset + node_size;

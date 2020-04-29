@@ -148,6 +148,12 @@ namespace basecode {
             return table.size == 0;
         }
 
+        template<typename K, typename V> hashtable_t<K, V> make(alloc_t* allocator) {
+            hashtable_t<K, V> table;
+            init(table, allocator);
+            return table;
+        }
+
         template<typename K, typename V> b8 requires_rehash(hashtable_t<K, V>& table) {
             return table.capacity == 0 || table.size * 3 > table.capacity * 2;
         }
@@ -213,10 +219,14 @@ namespace basecode {
             return true;
         }
 
-        template<typename K, typename V> hashtable_t<K, V> make(alloc_t* allocator) {
-            hashtable_t<K, V> table;
-            init(table, allocator);
-            return table;
+        template<typename K, typename V> u0 init(hashtable_t<K, V>& table, alloc_t* allocator) {
+            table.buf = {};
+            table.keys = {};
+            table.values = {};
+            table.hashes = {};
+            table.states = {};
+            table.allocator = allocator;
+            table.size = table.capacity = {};
         }
 
         template<typename K, typename V> u0 rehash(hashtable_t<K, V>& table, u32 new_capacity) {
@@ -306,14 +316,31 @@ namespace basecode {
             }
         }
 
-        template<typename K, typename V> u0 init(hashtable_t<K, V>& table, alloc_t* allocator) {
-            table.buf = {};
-            table.keys = {};
-            table.values = {};
-            table.hashes = {};
-            table.states = {};
-            table.allocator = allocator;
-            table.size = table.capacity = {};
+        template<typename K, typename V> decltype(auto) emplace(hashtable_t<K, V>& table, const K& key) {
+            if (requires_rehash(table))
+                rehash(table, table.capacity * 2);
+
+            auto hash = hashing::hash64(key);
+            auto bucket_index = hash * table.capacity >> (u32) 32;
+            u32 found_index{};
+            auto found = find_free_bucket(
+                table.states,
+                table.capacity,
+                bucket_index,
+                &found_index);
+            assert(found);
+            (void) found;
+
+            table.keys[found_index] = key;
+            table.hashes[found_index] = hash;
+            table.states[found_index] = bucket_state_t::filled;
+            ++table.size;
+
+            if constexpr (std::is_pointer_v<V>) {
+                return table.values[found_index];
+            } else {
+                return &table.values[found_index];
+            }
         }
 
         template<typename K, typename V> decltype(auto) insert(hashtable_t<K, V>& table, const K& key, const V& value) {
