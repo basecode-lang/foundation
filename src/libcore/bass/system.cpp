@@ -178,8 +178,8 @@ namespace basecode {
 
         u0 init(bass_t& storage, alloc_t* alloc) {
             storage.id = 1;
-            storage.alloc = alloc; //memory::proxy::make(alloc, "bass::page"_ss);
-            array::init(storage.index, alloc); //memory::proxy::make(alloc, "bass::index"_ss));
+            storage.alloc = memory::proxy::make(alloc, "bass::page"_ss);
+            array::init(storage.index, memory::proxy::make(alloc, "bass::index"_ss));
 
             page_config_t page_config{};
             page_config.backing = storage.alloc;
@@ -205,8 +205,10 @@ namespace basecode {
             result.header->value = node_size;
             result.header->kind = kind::header;
 
-            if (storage.index.capacity < result.id)
+            if (storage.index.size + 1 > storage.index.capacity
+            ||  storage.index.capacity < result.id) {
                 array::grow(storage.index, result.id);
+            }
             auto& index = storage.index[result.id - 1];
             index.page = result.page;
             index.offset = result.offset;
