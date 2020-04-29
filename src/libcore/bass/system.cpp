@@ -205,8 +205,8 @@ namespace basecode {
             result.header->value = node_size;
             result.header->kind = kind::header;
 
-            if (storage.index.size + 1 > storage.index.capacity)
-                array::grow(storage.index);
+            if (storage.index.capacity < result.id)
+                array::grow(storage.index, result.id);
             auto& index = storage.index[result.id - 1];
             index.page = result.page;
             index.offset = result.offset;
