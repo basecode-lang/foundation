@@ -37,10 +37,11 @@ namespace basecode::intern {
     };
 
     struct result_t final {
-        u64                             hash{};
-        string::slice_t                 slice{};
-        u32                             id{};
-        status_t                        status{};
+        u64                             hash;
+        string::slice_t                 slice;
+        u32                             id;
+        status_t                        status;
+        b8                              new_value;
     };
 
     struct pool_t final {

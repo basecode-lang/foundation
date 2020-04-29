@@ -20,10 +20,6 @@
 #include "proxy_system.h"
 
 namespace basecode::memory::proxy {
-    static u0 release(alloc_t* alloc) {
-        alloc->backing->system->release(alloc->backing);
-    }
-
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto proxy_config = (proxy_config_t*) config;
         alloc->backing = proxy_config->backing;
@@ -58,7 +54,6 @@ namespace basecode::memory::proxy {
         .type       = alloc_type_t::proxy,
         .free       = free,
         .alloc      = alloc,
-        .release    = release,
         .realloc    = realloc,
     };
 

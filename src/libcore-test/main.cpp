@@ -27,17 +27,19 @@ using namespace basecode;
 
 int main(int argc, const char** argv) {
     memory::initialize();
+
     auto ctx = context::make(memory::default_allocator());
     context::push(&ctx);
-    defer(context::pop());
-    if (!OK(memory::proxy::initialize()))
-        return 1;
-    defer(memory::shutdown());
-    defer(memory::proxy::shutdown());
 
-    if (!OK(profiler::initialize()))
-        return 1;
-    defer(profiler::shutdown());
+    if (!OK(profiler::initialize()))        return 1;
+    if (!OK(memory::proxy::initialize()))   return 1;
+
+    defer({
+        profiler::shutdown();
+        memory::proxy::shutdown();
+        memory::shutdown();
+        context::pop();
+    });
 
     return Catch::Session().run(argc, argv);
 }

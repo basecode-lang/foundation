@@ -101,6 +101,7 @@ namespace basecode::intern::pool {
     u0 reset(pool_t& pool) {
         memory::page::reset(&pool.page_alloc);
         memory::bump::reset(&pool.bump_alloc);
+        pool.id = 1;
         pool.size = {};
         std::memset(pool.index, 0, index_size(pool.capacity));
     }
@@ -194,7 +195,8 @@ namespace basecode::intern::pool {
                 .hash = index.hashes[bucket_index],
                 .slice = index.slices[bucket_index],
                 .id = index.ids[bucket_index],
-                .status = status_t::ok
+                .status = status_t::ok,
+                .new_value = false
             };
         }
 
@@ -219,7 +221,8 @@ namespace basecode::intern::pool {
             .hash = index.hashes[bucket_index],
             .slice = index.slices[bucket_index],
             .id = index.ids[bucket_index],
-            .status = status_t::ok
+            .status = status_t::ok,
+            .new_value = true
         };
     }
 }

@@ -33,8 +33,10 @@ TEST_CASE("basecode::cxx create program_t") {
 
     cxx::program_t pgm{};
     cxx::program::init(pgm);
-    defer(memory::proxy::reset());
-    defer(cxx::program::free(pgm));
+    defer({
+        cxx::program::free(pgm);
+        memory::proxy::reset();
+    });
     REQUIRE(pgm.storage.alloc);
     REQUIRE(pgm.modules.allocator);
     REQUIRE(pgm.storage.index.allocator);
@@ -52,8 +54,10 @@ TEST_CASE("basecode::cxx create module_t") {
 
     cxx::program_t pgm{};
     cxx::program::init(pgm);
-    defer(memory::proxy::reset());
-    defer(cxx::program::free(pgm));
+    defer({
+        cxx::program::free(pgm);
+        memory::proxy::reset();
+    });
 
     const auto expected_filename = "test.cpp"_ss;
     const auto expected_revision = cxx::revision_t::cpp20;
@@ -90,8 +94,10 @@ TEST_CASE("basecode::cxx create identifier within scope") {
 
     cxx::program_t pgm{};
     cxx::program::init(pgm);
-    defer(memory::proxy::reset());
-    defer(cxx::program::free(pgm));
+    defer({
+        cxx::program::free(pgm);
+        memory::proxy::reset();
+    });
 
     const auto expected_filename = "test.cpp"_ss;
     const auto expected_revision = cxx::revision_t::cpp20;
@@ -122,8 +128,10 @@ TEST_CASE("basecode::cxx declare s32 type within scope") {
 
     cxx::program_t pgm{};
     cxx::program::init(pgm);
-    defer(memory::proxy::reset());
-    defer(cxx::program::free(pgm));
+    defer({
+        cxx::program::free(pgm);
+        memory::proxy::reset();
+    });
 
     const auto expected_ident = "int"_ss;
     const auto expected_filename = "test.cpp"_ss;
@@ -145,8 +153,10 @@ TEST_CASE("basecode::cxx example program") {
     dl_config_t region_config{};
     region_config.heap_size = 512 * 1024;
     memory::init(&region_alloc, alloc_type_t::dlmalloc, &region_config);
-    defer(memory::proxy::reset(false));
-    defer(memory::release(&region_alloc, false));
+    defer({
+        memory::release(&region_alloc, false);
+        memory::proxy::reset(false);
+    });
     auto region_proxy = memory::proxy::make(&region_alloc, "512kb region"_ss);
 
     stopwatch_t build_time{};
@@ -154,7 +164,6 @@ TEST_CASE("basecode::cxx example program") {
 
     cxx::program_t pgm{};
     cxx::program::init(pgm, region_proxy);
-    //defer(cxx::program::free(pgm));
 
     const auto expected_main_ident = "main"_ss;
     const auto expected_filename = "test.cpp"_ss;
@@ -269,14 +278,11 @@ TEST_CASE("basecode::cxx example program") {
     stopwatch::stop(build_time);
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 
-    //cxx::program::debug_dump(pgm);
-
     stopwatch_t serialize_time{};
     stopwatch::start(serialize_time);
 
     cxx::serializer_t s{};
     cxx::serializer::init(s, pgm, region_proxy);
-    //defer(cxx::serializer::free(s));
 
     auto status = cxx::serializer::serialize(s);
     stopwatch::stop(serialize_time);
