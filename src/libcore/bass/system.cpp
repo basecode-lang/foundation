@@ -177,9 +177,9 @@ namespace basecode {
         }
 
         u0 init(bass_t& storage, alloc_t* alloc) {
-            array::init(storage.index, memory::proxy::make(alloc, "storage::index"_ss));
             storage.id = 1;
-            storage.alloc = memory::proxy::make(alloc, "storage::page"_ss);
+            storage.alloc = alloc; //memory::proxy::make(alloc, "bass::page"_ss);
+            array::init(storage.index, alloc); //memory::proxy::make(alloc, "bass::index"_ss));
 
             page_config_t page_config{};
             page_config.backing = storage.alloc;
