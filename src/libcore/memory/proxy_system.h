@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <basecode/core/array/array.h>
+#include <basecode/core/hashtable/hashtable.h>
 #include "system.h"
 
 namespace basecode {
@@ -26,6 +28,33 @@ namespace basecode {
     };
 
     namespace memory::proxy {
+        using proxy_list_t      = array_t<alloc_t*>;
+        using proxy_map_t       = hashtable_t<u32, alloc_t*>;
+
+        enum class status_t : u8 {
+            ok,
+        };
+
+        u0 shutdown();
+
+        proxy_list_t active();
+
+        u32 id(alloc_t* alloc);
+
         alloc_system_t* system();
+
+        u0 reset(b8 enforce = true);
+
+        u0 id(alloc_t* alloc, u32 id);
+
+        string::slice_t name(alloc_t* alloc);
+
+        u0 free(alloc_t* proxy, b8 enforce = true);
+
+        u0 name(alloc_t* alloc, string::slice_t name);
+
+        alloc_t* make(alloc_t* backing, string::slice_t name);
+
+        status_t initialize(alloc_t* alloc = context::top()->alloc);
     }
 }

@@ -55,10 +55,10 @@ namespace basecode::memory::bump {
             subclass->offset = {};
             subclass->end_offset = allocated_size;
         }
-        u32 align_adjustment{};
-        auto mem = memory::align_forward((u8*) subclass->buf + subclass->offset, align, align_adjustment);
-        subclass->offset += size + align_adjustment;
-        allocated_size = size + align_adjustment;
+        u32 align_adjust{};
+        auto mem = memory::system::align_forward((u8*) subclass->buf + subclass->offset, align, align_adjust);
+        subclass->offset += size + align_adjust;
+        allocated_size = size + align_adjust;
         return mem;
     }
 

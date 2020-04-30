@@ -301,13 +301,13 @@ namespace basecode::cxx {
     struct program_t final {
         bass_t                  storage;
         module_array_t          modules;
-        intern::pool_t          intern_pool;
+        intern_t                intern;
         alloc_t*                alloc;
         u32                     id;
     };
 
     struct serializer_t final {
-        intern::pool_t*         pool;
+        intern_t*               intern;
         bass_t*                 store;
         alloc_t*                alloc;
         string_t                scratch;
@@ -634,22 +634,13 @@ namespace basecode::cxx {
     }
 
     namespace serializer {
-        u0 init(
-            serializer_t& s,
-            program_t& pgm,
-            alloc_t* alloc = context::top()->alloc,
-            u16 margin = 160,
-            u16 tab_width = 4);
-
-        status_t expand_type(
-            bass_t& storage,
-            intern::pool_t& pool,
-            u32 type_id,
-            type_info_t& type_info);
-
         u0 free(serializer_t& s);
 
         status_t serialize(serializer_t& s);
+
+        status_t expand_type(bass_t& storage, intern_t& intern, u32 type_id, type_info_t& type_info);
+
+        u0 init(serializer_t& s, program_t& pgm, alloc_t* alloc = context::top()->alloc, u16 margin = 160, u16 tab_width = 4);
     }
 }
 

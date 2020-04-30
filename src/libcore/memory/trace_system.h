@@ -18,27 +18,16 @@
 
 #pragma once
 
-#include <basecode/core/string/str.h>
-#include <basecode/core/array/array.h>
 #include "system.h"
 
-namespace basecode::memory::proxy {
-    using proxy_list_t = array_t<alloc_t*>;
-
-    enum class status_t : u8 {
-        ok,
+namespace basecode {
+    struct trace_config_t : alloc_config_t {
     };
 
-    u0 shutdown();
+    namespace memory::trace {
+        alloc_system_t* system();
 
-    u0 reset(b8 enforce = true);
-
-    const proxy_list_t& active();
-
-    u0 free(alloc_t* proxy, b8 enforce = true);
-
-    alloc_t* make(alloc_t* backing, string::slice_t name);
-
-    status_t initialize(alloc_t* alloc = context::top()->alloc);
+        alloc_t* make(alloc_t* backing, string::slice_t name);
+    }
 }
 

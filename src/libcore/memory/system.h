@@ -29,7 +29,9 @@ namespace basecode {
         system,
         bump,
         page,
+        slab,
         proxy,
+        trace,
         dlmalloc,
     };
 
@@ -51,14 +53,25 @@ namespace basecode {
                 u32             end_offset;
             }                   bump;
             struct {
+                u0*             tail;
+                u0*             head;
+                u32             count;
+                u32             buf_size;
+                u32             buf_align;
+                u32             buf_max_count;
+            }                   slab;
+            struct {
                 u0*             cursor;
                 u0*             tail;
                 u0*             head;
                 u32             size;
                 u32             count;
             }                   page;
+            struct {
+                string::slice_t name;
+                u32             id;
+            }                   proxy;
         }                       subclass;
-        string::slice_t         name;
         u32                     total_allocated;
     };
 
@@ -84,53 +97,61 @@ namespace basecode {
             invalid_allocation_system,
         };
 
-        u0 shutdown();
+        namespace system {
+            u0 shutdown();
 
-        usize os_page_size();
+            usize os_page_size();
 
-        alloc_t* default_alloc();
+            alloc_t* default_alloc();
 
-        u0 free(alloc_t* alloc, u0* mem);
+            inline alloc_header_t* header(u0* data) {
+                auto p = static_cast<u32*>(data);
+                while (p[-1] == header_pad_value)
+                    --p;
+                return reinterpret_cast<alloc_header_t*>(p - 1);
+            }
 
-        inline alloc_header_t* header(u0* data) {
-            auto p = static_cast<u32*>(data);
-            while (p[-1] == header_pad_value)
-                --p;
-            return reinterpret_cast<alloc_header_t*>(p - 1);
+            u0 free(alloc_t* alloc, b8 enforce = true);
+
+            b8 set_page_executable(u0* ptr, usize size);
+
+            inline u32 size_with_padding(u32 size, u32 align) {
+                return size + align + sizeof(alloc_header_t);
+            }
+
+            inline u0* align_forward(u0* p, u32 align, u32& adjust) {
+                auto pi = uintptr_t(p);
+                const u32 mod = pi % align;
+                if (mod) {
+                    adjust = align - mod;
+                    pi += adjust;
+                }
+                return (u0*) pi;
+            }
+
+            inline u0 fill(alloc_header_t* header, u0* data, u32 size) {
+                header->size = size;
+                auto p = reinterpret_cast<u32*>(header + 1);
+                while (p < data)
+                    *p++ = header_pad_value;
+            }
+
+            inline u0* data_pointer(alloc_header_t* header, u32 align) {
+                u0* p = header + 1;
+                u32 adjust{};
+                return align_forward(p, align, adjust);
+            }
+
+            u0 initialize(u32 heap_size = 32 * 1024 * 1024, u0* base = {});
+
+            alloc_t* make(alloc_type_t type, alloc_config_t* config = {});
         }
-
-        b8 set_page_executable(u0* ptr, usize size);
 
         u0 release(alloc_t* alloc, b8 enforce = true);
 
-        inline u32 size_with_padding(u32 size, u32 align) {
-            return size + align + sizeof(alloc_header_t);
-        }
+        u0* alloc(alloc_t* alloc, u32* alloc_size = {});
 
-        inline u0* align_forward(u0* p, u32 align, u32& adjust) {
-            auto pi = uintptr_t(p);
-            const u32 mod = pi % align;
-            if (mod) {
-                adjust = align - mod;
-                pi += adjust;
-            }
-            return (u0*) pi;
-        }
-
-        inline u0 fill(alloc_header_t* header, u0* data, u32 size) {
-            header->size = size;
-            auto p = reinterpret_cast<u32*>(header + 1);
-            while (p < data)
-                *p++ = header_pad_value;
-        }
-
-        inline u0* data_pointer(alloc_header_t* header, u32 align) {
-            u0* p = header + 1;
-            u32 adjust{};
-            return align_forward(p, align, adjust);
-        }
-
-        u0 initialize(u32 heap_size = 32 * 1024 * 1024, u0* base = {});
+        u0 free(alloc_t* alloc, u0* mem, u32* freed_size = {});
 
         u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align = sizeof(u32));
 

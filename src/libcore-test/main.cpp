@@ -19,16 +19,16 @@
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
-#include <basecode/core/memory/proxy.h>
 #include <basecode/core/memory/system.h>
 #include <basecode/core/profiler/system.h>
+#include <basecode/core/memory/proxy_system.h>
 
 using namespace basecode;
 
-int main(int argc, const char** argv) {
-    memory::initialize();
+s32 main(s32 argc, const s8** argv) {
+    memory::system::initialize();
 
-    auto ctx = context::make(memory::default_alloc());
+    auto ctx = context::make(memory::system::default_alloc());
     context::push(&ctx);
 
     if (!OK(profiler::initialize()))        return 1;
@@ -37,7 +37,7 @@ int main(int argc, const char** argv) {
     defer({
         profiler::shutdown();
         memory::proxy::shutdown();
-        memory::shutdown();
+        memory::system::shutdown();
         context::pop();
     });
 

@@ -17,8 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/bass/system.h>
-#include <basecode/core/memory/proxy.h>
 #include <basecode/core/format/system.h>
+#include <basecode/core/memory/proxy_system.h>
 #include "types.h"
 
 namespace basecode::cxx::program {
@@ -27,7 +27,7 @@ namespace basecode::cxx::program {
         for (auto& module : pgm.modules)
             module::free(module);
         array::free(pgm.modules);
-        intern::pool::free(pgm.intern_pool);
+        intern::free(pgm.intern);
     }
 
     u0 debug_dump(program_t& pgm) {
@@ -111,7 +111,7 @@ namespace basecode::cxx::program {
                         break;
                     }
                     case element::field::intern: {
-                        auto rc = intern::pool::get(pgm.intern_pool, value);
+                        auto rc = intern::get(pgm.intern, value);
                         format::print("\n\t{:<16} = '{}'", " .slice", rc.slice);
                         break;
                     }
@@ -153,7 +153,7 @@ namespace basecode::cxx::program {
     }
 
     u0 init(program_t& pgm, alloc_t* alloc, u32 num_modules) {
-        intern::pool::init(pgm.intern_pool, memory::proxy::make(alloc, "intern::pool"_ss));
+        intern::init(pgm.intern, memory::proxy::make(alloc, "intern::pool"_ss));
         array::init(pgm.modules, memory::proxy::make(alloc, "program::modules"_ss));
         array::reserve(pgm.modules, num_modules);
         bass::init(pgm.storage, alloc);

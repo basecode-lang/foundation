@@ -16,9 +16,9 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/memory/proxy.h>
 #include <basecode/core/memory/bump_system.h>
 #include <basecode/core/memory/page_system.h>
+#include <basecode/core/memory/proxy_system.h>
 #include "system.h"
 
 namespace basecode {
@@ -55,12 +55,12 @@ namespace basecode {
 
         u0 free(bass_t& storage) {
             hashtable::free(storage.index);
-            memory::release(&storage.bump_alloc);
-            memory::release(&storage.page_alloc);
+            memory::system::free(storage.bump_alloc);
+            memory::system::free(storage.page_alloc);
         }
 
         b8 next_header(cursor_t& cursor) {
-            const auto page_size = memory::page::size(&cursor.storage->page_alloc);
+            const auto page_size = memory::page::size(cursor.storage->page_alloc);
             if (cursor.offset + sizeof(field_t) >= page_size) {
                 u8* next_page = (u8*) ((page_header_t*) cursor.page)->next;
                 if (!next_page) {
@@ -110,8 +110,8 @@ namespace basecode {
             cursor.header = {};
             cursor.last_offset = {};
             cursor.storage = &storage;
-            cursor.offset = cursor.start_offset = memory::bump::offset(&storage.bump_alloc);
-            cursor.page = (u8*) memory::bump::buf(&storage.bump_alloc);
+            cursor.offset = cursor.start_offset = memory::bump::offset(storage.bump_alloc);
+            cursor.page = (u8*) memory::bump::buf(storage.bump_alloc);
             return cursor;
         }
 
@@ -121,7 +121,7 @@ namespace basecode {
             cursor.ok = true;
             cursor.field = {};
             cursor.storage = &storage;
-            cursor.page = (u8*) memory::page::tail(&storage.page_alloc);
+            cursor.page = (u8*) memory::page::tail(storage.page_alloc);
             cursor.header = (field_t*) cursor.page;
             cursor.end_offset = cursor.header->value;
             cursor.offset = cursor.last_offset = cursor.start_offset = {};
@@ -183,20 +183,20 @@ namespace basecode {
 
             page_config_t page_config{};
             page_config.backing = storage.alloc;
-            page_config.page_size = memory::os_page_size() * 16;
-            memory::init(&storage.page_alloc, alloc_type_t::page, &page_config);
+            page_config.page_size = memory::system::os_page_size() * 16;
+            storage.page_alloc = memory::system::make(alloc_type_t::page, &page_config);
 
             bump_config_t bump_config{};
             bump_config.type = bump_type_t::allocator;
-            bump_config.backing.alloc = &storage.page_alloc;
-            memory::init(&storage.bump_alloc, alloc_type_t::bump, &bump_config);
+            bump_config.backing.alloc = storage.page_alloc;
+            storage.bump_alloc = memory::system::make(alloc_type_t::bump, &bump_config);
         }
 
         cursor_t write_header(bass_t& storage, u8 type, u32 size) {
             const auto node_size = (size + 3) * sizeof(field_t);
 
             u32 alloc_size{};
-            memory::alloc(&storage.bump_alloc, node_size, alignof(field_t), &alloc_size);
+            memory::alloc(storage.bump_alloc, node_size, alignof(field_t), &alloc_size);
             auto result = make_cursor(storage);
             result.offset -= alloc_size;
             result.id = result.storage->id++;

@@ -16,8 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/memory/proxy.h>
 #include <basecode/core/format/system.h>
+#include <basecode/core/memory/proxy_system.h>
 #include "types.h"
 
 namespace basecode::cxx::serializer {
@@ -76,14 +76,14 @@ namespace basecode::cxx::serializer {
     }
 
     static status_t decl_var(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
-        auto& pool = *s.pool;
+        auto& intern = *s.intern;
         auto& store = *s.store;
 
         auto dict = bass::dict::make(cursor);
         process_var_flags(s, buf, bass::dict::get(dict, element::field::type));
         type_info_t type_info{};
         type_info.name = &s.scratch;
-        expand_type(store, pool, bass::dict::get(dict, element::field::lhs), type_info);
+        expand_type(store, intern, bass::dict::get(dict, element::field::lhs), type_info);
         at_indent(s, buf, "{} ", s.scratch);
         auto rhs_cursor = bass::get_header(store, bass::dict::get(dict, element::field::rhs));
         if (unlikely(!rhs_cursor.ok))
@@ -154,7 +154,7 @@ namespace basecode::cxx::serializer {
 
     static status_t process_expr(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
         status_t status{};
-        auto& pool = *s.pool;
+        auto& intern = *s.intern;
         auto& store = *s.store;
         auto dict = bass::dict::make(cursor);
         switch (cursor.header->type) {
@@ -164,12 +164,12 @@ namespace basecode::cxx::serializer {
             }
             case element::header::ident:
             case element::header::num_lit: {
-                auto interned = intern::pool::get(pool, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
                 at_indent(s, buf, "{}", interned.slice);
                 return status_t::ok;
             }
             case element::header::str_lit: {
-                auto interned = intern::pool::get(pool, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
                 at_indent(s, buf, "\"{}\"", interned.slice);
                 return status_t::ok;
             }
@@ -197,7 +197,7 @@ namespace basecode::cxx::serializer {
             return status_t::lhs_not_found;
         switch (type) {
             case expression_type_t::raw: {
-                auto interned = intern::pool::get(pool, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
                 if (unlikely(!OK(interned.status)))
                     return status_t::intern_not_found;
                 at_indent(s, buf, "{}", interned.slice);
@@ -485,7 +485,7 @@ namespace basecode::cxx::serializer {
 
     static status_t process_stmt(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
         status_t status{};
-        auto& pool = *s.pool;
+        auto& intern = *s.intern;
         auto& store = *s.store;
         auto dict = bass::dict::make(cursor);
         auto type_field = bass::dict::get(dict, element::field::type);
@@ -498,13 +498,13 @@ namespace basecode::cxx::serializer {
             ||  !bass::next_field(label_cursor, intern_id, element::field::intern)) {
                 return status_t::label_not_found;
             }
-            auto interned = intern::pool::get(pool, intern_id);
+            auto interned = intern::get(intern, intern_id);
             at_indent(s, buf, "{}: ", interned.slice);
         }
         switch (type) {
             case statement_type_t::pp: {
                 auto pp_type = (preprocessor_type_t) SUB_TYPE(type_field);
-                auto interned = intern::pool::get(pool, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
                 switch (pp_type) {
                     case preprocessor_type_t::pragma: {
                         at_indent(s, buf, "#pragma {}", interned.slice);
@@ -526,7 +526,7 @@ namespace basecode::cxx::serializer {
                 break;
             }
             case statement_type_t::raw: {
-                auto interned = intern::pool::get(pool, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
                 if (unlikely(!OK(interned.status)))
                     return status_t::intern_not_found;
                 at_indent(s, buf, "{}", interned.slice);
@@ -848,13 +848,13 @@ namespace basecode::cxx::serializer {
                 break;
             }
             case statement_type_t::line_comment: {
-                auto interned = intern::pool::get(pool, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
                 at_indent(s, buf, "//{}", interned.slice);
                 newline(s, buf);
                 break;
             }
             case statement_type_t::block_comment: {
-                auto interned = intern::pool::get(pool, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
                 at_indent(s, buf, "/*{}*/", interned.slice);
                 break;
             }
@@ -970,14 +970,14 @@ namespace basecode::cxx::serializer {
         s.alloc = alloc;
         s.margin = margin;
         s.store = &pgm.storage;
+        s.intern = &pgm.intern;
         s.tab_width = tab_width;
-        s.pool = &pgm.intern_pool;
         auto scratch_allocator = memory::proxy::make(s.alloc, "serializer::scratch"_ss);
         string::init(s.scratch, scratch_allocator);
         string::reserve(s.scratch, 32);
     }
 
-    status_t expand_type(bass_t& storage, intern::pool_t& pool, u32 type_id, type_info_t& type_info) {
+    status_t expand_type(bass_t& storage, intern_t& intern, u32 type_id, type_info_t& type_info) {
         u8 suffix[8];
         s32 suffix_len{};
 
@@ -1026,7 +1026,7 @@ namespace basecode::cxx::serializer {
                     if (!bass::next_field(ident_cursor, intern_id, element::field::intern)) {
                         return status_t::intern_not_found;
                     }
-                    auto interned = intern::pool::get(pool, intern_id);
+                    auto interned = intern::get(intern, intern_id);
                     string::append(*type_info.name, interned.slice);
                     if (suffix_len > 0) {
                         string::append(*type_info.name, suffix, suffix_len);

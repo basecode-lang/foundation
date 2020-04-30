@@ -49,11 +49,12 @@ add_library(
 
         memory/std_allocator.h
         memory/dlmalloc_config.h
-        memory/proxy.cpp memory/proxy.h
         memory/system.cpp memory/system.h
         memory/dlmalloc.c memory/dlmalloc.h
         memory/page_system.cpp memory/page_system.h
+        memory/slab_system.cpp memory/slab_system.h
         memory/bump_system.cpp memory/bump_system.h
+        memory/trace_system.cpp memory/trace_system.h
         memory/proxy_system.cpp memory/proxy_system.h
         memory/default_system.cpp memory/default_system.h
         memory/dlmalloc_system.cpp memory/dlmalloc_system.h

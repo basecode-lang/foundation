@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/memory/proxy.h>
+#include <basecode/core/memory/proxy_system.h>
 #include "types.h"
 
 namespace basecode::cxx::module {

@@ -23,49 +23,46 @@
 #include <basecode/core/slice/slice.h>
 #include <basecode/core/hashtable/hashtable.h>
 
-namespace basecode::intern {
-    enum class status_t : u8 {
-        ok,
-        no_bucket,
-        not_found,
-    };
-
-    struct index_t final {
+namespace basecode {
+    struct intern_t final {
+        u8*                             index;
+        alloc_t*                        alloc;
+        alloc_t*                        page_alloc;
+        alloc_t*                        bump_alloc;
         u32*                            ids;
         u64*                            hashes;
         string::slice_t*                slices;
-    };
-
-    struct result_t final {
-        u64                             hash;
-        string::slice_t                 slice;
-        u32                             id;
-        status_t                        status;
-        b8                              new_value;
-    };
-
-    struct pool_t final {
-        u8*                             index;
-        alloc_t*                        alloc;
-        alloc_t                         page_alloc;
-        alloc_t                         bump_alloc;
         u32                             id;
         u32                             size;
         u32                             capacity;
     };
 
-    namespace pool {
-        u0 free(pool_t& pool);
+    namespace intern {
+        enum class status_t : u8 {
+            ok,
+            no_bucket,
+            not_found,
+        };
 
-        u0 reset(pool_t& pool);
+        struct result_t final {
+            u64                         hash;
+            string::slice_t             slice;
+            u32                         id;
+            status_t                    status;
+            b8                          new_value;
+        };
 
-        result_t get(pool_t& pool, u32 id);
+        u0 free(intern_t& pool);
 
-        result_t intern(pool_t& pool, string::slice_t value);
+        u0 reset(intern_t& pool);
 
-        pool_t make(alloc_t* alloc = context::top()->alloc);
+        result_t get(intern_t& pool, u32 id);
 
-        u0 init(pool_t& pool, alloc_t* alloc = context::top()->alloc);
+        result_t intern(intern_t& pool, string::slice_t value);
+
+        intern_t make(alloc_t* alloc = context::top()->alloc);
+
+        u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc);
     }
 }
 

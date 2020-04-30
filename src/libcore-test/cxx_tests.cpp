@@ -19,9 +19,9 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
 #include <basecode/core/cxx/types.h>
-#include <basecode/core/memory/proxy.h>
 #include <basecode/core/profiler/system.h>
 #include <basecode/core/profiler/stopwatch.h>
+#include <basecode/core/memory/proxy_system.h>
 #include <basecode/core/memory/dlmalloc_system.h>
 
 using namespace basecode;
@@ -42,7 +42,7 @@ TEST_CASE("basecode::cxx create program_t") {
     REQUIRE(pgm.storage.index.alloc);
     REQUIRE(pgm.storage.index.size == 1);
     REQUIRE(pgm.modules.size == 0);
-    REQUIRE(pgm.intern_pool.alloc);
+    REQUIRE(pgm.intern.alloc);
 
     stopwatch::stop(build_time);
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
@@ -113,7 +113,7 @@ TEST_CASE("basecode::cxx create identifier within scope") {
     s32 idx = array::contains(top_level.identifiers, id);
     REQUIRE(idx != -1);
 
-    auto intern_result = intern::pool::get(pgm.intern_pool, top_level.interns[idx]);
+    auto intern_result = intern::get(pgm.intern, top_level.interns[idx]);
     REQUIRE(OK(intern_result.status));
     REQUIRE(intern_result.id == top_level.interns[idx]);
     REQUIRE(intern_result.slice == expected_ident);
@@ -164,6 +164,7 @@ TEST_CASE("basecode::cxx example program") {
 
     cxx::program_t pgm{};
     cxx::program::init(pgm, region_proxy);
+    defer(cxx::program::free(pgm));
 
     const auto expected_main_ident = "main"_ss;
     const auto expected_filename = "test.cpp"_ss;
@@ -290,9 +291,10 @@ TEST_CASE("basecode::cxx example program") {
 
     format::print(stderr, "{}\n", program::status_name(status));
 
-    const auto& proxies = memory::proxy::active();
+    auto proxies = memory::proxy::active();
+    defer(array::free(proxies));
     for (auto proxy : proxies) {
-        format::print(stderr, "{:<32} {:>10}\n", proxy->name, proxy->total_allocated);
+        format::print(stderr, "{:<32} {:>10}\n", memory::proxy::name(proxy), proxy->total_allocated);
     }
 
     REQUIRE(OK(status));

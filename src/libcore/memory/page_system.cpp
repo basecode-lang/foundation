@@ -22,12 +22,12 @@
 namespace basecode::memory::page {
     static u0 release(alloc_t* alloc) {
         u32 freed_size{};
-        auto backing = alloc->backing;
+        auto backing = alloc->backing->system;
         auto subclass = &alloc->subclass.page;
         auto curr_page = (u0*) subclass->head;
         while (curr_page) {
             auto prev_page = ((page_header_t*) curr_page)->prev;
-            backing->system->free(backing, curr_page, freed_size);
+            backing->free(alloc->backing, curr_page, freed_size);
             alloc->total_allocated -= freed_size;
             curr_page = prev_page;
         }
@@ -40,8 +40,8 @@ namespace basecode::memory::page {
         subclass->count = {};
         alloc->backing = page_config->backing;
         subclass->cursor = subclass->tail = subclass->head = {};
-        if (page_config->page_size < memory::os_page_size()) {
-            page_config->page_size = memory::os_page_size();
+        if (page_config->page_size < memory::system::os_page_size()) {
+            page_config->page_size = memory::system::os_page_size();
         } else if (!is_power_of_two(page_config->page_size)) {
             page_config->page_size = next_power_of_two(page_config->page_size);
         }

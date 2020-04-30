@@ -56,8 +56,8 @@ namespace basecode {
     struct bass_t final {
         alloc_t*                alloc;
         header_index_t          index;
-        alloc_t                 page_alloc;
-        alloc_t                 bump_alloc;
+        alloc_t*                page_alloc;
+        alloc_t*                bump_alloc;
         u32                     id;
     };
 

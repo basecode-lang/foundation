@@ -62,7 +62,7 @@ namespace basecode::cxx::scope {
             integral_size_t size,
             u64 lit,
             u32 radix = 10) {
-        auto r = intern::pool::intern(scope.pgm->intern_pool, slice::make(format::to_radix(lit, radix)));
+        auto r = intern::intern(scope.pgm->intern, slice::make(format::to_radix(lit, radix)));
         auto c = bass::write_header(scope.pgm->storage, element::header::num_lit, 4);
         bass::write_field(c, element::field::scope, scope.id);
         bass::write_field(c, element::field::radix, radix);
@@ -340,7 +340,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 label(scope_t& scope, string::slice_t name) {
-        auto result = intern::pool::intern(scope.pgm->intern_pool, name);
+        auto result = intern::intern(scope.pgm->intern, name);
         auto c = bass::write_header(scope.pgm->storage, element::header::label, 1);
         bass::write_field(c, element::field::intern, result.id);
         array::append(scope.labels, c.id);
@@ -357,7 +357,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 lit::str(scope_t& scope, string::slice_t lit) {
-        auto r = intern::pool::intern(scope.pgm->intern_pool, lit);
+        auto r = intern::intern(scope.pgm->intern, lit);
         auto c = bass::write_header(scope.pgm->storage, element::header::str_lit, 1);
         bass::write_field(c, element::field::intern, r.id);
         return c.id;
@@ -388,7 +388,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 expr::raw(scope_t& scope, string::slice_t source) {
-        auto r = intern::pool::intern(scope.pgm->intern_pool, source);
+        auto r = intern::intern(scope.pgm->intern, source);
         auto c = bass::write_header(scope.pgm->storage, element::header::expression, 3);
         bass::write_field(c, element::field::scope, scope.id);
         bass::write_field(c, element::field::intern, r.id);
@@ -397,7 +397,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::raw(scope_t& scope, string::slice_t source) {
-        auto r = intern::pool::intern(scope.pgm->intern_pool, source);
+        auto r = intern::intern(scope.pgm->intern, source);
         auto c = bass::write_header(scope.pgm->storage, element::header::statement, 3);
         bass::write_field(c, element::field::scope, scope.id);
         bass::write_field(c, element::field::intern, r.id);
@@ -407,7 +407,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 expr::ident(scope_t& scope, string::slice_t name) {
-        auto r = intern::pool::intern(scope.pgm->intern_pool, name);
+        auto r = intern::intern(scope.pgm->intern, name);
         auto idx = array::contains(scope.interns, r.id);
         if (idx == -1) {
             auto c = bass::write_header(scope.pgm->storage, element::header::ident, 2);
@@ -472,7 +472,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::pp::pragma(scope_t &scope, string::slice_t expr) {
-        auto r = intern::pool::intern(scope.pgm->intern_pool, expr);
+        auto r = intern::intern(scope.pgm->intern, expr);
         auto c = bass::write_header(scope.pgm->storage, element::header::statement, 3);
         bass::write_field(c, element::field::scope, scope.id);
         bass::write_field(c, element::field::intern, r.id);
@@ -622,9 +622,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 lit::float_(scope_t& scope, f64 lit, integral_size_t size) {
-        auto r = intern::pool::intern(
-            scope.pgm->intern_pool,
-            slice::make(format::to_radix(lit, 10)));
+        auto r = intern::intern(scope.pgm->intern, slice::make(format::to_radix(lit, 10)));
         auto c = bass::write_header(scope.pgm->storage, element::header::num_lit, 3);
         bass::write_field(c, element::field::lit, r.id);
         bass::write_field(c, element::field::scope, scope.id);
@@ -641,7 +639,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::comment::line(scope_t& scope, string::slice_t value) {
-        auto r = intern::pool::intern(scope.pgm->intern_pool, value);
+        auto r = intern::intern(scope.pgm->intern, value);
         auto id = make_comment(scope, r.id);
         array::append(scope.statements, id);
         return id;
@@ -656,7 +654,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::comment::block(scope_t& scope, string::slice_t value) {
-        auto r = intern::pool::intern(scope.pgm->intern_pool, value);
+        auto r = intern::intern(scope.pgm->intern, value);
         auto id = make_comment(scope, r.id, true);
         array::append(scope.statements, id);
         return id;
@@ -700,14 +698,14 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::pp::include_local(scope_t &scope, string::slice_t path) {
-        auto r = intern::pool::intern(scope.pgm->intern_pool, path);
+        auto r = intern::intern(scope.pgm->intern, path);
         auto id = make_include(scope, r.id, true);
         array::append(scope.statements, id);
         return id;
     }
 
     u32 stmt::pp::include_system(scope_t &scope, string::slice_t path) {
-        auto r = intern::pool::intern(scope.pgm->intern_pool, path);
+        auto r = intern::intern(scope.pgm->intern, path);
         auto id = make_include(scope, r.id);
         array::append(scope.statements, id);
         return id;
