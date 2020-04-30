@@ -38,8 +38,8 @@ TEST_CASE("basecode::cxx create program_t") {
         memory::proxy::reset();
     });
     REQUIRE(pgm.storage.alloc);
-    REQUIRE(pgm.modules.allocator);
-    REQUIRE(pgm.storage.index.allocator);
+    REQUIRE(pgm.modules.alloc);
+    REQUIRE(pgm.storage.index.alloc);
     REQUIRE(pgm.storage.index.size == 1);
     REQUIRE(pgm.modules.size == 0);
     REQUIRE(pgm.intern_pool.alloc);
@@ -71,17 +71,17 @@ TEST_CASE("basecode::cxx create module_t") {
     const auto& root_scope = module::get_scope(mod, mod.root_scope_idx);
     REQUIRE(root_scope.id != 0);
     REQUIRE(root_scope.parent_idx == 0);
-    REQUIRE(root_scope.stack.allocator);
+    REQUIRE(root_scope.stack.alloc);
     REQUIRE(root_scope.stack.size == 0);
-    REQUIRE(root_scope.types.allocator);
+    REQUIRE(root_scope.types.alloc);
     REQUIRE(root_scope.types.size == 0);
-    REQUIRE(root_scope.labels.allocator);
+    REQUIRE(root_scope.labels.alloc);
     REQUIRE(root_scope.labels.size == 0);
-    REQUIRE(root_scope.children.allocator);
+    REQUIRE(root_scope.children.alloc);
     REQUIRE(root_scope.children.size == 0);
-    REQUIRE(root_scope.statements.allocator);
+    REQUIRE(root_scope.statements.alloc);
     REQUIRE(root_scope.statements.size == 0);
-    REQUIRE(root_scope.identifiers.allocator);
+    REQUIRE(root_scope.identifiers.alloc);
     REQUIRE(root_scope.identifiers.size == 0);
 
     stopwatch::stop(build_time);

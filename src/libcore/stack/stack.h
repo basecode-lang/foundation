@@ -28,7 +28,7 @@
 namespace basecode {
     template<typename T> struct stack_t final {
         T*                      data;
-        alloc_t*                allocator;
+        alloc_t*                alloc;
         u32                     size;
         u32                     capacity;
 
@@ -53,15 +53,16 @@ namespace basecode {
         template<typename T> u0 clear(stack_t<T>& stack);
         template<typename T> u32 push(stack_t<T>& stack, T&& value);
         template<typename T> u0 grow(stack_t<T>& stack, u32 min_capacity = 8);
+        template <typename T> stack_t<T> make(alloc_t* alloc = context::top()->alloc);
         template<typename T> u0 reserve(stack_t<T>& stack, u32 new_capacity, b8 copy = true);
-        template <typename T> stack_t<T> make(alloc_t* allocator = context::top()->alloc);
-        template<typename T> u0 init(stack_t<T>& stack, alloc_t* allocator = context::top()->alloc);
-        template<typename T> stack_t<T> make(std::initializer_list<T> elements, alloc_t* allocator = context::top()->alloc);
+        template<typename T> u0 init(stack_t<T>& stack, alloc_t* alloc = context::top()->alloc);
+        template<typename T> stack_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc);
 
-        template<typename T> u0 pop(stack_t<T>& stack) {
-            if (stack.size == 0)
-                return;
+        template<typename T> T pop(stack_t<T>& stack) {
+            if (stack.size == 0) return {};
+            T top = stack.data[stack.size - 1];
             --stack.size;
+            return top;
         }
 
         template<typename T> u0 trim(stack_t<T>& stack) {
@@ -82,14 +83,14 @@ namespace basecode {
         }
 
         template<typename T> u0 clear(stack_t<T>& stack) {
-            memory::free(stack.allocator, stack.data);
+            memory::free(stack.alloc, stack.data);
             stack.data = {};
             stack.size = stack.capacity = {};
         }
 
-        template<typename T> stack_t<T> make(alloc_t* allocator) {
+        template<typename T> stack_t<T> make(alloc_t* alloc) {
             stack_t<T> stack{};
-            init(stack, allocator);
+            init(stack, alloc);
             return stack;
         }
 
@@ -122,6 +123,12 @@ namespace basecode {
             return top(stack);
         }
 
+        template<typename T> u0 init(stack_t<T>& stack, alloc_t* alloc) {
+            stack.data = {};
+            stack.alloc = alloc;
+            stack.size = stack.capacity = {};
+        }
+
         template<typename T> u0 resize(stack_t<T>& stack, u32 new_size) {
             if (new_size > stack.capacity)
                 grow(stack, new_size);
@@ -152,12 +159,6 @@ namespace basecode {
             ++stack.size;
         }
 
-        template<typename T> u0 init(stack_t<T>& stack, alloc_t* allocator) {
-            stack.data = {};
-            stack.allocator = allocator;
-            stack.size = stack.capacity = {};
-        }
-
         template<typename T> u0 reserve(stack_t<T>& stack, u32 new_capacity, b8 copy) {
             if (stack.capacity == new_capacity)
                 return;
@@ -167,20 +168,20 @@ namespace basecode {
 
             T* new_data{};
             if (new_capacity > 0) {
-                new_data = (T*) memory::alloc(stack.allocator, new_capacity * sizeof(T), alignof(T));
+                new_data = (T*) memory::alloc(stack.alloc, new_capacity * sizeof(T), alignof(T));
                 std::memset(new_data, 0, new_capacity * sizeof(T));
                 if (stack.data && copy)
                     std::memcpy(new_data, stack.data, stack.size * sizeof(T));
             }
 
-            memory::free(stack.allocator, stack.data);
+            memory::free(stack.alloc, stack.data);
             stack.data = new_data;
             stack.capacity = new_capacity;
         }
 
-        template<typename T> stack_t<T> make(std::initializer_list<T> elements, alloc_t* allocator) {
+        template<typename T> stack_t<T> make(std::initializer_list<T> elements, alloc_t* alloc) {
             stack_t<T> stack{};
-            init(stack, allocator);
+            init(stack, alloc);
             reserve(stack, elements.size());
             for (auto&& e : elements)
                 push(stack, e);

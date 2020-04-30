@@ -186,7 +186,7 @@ namespace basecode::cxx::scope {
         auto& module = program::get_module(*scope.pgm, scope.module_idx);
         auto& new_scope = array::append(module.scopes);
         new_scope.idx = module.scopes.size - 1;
-        init(scope.pgm, &module, new_scope, &scope, scope.children.allocator);
+        init(scope.pgm, &module, new_scope, &scope, scope.children.alloc);
         stack::push(scope.stack, new_scope.idx);
         return *stack::top(scope.stack);
     }

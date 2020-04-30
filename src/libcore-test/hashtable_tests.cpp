@@ -19,11 +19,45 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
 #include <basecode/core/string/str.h>
+#include <basecode/core/profiler/stopwatch.h>
 #include <basecode/core/hashtable/hashtable.h>
 
 using namespace basecode;
 
+struct payload_t final {
+    u0*     ptr;
+    u32     offset;
+};
+
+TEST_CASE("basecode::hashtable payload with integer keys") {
+    stopwatch_t time{};
+    stopwatch::start(time);
+
+    hashtable_t<u32, payload_t> table{};
+    hashtable::init(table);
+    defer(hashtable::free(table));
+    hashtable::reserve(table, 2048);
+
+    for (u32 i = 0; i < 4096; ++i) {
+        auto payload = hashtable::emplace(table, i);
+        payload->ptr = {};
+        payload->offset = i * 100;
+    }
+
+    stopwatch::stop(time);
+    stopwatch::print_elapsed("hashtable payload + int key"_ss, 40, stopwatch::elapsed(time));
+
+//    auto keys = hashtable::keys(table);
+//    defer(array::free(keys));
+//    for (auto key : keys) {
+//        format::print("key = {}\n", *key);
+//    }
+}
+
 TEST_CASE("basecode::hashtable basics") {
+    stopwatch_t time{};
+    stopwatch::start(time);
+
     hashtable_t<s32, string::slice_t> table{};
     hashtable::init(table);
     defer(hashtable::free(table));
@@ -44,7 +78,7 @@ TEST_CASE("basecode::hashtable basics") {
     hashtable::insert(table, 6, six);
     hashtable::insert(table, 7, seven);
     REQUIRE(table.size == 7);
-    REQUIRE(table.capacity == 16);
+    REQUIRE(table.capacity == 8);
 
     string::slice_t* s{};
 
@@ -75,4 +109,7 @@ TEST_CASE("basecode::hashtable basics") {
     s = hashtable::find(table, 4);
     REQUIRE(s);
     REQUIRE(*s == four);
+
+    stopwatch::stop(time);
+    stopwatch::print_elapsed("hashtable insert + find"_ss, 40, stopwatch::elapsed(time));
 }

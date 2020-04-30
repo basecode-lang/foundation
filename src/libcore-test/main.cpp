@@ -28,7 +28,7 @@ using namespace basecode;
 int main(int argc, const char** argv) {
     memory::initialize();
 
-    auto ctx = context::make(memory::default_allocator());
+    auto ctx = context::make(memory::default_alloc());
     context::push(&ctx);
 
     if (!OK(profiler::initialize()))        return 1;

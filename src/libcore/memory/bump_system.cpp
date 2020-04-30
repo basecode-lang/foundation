@@ -31,22 +31,34 @@ namespace basecode::memory::bump {
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto bump_config = (bump_config_t*) config;
         auto subclass = &alloc->subclass.bump;
-        subclass->buf = {};
-        alloc->backing = bump_config->backing;
+        switch (bump_config->type) {
+            case bump_type_t::exiting:
+                subclass->buf = bump_config->backing.buf;
+                break;
+            case bump_type_t::allocator:
+                alloc->backing = bump_config->backing.alloc;
+                assert(alloc->backing);
+                break;
+        }
         subclass->offset = subclass->end_offset = {};
-        assert(alloc->backing);
     }
 
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& allocated_size) {
         auto subclass = &alloc->subclass.bump;
         if (!subclass->buf || subclass->offset + (size + align) > subclass->end_offset) {
-            subclass->buf = alloc->backing->system->alloc(alloc->backing, size, align, allocated_size);
+            if (alloc->backing) {
+                subclass->buf = alloc->backing->system->alloc(alloc->backing, size, align, allocated_size);
+            } else {
+                // XXX:
+                assert(false);
+            }
             subclass->offset = {};
             subclass->end_offset = allocated_size;
         }
-        auto mem = (u8*) subclass->buf + subclass->offset;
-        subclass->offset += size;
-        allocated_size = size;
+        u32 align_adjustment{};
+        auto mem = memory::align_forward((u8*) subclass->buf + subclass->offset, align, align_adjustment);
+        subclass->offset += size + align_adjustment;
+        allocated_size = size + align_adjustment;
         return mem;
     }
 
@@ -65,5 +77,12 @@ namespace basecode::memory::bump {
         auto subclass = &alloc->subclass.bump;
         subclass->buf = {};
         subclass->offset = subclass->end_offset = {};
+    }
+
+    u0 buf(alloc_t* alloc, u0* buf, u32 size) {
+        auto subclass = &alloc->subclass.bump;
+        subclass->buf = buf;
+        subclass->offset = {};
+        subclass->end_offset = size;
     }
 }

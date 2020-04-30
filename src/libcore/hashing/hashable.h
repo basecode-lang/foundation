@@ -26,19 +26,24 @@ namespace basecode::hashing {
     template <typename K> u32 hash32(const K& value);
     template <typename K> u64 hash64(const K& value);
 
-    inline u64 hash64(const u32& key) {
-        return murmur::hash64(&key, sizeof(key));
-    }
+    inline u32 hash32(const u8& key)    { return key; }
+    inline u64 hash64(const u8& key)    { return key; }
 
-    inline u64 hash64(const s32& key) {
-        return murmur::hash64(&key, sizeof(key));
-    }
+    inline u32 hash32(const s8& key)    { return key; }
+    inline u64 hash64(const s8& key)    { return key; }
 
-    inline u64 hash64(const s64& key) {
-        return murmur::hash64(&key, sizeof(key));
-    }
+    inline u32 hash32(const u16& key)   { return key; }
+    inline u64 hash64(const u16& key)   { return key; }
 
-    inline u64 hash64(const u64& key) {
-        return murmur::hash64(&key, sizeof(key));
-    }
+    inline u32 hash32(const s16& key)   { return key; }
+    inline u64 hash64(const s16& key)   { return key; }
+
+    inline u32 hash32(const u32& key)   { return key; }
+    inline u64 hash64(const u32& key)   { return key; }
+
+    inline u32 hash32(const s32& key)   { return key; }
+    inline u64 hash64(const s32& key)   { return key; }
+
+    inline u64 hash64(const s64& key)   { return key; }
+    inline u64 hash64(const u64& key)   { return key; }
 }

@@ -21,8 +21,17 @@
 #include "system.h"
 
 namespace basecode {
+    enum class bump_type_t : u8 {
+        exiting,
+        allocator
+    };
+
     struct bump_config_t : alloc_config_t {
-        alloc_t*                backing;
+        union {
+            alloc_t*            alloc;
+            u0*                 buf;
+        }                       backing;
+        bump_type_t             type;
     };
 
     namespace memory::bump {
@@ -39,6 +48,8 @@ namespace basecode {
             auto subclass = &alloc->subclass.bump;
             return subclass->offset;
         }
+
+        u0 buf(alloc_t* alloc, u0* buf, u32 size);
 
         force_inline u16 end_offset(alloc_t* alloc) {
             auto subclass = &alloc->subclass.bump;

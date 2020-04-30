@@ -71,7 +71,8 @@ namespace basecode::memory::proxy {
         memory::init(&g_proxy_system.page_alloc, alloc_type_t::page, &page_config);
 
         bump_config_t bump_config{};
-        bump_config.backing = &g_proxy_system.page_alloc;
+        bump_config.type = bump_type_t::allocator;
+        bump_config.backing.alloc = &g_proxy_system.page_alloc;
         memory::init(&g_proxy_system.bump_alloc, alloc_type_t::bump, &bump_config);
 
         array::init(g_proxy_system.proxies, alloc);

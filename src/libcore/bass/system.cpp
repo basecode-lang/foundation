@@ -187,7 +187,8 @@ namespace basecode {
             memory::init(&storage.page_alloc, alloc_type_t::page, &page_config);
 
             bump_config_t bump_config{};
-            bump_config.backing = &storage.page_alloc;
+            bump_config.type = bump_type_t::allocator;
+            bump_config.backing.alloc = &storage.page_alloc;
             memory::init(&storage.bump_alloc, alloc_type_t::bump, &bump_config);
         }
 

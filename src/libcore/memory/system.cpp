@@ -35,32 +35,38 @@ namespace basecode::memory {
     static constexpr u32 bootstrap_buffer_size  = sizeof(alloc_t);
 
     struct system_t final {
-        alloc_t*                default_allocator;
+        alloc_t*                default_alloc;
         usize                   os_page_size;
         u8                      buffer[bootstrap_buffer_size];
     };
 
-    thread_local system_t g_system{};
+    thread_local system_t       g_system{};
 
     u0 shutdown() {
-        release(g_system.default_allocator);
+        release(g_system.default_alloc);
     }
 
     usize os_page_size() {
         return g_system.os_page_size;
     }
 
-    alloc_t* default_allocator() {
-        return g_system.default_allocator;
+    alloc_t* default_alloc() {
+        return g_system.default_alloc;
+    }
+
+    u0 free(alloc_t* alloc, u0* mem) {
+        if (!mem || !alloc->system || !alloc->system->free) return;
+        u32 freed_size;
+        alloc->system->free(alloc, mem, freed_size);
     }
 
     u0 initialize(u32 heap_size, u0* base) {
-        g_system.default_allocator = new (g_system.buffer) alloc_t;
+        g_system.default_alloc = new (g_system.buffer) alloc_t;
         dl_config_t config{
             .base = base,
             .heap_size = heap_size
         };
-        init(g_system.default_allocator, alloc_type_t::dlmalloc, &config);
+        init(g_system.default_alloc, alloc_type_t::dlmalloc, &config);
 #ifdef _WIN32
         SYSTEM_INFO system_info;
         GetSystemInfo(&system_info);
@@ -82,63 +88,56 @@ namespace basecode::memory {
             PROT_READ | PROT_WRITE | PROT_EXEC) == 0;
     }
 
-    u0 free(alloc_t* allocator, u0* mem) {
-        if (!mem) return;
-        assert(allocator && allocator->system);
-        u32 freed_size;
-        allocator->system->free(allocator, mem, freed_size);
+    u0 release(alloc_t* alloc, b8 enforce) {
+        if (!alloc->system || !alloc->system->release) return;
+        alloc->system->release(alloc);
+        if (enforce) assert(alloc->total_allocated == 0);
+        alloc->backing = {};
     }
 
-    u0 release(alloc_t* allocator, b8 enforce) {
-        assert(allocator && allocator->system);
-        if (allocator->system->release)
-            allocator->system->release(allocator);
-        if (enforce) assert(allocator->total_allocated == 0);
-        allocator->backing = {};
+    u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
+        if (!mem || !alloc->system || !alloc->system->realloc) return nullptr;
+        u32 old_size, new_size;
+        return alloc->system->realloc(alloc, mem, size, align, old_size, new_size);
     }
 
-    u0* alloc(alloc_t* allocator, u32 size, u32 align, u32* alloc_size) {
-        assert(allocator && allocator->system);
+    u0* alloc(alloc_t* alloc, u32 size, u32 align, u32* alloc_size) {
+        if (!size || !alloc->system || !alloc->system->alloc) return nullptr;
         u32 allocated_size;
-        auto mem = allocator->system->alloc(allocator, size, align, allocated_size);
+        auto mem = alloc->system->alloc(alloc, size, align, allocated_size);
         if (alloc_size) *alloc_size = allocated_size;
         return mem;
     }
 
-    u0* realloc(alloc_t* allocator, u0* mem, u32 size, u32 align) {
-        if (!mem) return nullptr;
-        assert(allocator && allocator->system);
-        u32 old_size, new_size;
-        return allocator->system->realloc(allocator, mem, size, align, old_size, new_size);
-    }
-
-    u0 init(alloc_t* allocator, alloc_type_t type, alloc_config_t* config) {
-        assert(allocator);
+    status_t init(alloc_t* alloc, alloc_type_t type, alloc_config_t* config) {
+        if (!alloc)
+            return status_t::invalid_allocator;
         switch (type) {
             case alloc_type_t::bump: {
-                allocator->system = bump::system();
+                alloc->system = bump::system();
                 break;
             }
             case alloc_type_t::page: {
-                allocator->system = page::system();
+                alloc->system = page::system();
                 break;
             }
             case alloc_type_t::proxy: {
-                allocator->system = proxy::system();
+                alloc->system = proxy::system();
                 break;
             }
             case alloc_type_t::system: {
-                allocator->system = default_::system();
+                alloc->system = default_::system();
                 break;
             }
             case alloc_type_t::dlmalloc: {
-                allocator->system = dl::system();
+                alloc->system = dl::system();
                 break;
             }
         }
-        allocator->backing = {};
-        allocator->total_allocated = {};
-        if (allocator->system->init)
-            allocator->system->init(allocator, config);
+        alloc->backing = {};
+        alloc->total_allocated = {};
+        if (alloc->system->init)
+            alloc->system->init(alloc, config);
+        return status_t::ok;
     }
 }

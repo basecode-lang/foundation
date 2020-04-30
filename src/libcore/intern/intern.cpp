@@ -59,10 +59,11 @@ namespace basecode::intern::pool {
     }
 
     static index_t get_index(u8* data, u32 capacity) {
+        u32 adjust{};
         index_t index{};
         index.ids    = (u32*)               data;
-        index.hashes = (u64*)               memory::align_forward(index.ids    + capacity, alignof(u64));
-        index.slices = (string::slice_t*)   memory::align_forward(index.hashes + capacity, alignof(string::slice_t));
+        index.hashes = (u64*)               memory::align_forward(index.ids    + capacity, alignof(u64), adjust);
+        index.slices = (string::slice_t*)   memory::align_forward(index.hashes + capacity, alignof(string::slice_t), adjust);
         return index;
     }
 
@@ -139,7 +140,8 @@ namespace basecode::intern::pool {
         memory::init(&pool.page_alloc, alloc_type_t::page, &page_config);
 
         bump_config_t bump_config{};
-        bump_config.backing = &pool.page_alloc;
+        bump_config.type = bump_type_t::allocator;
+        bump_config.backing.alloc = &pool.page_alloc;
         memory::init(&pool.bump_alloc, alloc_type_t::bump, &bump_config);
     }
 
@@ -150,27 +152,18 @@ namespace basecode::intern::pool {
         auto new_index = get_index(new_index_data, new_capacity);
         if (pool.index) {
             auto old_index = get_index(pool.index, pool.capacity);
-
-            u32 count{};
-            u32 old_idx{};
-            while (old_idx < pool.capacity) {
-                if (old_index.hashes[old_idx] == 0) {
-                    ++old_idx;
+            for (u32 i = 0; i < pool.capacity; ++i) {
+                if (old_index.hashes[i] == 0)
                     continue;
-                }
 
-                u32 bucket_index = old_index.hashes[old_idx] * pool.capacity >> (u32) 32;
+                u32 bucket_index = old_index.hashes[i] % new_capacity;
                 if (!find_bucket(new_index, new_capacity, bucket_index))
                     return status_t::no_bucket;
 
-                new_index.ids[bucket_index] = old_index.ids[old_idx];
-                new_index.hashes[bucket_index] = old_index.hashes[old_idx];
-                new_index.slices[bucket_index] = old_index.slices[old_idx];
-
-                ++count;
-                ++old_idx;
+                new_index.ids[bucket_index] = old_index.ids[i];
+                new_index.hashes[bucket_index] = old_index.hashes[i];
+                new_index.slices[bucket_index] = old_index.slices[i];
             }
-
             memory::free(pool.alloc, pool.index);
         }
         pool.index = new_index_data;
@@ -186,8 +179,8 @@ namespace basecode::intern::pool {
                 return result_t{.status = status};
         }
 
-        const auto hash = hashing::hash64(value);
-        u32 bucket_index = hash * pool.capacity >> (u32) 32;
+        u64 hash = hashing::hash64(value);
+        u32 bucket_index = hash % pool.capacity;
         auto index = get_index(pool.index, pool.capacity);
 
         if (find_key(index, pool.capacity, hash, value, bucket_index)) {
