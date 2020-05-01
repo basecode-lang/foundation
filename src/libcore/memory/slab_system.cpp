@@ -178,6 +178,8 @@ namespace basecode::memory::slab {
     };
 
     u0 reset(alloc_t* alloc) {
+        auto a = unwrap(alloc);
+        assert(a && a->system->type == alloc_type_t::slab);
         // XXX: need to figure out how to do this
     }
 

@@ -113,8 +113,14 @@ namespace basecode::memory {
         }
     }
 
+    alloc_t* unwrap(alloc_t* alloc) {
+        while (alloc->system->type == alloc_type_t::proxy)
+            alloc = alloc->backing;
+        return alloc;
+    }
+
     u0 release(alloc_t* alloc, b8 enforce) {
-        if (!alloc->system || !alloc->system->release) return;
+       if (!alloc->system || !alloc->system->release) return;
         alloc->system->release(alloc);
         if (enforce) assert(alloc->total_allocated == 0);
         alloc->backing = {};

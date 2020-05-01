@@ -147,6 +147,8 @@ namespace basecode {
             alloc_t* make(alloc_type_t type, alloc_config_t* config = {});
         }
 
+        alloc_t* unwrap(alloc_t* alloc);
+
         u0 release(alloc_t* alloc, b8 enforce = true);
 
         u0* alloc(alloc_t* alloc, u32* alloc_size = {});

@@ -37,22 +37,30 @@ namespace basecode {
         alloc_system_t* system();
 
         force_inline u0* tail(alloc_t* alloc) {
-            auto subclass = &alloc->subclass.page;
+            auto a = unwrap(alloc);
+            assert(a && a->system->type == alloc_type_t::page);
+            auto subclass = &a->subclass.page;
             return (u8*) subclass->tail + sizeof(page_header_t);
         }
 
         force_inline u0* head(alloc_t* alloc) {
-            auto subclass = &alloc->subclass.page;
+            auto a = unwrap(alloc);
+            assert(a && a->system->type == alloc_type_t::page);
+            auto subclass = &a->subclass.page;
             return (u8*) subclass->head + sizeof(page_header_t);
         }
 
         force_inline u16 size(alloc_t* alloc) {
-            auto subclass = &alloc->subclass.page;
+            auto a = unwrap(alloc);
+            assert(a && a->system->type == alloc_type_t::page);
+            auto subclass = &a->subclass.page;
             return subclass->size;
         }
 
         force_inline u32 count(alloc_t* alloc) {
-            auto subclass = &alloc->subclass.page;
+            auto a = unwrap(alloc);
+            assert(a && a->system->type == alloc_type_t::page);
+            auto subclass = &a->subclass.page;
             return subclass->count;
         }
     }

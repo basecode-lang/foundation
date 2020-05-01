@@ -97,7 +97,9 @@ namespace basecode::memory::page {
     };
 
     u0 reset(alloc_t* alloc) {
-        auto subclass = &alloc->subclass.page;
+        auto a = unwrap(alloc);
+        assert(a && a->system->type == alloc_type_t::page);
+        auto subclass = &a->subclass.page;
         subclass->cursor = subclass->tail;
     }
 

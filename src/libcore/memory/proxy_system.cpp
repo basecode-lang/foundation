@@ -82,7 +82,7 @@ namespace basecode::memory::proxy {
         auto proxies = hashtable::values(g_proxy_system.proxies);
         defer(array::free(proxies));
         for (auto alloc : proxies)
-            system::free(alloc);
+            system::free(alloc, enforce);
         hashtable::reset(g_proxy_system.proxies);
         intern::reset(g_proxy_system.intern);
     }
@@ -92,6 +92,7 @@ namespace basecode::memory::proxy {
     }
 
     u32 id(alloc_t* alloc) {
+        assert(alloc && alloc->system->type == alloc_type_t::proxy);
         return alloc->subclass.proxy.id;
     }
 
@@ -100,6 +101,7 @@ namespace basecode::memory::proxy {
     }
 
     u0 id(alloc_t* alloc, u32 id) {
+        assert(alloc && alloc->system->type == alloc_type_t::proxy);
         alloc->subclass.proxy.id = id;
     }
 
@@ -114,6 +116,7 @@ namespace basecode::memory::proxy {
     }
 
     string::slice_t name(alloc_t* alloc) {
+        assert(alloc && alloc->system->type == alloc_type_t::proxy);
         return alloc->subclass.proxy.name;
     }
 
@@ -125,6 +128,7 @@ namespace basecode::memory::proxy {
     }
 
     u0 name(alloc_t* alloc, string::slice_t name) {
+        assert(alloc && alloc->system->type == alloc_type_t::proxy);
         alloc->subclass.proxy.name = name;
     }
 

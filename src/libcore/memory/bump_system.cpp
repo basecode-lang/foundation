@@ -74,13 +74,17 @@ namespace basecode::memory::bump {
     }
 
     u0 reset(alloc_t* alloc) {
-        auto subclass = &alloc->subclass.bump;
+        auto a = unwrap(alloc);
+        assert(a && a->system->type == alloc_type_t::bump);
+        auto subclass = &a->subclass.bump;
         subclass->buf = {};
         subclass->offset = subclass->end_offset = {};
     }
 
     u0 buf(alloc_t* alloc, u0* buf, u32 size) {
-        auto subclass = &alloc->subclass.bump;
+        auto a = unwrap(alloc);
+        assert(a && a->system->type == alloc_type_t::bump);
+        auto subclass = &a->subclass.bump;
         subclass->buf = buf;
         subclass->offset = {};
         subclass->end_offset = size;

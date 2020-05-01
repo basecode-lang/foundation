@@ -154,8 +154,8 @@ TEST_CASE("basecode::cxx example program") {
     region_config.heap_size = 512 * 1024;
     memory::init(&region_alloc, alloc_type_t::dlmalloc, &region_config);
     defer({
-        memory::release(&region_alloc, false);
         memory::proxy::reset(false);
+        memory::release(&region_alloc, false);
     });
     auto region_proxy = memory::proxy::make(&region_alloc, "512kb region"_ss);
 

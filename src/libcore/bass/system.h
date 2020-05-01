@@ -55,9 +55,9 @@ namespace basecode {
 
     struct bass_t final {
         alloc_t*                alloc;
-        header_index_t          index;
         alloc_t*                page_alloc;
         alloc_t*                bump_alloc;
+        header_index_t          index;
         u32                     id;
     };
 
@@ -93,11 +93,7 @@ namespace basecode {
 
         cursor_t first_header(bass_t& storage);
 
-        b8 move_next(cursor_t& cursor, u8 type = 0);
-
         cursor_t get_header(bass_t& storage, u32 id);
-
-        cursor_t make_cursor(const cursor_t& cursor);
 
         b8 write_field(cursor_t& cursor, u8 type, u32 value);
 
@@ -105,7 +101,7 @@ namespace basecode {
 
         cursor_t write_header(bass_t& storage, u8 type, u32 size = 0);
 
-        u0 init(bass_t& storage, alloc_t* alloc = context::top()->alloc);
+        u0 init(bass_t& storage, alloc_t* alloc = context::top()->alloc, u32 num_pages = 16);
     }
 }
 
