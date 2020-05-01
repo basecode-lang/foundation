@@ -22,8 +22,8 @@
 #include <cstring>
 #include <algorithm>
 #include <basecode/core/types.h>
-#include <basecode/core/memory/system.h>
-#include <basecode/core/context/system.h>
+#include <basecode/core/context.h>
+#include <basecode/core/memory/memory.h>
 
 namespace basecode {
     template<typename T> struct stack_t final {

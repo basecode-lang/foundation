@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "system.h"
+#include "memory.h"
 
 namespace basecode::memory::default_ {
     alloc_system_t* system();

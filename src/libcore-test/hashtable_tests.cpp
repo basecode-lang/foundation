@@ -17,10 +17,10 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
+#include <basecode/core/str.h>
 #include <basecode/core/defer.h>
-#include <basecode/core/string/str.h>
-#include <basecode/core/profiler/stopwatch.h>
-#include <basecode/core/hashtable/hashtable.h>
+#include <basecode/core/stopwatch.h>
+#include <basecode/core/hashtable.h>
 
 using namespace basecode;
 

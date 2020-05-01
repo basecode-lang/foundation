@@ -16,10 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/bass/system.h>
-#include <basecode/core/format/system.h>
 #include <basecode/core/memory/proxy_system.h>
-#include "types.h"
+#include "cxx.h"
 
 namespace basecode::cxx::program {
     u0 free(program_t& pgm) {
@@ -153,8 +151,10 @@ namespace basecode::cxx::program {
     }
 
     u0 init(program_t& pgm, alloc_t* alloc, u32 num_modules) {
-        intern::init(pgm.intern, memory::proxy::make(alloc, "intern::pool"_ss));
-        array::init(pgm.modules, memory::proxy::make(alloc, "program::modules"_ss));
+        auto intern_proxy = memory::proxy::make(alloc, "intern::pool"_ss);
+        intern::init(pgm.intern, intern_proxy);
+        auto modules_proxy = memory::proxy::make(alloc, "program::modules"_ss);
+        array::init(pgm.modules, modules_proxy);
         array::reserve(pgm.modules, num_modules);
         bass::init(pgm.storage, alloc);
         auto cursor = bass::write_header(pgm.storage, element::header::program, 1);

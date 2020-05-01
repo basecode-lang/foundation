@@ -18,7 +18,7 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
-#include <basecode/core/stack/stack.h>
+#include <basecode/core/stack.h>
 
 using namespace basecode;
 

@@ -18,12 +18,12 @@
 
 #pragma once
 
+#include <basecode/core/bass.h>
 #include <basecode/core/types.h>
-#include <basecode/core/bass/system.h>
-#include <basecode/core/stack/stack.h>
-#include <basecode/core/array/array.h>
-#include <basecode/core/intern/intern.h>
-#include <basecode/core/format/system.h>
+#include <basecode/core/stack.h>
+#include <basecode/core/array.h>
+#include <basecode/core/intern.h>
+#include <basecode/core/format.h>
 
 #define MAKE_TYPE(m, d) ((((u32) m) << (u32) 8) | ((u32) d))
 #define POSTFIX(x)      (((u32)x) | (u32) 0b100000000000000000000000)

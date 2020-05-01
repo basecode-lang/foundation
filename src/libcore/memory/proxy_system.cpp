@@ -17,8 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/defer.h>
-#include <basecode/core/intern/intern.h>
-#include "system.h"
+#include <basecode/core/intern.h>
+#include "memory.h"
 #include "proxy_system.h"
 
 namespace basecode::memory::proxy {

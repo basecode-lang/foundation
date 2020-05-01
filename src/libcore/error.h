@@ -18,19 +18,27 @@
 
 #pragma once
 
-#include "memory.h"
+#include <basecode/core/types.h>
+#include <basecode/core/format.h>
+#include <basecode/core/source/buffer.h>
 
 namespace basecode {
-    struct slab_config_t : alloc_config_t {
-        alloc_t*            backing;
-        u32                 buf_size;
-        u32                 buf_align;
-    };
-
-    namespace memory::slab {
-        u0 reset(alloc_t* alloc);
-
-        alloc_system_t* system();
+    namespace error {
+        template<typename ...Args>
+        inline u0 print(
+                FILE* file,
+                source::buffer_t& buf,
+                fmt::string_view fmt_msg,
+                Args&& ... args) {
+            const auto msg = format::format(buf.allocator, fmt_msg, std::forward<Args>(args)...);
+            format::print(
+                buf.allocator,
+                file,
+                "error({}:{}): {}\n",
+                buf.line + 1,
+                buf.column + 1,
+                msg);
+        }
     }
 }
 

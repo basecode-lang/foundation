@@ -19,7 +19,7 @@
 #pragma once
 
 #include <basecode/core/types.h>
-#include <basecode/core/hashtable/hashtable.h>
+#include <basecode/core/hashtable.h>
 
 namespace basecode {
     namespace kind {
@@ -69,7 +69,6 @@ namespace basecode {
         u32                     id;
         u16                     offset;
         u16                     end_offset;
-        u16                     last_offset;
         u16                     start_offset;
         b8                      ok;
     };

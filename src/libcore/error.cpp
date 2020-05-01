@@ -16,29 +16,9 @@
 //
 // ----------------------------------------------------------------------------
 
-#pragma once
-
-#include <basecode/core/types.h>
-#include <basecode/core/format/system.h>
-#include <basecode/core/source/buffer.h>
+#include "error.h"
 
 namespace basecode {
     namespace error {
-        template<typename ...Args>
-        inline u0 print(
-                FILE* file,
-                source::buffer_t& buf,
-                fmt::string_view fmt_msg,
-                Args&& ... args) {
-            const auto msg = format::format(buf.allocator, fmt_msg, std::forward<Args>(args)...);
-            format::print(
-                buf.allocator,
-                file,
-                "error({}:{}): {}\n",
-                buf.line + 1,
-                buf.column + 1,
-                msg);
-        }
     }
 }
-

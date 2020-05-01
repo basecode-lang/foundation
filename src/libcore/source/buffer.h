@@ -18,8 +18,8 @@
 
 #pragma once
 
+#include <basecode/core/str.h>
 #include <basecode/core/types.h>
-#include <basecode/core/string/str.h>
 
 #define CURSOR(b)   (b.data[b.idx])
 #define PEEK(b, c)  (b.data[b.idx + c])

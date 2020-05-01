@@ -18,9 +18,9 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
-#include <basecode/core/cxx/types.h>
-#include <basecode/core/profiler/system.h>
-#include <basecode/core/profiler/stopwatch.h>
+#include <basecode/core/cxx/cxx.h>
+#include <basecode/core/profiler.h>
+#include <basecode/core/stopwatch.h>
 #include <basecode/core/memory/proxy_system.h>
 #include <basecode/core/memory/dlmalloc_system.h>
 
@@ -155,15 +155,18 @@ TEST_CASE("basecode::cxx example program") {
     memory::init(&region_alloc, alloc_type_t::dlmalloc, &region_config);
     defer({
         memory::proxy::reset(false);
+        memory::system::print_allocators();
         memory::release(&region_alloc, false);
     });
     auto region_proxy = memory::proxy::make(&region_alloc, "512kb region"_ss);
+    defer(memory::proxy::free(region_proxy));
 
+    alloc_t* alloc = region_proxy; //context::top()->alloc;
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
     cxx::program_t pgm{};
-    cxx::program::init(pgm, region_proxy);
+    cxx::program::init(pgm, alloc);
     defer(cxx::program::free(pgm));
 
     const auto expected_main_ident = "main"_ss;
@@ -283,7 +286,7 @@ TEST_CASE("basecode::cxx example program") {
     stopwatch::start(serialize_time);
 
     cxx::serializer_t s{};
-    cxx::serializer::init(s, pgm, region_proxy);
+    cxx::serializer::init(s, pgm, alloc);
 
     auto status = cxx::serializer::serialize(s);
     stopwatch::stop(serialize_time);

@@ -73,10 +73,9 @@ namespace basecode::intern {
     u0 free(intern_t& pool) {
         memory::system::free(pool.bump_alloc);
         memory::system::free(pool.page_alloc);
-        if (pool.index) {
-            memory::free(pool.alloc, pool.index);
-            pool.index = {};
-        }
+        memory::free(pool.alloc, pool.index);
+        pool.index = {};
+        pool.size = pool.capacity = {};
     }
 
     u0 reset(intern_t& pool) {
@@ -110,13 +109,13 @@ namespace basecode::intern {
         };
     }
 
-    u0 init(intern_t& pool, alloc_t* alloc) {
+    u0 init(intern_t& pool, alloc_t* alloc, u32 num_pages) {
         pool.id = 1;
         pool.alloc = alloc;
 
         page_config_t page_config{};
         page_config.backing = pool.alloc;
-        page_config.page_size = memory::system::os_page_size() * 16;
+        page_config.page_size = memory::system::os_page_size() * num_pages;
         pool.page_alloc = memory::system::make(alloc_type_t::page, &page_config);
 
         bump_config_t bump_config{};

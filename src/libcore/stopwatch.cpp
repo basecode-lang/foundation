@@ -16,8 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/format/system.h>
-#include "system.h"
+#include <basecode/core/format.h>
+#include "profiler.h"
 #include "stopwatch.h"
 
 namespace basecode::stopwatch {

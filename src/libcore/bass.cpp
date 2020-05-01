@@ -19,7 +19,7 @@
 #include <basecode/core/memory/bump_system.h>
 #include <basecode/core/memory/page_system.h>
 #include <basecode/core/memory/proxy_system.h>
-#include "system.h"
+#include "bass.h"
 
 namespace basecode {
     static string::slice_t s_kinds[] = {
@@ -59,19 +59,16 @@ namespace basecode {
         static b8 move_next(cursor_t& cursor, u8 type = 0) {
             if (!cursor.header)
                 return false;
-            if (cursor.offset == cursor.last_offset)
-                cursor.offset += sizeof(field_t);
+            cursor.offset += sizeof(field_t);
             while (cursor.offset < cursor.end_offset) {
                 cursor.field = (field_t*) cursor.page + cursor.offset;
                 if (cursor.field->kind != kind::header
                 && (!type || cursor.field->type == type)) {
-                    cursor.last_offset = cursor.offset;
                     return true;
                 }
                 cursor.offset += sizeof(field_t);
             }
             cursor.field = {};
-            cursor.last_offset = {};
             return false;
         }
 
@@ -116,7 +113,6 @@ namespace basecode {
             cursor.ok = true;
             cursor.field = {};
             cursor.header = {};
-            cursor.last_offset = {};
             cursor.storage = &storage;
             cursor.page = (u8*) memory::bump::buf(storage.bump_alloc);
             cursor.offset = cursor.start_offset = memory::bump::offset(storage.bump_alloc);
@@ -132,7 +128,7 @@ namespace basecode {
             cursor.page = (u8*) memory::page::tail(storage.page_alloc);
             cursor.header = (field_t*) cursor.page;
             cursor.end_offset = cursor.header->value;
-            cursor.offset = cursor.last_offset = cursor.start_offset = {};
+            cursor.offset = cursor.start_offset = {};
             return cursor;
         }
 
@@ -140,7 +136,6 @@ namespace basecode {
             auto result = make_cursor(storage);
             auto index = hashtable::find(storage.index, id);
             if (index) {
-                result.last_offset = {};
                 result.page = index->page;
                 result.offset = index->offset;
                 result.start_offset = index->offset;
@@ -202,16 +197,16 @@ namespace basecode {
             result.header->kind = kind::header;
 
             auto index = hashtable::emplace(storage.index, result.id);
-            assert(index);
             index->page = result.page;
             index->offset = result.offset;
 
             result.start_offset = result.offset;
             result.end_offset = result.offset + node_size;
-            result.offset += sizeof(field_t);
-            result.last_offset = result.offset;
 
-            result.ok = write_field(result, field::id, result.id);
+            u32 value{};
+            result.ok = next_field(result, value);
+            if (result.ok)
+                result.ok = write_field(result, field::id, result.id);
             return result;
         }
     }

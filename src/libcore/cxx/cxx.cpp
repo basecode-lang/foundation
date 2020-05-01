@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "types.h"
+#include "cxx.h"
 
 namespace basecode::cxx {
     static u32 s_integral_size_in_bytes[]   = {0, 0, 1, 2, 4, 8};

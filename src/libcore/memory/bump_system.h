@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "system.h"
+#include "memory.h"
 
 namespace basecode {
     enum class bump_type_t : u8 {
-        exiting,
+        existing,
         allocator
     };
 

@@ -17,10 +17,10 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
+#include <basecode/core/str.h>
 #include <basecode/core/defer.h>
-#include <basecode/core/string/str.h>
-#include <basecode/core/error/system.h>
-#include <basecode/core/format/system.h>
+#include <basecode/core/error.h>
+#include <basecode/core/format.h>
 
 using namespace basecode;
 

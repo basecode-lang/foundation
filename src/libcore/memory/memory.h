@@ -19,7 +19,7 @@
 #pragma once
 
 #include <basecode/core/types.h>
-#include <basecode/core/slice/slice.h>
+#include <basecode/core/slice.h>
 #include "dlmalloc_config.h"
 
 namespace basecode {
@@ -46,7 +46,11 @@ namespace basecode {
         alloc_system_t*         system;
         alloc_t*                backing;
         union {
-            mspace              heap;
+            struct {
+                mspace          heap;
+                u0*             base;
+                u32             size;
+            }                   dl;
             struct {
                 u0*             buf;
                 u32             offset;
@@ -102,6 +106,8 @@ namespace basecode {
 
             usize os_page_size();
 
+            u0 print_allocators();
+
             alloc_t* default_alloc();
 
             inline alloc_header_t* header(u0* data) {
@@ -148,6 +154,8 @@ namespace basecode {
         }
 
         alloc_t* unwrap(alloc_t* alloc);
+
+        string::slice_t name(alloc_type_t type);
 
         u0 release(alloc_t* alloc, b8 enforce = true);
 

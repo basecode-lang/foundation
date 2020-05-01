@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "system.h"
+#include "format.h"
 
 namespace basecode::format {
     u0 vprint(

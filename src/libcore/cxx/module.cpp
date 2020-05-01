@@ -17,7 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/memory/proxy_system.h>
-#include "types.h"
+#include "cxx.h"
 
 namespace basecode::cxx::module {
     u0 free(module_t& module) {

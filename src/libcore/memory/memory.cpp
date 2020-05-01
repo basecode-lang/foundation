@@ -24,8 +24,9 @@
 #endif
 #include <cassert>
 #include <sys/mman.h>
-#include <basecode/core/array/array.h>
-#include "system.h"
+#include <basecode/core/array.h>
+#include <basecode/core/format.h>
+#include "memory.h"
 #include "page_system.h"
 #include "slab_system.h"
 #include "proxy_system.h"
@@ -41,7 +42,17 @@ namespace basecode::memory {
         usize                   os_page_size;
     };
 
-    thread_local system_t       g_system{};
+    static string::slice_t      s_type_names[] = {
+       "system"_ss,
+       "bump"_ss,
+       "page"_ss,
+       "slab"_ss,
+       "proxy"_ss,
+       "trace"_ss,
+       "dlmalloc"_ss,
+    };
+    //thread_local system_t       g_system{};
+    system_t       g_system{};
 
     namespace system {
         u0 shutdown() {
@@ -64,8 +75,7 @@ namespace basecode::memory {
 
         u0 free(alloc_t* alloc, b8 enforce) {
             auto idx = array::contains(g_system.allocators, alloc);
-            if (idx == -1)
-                return;
+            if (idx == -1) return;
             array::erase(g_system.allocators, idx);
             memory::release(alloc, enforce);
             memory::free(&g_system.slab_alloc, alloc);
@@ -111,6 +121,13 @@ namespace basecode::memory {
             array::append(g_system.allocators, alloc);
             return alloc;
         }
+
+        u0 print_allocators() {
+            format::print(stderr, "g_system.allocators.size = {}\n", g_system.allocators.size);
+            for (auto alloc : g_system.allocators) {
+                format::print(stderr, "alloc = {}, alloc->system->type = {}\n", (u0*) alloc, (u8) alloc->system->type);
+            }
+        }
     }
 
     alloc_t* unwrap(alloc_t* alloc) {
@@ -124,6 +141,10 @@ namespace basecode::memory {
         alloc->system->release(alloc);
         if (enforce) assert(alloc->total_allocated == 0);
         alloc->backing = {};
+    }
+
+    string::slice_t name(alloc_type_t type) {
+        return s_type_names[(u32) type];
     }
 
     u0* alloc(alloc_t* alloc, u32* alloc_size) {

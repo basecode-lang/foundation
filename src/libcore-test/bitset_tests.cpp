@@ -18,7 +18,7 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
-#include <basecode/core/bitset/bitset.h>
+#include <basecode/core/bitset.h>
 
 using namespace basecode;
 

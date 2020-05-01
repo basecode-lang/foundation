@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "system.h"
+#include "memory.h"
 
 namespace basecode {
     struct page_header_t final {

@@ -17,8 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <cassert>
-#include <basecode/core/format/system.h>
-#include "system.h"
+#include <basecode/core/format.h>
+#include "memory.h"
 #include "bump_system.h"
 
 namespace basecode::memory::bump {
@@ -32,7 +32,7 @@ namespace basecode::memory::bump {
         auto bump_config = (bump_config_t*) config;
         auto subclass = &alloc->subclass.bump;
         switch (bump_config->type) {
-            case bump_type_t::exiting:
+            case bump_type_t::existing:
                 subclass->buf = bump_config->backing.buf;
                 break;
             case bump_type_t::allocator:

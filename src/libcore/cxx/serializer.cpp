@@ -16,9 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/format/system.h>
 #include <basecode/core/memory/proxy_system.h>
-#include "types.h"
+#include "cxx.h"
 
 namespace basecode::cxx::serializer {
     static string::slice_t s_var_flags[] = {

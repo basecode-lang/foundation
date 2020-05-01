@@ -16,9 +16,35 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "system.h"
+#include <cassert>
+#include "context.h"
 
-namespace basecode {
-    namespace error {
+namespace basecode::context {
+
+    static constexpr u32        stack_size = 512;
+
+    thread_local u32            t_index = stack_size;
+    thread_local context_t*     t_stack[stack_size];
+
+    u0 pop() {
+        assert(t_index < stack_size);
+        t_index++;
+    }
+
+    context_t* top() {
+        assert(t_index < stack_size);
+        return t_stack[t_index];
+    }
+
+    u0 push(context_t* ctx) {
+        assert(t_index > 0);
+        t_stack[--t_index] = ctx;
+    }
+
+    context_t make(alloc_t* alloc) {
+        context_t ctx{};
+        ctx.user = {};
+        ctx.alloc = alloc;
+        return ctx;
     }
 }

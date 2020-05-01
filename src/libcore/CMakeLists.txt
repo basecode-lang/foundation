@@ -16,25 +16,25 @@ add_library(
         defer.h
         types.h
 
-        array/array.h
+        array.h
 
-        bass/system.cpp bass/system.h
+        bass.cpp bass.h
 
-        bitset/bitset.cpp bitset/bitset.h
+        bitset.cpp bitset.h
 
-        context/system.cpp context/system.h
+        context.cpp context.h
 
         cxx/scope.cpp
         cxx/module.cpp
         cxx/program.cpp
         cxx/serializer.cpp
-        cxx/types.cpp cxx/types.h
+        cxx/cxx.cpp cxx/cxx.h
 
-        error/system.cpp error/system.h
+        error.cpp error.h
 
-        format/system.cpp format/system.h
+        format.cpp format.h
 
-        gfx/types.h
+        gfx.h
 
         hashing/hashable.h
         hashing/crc.cpp hashing/crc.h
@@ -43,13 +43,13 @@ add_library(
         hashing/blake3.cpp hashing/blake3.h
         hashing/symbol.cpp hashing/symbol.h
 
-        hashtable/hashtable.h
+        hashtable.h
 
-        intern/intern.cpp intern/intern.h
+        intern.cpp intern.h
 
         memory/std_allocator.h
         memory/dlmalloc_config.h
-        memory/system.cpp memory/system.h
+        memory/memory.cpp memory/memory.h
         memory/dlmalloc.c memory/dlmalloc.h
         memory/page_system.cpp memory/page_system.h
         memory/slab_system.cpp memory/slab_system.h
@@ -59,18 +59,18 @@ add_library(
         memory/default_system.cpp memory/default_system.h
         memory/dlmalloc_system.cpp memory/dlmalloc_system.h
 
-        profiler/system.cpp profiler/system.h
-        profiler/stopwatch.cpp profiler/stopwatch.h
+        profiler.cpp profiler.h
+        stopwatch.cpp stopwatch.h
 
-        slice/slice.h
+        slice.h
 
         source/buffer.cpp source/buffer.h
 
-        stack/stack.h
+        stack.h
 
-        string/str.cpp string/str.h
+        str.cpp str.h
 
-        timers/system.cpp timers/system.h
+        timer.cpp timer.h
 )
 target_link_libraries(
         ${PROJECT_NAME}

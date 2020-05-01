@@ -18,11 +18,11 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
-#include <basecode/core/array/array.h>
-#include <basecode/core/intern/intern.h>
-#include <basecode/core/format/system.h>
-#include <basecode/core/profiler/system.h>
-#include <basecode/core/profiler/stopwatch.h>
+#include <basecode/core/array.h>
+#include <basecode/core/intern.h>
+#include <basecode/core/format.h>
+#include <basecode/core/profiler.h>
+#include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 

@@ -19,8 +19,8 @@
 #pragma once
 
 #include <fmt/format.h>
+#include <basecode/core/str.h>
 #include <basecode/core/types.h>
-#include <basecode/core/string/str.h>
 #include <basecode/core/memory/std_allocator.h>
 
 namespace basecode::format {

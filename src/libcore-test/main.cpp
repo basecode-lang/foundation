@@ -19,8 +19,8 @@
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
-#include <basecode/core/memory/system.h>
-#include <basecode/core/profiler/system.h>
+#include <basecode/core/profiler.h>
+#include <basecode/core/memory/memory.h>
 #include <basecode/core/memory/proxy_system.h>
 
 using namespace basecode;

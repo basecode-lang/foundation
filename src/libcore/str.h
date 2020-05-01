@@ -20,10 +20,10 @@
 
 #include <cstring>
 #include <cassert>
+#include <basecode/core/slice.h>
 #include <basecode/core/types.h>
-#include <basecode/core/slice/slice.h>
-#include <basecode/core/memory/system.h>
-#include <basecode/core/context/system.h>
+#include <basecode/core/context.h>
+#include <basecode/core/memory/memory.h>
 #include <basecode/core/hashing/murmur.h>
 #include <basecode/core/hashing/hashable.h>
 

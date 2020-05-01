@@ -16,8 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/format/system.h>
-#include "types.h"
+#include "cxx.h"
 
 namespace basecode::cxx::scope {
     static u32 make_unary(

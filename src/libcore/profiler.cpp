@@ -19,8 +19,7 @@
 #include <thread>
 #include <cpuid.h>
 #include <cassert>
-#include <basecode/core/format/system.h>
-#include "system.h"
+#include "profiler.h"
 
 namespace basecode::profiler {
     static s64      s_resolution = 0;

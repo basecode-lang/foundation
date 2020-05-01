@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "system.h"
+#include "memory.h"
 
 namespace basecode {
     struct trace_config_t : alloc_config_t {

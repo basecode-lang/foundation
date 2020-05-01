@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include <basecode/core/array/array.h>
-#include <basecode/core/hashtable/hashtable.h>
-#include "system.h"
+#include <basecode/core/array.h>
+#include <basecode/core/hashtable.h>
+#include "memory.h"
 
 namespace basecode {
     struct proxy_config_t : alloc_config_t {

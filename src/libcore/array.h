@@ -22,9 +22,9 @@
 #include <cstring>
 #include <algorithm>
 #include <basecode/core/types.h>
-#include <basecode/core/slice/slice.h>
-#include <basecode/core/memory/system.h>
-#include <basecode/core/context/system.h>
+#include <basecode/core/slice.h>
+#include <basecode/core/context.h>
+#include <basecode/core/memory/memory.h>
 
 namespace basecode {
     template<typename T> struct array_t final {
@@ -67,8 +67,12 @@ namespace basecode {
             reserve(array, array.size);
         }
 
-        template<typename T> T& back(array_t<T>& array) {
-            return array.data[array.size - 1];
+        template<typename T> T* back(array_t<T>& array) {
+            if constexpr (std::is_pointer_v<T>) {
+                return array.size == 0 ? nullptr : array.data[array.size - 1];
+            } else {
+                return array.size == 0 ? nullptr : &array.data[array.size - 1];
+            }
         }
 
         template<typename T> u0 reset(array_t<T>& array) {
@@ -84,22 +88,18 @@ namespace basecode {
             return array.size == 0;
         }
 
-        template<typename T> T& front(array_t<T>& array) {
-            return array.data[0];
+        template<typename T> T* front(array_t<T>& array) {
+            if constexpr (std::is_pointer_v<T>) {
+                return array.size == 0 ? nullptr : array.data[0];
+            } else {
+                return array.size == 0 ? nullptr : &array.data[0];
+            }
         }
 
         template<typename T> T& append(array_t<T>& array) {
             if (array.size + 1 > array.capacity)
                 grow(array);
             return array.data[array.size++];
-        }
-
-        template<typename T> const T& back(array_t<T>& array) {
-            return array.data[array.size - 1];
-        }
-
-        template<typename T> const T& front(array_t<T>& array) {
-            return array.data[0];
         }
 
         template<typename T> array_t<T> make(alloc_t* alloc) {
@@ -109,11 +109,11 @@ namespace basecode {
         }
 
         template<typename T> u0 erase(array_t<T>& array, u32 index) {
-            --array.size;
-            if (index > array.size)
+            if (index >= array.size)
                 return;
             auto dest = array.data + index;
-            std::memcpy(dest, dest + 1, (array.size + 1) * sizeof(T));
+            std::memcpy(dest, dest + 1, (array.size - index) * sizeof(T));
+            --array.size;
         }
 
         template<typename T> u0 append(array_t<T>& array, T&& value) {
@@ -146,11 +146,9 @@ namespace basecode {
         }
 
         template<typename T> s32 contains(array_t<T>& array, const T& value) {
-            const T* data = array.data;
-            const T* data_end = array.data + array.size;
-            while (data < data_end) {
-                if (*data++ == value)
-                    return (data - array.data) - 1;
+            for (u32 i = 0; i < array.size; ++i) {
+                if (array.data[i] == value)
+                    return i;
             }
             return -1;
         }
@@ -158,10 +156,8 @@ namespace basecode {
         template<typename T> u0 insert(array_t<T>& array, u32 index, T&& value) {
             if (array.size + 1 > array.capacity)
                 grow(array);
-            if (index < array.size) {
-                auto dest = array.data + index + 1;
-                std::memmove(dest, dest - 1, (array.size - index) * sizeof(T));
-            }
+            if (index < array.size)
+                std::memmove(array.data + index + 1, array.data + index, (array.size - index) * sizeof(T));
             array.data[index] = value;
             ++array.size;
         }
@@ -169,10 +165,8 @@ namespace basecode {
         template<typename T> u0 insert(array_t<T>& array, u32 index, const T& value) {
             if (array.size + 1 > array.capacity)
                 grow(array);
-            if (index < array.size) {
-                auto dest = array.data + index + 1;
-                std::memmove(dest, dest - 1, (array.size - index) * sizeof(T));
-            }
+            if (index < array.size)
+                std::memmove(array.data + index + 1, array.data + index, (array.size - index) * sizeof(T));
             array.data[index] = value;
             ++array.size;
         }
@@ -190,9 +184,7 @@ namespace basecode {
             if (new_capacity > 0) {
                 new_data = (T*) memory::alloc(array.alloc, new_capacity * sizeof(T), alignof(T));
                 std::memset(new_data, 0, new_capacity * sizeof(T));
-                if (array.data && copy) {
-                    std::memcpy(new_data, array.data, array.size * sizeof(T));
-                }
+                if (array.data && copy) std::memcpy(new_data, array.data, array.size * sizeof(T));
             }
 
             memory::free(array.alloc, array.data);

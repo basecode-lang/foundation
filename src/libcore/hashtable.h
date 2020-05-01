@@ -18,12 +18,12 @@
 
 #include <cassert>
 #include <algorithm>
+#include <basecode/core/str.h>
 #include <basecode/core/types.h>
-#include <basecode/core/string/str.h>
-#include <basecode/core/array/array.h>
-#include <basecode/core/memory/system.h>
-#include <basecode/core/format/system.h>
-#include <basecode/core/context/system.h>
+#include <basecode/core/array.h>
+#include <basecode/core/format.h>
+#include <basecode/core/context.h>
+#include <basecode/core/memory/memory.h>
 #include <basecode/core/hashing/hashable.h>
 #include <basecode/core/memory/bump_system.h>
 
@@ -45,11 +45,10 @@ namespace basecode {
         K*                      keys;
         V*                      values;
         alloc_t*                alloc;
+        alloc_t*                bump_alloc;
         u32                     size;
         u32                     capacity;
         u32                     weighted_capacity;
-        // XXX: not sure the best packing sequence for this
-        alloc_t                 bump_alloc;
     };
 
     namespace hashtable {
@@ -148,13 +147,16 @@ namespace basecode {
         }
 
         template<typename K, typename V> u0 reset(hashtable_t<K, V>& table) {
+            using state_t = typename hashtable_t<K, V>::state_t;
+
             if (table.buf)
-                std::memset(table.buf, 0, memory::bump::end_offset(&table.bump_alloc));
+                std::memset(table.states, 0, sizeof(state_t) * table.capacity);
             table.size = {};
         }
 
         template<typename K, typename V> u0 clear(hashtable_t<K, V>& table) {
             memory::free(table.alloc, table.buf);
+            memory::system::free(table.bump_alloc);
             table.buf = {};
             table.keys = {};
             table.values = {};
@@ -233,8 +235,8 @@ namespace basecode {
             table.alloc = alloc;
 
             bump_config_t config{};
-            config.type = bump_type_t::exiting;
-            memory::init(&table.bump_alloc, alloc_type_t::bump, &config);
+            config.type = bump_type_t::existing;
+            table.bump_alloc = memory::system::make(alloc_type_t::bump, &config);
 
             table.size = table.capacity = table.weighted_capacity = {};
         }
@@ -250,12 +252,12 @@ namespace basecode {
                             + sizeof(state_t) * new_capacity;
 
             auto new_buf = (u8*) memory::alloc(table.alloc, buf_size);
-            memory::bump::buf(&table.bump_alloc, new_buf, buf_size);
+            memory::bump::buf(table.bump_alloc, new_buf, buf_size);
 
-            auto new_states = (state_t*) memory::alloc(&table.bump_alloc, new_capacity * sizeof(state_t));
-            auto new_hashes = (u64*) memory::alloc(&table.bump_alloc, new_capacity * sizeof(u64), alignof(u64));
-            auto new_keys = (K*) memory::alloc(&table.bump_alloc, new_capacity * sizeof(K), alignof(K));
-            auto new_values = (V*) memory::alloc(&table.bump_alloc, new_capacity * sizeof(V), alignof(V));
+            auto new_states = (state_t*) memory::alloc(table.bump_alloc, new_capacity * sizeof(state_t));
+            auto new_hashes = (u64*) memory::alloc(table.bump_alloc, new_capacity * sizeof(u64), alignof(u64));
+            auto new_keys = (K*) memory::alloc(table.bump_alloc, new_capacity * sizeof(K), alignof(K));
+            auto new_values = (V*) memory::alloc(table.bump_alloc, new_capacity * sizeof(V), alignof(V));
 
             std::memset(new_states, 0, new_capacity * sizeof(state_t));
 

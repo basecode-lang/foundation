@@ -19,9 +19,9 @@
 #pragma once
 
 #include <basecode/core/types.h>
-#include <basecode/core/array/array.h>
-#include <basecode/core/slice/slice.h>
-#include <basecode/core/hashtable/hashtable.h>
+#include <basecode/core/array.h>
+#include <basecode/core/slice.h>
+#include <basecode/core/hashtable.h>
 
 namespace basecode {
     struct intern_t final {
@@ -62,7 +62,7 @@ namespace basecode {
 
         intern_t make(alloc_t* alloc = context::top()->alloc);
 
-        u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc);
+        u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc, u32 num_pages = 16);
     }
 }
 
