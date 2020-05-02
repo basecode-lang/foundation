@@ -23,12 +23,15 @@
 
 namespace basecode::memory::proxy {
     static u0 release(alloc_t* alloc) {
+        auto subclass = &alloc->subclass.proxy;
+        if (subclass->owner) alloc->backing->system->release(alloc->backing);
         alloc->total_allocated = {};
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto proxy_config = (proxy_config_t*) config;
         alloc->backing = proxy_config->backing;
+        alloc->subclass.proxy.owner = proxy_config->owner;
         assert(alloc->backing);
     }
 
@@ -115,11 +118,6 @@ namespace basecode::memory::proxy {
         }
     }
 
-    string::slice_t name(alloc_t* alloc) {
-        assert(alloc && alloc->system->type == alloc_type_t::proxy);
-        return alloc->subclass.proxy.name;
-    }
-
     status_t initialize(alloc_t* alloc) {
         g_proxy_system.alloc = alloc;
         hashtable::init(g_proxy_system.proxies, alloc);
@@ -127,12 +125,17 @@ namespace basecode::memory::proxy {
         return status_t::ok;
     }
 
+    string::slice_t name(alloc_t* alloc) {
+        assert(alloc && alloc->system->type == alloc_type_t::proxy);
+        return alloc->subclass.proxy.name;
+    }
+
     u0 name(alloc_t* alloc, string::slice_t name) {
         assert(alloc && alloc->system->type == alloc_type_t::proxy);
         alloc->subclass.proxy.name = name;
     }
 
-    alloc_t* make(alloc_t* backing, string::slice_t name) {
+    alloc_t* make(alloc_t* backing, string::slice_t name, b8 owner) {
         auto interned = intern::intern(g_proxy_system.intern, name);
         if (!OK(interned.status))
             return {};
@@ -140,6 +143,7 @@ namespace basecode::memory::proxy {
         if (proxy)
             return proxy;
         proxy_config_t config{};
+        config.owner = owner;
         config.backing = backing;
         proxy = system::make(alloc_type_t::proxy, &config);
         proxy::name(proxy, interned.slice);

@@ -25,6 +25,7 @@
 namespace basecode {
     struct proxy_config_t : alloc_config_t {
         alloc_t*                backing;
+        b8                      owner;
     };
 
     namespace memory::proxy {
@@ -53,16 +54,8 @@ namespace basecode {
 
         u0 name(alloc_t* alloc, string::slice_t name);
 
-        // XXX: proxy allocators + dynamically created allocators
-        //      via system::make create a unique situation whereby
-        //      the "owner" of the backing allocator isn't clear.
-        //
-        //      the calling code which creates the proxy and underlying
-        //      dynamic allocator need to ensure that the backing allocator
-        //      is properly free'd via system::free *before* system::shutdown
-        //      otherwise bad things happen.
-        alloc_t* make(alloc_t* backing, string::slice_t name);
-
         status_t initialize(alloc_t* alloc = context::top()->alloc);
+
+        alloc_t* make(alloc_t* backing, string::slice_t name, b8 owner = false);
     }
 }

@@ -21,7 +21,6 @@
 #include "memory/page_system.h"
 
 namespace basecode::intern {
-    static inline u32 index_size(u32);
     static b8 find_bucket(const u32* ids, u32 size, u32& bucket_index);
     static b8 find_key(const intern_t&, u64 hash, const string::slice_t& key, u32& bucket_index);
 
@@ -47,10 +46,8 @@ namespace basecode::intern {
         return false;
     }
 
-    static inline u32 index_size(u32 capacity) {
-        return (capacity * sizeof(u32))
-               + alignof(u64) + (capacity * sizeof(u64))
-               + alignof(string::slice_t) + (capacity * sizeof(string::slice_t));
+    static b8 requires_rehash(const intern_t& pool) {
+        return pool.capacity == 0 || pool.size + 1 > (pool.capacity - 1) * pool.load_factor;
     }
 
     static b8 find_bucket(const u32* ids, u32 capacity, u32& bucket_index) {
@@ -70,19 +67,21 @@ namespace basecode::intern {
     }
 
     u0 free(intern_t& pool) {
-        memory::system::free(pool.bump_alloc);
-        memory::system::free(pool.page_alloc);
-        memory::free(pool.alloc, pool.index);
-        pool.index = {};
-        pool.size = pool.capacity = {};
+        memory::system::free(memory::unwrap(pool.bump_alloc));
+        memory::system::free(memory::unwrap(pool.page_alloc));
+        memory::free(pool.alloc, pool.ids);
+        pool.ids    = {};
+        pool.hashes = {};
+        pool.slices = {};
+        pool.size   = pool.capacity = {};
     }
 
     u0 reset(intern_t& pool) {
         memory::page::reset(pool.page_alloc);
         memory::bump::reset(pool.bump_alloc);
-        pool.id = 1;
-        pool.size = {};
-        std::memset(pool.index, 0, index_size(pool.capacity));
+        pool.id     = 1;
+        pool.size   = {};
+        std::memset(pool.ids, 0, pool.capacity * sizeof(u32));
     }
 
     intern_t make(alloc_t* alloc) {
@@ -103,35 +102,24 @@ namespace basecode::intern {
                 };
             }
         }
-        return result_t{
-            .status = status_t::not_found
-        };
-    }
-
-    u0 init(intern_t& pool, alloc_t* alloc, u32 num_pages) {
-        pool.id = 1;
-        pool.alloc = alloc;
-
-        page_config_t page_config{};
-        page_config.backing = pool.alloc;
-        page_config.page_size = memory::system::os_page_size() * num_pages;
-        pool.page_alloc = memory::system::make(alloc_type_t::page, &page_config);
-
-        bump_config_t bump_config{};
-        bump_config.type = bump_type_t::allocator;
-        bump_config.backing.alloc = pool.page_alloc;
-        pool.bump_alloc = memory::system::make(alloc_type_t::bump, &bump_config);
+        return result_t{.status = status_t::not_found};
     }
 
     static status_t rehash(intern_t& pool, u32 new_capacity) {
-        new_capacity = std::max<u32>(new_capacity, 16);
+        new_capacity = std::max<u32>(new_capacity, std::ceil(std::max<u32>(16, new_capacity) / pool.load_factor));
 
-        auto new_data = (u8*) memory::alloc(pool.alloc, index_size(new_capacity), alignof(u32));
-        u32 adjust{};
-        auto ids    = (u32*)               new_data;
-        auto hashes = (u64*)               memory::system::align_forward(ids    + new_capacity, alignof(u64), adjust);
-        auto slices = (string::slice_t*)   memory::system::align_forward(hashes + new_capacity, alignof(string::slice_t), adjust);
-        std::memset(ids, 0, new_capacity * sizeof(u32));
+        const auto ids_size     = new_capacity * sizeof(u32);
+        const auto hashes_size  = new_capacity * sizeof(u64);
+        const auto slices_size  = new_capacity * sizeof(string::slice_t);
+        const auto buf_size     = ids_size + alignof(u64) + hashes_size + alignof(string::slice_t) + slices_size;
+
+        auto buf = (u8*) memory::alloc(pool.alloc, buf_size, alignof(u32));
+        std::memset(buf, 0, ids_size);
+
+        u32 align{};
+        auto ids    = (u32*)               buf;
+        auto hashes = (u64*)               memory::system::align_forward(buf + ids_size, alignof(u64), align);
+        auto slices = (string::slice_t*)   memory::system::align_forward(buf + ids_size + align + hashes_size, alignof(string::slice_t), align);
 
         for (u32 i = 0; i < pool.capacity; ++i) {
             if (pool.hashes[i] == 0)
@@ -141,23 +129,23 @@ namespace basecode::intern {
             if (!find_bucket(ids, new_capacity, bucket_index))
                 return status_t::no_bucket;
 
-            ids[bucket_index] = pool.ids[i];
-            hashes[bucket_index] = pool.hashes[i];
-            slices[bucket_index] = pool.slices[i];
+            ids[bucket_index]       = pool.ids[i];
+            hashes[bucket_index]    = pool.hashes[i];
+            slices[bucket_index]    = pool.slices[i];
         }
-        memory::free(pool.alloc, pool.index);
-        pool.index = new_data;
-        pool.ids = ids;
-        pool.hashes = hashes;
-        pool.slices = slices;
-        pool.capacity = new_capacity;
+
+        memory::free(pool.alloc, pool.ids);
+        pool.ids        = ids;
+        pool.hashes     = hashes;
+        pool.slices     = slices;
+        pool.capacity   = new_capacity;
 
         return status_t::ok;
     }
 
     result_t intern(intern_t& pool, string::slice_t value) {
-        if (!pool.index || pool.size * 3 > pool.capacity * 2) {
-            auto status = rehash(pool, pool.size * 3);
+        if (requires_rehash(pool)) {
+            auto status = rehash(pool, pool.size * 2);
             if (!OK(status))
                 return result_t{.status = status, .new_value = false};
         }
@@ -198,5 +186,21 @@ namespace basecode::intern {
             .status = status_t::ok,
             .new_value = true
         };
+    }
+
+    u0 init(intern_t& pool, alloc_t* alloc, f32 load_factor, u32 num_pages) {
+        pool.id = 1;
+        pool.alloc = alloc;
+        pool.load_factor = load_factor;
+
+        page_config_t page_config{};
+        page_config.backing = pool.alloc;
+        page_config.page_size = memory::system::os_page_size() * num_pages;
+        pool.page_alloc = memory::system::make(alloc_type_t::page, &page_config);
+
+        bump_config_t bump_config{};
+        bump_config.type = bump_type_t::allocator;
+        bump_config.backing.alloc = pool.page_alloc;
+        pool.bump_alloc = memory::system::make(alloc_type_t::bump, &bump_config);
     }
 }

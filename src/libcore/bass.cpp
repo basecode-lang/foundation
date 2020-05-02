@@ -74,12 +74,7 @@ namespace basecode {
 
         u0 free(bass_t& storage) {
             hashtable::free(storage.index);
-            memory::system::free(storage.bump_alloc);
-            // XXX: note that we must unwrap the page_alloc to get at the
-            //      underlying page allocator we created.  proxies can be/are usually
-            //      freed' via proxy::reset or proxy::shutdown *before* memory::system::shutdown.
-            //
-            //      pay attention!
+            memory::system::free(memory::unwrap(storage.bump_alloc));
             memory::system::free(memory::unwrap(storage.page_alloc));
         }
 
@@ -168,17 +163,22 @@ namespace basecode {
         u0 init(bass_t& storage, alloc_t* alloc, u32 num_pages) {
             storage.id = 1;
             storage.alloc = alloc;
-            hashtable::init(storage.index, memory::proxy::make(alloc, "bass::index"_ss));
+            
+            auto index_alloc = memory::proxy::make(storage.alloc, "bass::index"_ss);
+            hashtable::init(storage.index, index_alloc, .98f);
 
             page_config_t page_config{};
             page_config.backing = storage.alloc;
             page_config.page_size = memory::system::os_page_size() * num_pages;
-            storage.page_alloc = memory::proxy::make(memory::system::make(alloc_type_t::page, &page_config), "bass::page"_ss);
+            auto page_alloc = memory::system::make(alloc_type_t::page, &page_config);
+            auto page_alloc_proxy = memory::proxy::make(page_alloc, "bass::page"_ss );
+            storage.page_alloc = page_alloc_proxy;
 
             bump_config_t bump_config{};
             bump_config.type = bump_type_t::allocator;
             bump_config.backing.alloc = storage.page_alloc;
-            storage.bump_alloc = memory::system::make(alloc_type_t::bump, &bump_config);
+            auto bump_alloc = memory::system::make(alloc_type_t::bump, &bump_config);
+            storage.bump_alloc = bump_alloc;
         }
 
         cursor_t write_header(bass_t& storage, u8 type, u32 size) {

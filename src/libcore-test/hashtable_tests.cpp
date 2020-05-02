@@ -36,7 +36,7 @@ TEST_CASE("basecode::hashtable payload with integer keys") {
     hashtable_t<u32, payload_t> table{};
     hashtable::init(table, context::top()->alloc, .98f);
     defer(hashtable::free(table));
-    hashtable::reserve(table, 2048);
+    //hashtable::reserve(table, 2048);
 
     for (u32 i = 0; i < 4096; ++i) {
         auto payload = hashtable::emplace(table, i);

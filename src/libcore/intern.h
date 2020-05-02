@@ -25,7 +25,6 @@
 
 namespace basecode {
     struct intern_t final {
-        u8*                             index;
         alloc_t*                        alloc;
         alloc_t*                        page_alloc;
         alloc_t*                        bump_alloc;
@@ -35,6 +34,7 @@ namespace basecode {
         u32                             id;
         u32                             size;
         u32                             capacity;
+        f32                             load_factor;
     };
 
     namespace intern {
@@ -58,11 +58,11 @@ namespace basecode {
 
         result_t get(intern_t& pool, u32 id);
 
-        result_t intern(intern_t& pool, string::slice_t value);
-
         intern_t make(alloc_t* alloc = context::top()->alloc);
 
-        u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc, u32 num_pages = 16);
+        result_t intern(intern_t& pool, string::slice_t value);
+
+        u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc, f32 load_factor = .5f, u32 num_pages = 16);
     }
 }
 

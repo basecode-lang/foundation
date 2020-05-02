@@ -74,6 +74,7 @@ namespace basecode {
             struct {
                 string::slice_t name;
                 u32             id;
+                b8              owner;
             }                   proxy;
         }                       subclass;
         u32                     total_allocated;

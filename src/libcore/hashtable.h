@@ -25,7 +25,6 @@
 #include "context.h"
 #include "hashable.h"
 #include "memory/memory.h"
-#include "memory/bump_system.h"
 
 #pragma once
 
@@ -39,13 +38,11 @@ namespace basecode {
             removed
         };
 
-        u8*                     buf;
         state_t*                states;
         u64*                    hashes;
         K*                      keys;
         V*                      values;
         alloc_t*                alloc;
-        alloc_t*                bump_alloc;
         u32                     size;
         u32                     capacity;
         f32                     load_factor;
@@ -147,25 +144,17 @@ namespace basecode {
         }
 
         template<typename K, typename V> u0 reset(hashtable_t<K, V>& table) {
-            using state_t = typename hashtable_t<K, V>::state_t;
-
-            if (table.states) std::memset(table.states, 0, sizeof(state_t) * table.capacity);
+            if (table.states) std::memset(table.states, 0, table.capacity);
             table.size = {};
         }
 
         template<typename K, typename V> u0 clear(hashtable_t<K, V>& table) {
-            //memory::free(table.alloc, table.buf);
-            //memory::system::free(table.bump_alloc);
-            memory::free(table.alloc, table.keys);
             memory::free(table.alloc, table.states);
-            memory::free(table.alloc, table.hashes);
-            memory::free(table.alloc, table.values);
-            table.buf = {};
-            table.keys = {};
-            table.values = {};
-            table.hashes = {};
-            table.states = {};
-            table.capacity = table.size = {};
+            table.keys      = {};
+            table.values    = {};
+            table.hashes    = {};
+            table.states    = {};
+            table.capacity  = table.size = {};
         }
 
         template<typename K, typename V> auto keys(hashtable_t<K, V>& table) {
@@ -234,20 +223,21 @@ namespace basecode {
 
             new_capacity = std::max<u32>(new_capacity, std::ceil(std::max<u32>(16, new_capacity) / table.load_factor));
 
-//            auto buf_size = ((sizeof(K) * new_capacity) + alignof(K))
-//                            + ((sizeof(V) * new_capacity) + alignof(V))
-//                            + ((sizeof(u64) * new_capacity) + alignof(u64))
-//                            + sizeof(state_t) * new_capacity;
-//
-//            auto new_buf = (u8*) memory::alloc(table.alloc, buf_size);
-//            memory::bump::buf(table.bump_alloc, new_buf, buf_size);
+            const auto size_of_states = new_capacity;
+            const auto size_of_keys   = sizeof(K) * new_capacity;
+            const auto size_of_values = sizeof(V) * new_capacity;
+            const auto size_of_hashes = sizeof(u64) * new_capacity;
 
-            auto new_keys = (K*) memory::alloc(table.alloc, new_capacity * sizeof(K), alignof(K));
-            auto new_states = (state_t*) memory::alloc(table.alloc, new_capacity * sizeof(state_t));
-            auto new_values = (V*) memory::alloc(table.alloc, new_capacity * sizeof(V), alignof(V));
-            auto new_hashes = (u64*) memory::alloc(table.alloc, new_capacity * sizeof(u64), alignof(u64));
+            const auto buf_size = size_of_states + (alignof(K) + size_of_keys) + (alignof(V) + size_of_values) + (alignof(u64) + size_of_hashes);
 
-            std::memset(new_states, 0, new_capacity * sizeof(state_t));
+            u8* buf = (u8*) memory::alloc(table.alloc, buf_size);
+            std::memset(buf, 0, size_of_states);
+            state_t* new_states = (state_t*) buf;
+
+            u32 align{};
+            auto new_keys   = (K*)   memory::system::align_forward(buf + size_of_states, alignof(K), align);
+            auto new_values = (V*)   memory::system::align_forward(buf + size_of_states + size_of_keys + align, alignof(V), align);
+            auto new_hashes = (u64*) memory::system::align_forward(buf + size_of_states + size_of_keys + size_of_values + align, alignof(u64), align);
 
             for (u32 i = 0; i < table.capacity; ++i) {
                 if (table.states[i] != state_t::filled)
@@ -264,18 +254,13 @@ namespace basecode {
                 new_states[found_index] = state_t::filled;
             }
 
-            //memory::free(table.alloc, table.buf);
-            memory::free(table.alloc, table.keys);
-            memory::free(table.alloc, table.values);
             memory::free(table.alloc, table.states);
-            memory::free(table.alloc, table.hashes);
 
-            table.buf = {}; //new_buf;
-            table.keys = new_keys;
-            table.values = new_values;
-            table.states = new_states;
-            table.hashes = new_hashes;
-            table.capacity = new_capacity;
+            table.keys      = new_keys;
+            table.values    = new_values;
+            table.states    = new_states;
+            table.hashes    = new_hashes;
+            table.capacity  = new_capacity;
         }
 
         template<typename K, typename V> u0 reserve(hashtable_t<K, V>& table, u32 new_capacity) {
@@ -311,9 +296,9 @@ namespace basecode {
 
             find_free_bucket<K ,V>(table.states, table.capacity, bucket_index, &found_index);
 
-            table.keys[found_index] = key;
-            table.hashes[found_index] = hash;
-            table.states[found_index] = state_t::filled;
+            table.keys[found_index]     = key;
+            table.hashes[found_index]   = hash;
+            table.states[found_index]   = state_t::filled;
             ++table.size;
 
             if constexpr (std::is_pointer_v<V>) {
@@ -324,18 +309,13 @@ namespace basecode {
         }
 
         template<typename K, typename V> u0 init(hashtable_t<K, V>& table, alloc_t* alloc, f32 load_factor) {
-            table.buf = {};
-            table.keys = {};
-            table.values = {};
-            table.hashes = {};
-            table.states = {};
-            table.alloc = alloc;
-            table.load_factor = load_factor;
+            table.keys          = {};
+            table.values        = {};
+            table.hashes        = {};
+            table.states        = {};
+            table.alloc         = alloc;
+            table.load_factor   = load_factor;
             table.size = table.capacity = {};
-
-            //bump_config_t config{};
-            //config.type = bump_type_t::existing;
-            //table.bump_alloc = memory::system::make(alloc_type_t::bump, &config);
         }
 
         template<typename K, typename V> decltype(auto) insert(hashtable_t<K, V>& table, const K& key, const V& value) {
@@ -350,10 +330,10 @@ namespace basecode {
 
             find_free_bucket<K, V>(table.states, table.capacity, bucket_index, &found_index);
 
-            table.keys[found_index] = key;
-            table.hashes[found_index] = hash;
-            table.values[found_index] = value;
-            table.states[found_index] = state_t::filled;
+            table.keys[found_index]     = key;
+            table.hashes[found_index]   = hash;
+            table.values[found_index]   = value;
+            table.states[found_index]   = state_t::filled;
             ++table.size;
 
             if constexpr (std::is_pointer_v<V>) {

@@ -26,6 +26,7 @@
 #include "../array.h"
 #include "../format.h"
 #include "page_system.h"
+#include "bump_system.h"
 #include "slab_system.h"
 #include "proxy_system.h"
 #include "trace_system.h"
@@ -123,7 +124,7 @@ namespace basecode::memory {
         u0 print_allocators() {
             format::print(stderr, "g_system.allocators.size = {}\n", g_system.allocators.size);
             for (auto alloc : g_system.allocators) {
-                format::print(stderr, "alloc = {}, alloc->system->type = {}\n", (u0*) alloc, (u8) alloc->system->type);
+                format::print(stderr, "alloc = {}, alloc->system->type = {}\n", (u0*) alloc, name(alloc->system->type));
             }
         }
     }
