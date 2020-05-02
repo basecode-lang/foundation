@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/format.h>
+#include "format.h"
 #include "profiler.h"
 #include "stopwatch.h"
 

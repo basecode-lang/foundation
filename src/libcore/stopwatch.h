@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/slice.h>
+#include "types.h"
+#include "slice.h"
 
 namespace basecode {
     struct stopwatch_t final {

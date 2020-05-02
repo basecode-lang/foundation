@@ -19,9 +19,9 @@
 #pragma once
 
 #include <fmt/format.h>
-#include <basecode/core/str.h>
-#include <basecode/core/types.h>
-#include <basecode/core/memory/std_allocator.h>
+#include "str.h"
+#include "types.h"
+#include "memory/std_allocator.h"
 
 namespace basecode::format {
     using allocator_t = memory::std_allocator_t<char>;

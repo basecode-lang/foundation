@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include "types.h"
+
 namespace basecode {
 
     struct  timer_t;

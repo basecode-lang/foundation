@@ -5,6 +5,11 @@ set(VERSION_MAJOR 0)
 set(VERSION_MINOR 1)
 set(PRODUCT_NAME  "Basecode Foundation Core Library")
 
+include_directories(
+        ${PROJECT_SOURCE_DIR}
+        ${CMAKE_BINARY_DIR}/include/basecode/core
+)
+
 configure_file (
         configure.in.h
         "${CMAKE_BINARY_DIR}/include/basecode/core/configure.h"
@@ -22,6 +27,8 @@ add_library(
 
         bitset.cpp bitset.h
 
+        buffer.cpp buffer.h
+
         context.cpp context.h
 
         cxx/scope.cpp
@@ -36,7 +43,8 @@ add_library(
 
         gfx.h
 
-        hashing/hashable.h
+        hashable.h
+
         hashing/crc.cpp hashing/crc.h
         hashing/adler.cpp hashing/adler.h
         hashing/murmur.cpp hashing/murmur.h
@@ -60,13 +68,12 @@ add_library(
         memory/dlmalloc_system.cpp memory/dlmalloc_system.h
 
         profiler.cpp profiler.h
-        stopwatch.cpp stopwatch.h
 
         slice.h
 
-        source/buffer.cpp source/buffer.h
-
         stack.h
+
+        stopwatch.cpp stopwatch.h
 
         str.cpp str.h
 

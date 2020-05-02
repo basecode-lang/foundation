@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include "types.h"
 
 #define COL32_R_SHIFT    ((u32)0)
 #define COL32_G_SHIFT    ((u32)8)

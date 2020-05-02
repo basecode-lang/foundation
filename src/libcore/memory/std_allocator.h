@@ -19,8 +19,8 @@
 #pragma once
 
 #include <cassert>
-#include <basecode/core/context.h>
 #include "memory.h"
+#include "../context.h"
 
 namespace basecode::memory {
     template<class T>

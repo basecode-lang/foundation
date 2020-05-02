@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.15)
 project(core-test)
 
+include_directories(
+        ${PROJECT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_BINARY_DIR}/include
+)
+
 add_executable(
         ${PROJECT_NAME}
 

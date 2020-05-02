@@ -16,7 +16,6 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <new>
 #ifdef _WIN32
 #   include <windows.h>
 #else
@@ -24,9 +23,8 @@
 #endif
 #include <cassert>
 #include <sys/mman.h>
-#include <basecode/core/array.h>
-#include <basecode/core/format.h>
-#include "memory.h"
+#include "../array.h"
+#include "../format.h"
 #include "page_system.h"
 #include "slab_system.h"
 #include "proxy_system.h"

@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include "murmur.h"
+#include "types.h"
 
 namespace basecode::hashing {
 

@@ -18,14 +18,14 @@
 
 #include <cassert>
 #include <algorithm>
-#include <basecode/core/str.h>
-#include <basecode/core/types.h>
-#include <basecode/core/array.h>
-#include <basecode/core/format.h>
-#include <basecode/core/context.h>
-#include <basecode/core/memory/memory.h>
-#include <basecode/core/hashing/hashable.h>
-#include <basecode/core/memory/bump_system.h>
+#include "str.h"
+#include "types.h"
+#include "array.h"
+#include "format.h"
+#include "context.h"
+#include "hashable.h"
+#include "memory/memory.h"
+#include "memory/bump_system.h"
 
 #pragma once
 
@@ -48,16 +48,16 @@ namespace basecode {
         alloc_t*                bump_alloc;
         u32                     size;
         u32                     capacity;
-        u32                     weighted_capacity;
+        f32                     load_factor;
     };
 
     namespace hashtable {
         template<typename K, typename V> u0 clear(hashtable_t<K, V>& table);
         template<typename K, typename V> b8 requires_rehash(hashtable_t<K, V>& table);
-        template<typename K, typename V> u0 rehash(hashtable_t<K, V>& table, u32 new_capacity);
+        template<typename K, typename V> u0 rehash(hashtable_t<K, V>& table, u32 new_capacity = 16);
         template<typename K, typename V> hashtable_t<K, V> make(alloc_t* alloc = context::top()->alloc);
-        template<typename K, typename V> u0 init(hashtable_t<K, V>& table, alloc_t* alloc = context::top()->alloc);
         template<typename K, typename V> b8 find_key(hashtable_t<K, V>& table, u32 start, u64 hash, const K& key, u32* found);
+        template<typename K, typename V> u0 init(hashtable_t<K, V>& table, alloc_t* alloc = context::top()->alloc, f32 load_factor = .5f);
         template <typename K, typename V> b8 find_free_bucket(typename hashtable_t<K, V>::state_t* states, u32 states_size, u32 start, u32* found);
 
         template<typename K, typename V> consteval auto make_key_array(hashtable_t<K, V>& table) {
@@ -149,14 +149,17 @@ namespace basecode {
         template<typename K, typename V> u0 reset(hashtable_t<K, V>& table) {
             using state_t = typename hashtable_t<K, V>::state_t;
 
-            if (table.buf)
-                std::memset(table.states, 0, sizeof(state_t) * table.capacity);
+            if (table.states) std::memset(table.states, 0, sizeof(state_t) * table.capacity);
             table.size = {};
         }
 
         template<typename K, typename V> u0 clear(hashtable_t<K, V>& table) {
-            memory::free(table.alloc, table.buf);
-            memory::system::free(table.bump_alloc);
+            //memory::free(table.alloc, table.buf);
+            //memory::system::free(table.bump_alloc);
+            memory::free(table.alloc, table.keys);
+            memory::free(table.alloc, table.states);
+            memory::free(table.alloc, table.hashes);
+            memory::free(table.alloc, table.values);
             table.buf = {};
             table.keys = {};
             table.values = {};
@@ -193,7 +196,7 @@ namespace basecode {
         }
 
         template<typename K, typename V> b8 requires_rehash(hashtable_t<K, V>& table) {
-            return table.capacity == 0 || table.size > table.weighted_capacity;
+            return table.capacity == 0 || table.size + 1 > (table.capacity - 1) * table.load_factor;
         }
 
         template<typename K, typename V> decltype(auto) values(hashtable_t<K, V>& table) {
@@ -226,38 +229,23 @@ namespace basecode {
             return true;
         }
 
-        template<typename K, typename V> u0 init(hashtable_t<K, V>& table, alloc_t* alloc) {
-            table.buf = {};
-            table.keys = {};
-            table.values = {};
-            table.hashes = {};
-            table.states = {};
-            table.alloc = alloc;
-
-            bump_config_t config{};
-            config.type = bump_type_t::existing;
-            table.bump_alloc = memory::system::make(alloc_type_t::bump, &config);
-
-            table.size = table.capacity = table.weighted_capacity = {};
-        }
-
         template<typename K, typename V> u0 rehash(hashtable_t<K, V>& table, u32 new_capacity) {
             using state_t = typename hashtable_t<K, V>::state_t;
 
-            new_capacity = std::max(std::max(new_capacity, table.size), (u32) 8);
+            new_capacity = std::max<u32>(new_capacity, std::ceil(std::max<u32>(16, new_capacity) / table.load_factor));
 
-            auto buf_size = ((sizeof(K) * new_capacity) + alignof(K))
-                            + ((sizeof(V) * new_capacity) + alignof(V))
-                            + ((sizeof(u64) * new_capacity) + alignof(u64))
-                            + sizeof(state_t) * new_capacity;
+//            auto buf_size = ((sizeof(K) * new_capacity) + alignof(K))
+//                            + ((sizeof(V) * new_capacity) + alignof(V))
+//                            + ((sizeof(u64) * new_capacity) + alignof(u64))
+//                            + sizeof(state_t) * new_capacity;
+//
+//            auto new_buf = (u8*) memory::alloc(table.alloc, buf_size);
+//            memory::bump::buf(table.bump_alloc, new_buf, buf_size);
 
-            auto new_buf = (u8*) memory::alloc(table.alloc, buf_size);
-            memory::bump::buf(table.bump_alloc, new_buf, buf_size);
-
-            auto new_states = (state_t*) memory::alloc(table.bump_alloc, new_capacity * sizeof(state_t));
-            auto new_hashes = (u64*) memory::alloc(table.bump_alloc, new_capacity * sizeof(u64), alignof(u64));
-            auto new_keys = (K*) memory::alloc(table.bump_alloc, new_capacity * sizeof(K), alignof(K));
-            auto new_values = (V*) memory::alloc(table.bump_alloc, new_capacity * sizeof(V), alignof(V));
+            auto new_keys = (K*) memory::alloc(table.alloc, new_capacity * sizeof(K), alignof(K));
+            auto new_states = (state_t*) memory::alloc(table.alloc, new_capacity * sizeof(state_t));
+            auto new_values = (V*) memory::alloc(table.alloc, new_capacity * sizeof(V), alignof(V));
+            auto new_hashes = (u64*) memory::alloc(table.alloc, new_capacity * sizeof(u64), alignof(u64));
 
             std::memset(new_states, 0, new_capacity * sizeof(state_t));
 
@@ -276,19 +264,22 @@ namespace basecode {
                 new_states[found_index] = state_t::filled;
             }
 
-            memory::free(table.alloc, table.buf);
+            //memory::free(table.alloc, table.buf);
+            memory::free(table.alloc, table.keys);
+            memory::free(table.alloc, table.values);
+            memory::free(table.alloc, table.states);
+            memory::free(table.alloc, table.hashes);
 
-            table.buf = new_buf;
+            table.buf = {}; //new_buf;
             table.keys = new_keys;
             table.values = new_values;
             table.states = new_states;
             table.hashes = new_hashes;
             table.capacity = new_capacity;
-            table.weighted_capacity = new_capacity - (new_capacity * .15f);
         }
 
         template<typename K, typename V> u0 reserve(hashtable_t<K, V>& table, u32 new_capacity) {
-            rehash(table, new_capacity * 3);
+            rehash(table, std::ceil(std::max<u32>(16, new_capacity) / std::min(.5f, table.load_factor)));
         }
 
         template<typename K, typename V> decltype(auto) find(hashtable_t<K, V>& table, const K& key) {
@@ -308,17 +299,11 @@ namespace basecode {
             }
         }
 
-        // XXX: this should be working, but isn't.
-        //      investigate before heat death of universe.
-        force_inline u32 fast_range(u32 x, u32 y) {
-            return ((u64) x * (u64) y) >> 32;
-        }
-
         template<typename K, typename V> decltype(auto) emplace(hashtable_t<K, V>& table, const K& key) {
             using state_t = typename hashtable_t<K, V>::state_t;
 
             if (requires_rehash(table))
-                rehash(table, table.capacity * 3);
+                rehash(table, table.capacity * 2);
 
             u64 hash = hashing::hash64(key);
             u32 bucket_index = hash % table.capacity;
@@ -338,11 +323,26 @@ namespace basecode {
             }
         }
 
+        template<typename K, typename V> u0 init(hashtable_t<K, V>& table, alloc_t* alloc, f32 load_factor) {
+            table.buf = {};
+            table.keys = {};
+            table.values = {};
+            table.hashes = {};
+            table.states = {};
+            table.alloc = alloc;
+            table.load_factor = load_factor;
+            table.size = table.capacity = {};
+
+            //bump_config_t config{};
+            //config.type = bump_type_t::existing;
+            //table.bump_alloc = memory::system::make(alloc_type_t::bump, &config);
+        }
+
         template<typename K, typename V> decltype(auto) insert(hashtable_t<K, V>& table, const K& key, const V& value) {
             using state_t = typename hashtable_t<K, V>::state_t;
 
             if (requires_rehash(table))
-                rehash(table, table.capacity * 3);
+                rehash(table, table.capacity * 2);
 
             u64 hash = hashing::hash64(key);
             u32 bucket_index = hash % table.capacity;

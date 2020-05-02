@@ -21,9 +21,9 @@
 #include <cassert>
 #include <cstring>
 #include <algorithm>
-#include <basecode/core/types.h>
-#include <basecode/core/context.h>
-#include <basecode/core/memory/memory.h>
+#include "types.h"
+#include "context.h"
+#include "memory/memory.h"
 
 namespace basecode {
     template<typename T> struct stack_t final {

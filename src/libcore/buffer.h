@@ -18,20 +18,19 @@
 
 #pragma once
 
-#include <basecode/core/str.h>
-#include <basecode/core/types.h>
+#include "str.h"
 
 #define CURSOR(b)   (b.data[b.idx])
 #define PEEK(b, c)  (b.data[b.idx + c])
 
-namespace basecode::source {
+namespace basecode {
     struct buffer_t final {
-        u64                     idx;
+        alloc_t*                alloc;
         u8*                     data;
-        u32                     line;
+        u64                     idx;
         u64                     length;
+        u32                     line;
         u32                     column;
-        alloc_t*                allocator;
     };
 
     namespace buffer {
@@ -52,9 +51,9 @@ namespace basecode::source {
 
         status_t load(const string_t& path, buffer_t& buf);
 
-        buffer_t make(alloc_t* allocator = context::top()->alloc);
+        buffer_t make(alloc_t* alloc = context::top()->alloc);
 
-        u0 init(buffer_t& buf, alloc_t* allocator = context::top()->alloc);
+        u0 init(buffer_t& buf, alloc_t* alloc = context::top()->alloc);
     }
 }
 

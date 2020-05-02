@@ -16,12 +16,12 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/defer.h>
+#include "defer.h"
 #include "buffer.h"
 
-namespace basecode::source::buffer {
+namespace basecode::buffer {
     u0 free(buffer_t& buf) {
-        memory::free(buf.allocator, buf.data);
+        memory::free(buf.alloc, buf.data);
     }
 
     b8 has_more(buffer_t& buf) {
@@ -43,15 +43,15 @@ namespace basecode::source::buffer {
         buf.column = 0;
     }
 
-    buffer_t make(alloc_t* allocator) {
+    buffer_t make(alloc_t* alloc) {
         buffer_t buf{};
-        init(buf, allocator);
+        init(buf, alloc);
         return buf;
     }
 
-    u0 init(buffer_t& buf, alloc_t* allocator) {
+    u0 init(buffer_t& buf, alloc_t* alloc) {
         buf.data = {};
-        buf.allocator = allocator;
+        buf.alloc = alloc;
         buf.idx = buf.length = {};
         buf.column = buf.line = {};
     }

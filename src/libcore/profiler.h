@@ -19,7 +19,7 @@
 #pragma once
 
 #include <chrono>
-#include <basecode/core/types.h>
+#include "types.h"
 #if __APPLE__
 #   include <mach/mach_time.h>
 #endif

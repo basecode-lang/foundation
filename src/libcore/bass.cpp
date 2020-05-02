@@ -16,10 +16,10 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/memory/bump_system.h>
-#include <basecode/core/memory/page_system.h>
-#include <basecode/core/memory/proxy_system.h>
 #include "bass.h"
+#include "memory/bump_system.h"
+#include "memory/page_system.h"
+#include "memory/proxy_system.h"
 
 namespace basecode {
     static string::slice_t s_kinds[] = {

@@ -16,10 +16,9 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/hashing/murmur.h>
-#include <basecode/core/memory/bump_system.h>
-#include <basecode/core/memory/page_system.h>
 #include "intern.h"
+#include "memory/bump_system.h"
+#include "memory/page_system.h"
 
 namespace basecode::intern {
     static inline u32 index_size(u32);

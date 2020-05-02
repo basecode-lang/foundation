@@ -20,9 +20,9 @@
 
 #include <cstring>
 #include <fmt/format.h>
-#include <basecode/core/types.h>
-#include <basecode/core/hashing/murmur.h>
-#include <basecode/core/hashing/hashable.h>
+#include "types.h"
+#include "hashable.h"
+#include "hashing/murmur.h"
 
 namespace basecode {
     template<typename T> struct slice_t final {

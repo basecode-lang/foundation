@@ -18,26 +18,16 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/format.h>
-#include <basecode/core/source/buffer.h>
+#include "types.h"
+#include "format.h"
+#include "buffer.h"
 
 namespace basecode {
     namespace error {
         template<typename ...Args>
-        inline u0 print(
-                FILE* file,
-                source::buffer_t& buf,
-                fmt::string_view fmt_msg,
-                Args&& ... args) {
-            const auto msg = format::format(buf.allocator, fmt_msg, std::forward<Args>(args)...);
-            format::print(
-                buf.allocator,
-                file,
-                "error({}:{}): {}\n",
-                buf.line + 1,
-                buf.column + 1,
-                msg);
+        inline u0 print(FILE* file, buffer_t& buf, fmt::string_view fmt_msg, Args&& ... args) {
+            const auto msg = format::format(buf.alloc, fmt_msg, std::forward<Args>(args)...);
+            format::print(buf.alloc, file, "error({}:{}): {}\n", buf.line + 1, buf.column + 1, msg);
         }
     }
 }

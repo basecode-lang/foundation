@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/context.h>
-#include <basecode/core/memory/memory.h>
+#include "types.h"
+#include "context.h"
+#include "memory/memory.h"
 
 namespace basecode {
     struct bitset_t final {

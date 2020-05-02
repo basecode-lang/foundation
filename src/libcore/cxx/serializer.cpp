@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/memory/proxy_system.h>
+#include "../memory/proxy_system.h"
 #include "cxx.h"
 
 namespace basecode::cxx::serializer {

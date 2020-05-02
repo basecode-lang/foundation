@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include "../types.h"
 
 namespace basecode::hashing::symbol {
     u64 hash64(const u8* src, usize len);

@@ -34,7 +34,7 @@ TEST_CASE("basecode::hashtable payload with integer keys") {
     stopwatch::start(time);
 
     hashtable_t<u32, payload_t> table{};
-    hashtable::init(table);
+    hashtable::init(table, context::top()->alloc, .98f);
     defer(hashtable::free(table));
     hashtable::reserve(table, 2048);
 
@@ -78,7 +78,7 @@ TEST_CASE("basecode::hashtable basics") {
     hashtable::insert(table, 6, six);
     hashtable::insert(table, 7, seven);
     REQUIRE(table.size == 7);
-    REQUIRE(table.capacity == 8);
+    REQUIRE(table.capacity == 32);
 
     string::slice_t* s{};
 

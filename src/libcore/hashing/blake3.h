@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include "../types.h"
 
 namespace basecode::hashing::blake3 {
 

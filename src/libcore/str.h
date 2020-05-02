@@ -20,12 +20,12 @@
 
 #include <cstring>
 #include <cassert>
-#include <basecode/core/slice.h>
-#include <basecode/core/types.h>
-#include <basecode/core/context.h>
-#include <basecode/core/memory/memory.h>
-#include <basecode/core/hashing/murmur.h>
-#include <basecode/core/hashing/hashable.h>
+#include "slice.h"
+#include "types.h"
+#include "context.h"
+#include "hashable.h"
+#include "memory/memory.h"
+#include "hashing/murmur.h"
 
 namespace basecode {
     struct string_t;

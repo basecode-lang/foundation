@@ -17,8 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <cassert>
-#include <basecode/core/format.h>
-#include "memory.h"
+#include "../format.h"
 #include "bump_system.h"
 
 namespace basecode::memory::bump {

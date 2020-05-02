@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/hashtable.h>
+#include "hashtable.h"
 
 namespace basecode {
     namespace kind {

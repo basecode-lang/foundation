@@ -18,7 +18,6 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/str.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/error.h>
 #include <basecode/core/format.h>
 
@@ -27,8 +26,8 @@ using namespace basecode;
 TEST_CASE("string::slice_t formatting") {
     format::print("{:<20}", "test with alignment\n"_ss);
 
-    source::buffer_t buf{};
-    source::buffer::init(buf);
+    buffer_t buf{};
+    buffer::init(buf);
 
     error::print(stderr, buf, "test: {}", 10);
 }

@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/array.h>
-#include <basecode/core/slice.h>
-#include <basecode/core/hashtable.h>
+#include "types.h"
+#include "array.h"
+#include "slice.h"
+#include "hashtable.h"
 
 namespace basecode {
     struct intern_t final {
