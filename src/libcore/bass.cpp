@@ -154,7 +154,8 @@ namespace basecode {
 
         b8 new_record(cursor_t& cursor, u8 type, u32 num_fields) {
             const u32 record_size = RECORD_BYTE_SIZE(num_fields + 2);
-            cursor.page = (u8*) memory::alloc(cursor.storage->bump_alloc, record_size, alignof(field_t));
+            memory::alloc(cursor.storage->bump_alloc, record_size, alignof(field_t));
+            cursor.page = (u8*) memory::bump::buf(cursor.storage->bump_alloc);
 
             cursor.field = {};
             cursor.id = cursor.storage->id++;
