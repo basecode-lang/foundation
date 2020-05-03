@@ -30,13 +30,15 @@ namespace basecode::cxx::program {
 
     u0 debug_dump(program_t& pgm) {
         u32 value{};
-        auto cursor = bass::first_header(pgm.storage);
-        while (cursor.ok) {
+        cursor_t cursor{};
+        if (!bass::seek_first(pgm.storage, cursor))
+            return;
+        do {
             format::print(
                 "{}(bytes={}, field_capacity={}) {{\n",
                 element::header::name(cursor.header->type),
                 cursor.header->value,
-                (cursor.header->value / sizeof(field_t)) - 1);
+                RECORD_FIELD_COUNT(cursor.header->value));
 
             while (bass::next_field(cursor, value)) {
                 format::print(
@@ -121,18 +123,20 @@ namespace basecode::cxx::program {
             }
 
             format::print("}}\n");
-            bass::next_header(cursor);
-        }
+        } while (bass::next_record(cursor));
     }
 
     status_t finalize(program_t& pgm) {
-        auto list_cursor = bass::write_header(pgm.storage, element::header::list, pgm.modules.size + 1);
+        cursor_t list_cursor{};
+        bass::seek_current(pgm.storage, list_cursor);
+        bass::new_record(list_cursor, element::header::list, pgm.modules.size + 1);
         bass::write_field(list_cursor, element::field::parent, pgm.id);
         for (const auto& module : pgm.modules)
             bass::write_field(list_cursor, element::field::child, module.id);
 
+        cursor_t pgm_cursor{};
         u32 value{};
-        auto pgm_cursor = bass::get_header(pgm.storage, pgm.id);
+        bass::seek_record(pgm.storage, pgm.id, pgm_cursor);
         if (!bass::next_field(pgm_cursor, value, element::field::list))
             return status_t::list_not_found;
         bass::write_field(pgm_cursor, element::field::list, list_cursor.id);
@@ -155,7 +159,9 @@ namespace basecode::cxx::program {
         array::init(pgm.modules, alloc);
         array::reserve(pgm.modules, num_modules);
         bass::init(pgm.storage, alloc);
-        auto cursor = bass::write_header(pgm.storage, element::header::program, 1);
+        cursor_t cursor{};
+        bass::seek_current(pgm.storage, cursor);
+        bass::new_record(cursor, element::header::program, 1);
         bass::write_field(cursor, element::field::list, 0);
         pgm.id = cursor.id;
         pgm.alloc = alloc;

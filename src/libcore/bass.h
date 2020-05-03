@@ -20,6 +20,9 @@
 
 #include "hashtable.h"
 
+#define RECORD_BYTE_SIZE(n)     ((n) * sizeof(field_t))
+#define RECORD_FIELD_COUNT(n)   (((n) / sizeof(field_t)) - 1)
+
 namespace basecode {
     namespace kind {
         [[maybe_unused]] static constexpr u8 none       = 0b000;
@@ -69,7 +72,6 @@ namespace basecode {
         u16                     offset;
         u16                     end_offset;
         u16                     start_offset;
-        b8                      ok;
     };
 
     namespace bass {
@@ -83,21 +85,21 @@ namespace basecode {
 
         u0 free(bass_t& storage);
 
-        b8 next_header(cursor_t& cursor);
+        b8 next_record(cursor_t& cursor);
 
         u0 reset_cursor(cursor_t& cursor);
 
-        cursor_t make_cursor(bass_t& storage);
+        b8 seek_first(bass_t& storage, cursor_t& cursor);
 
-        cursor_t first_header(bass_t& storage);
-
-        cursor_t get_header(bass_t& storage, u32 id);
+        b8 seek_current(bass_t& storage, cursor_t& cursor);
 
         b8 write_field(cursor_t& cursor, u8 type, u32 value);
 
         b8 next_field(cursor_t& cursor, u32& value, u8 type = 0);
 
-        cursor_t write_header(bass_t& storage, u8 type, u32 size = 0);
+        b8 new_record(cursor_t& cursor, u8 type, u32 num_fields);
+
+        b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor);
 
         u0 init(bass_t& storage, alloc_t* alloc = context::top()->alloc, u32 num_pages = 16);
     }

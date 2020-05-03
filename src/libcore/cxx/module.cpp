@@ -44,7 +44,9 @@ namespace basecode::cxx::module {
         module.program = &pgm;
         module.revision = rev;
 
-        auto cursor = bass::write_header(pgm.storage, element::header::module, 4);
+        cursor_t cursor{};
+        bass::seek_current(pgm.storage, cursor);
+        bass::new_record(cursor, element::header::module, 4);
         bass::write_field(cursor, element::field::parent, pgm.id);
         bass::write_field(cursor, element::field::revision, (u32) rev);
         module.id = cursor.id;
