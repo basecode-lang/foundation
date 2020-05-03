@@ -954,9 +954,8 @@ namespace basecode::cxx::serializer {
         if (unlikely(!bass::next_field(pgm_cursor, value, element::field::list)))
             return status_t::list_not_found;
         auto list_cursor = bass::get_header(store, value);
-        auto buf_allocator = memory::proxy::make(s.alloc, "serializer::buf"_ss);
         while (bass::next_field(list_cursor, value, element::field::child)) {
-            auto status = serialize_module(s, value, buf_allocator);
+            auto status = serialize_module(s, value, s.alloc);
             if (unlikely(!OK(status)))
                 return status;
         }
@@ -971,8 +970,7 @@ namespace basecode::cxx::serializer {
         s.store = &pgm.storage;
         s.intern = &pgm.intern;
         s.tab_width = tab_width;
-        auto scratch_allocator = memory::proxy::make(s.alloc, "serializer::scratch"_ss);
-        string::init(s.scratch, scratch_allocator);
+        string::init(s.scratch, s.alloc);
         string::reserve(s.scratch, 32);
     }
 

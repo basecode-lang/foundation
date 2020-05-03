@@ -49,16 +49,13 @@ namespace basecode::cxx::module {
         bass::write_field(cursor, element::field::revision, (u32) rev);
         module.id = cursor.id;
 
-        const auto& scopes_array_name = format::format("module[{}]::scope<array_t>", module.id);
-        array::init(module.scopes, memory::proxy::make(alloc, slice::make(scopes_array_name)));
+        array::init(module.scopes, alloc);
 
         auto& root = array::append(module.scopes);
         root.idx = module.scopes.size - 1;
         module.root_scope_idx = root.idx;
 
-        const auto& root_scope_name = format::format("module[{}]::root<scope_t*>", module.id);
-        const auto root_scope_proxy = memory::proxy::make(alloc, slice::make(root_scope_name));
-        scope::init(&pgm, &module, root, {}, root_scope_proxy);
+        scope::init(&pgm, &module, root, {}, alloc);
 
         module.filename_id = scope::lit::str(root, filename);
         bass::write_field(cursor, element::field::lit, module.filename_id);

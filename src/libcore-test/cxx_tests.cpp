@@ -27,7 +27,7 @@
 using namespace basecode;
 using namespace basecode::cxx;
 
-TEST_CASE("basecode::cxx create program_t") {
+TEST_CASE("basecode::cxx create program_t"/*, "[!hide]"*/) {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -35,7 +35,6 @@ TEST_CASE("basecode::cxx create program_t") {
     cxx::program::init(pgm);
     defer({
         cxx::program::free(pgm);
-        memory::proxy::reset();
     });
     REQUIRE(pgm.storage.alloc);
     REQUIRE(pgm.modules.alloc);
@@ -48,7 +47,7 @@ TEST_CASE("basecode::cxx create program_t") {
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx create module_t") {
+TEST_CASE("basecode::cxx create module_t"/*, "[!hide]"*/) {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -56,7 +55,6 @@ TEST_CASE("basecode::cxx create module_t") {
     cxx::program::init(pgm);
     defer({
         cxx::program::free(pgm);
-        memory::proxy::reset();
     });
 
     const auto expected_filename = "test.cpp"_ss;
@@ -88,7 +86,7 @@ TEST_CASE("basecode::cxx create module_t") {
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx create identifier within scope") {
+TEST_CASE("basecode::cxx create identifier within scope"/*, "[!hide]"*/) {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -96,7 +94,6 @@ TEST_CASE("basecode::cxx create identifier within scope") {
     cxx::program::init(pgm);
     defer({
         cxx::program::free(pgm);
-        memory::proxy::reset();
     });
 
     const auto expected_filename = "test.cpp"_ss;
@@ -122,7 +119,7 @@ TEST_CASE("basecode::cxx create identifier within scope") {
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx declare s32 type within scope") {
+TEST_CASE("basecode::cxx declare s32 type within scope"/*, "[!hide]"*/) {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -130,7 +127,6 @@ TEST_CASE("basecode::cxx declare s32 type within scope") {
     cxx::program::init(pgm);
     defer({
         cxx::program::free(pgm);
-        memory::proxy::reset();
     });
 
     const auto expected_ident = "int"_ss;
@@ -148,20 +144,17 @@ TEST_CASE("basecode::cxx declare s32 type within scope") {
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx example program") {
+TEST_CASE("basecode::cxx example program"/*, "[!hide]"*/) {
     alloc_t region_alloc{};
     dl_config_t region_config{};
     region_config.heap_size = 512 * 1024;
     memory::init(&region_alloc, alloc_type_t::dlmalloc, &region_config);
     defer({
-        memory::proxy::reset(false);
         memory::system::print_allocators();
         memory::release(&region_alloc, false);
     });
-    auto region_proxy = memory::proxy::make(&region_alloc, "512kb region"_ss);
-    defer(memory::proxy::free(region_proxy));
 
-    alloc_t* alloc = region_proxy; //context::top()->alloc;
+    alloc_t* alloc = &region_alloc;
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 

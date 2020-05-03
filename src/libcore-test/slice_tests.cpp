@@ -29,5 +29,5 @@ TEST_CASE("string::slice_t formatting") {
     buffer_t buf{};
     buffer::init(buf);
 
-    error::print(stderr, buf, "test: {}", 10);
+    error::print(stdout, buf, "test: {}", 10);
 }

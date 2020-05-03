@@ -151,10 +151,8 @@ namespace basecode::cxx::program {
     }
 
     u0 init(program_t& pgm, alloc_t* alloc, u32 num_modules) {
-        auto intern_proxy = memory::proxy::make(alloc, "intern::pool"_ss);
-        intern::init(pgm.intern, intern_proxy);
-        auto modules_proxy = memory::proxy::make(alloc, "program::modules"_ss);
-        array::init(pgm.modules, modules_proxy);
+        intern::init(pgm.intern, alloc);
+        array::init(pgm.modules, alloc);
         array::reserve(pgm.modules, num_modules);
         bass::init(pgm.storage, alloc);
         auto cursor = bass::write_header(pgm.storage, element::header::program, 1);

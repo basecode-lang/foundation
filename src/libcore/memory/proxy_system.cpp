@@ -24,7 +24,7 @@
 namespace basecode::memory::proxy {
     static u0 release(alloc_t* alloc) {
         auto subclass = &alloc->subclass.proxy;
-        if (subclass->owner) alloc->backing->system->release(alloc->backing);
+        if (subclass->owner) memory::release(alloc->backing);
         alloc->total_allocated = {};
     }
 

@@ -164,15 +164,13 @@ namespace basecode {
             storage.id = 1;
             storage.alloc = alloc;
             
-            auto index_alloc = memory::proxy::make(storage.alloc, "bass::index"_ss);
-            hashtable::init(storage.index, index_alloc, .98f);
+            hashtable::init(storage.index, storage.alloc, .98f);
 
             page_config_t page_config{};
             page_config.backing = storage.alloc;
             page_config.page_size = memory::system::os_page_size() * num_pages;
             auto page_alloc = memory::system::make(alloc_type_t::page, &page_config);
-            auto page_alloc_proxy = memory::proxy::make(page_alloc, "bass::page"_ss );
-            storage.page_alloc = page_alloc_proxy;
+            storage.page_alloc = page_alloc;
 
             bump_config_t bump_config{};
             bump_config.type = bump_type_t::allocator;
