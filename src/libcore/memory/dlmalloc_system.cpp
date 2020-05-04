@@ -56,9 +56,10 @@ namespace basecode::memory::dl {
     static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size) {
         auto h = system::header(mem);
         old_size = h->size;
-        alloc->total_allocated += (s32) (size - old_size);
-        h = (alloc_header_t*) mspace_realloc(alloc->subclass.dl.heap, h, size);
-        h->size = size;
+        auto alloc_size = system::size_with_padding(size, align);
+        h = (alloc_header_t*) mspace_realloc(alloc->subclass.dl.heap, h, alloc_size);
+        h->size = alloc_size;
+        alloc->total_allocated += (s32) (alloc_size - old_size);
         return system::data_pointer(h, align);
     }
 
