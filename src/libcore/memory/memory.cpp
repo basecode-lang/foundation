@@ -89,23 +89,13 @@ namespace basecode::memory {
         }
 
         u0 free(alloc_t* alloc, b8 enforce) {
-//            format::print("before: ");
-//            for (u32 i = 0; i < g_system.allocators.size; ++i) {
-//                if (i > 0) format::print(", ");
-//                format::print("{} = {}", i, (u0*) g_system.allocators.data[i]);
-//            }
-//            format::print("\n");
             auto idx = array::contains(g_system.allocators, alloc);
             if (idx == -1) return;
             array::erase(g_system.allocators, idx);
+            if (alloc->system->type == alloc_type_t::proxy && alloc->subclass.proxy.owner)
+                free(alloc->backing, enforce);
             memory::release(alloc, enforce);
             memory::free(&g_system.slab_alloc, alloc);
-//            format::print("after:  ");
-//            for (u32 i = 0; i < g_system.allocators.size; ++i) {
-//                if (i > 0) format::print(", ");
-//                format::print("{} = {}", i, (u0*) g_system.allocators.data[i]);
-//            }
-//            format::print("\n");
         }
 
         b8 set_page_executable(u0* ptr, usize size) {

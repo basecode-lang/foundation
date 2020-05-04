@@ -19,6 +19,10 @@
 #include "default_system.h"
 
 namespace basecode::memory::default_ {
+    static u0 release(alloc_t* alloc) {
+        alloc->total_allocated = {};
+    }
+
     static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
         auto h = system::header(mem);
         freed_size = h->size;
@@ -49,6 +53,7 @@ namespace basecode::memory::default_ {
         .type       = alloc_type_t::system,
         .free       = free,
         .alloc      = alloc,
+        .release    = release,
         .realloc    = realloc,
     };
 

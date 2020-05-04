@@ -21,6 +21,7 @@
 namespace basecode::memory::dl {
     static u0 release(alloc_t* alloc) {
         destroy_mspace(alloc->subclass.dl.heap);
+        alloc->total_allocated = {};
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {

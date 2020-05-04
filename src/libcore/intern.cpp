@@ -19,6 +19,7 @@
 #include "intern.h"
 #include "memory/bump_system.h"
 #include "memory/page_system.h"
+#include "memory/proxy_system.h"
 
 namespace basecode::intern {
     static b8 find_bucket(const u32* ids, u32 size, u32& bucket_index);
@@ -67,8 +68,8 @@ namespace basecode::intern {
     }
 
     u0 free(intern_t& pool) {
-        memory::system::free(memory::unwrap(pool.bump_alloc));
-        memory::system::free(memory::unwrap(pool.page_alloc));
+        memory::system::free(pool.bump_alloc);
+        memory::system::free(pool.page_alloc);
         memory::free(pool.alloc, pool.ids);
         pool.ids    = {};
         pool.hashes = {};
@@ -202,5 +203,7 @@ namespace basecode::intern {
         bump_config.type = bump_type_t::allocator;
         bump_config.backing.alloc = pool.page_alloc;
         pool.bump_alloc = memory::system::make(alloc_type_t::bump, &bump_config);
+
+        pool.alloc = memory::proxy::make(pool.alloc, "intern::index"_ss);
     }
 }

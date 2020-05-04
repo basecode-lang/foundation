@@ -19,6 +19,7 @@
 #include "bass.h"
 #include "memory/bump_system.h"
 #include "memory/page_system.h"
+#include "memory/proxy_system.h"
 
 namespace basecode {
     static string::slice_t s_kinds[] = {
@@ -72,9 +73,10 @@ namespace basecode {
         }
 
         u0 free(bass_t& storage) {
+            memory::system::free(storage.bump_alloc);
+            memory::system::free(storage.page_alloc);
             hashtable::free(storage.index);
-            memory::system::free(memory::unwrap(storage.bump_alloc));
-            memory::system::free(memory::unwrap(storage.page_alloc));
+            memory::system::free(storage.alloc);
         }
 
         b8 next_record(cursor_t& cursor) {
@@ -149,19 +151,19 @@ namespace basecode {
 
         u0 init(bass_t& storage, alloc_t* alloc, u32 num_pages) {
             storage.id = 1;
-            storage.alloc = alloc;
+            storage.alloc = memory::proxy::make(alloc, "bass"_ss);
 
-            hashtable::init(storage.index, storage.alloc, .98f);
+            hashtable::init(storage.index, memory::proxy::make(storage.alloc, "bass::index"_ss), .98f);
 
             page_config_t page_config{};
             page_config.backing = storage.alloc;
             page_config.page_size = memory::system::os_page_size() * num_pages;
-            storage.page_alloc = memory::system::make(alloc_type_t::page, &page_config);
+            storage.page_alloc = memory::proxy::make(memory::system::make(alloc_type_t::page, &page_config), "bass::page"_ss, true);
 
             bump_config_t bump_config{};
             bump_config.type = bump_type_t::allocator;
             bump_config.backing.alloc = storage.page_alloc;
-            storage.bump_alloc = memory::system::make(alloc_type_t::bump, &bump_config);
+            storage.bump_alloc = memory::proxy::make(memory::system::make(alloc_type_t::bump, &bump_config), "bass::bump"_ss, true);
         }
 
         b8 new_record(cursor_t& cursor, u8 type, u32 num_fields) {
