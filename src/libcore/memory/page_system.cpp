@@ -40,12 +40,13 @@ namespace basecode::memory::page {
         subclass->count = {};
         alloc->backing = page_config->backing;
         subclass->cursor = subclass->tail = subclass->head = {};
-        if (page_config->page_size < memory::system::os_page_size()) {
-            page_config->page_size = memory::system::os_page_size();
+        auto page_size = memory::system::os_page_size();
+        if (page_config->page_size < page_size) {
+            page_config->page_size = page_size;
         } else if (!is_power_of_two(page_config->page_size)) {
             page_config->page_size = next_power_of_two(page_config->page_size);
         }
-        subclass->size = page_config->page_size - (alignof(page_header_t) + 4);
+        subclass->size = page_config->page_size - (sizeof(page_header_t) + sizeof(alloc_header_t));
         assert(alloc->backing);
     }
 
@@ -84,7 +85,7 @@ namespace basecode::memory::page {
             }
             subclass->head = page;
         }
-        allocated_size = subclass->size;
+        allocated_size = subclass->size - sizeof(page_header_t) - sizeof(alloc_header_t);
         return page + sizeof(page_header_t);
     }
 

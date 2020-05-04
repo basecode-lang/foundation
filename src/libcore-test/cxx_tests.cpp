@@ -27,7 +27,7 @@
 using namespace basecode;
 using namespace basecode::cxx;
 
-TEST_CASE("basecode::cxx create program_t"/*, "[!hide]"*/) {
+TEST_CASE("basecode::cxx create program_t", "[!hide]") {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -47,7 +47,7 @@ TEST_CASE("basecode::cxx create program_t"/*, "[!hide]"*/) {
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx create module_t"/*, "[!hide]"*/) {
+TEST_CASE("basecode::cxx create module_t", "[!hide]") {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -86,7 +86,7 @@ TEST_CASE("basecode::cxx create module_t"/*, "[!hide]"*/) {
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx create identifier within scope"/*, "[!hide]"*/) {
+TEST_CASE("basecode::cxx create identifier within scope", "[!hide]") {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -119,7 +119,7 @@ TEST_CASE("basecode::cxx create identifier within scope"/*, "[!hide]"*/) {
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx declare s32 type within scope"/*, "[!hide]"*/) {
+TEST_CASE("basecode::cxx declare s32 type within scope", "[!hide]") {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -270,6 +270,7 @@ TEST_CASE("basecode::cxx example program"/*, "[!hide]"*/) {
             main_params_list_id));
     scope::pop(top_level);
 
+//    program::debug_dump(pgm);
     REQUIRE(OK(cxx::program::finalize(pgm)));
 
     stopwatch::stop(build_time);

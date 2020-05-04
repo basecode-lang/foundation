@@ -27,6 +27,8 @@ namespace basecode::format {
     using allocator_t = memory::std_allocator_t<char>;
     using memory_buffer_t = fmt::basic_memory_buffer<char, fmt::inline_buffer_size, allocator_t>;
 
+    u0 hex_dump(memory_buffer_t& buf, const u0* data, u32 size);
+
     u0 vprint(alloc_t*, FILE*, fmt::string_view, fmt::format_args);
 
     string_t vformat(alloc_t*, fmt::string_view, fmt::format_args);

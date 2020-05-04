@@ -60,7 +60,7 @@ namespace basecode {
                 return false;
             cursor.offset += sizeof(field_t);
             while (cursor.offset < cursor.end_offset) {
-                cursor.field = (field_t*) cursor.page + cursor.offset;
+                cursor.field = (field_t*) (cursor.page + cursor.offset);
                 if (cursor.field->kind != kind::header
                 && (!type || cursor.field->type == type)) {
                     return true;
@@ -89,7 +89,7 @@ namespace basecode {
                 cursor.offset += cursor.end_offset - cursor.offset;
             }
             cursor.field = {};
-            cursor.header = (field_t*) cursor.page + cursor.offset;
+            cursor.header = (field_t*) (cursor.page + cursor.offset);
             cursor.end_offset = cursor.offset + cursor.header->value;
             return cursor.header && cursor.header->kind == kind::header;
         }
@@ -103,7 +103,7 @@ namespace basecode {
             cursor.field = {};
             cursor.storage = &storage;
             cursor.page = (u8*) memory::bump::buf(storage.bump_alloc);
-            cursor.header = (field_t*) cursor.page;
+            cursor.header = (field_t*) (cursor.page);
             cursor.end_offset = cursor.header->value;
             cursor.offset = cursor.start_offset = {};
             return cursor.header && cursor.header->kind == kind::header;
@@ -128,10 +128,22 @@ namespace basecode {
         }
 
         b8 write_field(cursor_t& cursor, u8 type, u32 value) {
-            cursor.field = (field_t*) cursor.page + cursor.offset;
+//            auto record_ptr = (u8*) cursor.header;
+//            format::memory_buffer_t buf{};
+//            format::format_to(buf, "\nwrite_field before: offset = {}\n", cursor.offset);
+//            format::hex_dump(buf, record_ptr, cursor.header->value);
+//            format::print("{}", format::to_string(buf));
+
+            cursor.field = (field_t*) (cursor.page + cursor.offset);
             cursor.field->type = type;
             cursor.field->value = value;
             cursor.field->kind = kind::field;
+
+//            buf.clear();
+//            format::format_to(buf, "\nwrite_field after: {:02x} {:02x} {:06x}\n", cursor.field->kind, cursor.field->type, cursor.field->value);
+//            format::hex_dump(buf, record_ptr, cursor.header->value);
+//            format::print("{}", format::to_string(buf));
+
             return move_next(cursor);
         }
 
@@ -156,11 +168,12 @@ namespace basecode {
             const u32 record_size = RECORD_BYTE_SIZE(num_fields + 2);
             memory::alloc(cursor.storage->bump_alloc, record_size, alignof(field_t));
             cursor.page = (u8*) memory::bump::buf(cursor.storage->bump_alloc);
+            std::memset(cursor.page + cursor.offset, 0, record_size);
 
             cursor.field = {};
             cursor.id = cursor.storage->id++;
             cursor.end_offset = cursor.offset + record_size;
-            cursor.header = (field_t*) cursor.page + cursor.offset;
+            cursor.header = (field_t*) (cursor.page + cursor.offset);
             cursor.header->type = type;
             cursor.header->value = record_size;
             cursor.header->kind = kind::header;
@@ -181,7 +194,7 @@ namespace basecode {
                 cursor.page = index->page;
                 cursor.offset = index->offset;
                 cursor.start_offset = index->offset;
-                cursor.header = (field_t*) cursor.page + cursor.offset;
+                cursor.header = (field_t*) (cursor.page + cursor.offset);
                 cursor.end_offset = cursor.offset + cursor.header->value;
             }
             return cursor.header && cursor.header->kind == kind::header;
