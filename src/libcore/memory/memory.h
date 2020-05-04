@@ -84,7 +84,7 @@ namespace basecode {
     using release_callback_t    = u0  (*)(alloc_t*);
     using free_callback_t       = u0  (*)(alloc_t*, u0* mem, u32& freed_size);
     using alloc_callback_t      = u0* (*)(alloc_t*, u32 size, u32 align, u32& allocated_size);
-    using realloc_callback_t    = u0* (*)(alloc_t*, u0* mem, u32 size, u32 align, u32& old_size, u32& new_size);
+    using realloc_callback_t    = u0* (*)(alloc_t*, u0* mem, u32 size, u32 align, u32& old_size);
 
     struct alloc_system_t final {
         init_callback_t         init{};
@@ -99,6 +99,7 @@ namespace basecode {
         enum class status_t : u8 {
             ok,
             invalid_allocator,
+            invalid_default_allocator,
             invalid_allocation_system,
         };
 
@@ -149,14 +150,16 @@ namespace basecode {
                 return align_forward(p, align, adjust);
             }
 
-            u0 initialize(u32 heap_size = 32 * 1024 * 1024, u0* base = {});
-
             alloc_t* make(alloc_type_t type, alloc_config_t* config = {});
+
+            status_t initialize(alloc_type_t type, u32 heap_size = 32 * 1024 * 1024, u0* base = {});
         }
 
         alloc_t* unwrap(alloc_t* alloc);
 
-        string::slice_t name(alloc_type_t type);
+        string::slice_t type_name(alloc_type_t type);
+
+        string::slice_t status_name(status_t status);
 
         u0 release(alloc_t* alloc, b8 enforce = true);
 

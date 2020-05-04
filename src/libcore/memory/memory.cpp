@@ -32,6 +32,8 @@
 #include "trace_system.h"
 #include "default_system.h"
 #include "dlmalloc_system.h"
+#include "memory.h"
+
 
 namespace basecode::memory {
     struct system_t final {
@@ -39,6 +41,13 @@ namespace basecode::memory {
         alloc_t                 slab_alloc;
         array_t<alloc_t*>       allocators;
         usize                   os_page_size;
+    };
+
+    static string::slice_t      s_status_names[] = {
+        "ok"_ss,
+        "invalid allocator"_ss,
+        "invalid default allocator"_ss,
+        "invalid allocation system"_ss,
     };
 
     static string::slice_t      s_type_names[] = {
@@ -68,6 +77,13 @@ namespace basecode::memory {
             return g_system.os_page_size;
         }
 
+        u0 print_allocators() {
+            format::print("g_system.allocators.size = {}\n", g_system.allocators.size);
+            for (auto alloc : g_system.allocators) {
+                format::print("alloc = {}, alloc->system->type = {}\n", (u0*) alloc, type_name(alloc->system->type));
+            }
+        }
+
         alloc_t* default_alloc() {
             return &g_system.default_alloc;
         }
@@ -92,28 +108,6 @@ namespace basecode::memory {
 //            format::print("\n");
         }
 
-        u0 initialize(u32 heap_size, u0* base) {
-#ifdef _WIN32
-            SYSTEM_INFO system_info;
-            GetSystemInfo(&system_info);
-            g_system.os_page_size = system_info.dwAllocationGranularity;
-#else
-            g_system.os_page_size = sysconf(_SC_PAGE_SIZE);
-#endif
-            dl_config_t dl_config{};
-            dl_config.base = base;
-            dl_config.heap_size = heap_size;
-            init(&g_system.default_alloc, alloc_type_t::dlmalloc, &dl_config);
-
-            slab_config_t slab_config{};
-            slab_config.backing = &g_system.default_alloc;
-            slab_config.buf_size = sizeof(alloc_t);
-            slab_config.buf_align = alignof(alloc_t);
-            memory::init(&g_system.slab_alloc, alloc_type_t::slab, &slab_config);
-
-            array::init(g_system.allocators, &g_system.default_alloc);
-        }
-
         b8 set_page_executable(u0* ptr, usize size) {
             const auto page_size = g_system.os_page_size;
             u64 start, end;
@@ -133,11 +127,43 @@ namespace basecode::memory {
             return alloc;
         }
 
-        u0 print_allocators() {
-            format::print("g_system.allocators.size = {}\n", g_system.allocators.size);
-            for (auto alloc : g_system.allocators) {
-                format::print("alloc = {}, alloc->system->type = {}\n", (u0*) alloc, name(alloc->system->type));
+        status_t initialize(alloc_type_t type, u32 heap_size, u0* base) {
+#ifdef _WIN32
+            SYSTEM_INFO system_info;
+            GetSystemInfo(&system_info);
+            g_system.os_page_size = system_info.dwAllocationGranularity;
+#else
+            g_system.os_page_size = sysconf(_SC_PAGE_SIZE);
+#endif
+            switch (type) {
+                case alloc_type_t::system: {
+                    auto status = init(&g_system.default_alloc, alloc_type_t::system);
+                    if (!OK(status))
+                        return status;
+                    break;
+                }
+                case alloc_type_t::dlmalloc: {
+                    dl_config_t dl_config{};
+                    dl_config.base = base;
+                    dl_config.heap_size = heap_size;
+                    auto status = init(&g_system.default_alloc, alloc_type_t::dlmalloc, &dl_config);
+                    if (!OK(status))
+                        return status;
+                    break;
+                }
+                default: {
+                    return status_t::invalid_default_allocator;
+                }
             }
+
+            slab_config_t slab_config{};
+            slab_config.backing = &g_system.default_alloc;
+            slab_config.buf_size = sizeof(alloc_t);
+            slab_config.buf_align = alignof(alloc_t);
+            memory::init(&g_system.slab_alloc, alloc_type_t::slab, &slab_config);
+
+            array::init(g_system.allocators, &g_system.default_alloc);
+            return status_t::ok;
         }
     }
 
@@ -154,16 +180,20 @@ namespace basecode::memory {
         alloc->backing = {};
     }
 
-    string::slice_t name(alloc_type_t type) {
-        return s_type_names[(u32) type];
-    }
-
     u0* alloc(alloc_t* alloc, u32* alloc_size) {
         if (!alloc->system || !alloc->system->alloc) return {};
         u32 temp;
         auto mem = alloc->system->alloc(alloc, 0, 0, temp);
         if (alloc_size) *alloc_size = temp;
         return mem;
+    }
+
+    string::slice_t type_name(alloc_type_t type) {
+        return s_type_names[(u32) type];
+    }
+
+    string::slice_t status_name(status_t status) {
+        return s_status_names[(u32) status];
     }
 
     u0 free(alloc_t* alloc, u0* mem, u32* freed_size) {
@@ -175,8 +205,8 @@ namespace basecode::memory {
 
     u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
         if (!mem || !alloc->system || !alloc->system->realloc) return {};
-        u32 old_size, new_size;
-        return alloc->system->realloc(alloc, mem, size, align, old_size, new_size);
+        u32 old_size;
+        return alloc->system->realloc(alloc, mem, size, align, old_size);
     }
 
     u0* alloc(alloc_t* alloc, u32 size, u32 align, u32* alloc_size) {

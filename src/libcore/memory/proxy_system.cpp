@@ -41,17 +41,17 @@ namespace basecode::memory::proxy {
         alloc->total_allocated -= freed_size;
     }
 
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& allocated_size) {
+    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
         auto backing = alloc->backing->system;
-        auto mem = backing->alloc(alloc->backing, size, align, allocated_size);
-        alloc->total_allocated += allocated_size;
+        auto mem = backing->alloc(alloc->backing, size, align, alloc_size);
+        alloc->total_allocated += alloc_size;
         return mem;
     }
 
-    static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size, u32& new_size) {
+    static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size) {
         auto backing = alloc->backing->system;
-        auto new_mem = backing->realloc(alloc->backing, mem, size, align, old_size, new_size);
-        alloc->total_allocated += (s32) new_size - (s32) old_size;
+        auto new_mem = backing->realloc(alloc->backing, mem, size, align, old_size);
+        alloc->total_allocated += (s32) (size - old_size);
         return new_mem;
     }
 

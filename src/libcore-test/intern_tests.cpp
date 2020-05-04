@@ -64,7 +64,7 @@ TEST_CASE("basecode::intern") {
 
     array_t<intern::result_t> interned_list{};
     array::init(interned_list);
-    array::reserve(interned_list, expected_intern_count, false);
+    array::reserve(interned_list, expected_intern_count);
     defer(array::free(interned_list));
 
     defer({

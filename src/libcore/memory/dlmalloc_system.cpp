@@ -44,21 +44,22 @@ namespace basecode::memory::dl {
         mspace_free(alloc->subclass.dl.heap, h);
     }
 
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& allocated_size) {
-        allocated_size = system::size_with_padding(size, align);
-        auto h = (alloc_header_t*) mspace_malloc(alloc->subclass.dl.heap, allocated_size);
+    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
+        alloc_size = system::size_with_padding(size, align);
+        auto h = (alloc_header_t*) mspace_malloc(alloc->subclass.dl.heap, alloc_size);
         auto p = system::data_pointer(h, align);
-        system::fill(h, p, allocated_size);
-        alloc->total_allocated += allocated_size;
+        system::fill(h, p, alloc_size);
+        alloc->total_allocated += alloc_size;
         return p;
     }
 
-    static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size, u32& new_size) {
+    static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size) {
         auto h = system::header(mem);
-        auto new_data = dl::alloc(alloc, size, align, new_size);
-        std::memcpy(new_data, mem, h->size);
-        dl::free(alloc, mem, old_size);
-        return new_data;
+        old_size = h->size;
+        alloc->total_allocated += (s32) (size - old_size);
+        h = (alloc_header_t*) mspace_realloc(alloc->subclass.dl.heap, h, size);
+        h->size = size;
+        return system::data_pointer(h, align);
     }
 
     alloc_system_t g_system{

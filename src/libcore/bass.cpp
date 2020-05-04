@@ -78,7 +78,7 @@ namespace basecode {
         }
 
         b8 next_record(cursor_t& cursor) {
-            const auto page_size = memory::page::size(cursor.storage->page_alloc);
+            const auto page_size = memory::bump::end_offset(cursor.storage->bump_alloc);
             if (cursor.offset + sizeof(field_t) >= page_size) {
                 u8* next_page = (u8*) ((page_header_t*) cursor.page)->next;
                 if (!next_page)
@@ -102,7 +102,7 @@ namespace basecode {
             cursor.id = {};
             cursor.field = {};
             cursor.storage = &storage;
-            cursor.page = (u8*) memory::page::tail(storage.page_alloc);
+            cursor.page = (u8*) memory::bump::buf(storage.bump_alloc);
             cursor.header = (field_t*) cursor.page;
             cursor.end_offset = cursor.header->value;
             cursor.offset = cursor.start_offset = {};

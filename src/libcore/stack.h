@@ -52,9 +52,9 @@ namespace basecode {
     namespace stack {
         template<typename T> u0 clear(stack_t<T>& stack);
         template<typename T> u32 push(stack_t<T>& stack, T&& value);
+        template<typename T> u0 reserve(stack_t<T>& stack, u32 new_capacity);
         template<typename T> u0 grow(stack_t<T>& stack, u32 min_capacity = 8);
         template <typename T> stack_t<T> make(alloc_t* alloc = context::top()->alloc);
-        template<typename T> u0 reserve(stack_t<T>& stack, u32 new_capacity, b8 copy = true);
         template<typename T> u0 init(stack_t<T>& stack, alloc_t* alloc = context::top()->alloc);
         template<typename T> stack_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc);
 
@@ -75,7 +75,7 @@ namespace basecode {
 
         template<typename T> u0 reset(stack_t<T>& stack) {
             stack.size = {};
-            std::memset(stack.data, 0, sizeof(T) * stack.capacity);
+            std::memset(stack.data, 0, stack.capacity * sizeof(T));
         }
 
         template<typename T> b8 empty(stack_t<T>& stack) {
@@ -83,6 +83,7 @@ namespace basecode {
         }
 
         template<typename T> u0 clear(stack_t<T>& stack) {
+            assert(stack.alloc);
             memory::free(stack.alloc, stack.data);
             stack.data = {};
             stack.size = stack.capacity = {};
@@ -147,6 +148,29 @@ namespace basecode {
             reserve(stack, min_capacity * 2 + 8);
         }
 
+        template<typename T> u0 reserve(stack_t<T>& stack, u32 new_capacity) {
+            assert(stack.alloc);
+
+            if (new_capacity == 0) {
+                memory::free(stack.alloc, stack.data);
+                stack.data = {};
+                stack.capacity = stack.size = {};
+                return;
+            }
+
+            if (new_capacity == stack.capacity)
+                return;
+
+            new_capacity = std::max(stack.size, new_capacity);
+            if (!stack.data) {
+                stack.data = (T*) memory::alloc(stack.alloc, new_capacity * sizeof(T), alignof(T));
+                std::memset(stack.data, 0, new_capacity * sizeof(T));
+            } else {
+                stack.data = (T*) memory::realloc(stack.alloc, stack.data, new_capacity * sizeof(T), alignof(T));
+            }
+            stack.capacity = new_capacity;
+        }
+
         template<typename T> u0 insert(stack_t<T>& stack, u32 index, T& value) {
             if (stack.size + 1 > stack.capacity)
                 grow(stack);
@@ -157,26 +181,6 @@ namespace basecode {
                 *current++ = *prev++;
             *target = value;
             ++stack.size;
-        }
-
-        template<typename T> u0 reserve(stack_t<T>& stack, u32 new_capacity, b8 copy) {
-            if (stack.capacity == new_capacity)
-                return;
-
-            if (new_capacity < stack.size)
-                new_capacity = stack.size;
-
-            T* new_data{};
-            if (new_capacity > 0) {
-                new_data = (T*) memory::alloc(stack.alloc, new_capacity * sizeof(T), alignof(T));
-                std::memset(new_data, 0, new_capacity * sizeof(T));
-                if (stack.data && copy)
-                    std::memcpy(new_data, stack.data, stack.size * sizeof(T));
-            }
-
-            memory::free(stack.alloc, stack.data);
-            stack.data = new_data;
-            stack.capacity = new_capacity;
         }
 
         template<typename T> stack_t<T> make(std::initializer_list<T> elements, alloc_t* alloc) {

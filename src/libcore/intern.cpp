@@ -116,10 +116,10 @@ namespace basecode::intern {
         auto buf = (u8*) memory::alloc(pool.alloc, buf_size, alignof(u32));
         std::memset(buf, 0, ids_size);
 
-        u32 align{};
+        u32 hashes_align{}, slices_align{};
         auto ids    = (u32*)               buf;
-        auto hashes = (u64*)               memory::system::align_forward(buf + ids_size, alignof(u64), align);
-        auto slices = (string::slice_t*)   memory::system::align_forward(buf + ids_size + align + hashes_size, alignof(string::slice_t), align);
+        auto hashes = (u64*)               memory::system::align_forward(buf + ids_size, alignof(u64), hashes_align);
+        auto slices = (string::slice_t*)   memory::system::align_forward(buf + ids_size + hashes_align + hashes_size, alignof(string::slice_t), slices_align);
 
         for (u32 i = 0; i < pool.capacity; ++i) {
             if (pool.hashes[i] == 0)

@@ -46,9 +46,10 @@ namespace basecode {
     };
 
     namespace array {
+        template<typename T> u0 clear(array_t<T>& array);
+        template<typename T> u0 reserve(array_t<T>& array, u32 new_capacity);
         template<typename T> u0 grow(array_t<T>& array, u32 new_capacity = 8);
         template<typename T> array_t<T> make(alloc_t* alloc = context::top()->alloc);
-        template<typename T> u0 reserve(array_t<T>& array, u32 new_capacity, b8 copy = true);
         template<typename T> u0 init(array_t<T>& array, alloc_t* alloc = context::top()->alloc);
         template<typename T> array_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc);
 
@@ -57,10 +58,7 @@ namespace basecode {
         }
 
         template<typename T> u0 free(array_t<T>& array) {
-            if (array.alloc)
-                memory::free(array.alloc, array.data);
-            array.data = {};
-            array.size = array.capacity = {};
+            clear(array);
         }
 
         template<typename T> u0 trim(array_t<T>& array) {
@@ -77,11 +75,14 @@ namespace basecode {
 
         template<typename T> u0 reset(array_t<T>& array) {
             array.size = {};
-            std::memset(array.data, 0, sizeof(T) * array.capacity);
+            std::memset(array.data, 0, array.capacity * sizeof(T));
         }
 
         template<typename T> u0 clear(array_t<T>& array) {
-            free(array);
+            assert(array.alloc);
+            memory::free(array.alloc, array.data);
+            array.data = {};
+            array.size = array.capacity = {};
         }
 
         template<typename T> b8 empty(array_t<T>& array) {
@@ -128,6 +129,12 @@ namespace basecode {
             array.size = new_size;
         }
 
+        template<typename T> u0 init(array_t<T>& array, alloc_t* alloc) {
+            array.data = {};
+            array.alloc = alloc;
+            array.size = array.capacity = {};
+        }
+
         template<typename T> u0 grow(array_t<T>& array, u32 new_capacity) {
             new_capacity = std::max(new_capacity, array.capacity);
             reserve(array, new_capacity * 2 + 8);
@@ -139,18 +146,35 @@ namespace basecode {
             array.data[array.size++] = value;
         }
 
-        template<typename T> u0 init(array_t<T>& array, alloc_t* alloc) {
-            array.data = {};
-            array.alloc = alloc;
-            array.size = array.capacity = {};
-        }
-
         template<typename T> s32 contains(array_t<T>& array, const T& value) {
             for (u32 i = 0; i < array.size; ++i) {
                 if (array.data[i] == value)
                     return i;
             }
             return -1;
+        }
+
+        template<typename T> u0 reserve(array_t<T>& array, u32 new_capacity) {
+            assert(array.alloc);
+
+            if (new_capacity == 0) {
+                memory::free(array.alloc, array.data);
+                array.data = {};
+                array.capacity = array.size = {};
+                return;
+            }
+
+            if (new_capacity == array.capacity)
+                return;
+
+            new_capacity = std::max(array.size, new_capacity);
+            if (!array.data) {
+                array.data = (T*) memory::alloc(array.alloc, new_capacity * sizeof(T), alignof(T));
+                std::memset(array.data, 0, new_capacity * sizeof(T));
+            } else {
+                array.data = (T*) memory::realloc(array.alloc, array.data, new_capacity * sizeof(T), alignof(T));
+            }
+            array.capacity = new_capacity;
         }
 
         template<typename T> u0 insert(array_t<T>& array, u32 index, T&& value) {
@@ -169,27 +193,6 @@ namespace basecode {
                 std::memmove(array.data + index + 1, array.data + index, (array.size - index) * sizeof(T));
             array.data[index] = value;
             ++array.size;
-        }
-
-        template<typename T> u0 reserve(array_t<T>& array, u32 new_capacity, b8 copy) {
-            assert(array.alloc);
-
-            if (array.capacity == new_capacity)
-                return;
-
-            if (new_capacity < array.size)
-                new_capacity = array.size;
-
-            T* new_data{};
-            if (new_capacity > 0) {
-                new_data = (T*) memory::alloc(array.alloc, new_capacity * sizeof(T), alignof(T));
-                std::memset(new_data, 0, new_capacity * sizeof(T));
-                if (array.data && copy) std::memcpy(new_data, array.data, array.size * sizeof(T));
-            }
-
-            memory::free(array.alloc, array.data);
-            array.data = new_data;
-            array.capacity = new_capacity;
         }
 
         template<typename T> array_t<T> make(std::initializer_list<T> elements, alloc_t* alloc) {

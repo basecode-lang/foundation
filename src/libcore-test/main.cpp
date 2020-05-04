@@ -26,7 +26,11 @@
 using namespace basecode;
 
 s32 main(s32 argc, const s8** argv) {
-    memory::system::initialize();
+    auto status = memory::system::initialize(alloc_type_t::dlmalloc);
+    if (!OK(status)) {
+        format::print(stderr, "memory::system::initialize error: {}\n", memory::status_name(status));
+        return (s32) status;
+    }
 
     auto ctx = context::make(memory::system::default_alloc());
     context::push(&ctx);

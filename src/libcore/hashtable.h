@@ -149,6 +149,7 @@ namespace basecode {
         }
 
         template<typename K, typename V> u0 clear(hashtable_t<K, V>& table) {
+            assert(table.alloc);
             memory::free(table.alloc, table.states);
             table.keys      = {};
             table.values    = {};
@@ -224,9 +225,9 @@ namespace basecode {
             new_capacity = std::max<u32>(new_capacity, std::ceil(std::max<u32>(16, new_capacity) / table.load_factor));
 
             const auto size_of_states = new_capacity;
-            const auto size_of_keys   = sizeof(K) * new_capacity;
-            const auto size_of_values = sizeof(V) * new_capacity;
-            const auto size_of_hashes = sizeof(u64) * new_capacity;
+            const auto size_of_keys   = new_capacity * sizeof(K);
+            const auto size_of_values = new_capacity * sizeof(V);
+            const auto size_of_hashes = new_capacity * sizeof(u64);
 
             const auto buf_size = size_of_states + (alignof(K) + size_of_keys) + (alignof(V) + size_of_values) + (alignof(u64) + size_of_hashes);
 
@@ -234,10 +235,10 @@ namespace basecode {
             std::memset(buf, 0, size_of_states);
             state_t* new_states = (state_t*) buf;
 
-            u32 align{};
-            auto new_keys   = (K*)   memory::system::align_forward(buf + size_of_states, alignof(K), align);
-            auto new_values = (V*)   memory::system::align_forward(buf + size_of_states + size_of_keys + align, alignof(V), align);
-            auto new_hashes = (u64*) memory::system::align_forward(buf + size_of_states + size_of_keys + size_of_values + align, alignof(u64), align);
+            u32 keys_align{}, values_align{}, hashes_align{};
+            auto new_keys   = (K*)   memory::system::align_forward(buf + size_of_states, alignof(K), keys_align);
+            auto new_values = (V*)   memory::system::align_forward(buf + size_of_states + size_of_keys + keys_align, alignof(V), values_align);
+            auto new_hashes = (u64*) memory::system::align_forward(buf + size_of_states + size_of_keys + size_of_values + keys_align + values_align, alignof(u64), hashes_align);
 
             for (u32 i = 0; i < table.capacity; ++i) {
                 if (table.states[i] != state_t::filled)

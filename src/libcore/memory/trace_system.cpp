@@ -71,8 +71,8 @@ namespace basecode::memory::trace {
         return {};
     }
 
-    static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size, u32& new_size) {
-        old_size = new_size = {};
+    static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size) {
+        old_size = {};
         return {};
     }
 
