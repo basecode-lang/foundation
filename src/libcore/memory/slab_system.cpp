@@ -127,7 +127,9 @@ namespace basecode::memory::slab {
             curr = curr->next;
         }
 
-        // XXX: handle not finding the buffer
+        // XXX: review this
+        if (!curr || !curr->page)
+            return;
 
         u32 align_adjust{};
         auto slab = (slab_t*) system::align_forward((u8*) curr->page + page_size - slab_size, alignof(slab_t), align_adjust);
@@ -154,12 +156,13 @@ namespace basecode::memory::slab {
 
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& allocated_size) {
         auto subclass = &alloc->subclass.slab;
-        if (!subclass->head
-        ||   subclass->count == subclass->buf_max_count) {
+        auto head_slab = (slab_t*) subclass->head;
+        if (!head_slab
+        ||   head_slab->buf_count == subclass->buf_max_count) {
             grow(alloc);
+            head_slab = (slab_t*) subclass->head;
         }
 
-        auto head_slab = (slab_t*) subclass->head;
         u0* buf = head_slab->free_list;
         head_slab->free_list = *((u0**) buf);
         ++head_slab->buf_count;
