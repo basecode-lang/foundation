@@ -53,13 +53,13 @@ namespace basecode {
         u32                     values[32];
     };
 
-    using header_index_t = hashtable_t<u32, field_index_t>;
+    using record_index_t = array_t<field_index_t>;
 
     struct bass_t final {
         alloc_t*                alloc;
         alloc_t*                page_alloc;
         alloc_t*                bump_alloc;
-        header_index_t          index;
+        record_index_t          index;
         u32                     id;
     };
 
@@ -101,7 +101,7 @@ namespace basecode {
 
         b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor);
 
-        u0 init(bass_t& storage, alloc_t* alloc = context::top()->alloc, u32 num_pages = 16, f32 load_factor = .98f);
+        u0 init(bass_t& storage, alloc_t* alloc = context::top()->alloc, u32 num_pages = 16);
     }
 }
 

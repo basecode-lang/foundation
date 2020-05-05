@@ -73,9 +73,9 @@ namespace basecode {
         }
 
         u0 free(bass_t& storage) {
+            array::free(storage.index);
             memory::system::free(storage.bump_alloc);
             memory::system::free(storage.page_alloc);
-            hashtable::free(storage.index);
             memory::system::free(storage.alloc);
         }
 
@@ -163,9 +163,12 @@ namespace basecode {
             cursor.header->value = record_size;
             cursor.header->kind = kind::header;
 
-            auto index = hashtable::emplace(cursor.storage->index, cursor.id);
-            index->page = cursor.page;
-            index->offset = cursor.offset;
+            if (cursor.storage->index.capacity < cursor.id)
+                array::grow(cursor.storage->index);
+            ++cursor.storage->index.size;
+            auto& index = cursor.storage->index[cursor.id - 1];
+            index.page = cursor.page;
+            index.offset = cursor.offset;
 
             u32 value{};
             if (!next_field(cursor, value))
@@ -173,23 +176,11 @@ namespace basecode {
             return write_field(cursor, field::id, cursor.id);
         }
 
-        b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor) {
-            auto index = hashtable::find(storage.index, id);
-            if (index) {
-                cursor.page = index->page;
-                cursor.offset = index->offset;
-                cursor.start_offset = index->offset;
-                cursor.header = (field_t*) (cursor.page + cursor.offset);
-                cursor.end_offset = cursor.offset + cursor.header->value;
-            }
-            return cursor.header && cursor.header->kind == kind::header;
-        }
-
-        u0 init(bass_t& storage, alloc_t* alloc, u32 num_pages, f32 load_factor) {
+        u0 init(bass_t& storage, alloc_t* alloc, u32 num_pages) {
             storage.id = 1;
             storage.alloc = memory::proxy::make(alloc, "bass"_ss);
 
-            hashtable::init(storage.index, memory::proxy::make(storage.alloc, "bass::index"_ss), load_factor);
+            array::init(storage.index, memory::proxy::make(storage.alloc, "bass::index"_ss));
 
             page_config_t page_config{};
             page_config.backing = storage.alloc;
@@ -200,6 +191,17 @@ namespace basecode {
             bump_config.type = bump_type_t::allocator;
             bump_config.backing.alloc = storage.page_alloc;
             storage.bump_alloc = memory::proxy::make(memory::system::make(alloc_type_t::bump, &bump_config), "bass::bump"_ss, true);
+        }
+
+        b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor) {
+            if (id == 0 || id > storage.index.size)
+                return false;
+            const auto& index = storage.index[id - 1];
+            cursor.page = index.page;
+            cursor.offset = cursor.start_offset = index.offset;
+            cursor.header = (field_t*) (cursor.page + cursor.offset);
+            cursor.end_offset = cursor.offset + cursor.header->value;
+            return cursor.header && cursor.header->kind == kind::header;
         }
     }
 }
