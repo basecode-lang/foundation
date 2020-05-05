@@ -18,6 +18,7 @@ add_executable(
         intern_tests.cpp
         bitset_tests.cpp
         hashtable_tests.cpp
+        stable_array_tests.cpp
 )
 target_link_libraries(
         ${PROJECT_NAME}

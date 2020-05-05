@@ -73,6 +73,8 @@ add_library(
 
         stack.h
 
+        stable_array.h
+
         stopwatch.cpp stopwatch.h
 
         str.cpp str.h

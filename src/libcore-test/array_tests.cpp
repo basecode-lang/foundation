@@ -57,6 +57,7 @@ TEST_CASE("basecode::array erase") {
     array::erase(numbers, 3);
     REQUIRE(numbers[3] == 4);
     for (auto n : numbers) format::print("{},", n);
+    format::print("\n");
 
     REQUIRE(numbers.size == 8);
 

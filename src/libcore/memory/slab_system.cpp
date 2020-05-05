@@ -107,9 +107,11 @@ namespace basecode::memory::slab {
         auto subclass = &alloc->subclass.slab;
         auto slab_config = (slab_config_t*) config;
         alloc->backing = slab_config->backing;
-        subclass->buf_size = slab_config->buf_size;
-        subclass->buf_align = slab_config->buf_align;
-        subclass->buf_max_count = (system::os_page_size() - slab_size - slab_config->buf_align) / slab_config->buf_size;
+        subclass->count = {};
+        subclass->head = subclass->tail = {};
+        subclass->buf_size = std::max<u32>(slab_config->buf_size, sizeof(u0*));
+        subclass->buf_align = std::max<u32>(slab_config->buf_align, alignof(u0*));
+        subclass->buf_max_count = (system::os_page_size() - slab_size - subclass->buf_align) / subclass->buf_size;
     }
 
     static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
