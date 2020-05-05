@@ -101,7 +101,7 @@ namespace basecode {
 
         b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor);
 
-        u0 init(bass_t& storage, alloc_t* alloc = context::top()->alloc, u32 num_pages = 16);
+        u0 init(bass_t& storage, alloc_t* alloc = context::top()->alloc, u32 num_pages = 16, f32 load_factor = .98f);
     }
 }
 
