@@ -66,6 +66,8 @@ namespace basecode {
     using b8    = bool;
     using f32   = float;
     using f64   = double;
+    using s128  = __int128_t;
+    using u128  = __uint128_t;
     using usize = std::size_t;
 
     static inline u32 next_power_of_two(u32 n) {

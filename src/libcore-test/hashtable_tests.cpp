@@ -29,17 +29,49 @@ struct payload_t final {
     u32     offset;
 };
 
-TEST_CASE("basecode::hashtable payload with integer keys") {
+TEST_CASE("basecode::hashtable payload with random string keys") {
+    hashtable_t<string::slice_t, payload_t> table{};
+    hashtable::init(table, context::top()->alloc, .65f);
+    defer(hashtable::free(table));
+    //hashtable::reserve(table, 1024);
+
+    string_t str[4096];
+    for (u32 i = 0; i < 4096; ++i) {
+        string::init(str[i], context::top()->alloc);
+        string::reserve(str[i], 32);
+        str[i] = string::random(32);
+    }
+
     stopwatch_t time{};
     stopwatch::start(time);
 
+    for (u32 i = 0; i < 4096; ++i) {
+        auto payload = hashtable::emplace(table, slice::make(str[i]));
+        payload->ptr = {};
+        payload->offset = i * 100;
+    }
+
+    stopwatch::stop(time);
+    stopwatch::print_elapsed("hashtable payload + string key"_ss, 40, stopwatch::elapsed(time));
+
+//    auto keys = hashtable::keys(table);
+//    defer(array::free(keys));
+//    for (auto key : keys) {
+//        format::print("key = {}\n", *key);
+//    }
+}
+
+TEST_CASE("basecode::hashtable payload with integer keys") {
     hashtable_t<u32, payload_t> table{};
-    hashtable::init(table, context::top()->alloc, .98f);
+    hashtable::init(table, context::top()->alloc, .65f);
     defer(hashtable::free(table));
-    //hashtable::reserve(table, 2048);
+    //hashtable::reserve(table, 1024);
+
+    stopwatch_t time{};
+    stopwatch::start(time);
 
     for (u32 i = 0; i < 4096; ++i) {
-        auto payload = hashtable::emplace(table, i);
+        auto payload = hashtable::emplace(table, i * 4096);
         payload->ptr = {};
         payload->offset = i * 100;
     }
@@ -80,7 +112,7 @@ TEST_CASE("basecode::hashtable basics") {
     REQUIRE(table.size == 7);
     REQUIRE(table.capacity == 32);
 
-    string::slice_t* s{};
+    string::slice_t* s;
 
     s = hashtable::find(table, 5);
     REQUIRE(s);

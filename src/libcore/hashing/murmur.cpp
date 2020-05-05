@@ -32,10 +32,10 @@ namespace basecode::hashing::murmur {
         u32 const m = 5;
         u32 const n = 0xe6546b64;
 
-        int32_t i, nblocks = len / 4;
+        s32 i, nblocks = len / 4;
         u32 hash = seed, k1 = 0;
         auto const* blocks = static_cast<u32 const*>(src);
-        uint8_t const* tail = static_cast<uint8_t const*>(src) + nblocks * 4;
+        u8 const* tail = static_cast<u8 const*>(src) + nblocks * 4;
 
         for (i = 0; i < nblocks; i++) {
             u32 k = blocks[i];
@@ -48,13 +48,9 @@ namespace basecode::hashing::murmur {
         }
 
         switch (len & 3) {
-            case 3:
-                k1 ^= tail[2] << 16;
-            case 2:
-                k1 ^= tail[1] << 8;
-            case 1:
-                k1 ^= tail[0];
-
+            case 3: k1 ^= tail[2] << 16;
+            case 2: k1 ^= tail[1] << 8;
+            case 1: k1 ^= tail[0];
                 k1 *= c1;
                 k1 = (k1 << r1) | (k1 >> (32 - r1));
                 k1 *= c2;
@@ -77,12 +73,12 @@ namespace basecode::hashing::murmur {
 
     u64 hash64(const u0* src, usize len, u64 seed) {
         u64 const m = 0xc6a4a7935bd1e995ULL;
-        int32_t const r = 47;
+        s32 const r = 47;
 
         u64 h = seed ^(len * m);
 
         auto const* data = static_cast<u64 const*>(src);
-        auto const* data2 = static_cast<uint8_t const*>(src);
+        auto const* data2 = static_cast<u8 const*>(src);
         u64 const* end = data + (len / 8);
 
         while (data != end) {
@@ -97,21 +93,13 @@ namespace basecode::hashing::murmur {
         }
 
         switch (len & 7) {
-            case 7:
-                h ^= static_cast<u64>(data2[6]) << 48;
-            case 6:
-                h ^= static_cast<u64>(data2[5]) << 40;
-            case 5:
-                h ^= static_cast<u64>(data2[4]) << 32;
-            case 4:
-                h ^= static_cast<u64>(data2[3]) << 24;
-            case 3:
-                h ^= static_cast<u64>(data2[2]) << 16;
-            case 2:
-                h ^= static_cast<u64>(data2[1]) << 8;
-            case 1:
-                h ^= static_cast<u64>(data2[0]);
-                h *= m;
+            case 7: h ^= static_cast<u64>(data2[6]) << 48;
+            case 6: h ^= static_cast<u64>(data2[5]) << 40;
+            case 5: h ^= static_cast<u64>(data2[4]) << 32;
+            case 4: h ^= static_cast<u64>(data2[3]) << 24;
+            case 3: h ^= static_cast<u64>(data2[2]) << 16;
+            case 2: h ^= static_cast<u64>(data2[1]) << 8;
+            case 1: h ^= static_cast<u64>(data2[0]); h *= m;
         }
 
         h ^= h >> r;

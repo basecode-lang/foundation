@@ -125,7 +125,7 @@ namespace basecode::intern {
             if (pool.hashes[i] == 0)
                 continue;
 
-            u32 bucket_index = pool.hashes[i] % new_capacity;
+            u32 bucket_index = ((u128) pool.hashes[i] * (u128) new_capacity) >> 64;
             if (!find_bucket(ids, new_capacity, bucket_index))
                 return status_t::no_bucket;
 
@@ -151,7 +151,7 @@ namespace basecode::intern {
         }
 
         u64 hash = hashing::hash64(value);
-        u32 bucket_index = hash % pool.capacity;
+        u32 bucket_index = ((u128) hash * (u128) pool.capacity) >> 64;
 
         if (find_key(pool, hash, value, bucket_index)) {
             return result_t{
