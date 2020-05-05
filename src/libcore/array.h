@@ -65,14 +65,6 @@ namespace basecode {
             reserve(array, array.size);
         }
 
-        template<typename T> T* back(array_t<T>& array) {
-            if constexpr (std::is_pointer_v<T>) {
-                return array.size == 0 ? nullptr : array.data[array.size - 1];
-            } else {
-                return array.size == 0 ? nullptr : &array.data[array.size - 1];
-            }
-        }
-
         template<typename T> u0 reset(array_t<T>& array) {
             array.size = {};
             std::memset(array.data, 0, array.capacity * sizeof(T));
@@ -87,14 +79,6 @@ namespace basecode {
 
         template<typename T> b8 empty(array_t<T>& array) {
             return array.size == 0;
-        }
-
-        template<typename T> T* front(array_t<T>& array) {
-            if constexpr (std::is_pointer_v<T>) {
-                return array.size == 0 ? nullptr : array.data[0];
-            } else {
-                return array.size == 0 ? nullptr : &array.data[0];
-            }
         }
 
         template<typename T> T& append(array_t<T>& array) {
@@ -115,6 +99,22 @@ namespace basecode {
             auto dest = array.data + index;
             std::memcpy(dest, dest + 1, (array.size - index) * sizeof(T));
             --array.size;
+        }
+
+        template<typename T> decltype(auto) back(array_t<T>& array) {
+            if constexpr (std::is_pointer_v<T>) {
+                return array.size == 0 ? nullptr : array.data[array.size - 1];
+            } else {
+                return array.size == 0 ? nullptr : &array.data[array.size - 1];
+            }
+        }
+
+        template<typename T> decltype(auto) front(array_t<T>& array) {
+            if constexpr (std::is_pointer_v<T>) {
+                return array.size == 0 ? nullptr : array.data[0];
+            } else {
+                return array.size == 0 ? nullptr : &array.data[0];
+            }
         }
 
         template<typename T> u0 append(array_t<T>& array, T&& value) {
