@@ -18,30 +18,79 @@
 
 #define CATCH_CONFIG_RUNNER
 #include <catch2/catch.hpp>
+#include <basecode/core/log.h>
+#include <basecode/core/ffi.h>
 #include <basecode/core/defer.h>
+#include <basecode/core/memory.h>
+#include <basecode/core/filesys.h>
+#include <basecode/core/network.h>
 #include <basecode/core/profiler.h>
-#include <basecode/core/memory/memory.h>
-#include <basecode/core/memory/proxy_system.h>
+#include <basecode/core/log/system/spdlog.h>
+#include <basecode/core/log/system/syslog.h>
+#include <basecode/core/log/system/default.h>
+#include <basecode/core/memory/system/proxy.h>
 
 using namespace basecode;
 
 s32 main(s32 argc, const s8** argv) {
-    auto status = memory::system::initialize(alloc_type_t::dlmalloc);
-    if (!OK(status)) {
-        format::print(stderr, "memory::system::initialize error: {}\n", memory::status_name(status));
-        return (s32) status;
+    {
+        auto status = memory::system::init(alloc_type_t::dlmalloc);
+        if (!OK(status)) {
+            format::print(stderr, "memory::system::init error: {}\n", memory::status_name(status));
+            return (s32) status;
+        }
+    }
+    {
+        default_config_t dft_config{};
+        dft_config.file = stderr;
+        dft_config.process_arg = argv[0];
+        auto status = log::system::init(logger_type_t::default_, &dft_config, log_level_t::debug, memory::system::default_alloc());
+        if (!OK(status)) {
+            format::print(stderr, "log::system::init error: {}\n", log::status_name(status));
+        }
     }
 
-    auto ctx = context::make(memory::system::default_alloc());
+    auto ctx = context::make(argc, argv, memory::system::default_alloc(), log::system::default_logger());
     context::push(&ctx);
 
-    if (!OK(profiler::initialize()))        return 1;
-    if (!OK(memory::proxy::initialize()))   return 1;
+    spdlog_color_config_t spdlog_config{};
+    spdlog_config.color_type = spdlog_color_type_t::out;
+
+    logger_t spdlog{};
+    spdlog.name = "console"_ss;
+    log::init(&spdlog, logger_type_t::spdlog, &spdlog_config);
+    log::append_child(context::top()->logger, &spdlog);
+
+    syslog_config_t syslog_config{};
+    syslog_config.ident    = "bc-libcore-tests";
+    syslog_config.opts     = opt_pid | opt_ndelay | opt_cons;
+    syslog_config.facility = facility_local0;
+
+    logger_t syslog{};
+    log::init(&syslog, logger_type_t::syslog, &syslog_config);
+    log::append_child(context::top()->logger, &syslog);
+
+    log::info("example log message!");
+    log::warn("oh, shit!");
+    log::error("this should really stick out");
+
+    if (!OK(profiler::init()))          return 1;
+    if (!OK(memory::proxy::init()))     return 1;
+    if (!OK(ffi::system::init()))       return 1;
+    if (!OK(filesys::init()))           return 1;
+    if (!OK(network::system::init()))   return 1;
 
     defer({
-        profiler::shutdown();
-        memory::proxy::shutdown();
-        memory::system::shutdown();
+        log::notice("in defer shutdown");
+        log::fini(&spdlog);
+        log::fini(&syslog);
+        network::system::fini();
+        filesys::fini();
+        ffi::system::fini();
+        profiler::fini();
+        memory::proxy::fini();
+        log::system::fini();
+        memory::system::fini();
         context::pop();
     });
 

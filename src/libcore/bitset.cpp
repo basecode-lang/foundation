@@ -16,11 +16,11 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <cmath>
 #include <cstring>
 #include <algorithm>
 #include <x86intrin.h>
-#include "bitset.h"
+#include <basecode/core/bits.h>
+#include <basecode/core/bitset.h>
 
 namespace basecode {
     bitset_t& bitset_t::operator<<(u32 bits) {

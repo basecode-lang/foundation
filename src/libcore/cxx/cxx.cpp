@@ -16,13 +16,13 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "cxx.h"
+#include <basecode/core/cxx/cxx.h>
 
 namespace basecode::cxx {
     static u32 s_integral_size_in_bytes[]   = {0, 0, 1, 2, 4, 8};
     static u32 s_integral_size_in_bits[]    = {0, 0, 8, 16, 32, 64};
 
-    static string::slice_t s_statuses[] = {
+    static str::slice_t s_statuses[] = {
         "ok"_ss,
         "general error"_ss,
         "field not found: lhs"_ss,
@@ -46,7 +46,7 @@ namespace basecode::cxx {
         "not implemented"_ss,
     };
 
-    static string::slice_t s_revisions[] = {
+    static str::slice_t s_revisions[] = {
         "none"_ss,
         "c99"_ss,
         "c11"_ss,
@@ -54,7 +54,7 @@ namespace basecode::cxx {
         "cpp20"_ss,
     };
 
-    static string::slice_t s_meta_types[] = {
+    static str::slice_t s_meta_types[] = {
         "empty"_ss,
         "none"_ss,
         "alias"_ss,
@@ -71,7 +71,7 @@ namespace basecode::cxx {
         "unsigned_integer"_ss,
     };
 
-    static string::slice_t s_aggregate_types[] = {
+    static str::slice_t s_aggregate_types[] = {
         "none"_ss,
         "enum_"_ss,
         "union_"_ss,
@@ -80,7 +80,7 @@ namespace basecode::cxx {
         "enum_class"_ss,
     };
 
-    static string::slice_t s_integral_sizes[] = {
+    static str::slice_t s_integral_sizes[] = {
         "none"_ss,
         "zero"_ss,
         "byte"_ss,
@@ -89,7 +89,7 @@ namespace basecode::cxx {
         "qword"_ss,
     };
 
-    static string::slice_t s_statement_types[] = {
+    static str::slice_t s_statement_types[] = {
         "none"_ss,
         "empty"_ss,
         "pp"_ss,
@@ -117,7 +117,7 @@ namespace basecode::cxx {
         "block_comment"_ss,
     };
 
-    static string::slice_t s_preprocessor_types[] = {
+    static str::slice_t s_preprocessor_types[] = {
         "none"_ss,
         "if_"_ss,
         "pragma"_ss,
@@ -127,7 +127,7 @@ namespace basecode::cxx {
         "system_include"_ss,
     };
 
-    static string::slice_t s_expression_types[] = {
+    static str::slice_t s_expression_types[] = {
         "none"_ss,
         "raw"_ss,
         "unary"_ss,
@@ -136,13 +136,13 @@ namespace basecode::cxx {
         "initializer"_ss,
     };
 
-    static string::slice_t s_initializer_types[] = {
+    static str::slice_t s_initializer_types[] = {
         "none"_ss,
         "direct"_ss,
         "list"_ss,
     };
 
-    static string::slice_t s_assignment_types[] = {
+    static str::slice_t s_assignment_types[] = {
         "none"_ss,
         "direct"_ss,
         "bor"_ss,
@@ -157,7 +157,7 @@ namespace basecode::cxx {
         "remainder"_ss,
     };
 
-    static string::slice_t s_unary_op_types[]= {
+    static str::slice_t s_unary_op_types[] = {
         "none"_ss,
         "neg"_ss,
         "inc"_ss,
@@ -168,13 +168,13 @@ namespace basecode::cxx {
         "addrof"_ss,
     };
 
-    static string::slice_t s_position_types[] = {
+    static str::slice_t s_position_types[] = {
         "none"_ss,
         "prefix"_ss,
         "postfix"_ss
     };
 
-    static string::slice_t s_binary_op_types[] = {
+    static str::slice_t s_binary_op_types[] = {
         "none"_ss,
         "eq"_ss,
         "lt"_ss,
@@ -202,7 +202,7 @@ namespace basecode::cxx {
         "subscript"_ss,
     };
 
-    static string::slice_t s_element_fields[] = {
+    static str::slice_t s_element_fields[] = {
         "none"_ss,
         "id"_ss,
         "lhs"_ss,
@@ -223,7 +223,7 @@ namespace basecode::cxx {
         "fbranch"_ss,
     };
 
-    static string::slice_t s_element_headers[] = {
+    static str::slice_t s_element_headers[] = {
         "none"_ss,
         "type"_ss,
         "list"_ss,
@@ -240,23 +240,23 @@ namespace basecode::cxx {
         "label"_ss,
     };
 
-    string::slice_t element::field::name(u8 value) {
+    str::slice_t element::field::name(u8 value) {
         return s_element_fields[value];
     }
 
-    string::slice_t element::header::name(u8 value) {
+    str::slice_t element::header::name(u8 value) {
         return s_element_headers[value];
     }
 
-    string::slice_t program::status_name(status_t status) {
+    str::slice_t program::status_name(status_t status) {
         return s_statuses[(u32) status];
     }
 
-    string::slice_t program::revision_name(revision_t rev) {
+    str::slice_t program::revision_name(revision_t rev) {
         return s_revisions[(u32) rev];
     }
 
-    string::slice_t scope::type::meta_name(meta_type_t type) {
+    str::slice_t scope::type::meta_name(meta_type_t type) {
         return s_meta_types[(u32) type];
     }
 
@@ -264,47 +264,47 @@ namespace basecode::cxx {
         return s_integral_size_in_bits[(u32) size];
     }
 
-    string::slice_t scope::stmt::name(statement_type_t type) {
+    str::slice_t scope::stmt::name(statement_type_t type) {
         return s_statement_types[(u32) type];
+    }
+
+    str::slice_t scope::expr::name(expression_type_t type) {
+        return s_expression_types[(u32) type];
     }
 
     u32 program::integral_size_in_bytes(integral_size_t size) {
         return s_integral_size_in_bytes[(u32) size];
     }
 
-    string::slice_t scope::expr::name(expression_type_t type) {
-        return s_expression_types[(u32) type];
-    }
-
-    string::slice_t scope::expr::unary::name(unary_op_type_t type) {
+    str::slice_t scope::expr::unary::name(unary_op_type_t type) {
         return s_unary_op_types[(u32) type];
     }
 
-    string::slice_t scope::stmt::pp::name(preprocessor_type_t type) {
+    str::slice_t scope::stmt::pp::name(preprocessor_type_t type) {
         return s_preprocessor_types[(u32) type];
     }
 
-    string::slice_t scope::expr::init::name(initializer_type_t type) {
+    str::slice_t scope::expr::init::name(initializer_type_t type) {
         return s_initializer_types[(u32) type];
     }
 
-    string::slice_t scope::expr::binary::name(binary_op_type_t type) {
+    str::slice_t scope::expr::binary::name(binary_op_type_t type) {
         return s_binary_op_types[(u32) type];
     }
 
-    string::slice_t scope::expr::assign::name(assignment_type_t type) {
+    str::slice_t scope::expr::assign::name(assignment_type_t type) {
         return s_assignment_types[(u32) type];
     }
 
-    string::slice_t scope::type::aggregate_name(aggregate_type_t type) {
+    str::slice_t scope::type::aggregate_name(aggregate_type_t type) {
         return s_aggregate_types[(u32) type];
     }
 
-    string::slice_t scope::type::integral_size_name(integral_size_t size) {
+    str::slice_t scope::type::integral_size_name(integral_size_t size) {
         return s_integral_sizes[(u32) size];
     }
 
-    string::slice_t scope::expr::unary::position_name(position_type_t type) {
+    str::slice_t scope::expr::unary::position_name(position_type_t type) {
         return s_position_types[(u32) type];
     }
 }

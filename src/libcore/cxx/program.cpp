@@ -16,114 +16,116 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "../memory/proxy_system.h"
-#include "cxx.h"
+#include <basecode/core/cxx/cxx.h>
+#include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::cxx::program {
+    static b8 format_record(format_type_t type, cursor_t& c, fmt_buf_t& buf, u0* ctx) {
+        auto pgm = (program_t*) ctx;
+        if (type == format_type_t::field) {
+            auto value = c.field->value;
+            format::format_to(
+                buf,
+                "\t{:<16} = {}",
+                element::field::name(c.field->type),
+                c.field->value);
+            switch (c.field->type) {
+                case element::field::revision: {
+                    format::format_to(
+                        buf,
+                        "\n\t{:<16} = '{}'",
+                        " .name",
+                        program::revision_name((revision_t) value));
+                    break;
+                }
+                case element::field::type: {
+                    switch (c.header->type) {
+                        case element::header::type: {
+                            auto base_type = (meta_type_t) BASE_TYPE(value);
+                            format::format_to(
+                                buf,
+                                "\n\t{:<16} = '{}'",
+                                " .name",
+                                scope::type::meta_name(base_type));
+                            break;
+                        }
+                        case element::header::statement: {
+                            auto base_type = (statement_type_t) BASE_TYPE(value);
+                            format::format_to(
+                                buf,
+                                "\n\t{:<16} = '{}'",
+                                " .name",
+                                scope::stmt::name(base_type));
+                            break;
+                        }
+                        case element::header::expression: {
+                            auto base_type = (expression_type_t) BASE_TYPE(value);
+                            auto sub_type = SUB_TYPE(value);
+                            format::format_to(
+                                buf,
+                                "\n\t{:<16} = '{}'",
+                                " .name",
+                                scope::expr::name(base_type));
+                            str::slice_t sub_type_name = "unknown"_ss;
+                            switch (base_type) {
+                                case expression_type_t::raw: {
+                                    sub_type_name = "none"_ss;
+                                    break;
+                                }
+                                case expression_type_t::initializer: {
+                                    sub_type_name = cxx::scope::expr::init::name((initializer_type_t) sub_type);
+                                    break;
+                                }
+                                case expression_type_t::assignment: {
+                                    sub_type_name = cxx::scope::expr::assign::name((assignment_type_t) sub_type);
+                                    break;
+                                }
+                                case expression_type_t::binary: {
+                                    sub_type_name = cxx::scope::expr::binary::name((binary_op_type_t) sub_type);
+                                    break;
+                                }
+                                case expression_type_t::unary: {
+                                    sub_type_name = cxx::scope::expr::unary::name((unary_op_type_t) sub_type);
+                                    break;
+                                }
+                            }
+                            format::format_to(buf, "\n\t{:<16} = '{}'", " .sub_type", sub_type_name);
+                            break;
+                        }
+                        default: {
+                            break;
+                        }
+                    }
+                    break;
+                }
+                case element::field::intern: {
+                    auto rc = intern::get(pgm->intern, value);
+                    format::format_to(buf, "\n\t{:<16} = '{}'", " .slice", rc.slice);
+                    break;
+                }
+                default: {
+                    break;
+                }
+            }
+            format::format_to(buf, "\n");
+        } else {
+            format::format_to(
+                buf,
+                "{}(bytes={}, field_capacity={}) {{\n",
+                element::header::name(c.header->type),
+                c.header->value,
+                RECORD_FIELD_COUNT(c.header->value));
+        }
+        return true;
+    }
+
     u0 free(program_t& pgm) {
         bass::free(pgm.storage);
         for (auto& module : pgm.modules)
             module::free(module);
+        str::free(pgm.scratch);
         array::free(pgm.modules);
         intern::free(pgm.intern);
-    }
-
-    u0 debug_dump(program_t& pgm) {
-        u32 value{};
-        cursor_t cursor{};
-        if (!bass::seek_first(pgm.storage, cursor))
-            return;
-        do {
-            format::print(
-                "{}(bytes={}, field_capacity={}) {{\n",
-                element::header::name(cursor.header->type),
-                cursor.header->value,
-                RECORD_FIELD_COUNT(cursor.header->value));
-
-            while (bass::next_field(cursor, value)) {
-                format::print(
-                    "\t{:<16} = {}",
-                    element::field::name(cursor.field->type),
-                    cursor.field->value);
-                switch (cursor.field->type) {
-                    case element::field::revision: {
-                        format::print(
-                            "\n\t{:<16} = '{}'",
-                            " .name",
-                            program::revision_name((revision_t) value));
-                        break;
-                    }
-                    case element::field::type: {
-                        switch (cursor.header->type) {
-                            case element::header::type: {
-                                auto base_type = (meta_type_t) BASE_TYPE(value);
-                                format::print(
-                                    "\n\t{:<16} = '{}'",
-                                    " .name",
-                                    scope::type::meta_name(base_type));
-                                break;
-                            }
-                            case element::header::statement: {
-                                auto base_type = (statement_type_t) BASE_TYPE(value);
-                                format::print(
-                                    "\n\t{:<16} = '{}'",
-                                    " .name",
-                                    scope::stmt::name(base_type));
-                                break;
-                            }
-                            case element::header::expression: {
-                                auto base_type = (expression_type_t) BASE_TYPE(value);
-                                auto sub_type = SUB_TYPE(value);
-                                format::print(
-                                    "\n\t{:<16} = '{}'",
-                                    " .name",
-                                    scope::expr::name(base_type));
-                                string::slice_t sub_type_name;
-                                switch (base_type) {
-                                    case expression_type_t::raw: {
-                                        sub_type_name = "none"_ss;
-                                        break;
-                                    }
-                                    case expression_type_t::initializer: {
-                                        sub_type_name = cxx::scope::expr::init::name((initializer_type_t) sub_type);
-                                        break;
-                                    }
-                                    case expression_type_t::assignment: {
-                                        sub_type_name = cxx::scope::expr::assign::name((assignment_type_t) sub_type);
-                                        break;
-                                    }
-                                    case expression_type_t::binary: {
-                                        sub_type_name = cxx::scope::expr::binary::name((binary_op_type_t) sub_type);
-                                        break;
-                                    }
-                                    case expression_type_t::unary: {
-                                        sub_type_name = cxx::scope::expr::unary::name((unary_op_type_t) sub_type);
-                                        break;
-                                    }
-                                }
-                                format::print("\n\t{:<16} = '{}'", " .sub_type", sub_type_name);
-                                break;
-                            }
-                            default: {
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                    case element::field::intern: {
-                        auto rc = intern::get(pgm.intern, value);
-                        format::print("\n\t{:<16} = '{}'", " .slice", rc.slice);
-                        break;
-                    }
-                    default: {
-                        break;
-                    }
-                }
-                format::print("\n");
-            }
-
-            format::print("}}\n");
-        } while (bass::next_record(cursor));
     }
 
     status_t finalize(program_t& pgm) {
@@ -150,6 +152,16 @@ namespace basecode::cxx::program {
         return status_t::ok;
     }
 
+    u0 debug_dump(program_t& pgm, fmt_buf_t& buf) {
+        cursor_t cursor{};
+        if (!bass::seek_first(pgm.storage, cursor))
+            return;
+        do {
+            bass::format_record(pgm.storage, buf, cursor.id, format_record, &pgm);
+            format::format_to(buf, "}}\n");
+        } while (bass::next_record(cursor));
+    }
+
     module_t& get_module(program_t& pgm, u32 module_idx) {
         return pgm.modules[module_idx];
     }
@@ -158,6 +170,8 @@ namespace basecode::cxx::program {
         intern::init(pgm.intern, alloc);
         array::init(pgm.modules, alloc);
         array::reserve(pgm.modules, num_modules);
+        str::init(pgm.scratch, alloc);
+        str::reserve(pgm.scratch, 64);
         bass::init(pgm.storage, alloc);
         cursor_t cursor{};
         bass::seek_current(pgm.storage, cursor);
@@ -167,7 +181,7 @@ namespace basecode::cxx::program {
         pgm.alloc = alloc;
     }
 
-    module_t& add_module(program_t& pgm, string::slice_t filename, cxx::revision_t rev) {
+    module_t& add_module(program_t& pgm, str::slice_t filename, cxx::revision_t rev) {
         auto& mod = array::append(pgm.modules);
         mod.idx = pgm.modules.size - 1;
         module::init(mod, pgm, filename, rev, pgm.alloc);

@@ -33,7 +33,7 @@ endif()
 
 if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-string-plus-int" CACHE STRING "compile flags" FORCE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-cast-qual -Wno-string-plus-int -Wno-auto-var-id -Wno-unused-private-field -Wno-unknown-pragmas -Wno-inconsistent-missing-override" CACHE STRING "compile flags" FORCE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-cast-qual -Wno-string-plus-int -Wno-auto-var-id -Wno-unused-private-field -Wno-unknown-pragmas -Wno-inconsistent-missing-override -Wno-c99-designator" CACHE STRING "compile flags" FORCE)
     message(STATUS "${PROJECT_NAME} using clang flags: ${CMAKE_CXX_FLAGS}")
 elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++2a -Wall -Wno-string-plus-int -Wno-unknown-pragmas -Wno-parentheses -Wno-sequence-point" CACHE STRING "compile flags" FORCE)
@@ -70,6 +70,13 @@ include_directories(ext/catch2-2.8.0/single_include)
 # libfmt
 add_subdirectory(ext/fmt-6.2.0 EXCLUDE_FROM_ALL)
 
+# spdlog
+option(SPDLOG_FMT_EXTERNAL "" ON)
+option(SPDLOG_INSTALL "" OFF)
+option(SPDLOG_BUILD_TESTS "" OFF)
+option(SPDLOG_BUILD_EXAMPLE "" OFF)
+add_subdirectory(ext/spdlog-1.5.0 EXCLUDE_FROM_ALL)
+
 # utf8proc
 add_subdirectory(ext/utf8proc-2.5.0 EXCLUDE_FROM_ALL)
 include_directories(ext/utf8proc-2.5.0)
@@ -86,6 +93,12 @@ set(
         ext/blake3-0.3.1/blake3_avx512_x86-64_unix.S
 )
 add_library(blake3 ${BLAKE3_SOURCES})
+
+# dyncall
+include_directories(ext/dyncall-1.1.0)
+add_subdirectory(ext/dyncall-1.1.0 EXCLUDE_FROM_ALL)
+target_compile_definitions(dyncall_s PRIVATE malloc=dyn_alloc free=dyn_free)
+target_compile_definitions(dynload_s PRIVATE malloc=dyn_alloc free=dyn_free)
 
 # -----------------------------------------------------------------------------
 #

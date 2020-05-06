@@ -19,7 +19,7 @@
 #include <thread>
 #include <cpuid.h>
 #include <cassert>
-#include "profiler.h"
+#include <basecode/core/profiler.h>
 
 namespace basecode::profiler {
     static s64      s_resolution = 0;
@@ -57,10 +57,10 @@ namespace basecode::profiler {
 
     ///////////////////////////////////////////////////////////////////////////
 
-    u0 shutdown() {
+    u0 fini() {
     }
 
-    status_t initialize() {
+    status_t init() {
         u32 regs[4];
 
         cpuid(regs, 0x80000001);
@@ -87,11 +87,11 @@ namespace basecode::profiler {
         return status_t::ok;
     }
 
-    s64 get_timer_resolution() {
+    s64 timer_resolution() {
         return s_resolution;
     }
 
-    f64 get_calibration_multiplier() {
+    f64 calibration_mult() {
         return s_timer_multiplier;
     }
 }

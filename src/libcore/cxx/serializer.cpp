@@ -16,11 +16,11 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "../memory/proxy_system.h"
-#include "cxx.h"
+#include <basecode/core/cxx/cxx.h>
+#include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::cxx::serializer {
-    static string::slice_t s_var_flags[] = {
+    static str::slice_t s_var_flags[] = {
         "const"_ss,
         "static"_ss,
         "volatile"_ss,
@@ -28,17 +28,12 @@ namespace basecode::cxx::serializer {
         "constexpr"_ss,
     };
 
-    static u0 newline(serializer_t& s, format::memory_buffer_t& buf);
-
-    static status_t decl_var(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor);
-
-    static status_t process_list(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor);
-
-    static status_t process_expr(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor);
-
-    static status_t process_stmt(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor);
-
-    static status_t process_scope(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor);
+    static u0 newline(serializer_t& s, str_buf_t& buf);
+    static status_t decl_var(serializer_t& s, str_buf_t& buf, cursor_t& cursor);
+    static status_t process_list(serializer_t& s, str_buf_t& buf, cursor_t& cursor);
+    static status_t process_expr(serializer_t& s, str_buf_t& buf, cursor_t& cursor);
+    static status_t process_stmt(serializer_t& s, str_buf_t& buf, cursor_t& cursor);
+    static status_t process_scope(serializer_t& s, str_buf_t& buf, cursor_t& cursor);
 
     static u0 tab(serializer_t& s) {
         s.indent += s.tab_width - (s.column % s.tab_width);
@@ -48,14 +43,14 @@ namespace basecode::cxx::serializer {
         s.indent -= s.tab_width - (s.column % s.tab_width);
     }
 
-    static u0 newline(serializer_t& s, format::memory_buffer_t& buf) {
+    static u0 newline(serializer_t& s, str_buf_t& buf) {
         ++s.line;
         s.column = {};
         format::format_to(buf, "\n");
     }
 
     template <typename... Args>
-    static u0 at_indent(serializer_t& s, format::memory_buffer_t& buf, fmt::string_view format_str, const Args&... args) {
+    static u0 at_indent(serializer_t& s, str_buf_t& buf, fmt::string_view format_str, const Args&... args) {
         if (likely(s.column == 0 && s.indent > 0))
             format::format_to(buf, "{:<{}}", " ", s.indent);
         auto start = buf.size();
@@ -65,7 +60,7 @@ namespace basecode::cxx::serializer {
             newline(s, buf);
     }
 
-    static u0 process_var_flags(serializer_t& s, format::memory_buffer_t& buf, u8 flags) {
+    static u0 process_var_flags(serializer_t& s, str_buf_t& buf, u8 flags) {
         u8 mask = 1;
         for (u32 i = 0; i < 8; ++i) {
             if ((flags & mask) == mask)
@@ -74,7 +69,7 @@ namespace basecode::cxx::serializer {
         }
     }
 
-    static status_t decl_var(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
+    static status_t decl_var(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         auto& intern = *s.intern;
         auto& store = *s.store;
 
@@ -114,7 +109,7 @@ namespace basecode::cxx::serializer {
         return status;
     }
 
-    static status_t process_list(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
+    static status_t process_list(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         u32 id{};
         b8 first = true;
         auto& store = *s.store;
@@ -151,7 +146,7 @@ namespace basecode::cxx::serializer {
         return status_t::ok;
     }
 
-    static status_t process_expr(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
+    static status_t process_expr(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         status_t status{};
         auto& intern = *s.intern;
         auto& store = *s.store;
@@ -484,7 +479,7 @@ namespace basecode::cxx::serializer {
         return status;
     }
 
-    static status_t process_stmt(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
+    static status_t process_stmt(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         status_t status{};
         auto& intern = *s.intern;
         auto& store = *s.store;
@@ -874,7 +869,7 @@ namespace basecode::cxx::serializer {
         return status;
     }
 
-    static status_t process_scope(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
+    static status_t process_scope(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         auto& store = *s.store;
 
         u32 parent_scope_id{};
@@ -905,23 +900,23 @@ namespace basecode::cxx::serializer {
         return status_t::ok;
     }
 
-    static status_t unsupported(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
+    static status_t unsupported(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         return status_t::unsupported_revision;
     }
 
-    static status_t c99(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
+    static status_t c99(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         return status_t::not_implemented;
     }
 
-    static status_t c11(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
+    static status_t c11(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         return status_t::not_implemented;
     }
 
-    static status_t cpp17(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
+    static status_t cpp17(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         return status_t::not_implemented;
     }
 
-    static status_t cpp20(serializer_t& s, format::memory_buffer_t& buf, cursor_t& cursor) {
+    static status_t cpp20(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         auto& store = *s.store;
         u32 id{};
         if (unlikely(!bass::next_field(cursor, id, element::field::child)))
@@ -932,32 +927,45 @@ namespace basecode::cxx::serializer {
         auto status = process_scope(s, buf, scope_cursor);
         if (unlikely(!OK(status)))
             return status;
-        format::print("{}\n", format::to_string(buf));
         return status_t::ok;
     }
 
-    using revision_handler_t = status_t (*)(serializer_t&, format::memory_buffer_t& buf, cursor_t& cursor);
+    using revision_handler_t = status_t (*)(serializer_t&, str_buf_t& buf, cursor_t& cursor);
+    static revision_handler_t s_revision_handlers[] = { unsupported, c99, c11, cpp17, cpp20 };
 
-    static revision_handler_t s_revision_handlers[] = {
-        unsupported,
-        c99,
-        c11,
-        cpp17,
-        cpp20
-    };
-
-    static status_t serialize_module(serializer_t& s, u32 id, alloc_t* allocator) {
+    static status_t serialize_module(serializer_t& s, u32 id, alloc_t* alloc) {
         auto& store = *s.store;
         cursor_t cursor{};
         if (!bass::seek_record(store, id, cursor)) return status_t::element_not_found;
         auto dict = bass::dict::make(cursor);
+        auto filename_lit = bass::dict::get(dict, element::field::lit);
         auto revision = (revision_t) bass::dict::get(dict, element::field::revision);
-        format::memory_buffer_t buf(format::allocator_t{allocator});
+        str::slice_t filename = "(module)"_ss;
+        if (filename_lit) {
+            cursor_t lit_cursor{};
+            if (!bass::seek_record(store, filename_lit, lit_cursor))
+                return status_t::intern_not_found;
+            auto lit_dict = bass::dict::make(lit_cursor);
+            auto interned = intern::get(*s.intern, bass::dict::get(lit_dict, element::field::intern));
+            if (unlikely(!OK(interned.status)))
+                return status_t::intern_not_found;
+            filename = interned.slice;
+        }
+        str_t* str{};
+        if (!symtab::emplace(s.modules, filename, &str))
+            return status_t::error;
+        str::init(*str, s.alloc);
+        str::reserve(*str, 512);
+        str_buf_t buf(str);
         return (*s_revision_handlers[(u32) revision])(s, buf, cursor);
     }
 
     u0 free(serializer_t& s) {
-        string::free(s.scratch);
+        str::free(s.scratch);
+        auto pairs = symtab::pairs(s.modules);
+        for (auto& pair : pairs)
+            str::free(*pair.value);
+        symtab::free(s.modules);
     }
 
     status_t serialize(serializer_t& s) {
@@ -978,15 +986,16 @@ namespace basecode::cxx::serializer {
     }
 
     u0 init(serializer_t& s, program_t& pgm, alloc_t* alloc, u16 margin, u16 tab_width) {
-        s.line = {};
-        s.indent = {};
-        s.alloc = alloc;
-        s.margin = margin;
-        s.store = &pgm.storage;
-        s.intern = &pgm.intern;
+        s.line      = {};
+        s.indent    = {};
+        s.alloc     = alloc;
+        s.margin    = margin;
+        s.store     = &pgm.storage;
+        s.intern    = &pgm.intern;
         s.tab_width = tab_width;
-        string::init(s.scratch, s.alloc);
-        string::reserve(s.scratch, 32);
+        symtab::init(s.modules, s.alloc);
+        str::init(s.scratch, s.alloc);
+        str::reserve(s.scratch, 32);
     }
 
     status_t expand_type(bass_t& storage, intern_t& intern, u32 type_id, type_info_t& type_info) {
@@ -996,7 +1005,7 @@ namespace basecode::cxx::serializer {
         type_info.meta_type = meta_type_t::none;
         type_info.size_type = integral_size_t::zero;
         type_info.size = 0;
-        string::reset(*type_info.name);
+        str::reset(*type_info.name);
 
         cursor_t type_cursor{};
         if (!bass::seek_record(storage, type_id, type_cursor))
@@ -1040,9 +1049,9 @@ namespace basecode::cxx::serializer {
                     if (!bass::next_field(ident_cursor, intern_id, element::field::intern))
                         return status_t::intern_not_found;
                     auto interned = intern::get(intern, intern_id);
-                    string::append(*type_info.name, interned.slice);
+                    str::append(*type_info.name, interned.slice);
                     if (suffix_len > 0) {
-                        string::append(*type_info.name, suffix, suffix_len);
+                        str::append(*type_info.name, suffix, suffix_len);
                         suffix_len = {};
                     }
                     return status_t::ok;

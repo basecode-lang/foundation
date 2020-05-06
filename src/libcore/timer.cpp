@@ -16,8 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "timer.h"
-#include "profiler.h"
+#include <basecode/core/timer.h>
+#include <basecode/core/profiler.h>
 
 namespace basecode::timer {
     static constexpr u32        timer_max_count = 256;

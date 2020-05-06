@@ -16,8 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "../memory/proxy_system.h"
-#include "cxx.h"
+#include <basecode/core/cxx/cxx.h>
+#include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::cxx::module {
     u0 free(module_t& module) {
@@ -40,7 +40,7 @@ namespace basecode::cxx::module {
         return module.scopes[scope_idx];
     }
 
-    u0 init(module_t& module, program_t& pgm, string::slice_t& filename, cxx::revision_t rev, alloc_t* alloc) {
+    u0 init(module_t& module, program_t& pgm, str::slice_t& filename, cxx::revision_t rev, alloc_t* alloc) {
         module.program = &pgm;
         module.revision = rev;
 

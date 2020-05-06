@@ -21,13 +21,13 @@
 #include <basecode/core/cxx/cxx.h>
 #include <basecode/core/profiler.h>
 #include <basecode/core/stopwatch.h>
-#include <basecode/core/memory/proxy_system.h>
-#include <basecode/core/memory/dlmalloc_system.h>
+#include <basecode/core/memory/system/dl.h>
+#include <basecode/core/memory/system/proxy.h>
 
 using namespace basecode;
 using namespace basecode::cxx;
 
-TEST_CASE("basecode::cxx create program_t", "[!hide]") {
+TEST_CASE("basecode::cxx create program_t") {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -35,6 +35,7 @@ TEST_CASE("basecode::cxx create program_t", "[!hide]") {
     cxx::program::init(pgm);
     defer({
         cxx::program::free(pgm);
+        memory::proxy::reset();
     });
     REQUIRE(pgm.storage.alloc);
     REQUIRE(pgm.modules.alloc);
@@ -47,7 +48,7 @@ TEST_CASE("basecode::cxx create program_t", "[!hide]") {
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx create module_t", "[!hide]") {
+TEST_CASE("basecode::cxx create module_t") {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -55,6 +56,7 @@ TEST_CASE("basecode::cxx create module_t", "[!hide]") {
     cxx::program::init(pgm);
     defer({
         cxx::program::free(pgm);
+        memory::proxy::reset();
     });
 
     const auto expected_filename = "test.cpp"_ss;
@@ -86,7 +88,7 @@ TEST_CASE("basecode::cxx create module_t", "[!hide]") {
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx create identifier within scope", "[!hide]") {
+TEST_CASE("basecode::cxx create identifier within scope") {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -94,6 +96,7 @@ TEST_CASE("basecode::cxx create identifier within scope", "[!hide]") {
     cxx::program::init(pgm);
     defer({
         cxx::program::free(pgm);
+        memory::proxy::reset();
     });
 
     const auto expected_filename = "test.cpp"_ss;
@@ -107,19 +110,20 @@ TEST_CASE("basecode::cxx create identifier within scope", "[!hide]") {
     auto id = cxx::scope::expr::ident(top_level, expected_ident);
     REQUIRE(id != 0);
 
-    s32 idx = array::contains(top_level.identifiers, id);
-    REQUIRE(idx != -1);
+    cxx::ident_t ident{};
+    REQUIRE(symtab::find(top_level.identifiers, expected_ident, ident));
+    REQUIRE(ident.record_id == id);
+    REQUIRE(ident.intern_id != 0);
 
-    auto intern_result = intern::get(pgm.intern, top_level.interns[idx]);
+    auto intern_result = intern::get(pgm.intern, ident.intern_id);
     REQUIRE(OK(intern_result.status));
-    REQUIRE(intern_result.id == top_level.interns[idx]);
     REQUIRE(intern_result.slice == expected_ident);
 
     stopwatch::stop(build_time);
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx declare s32 type within scope", "[!hide]") {
+TEST_CASE("basecode::cxx declare s32 type within scope") {
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
@@ -127,6 +131,7 @@ TEST_CASE("basecode::cxx declare s32 type within scope", "[!hide]") {
     cxx::program::init(pgm);
     defer({
         cxx::program::free(pgm);
+        memory::proxy::reset();
     });
 
     const auto expected_ident = "int"_ss;
@@ -144,14 +149,14 @@ TEST_CASE("basecode::cxx declare s32 type within scope", "[!hide]") {
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 }
 
-TEST_CASE("basecode::cxx example program"/*, "[!hide]"*/) {
+TEST_CASE("basecode::cxx example program") {
     alloc_t region_alloc{};
     dl_config_t region_config{};
     region_config.heap_size = 512 * 1024;
     memory::init(&region_alloc, alloc_type_t::dlmalloc, &region_config);
     defer({
         memory::system::print_allocators();
-        memory::release(&region_alloc, false);
+        memory::fini(&region_alloc, false);
     });
 
     alloc_t* alloc = &region_alloc;
@@ -270,28 +275,41 @@ TEST_CASE("basecode::cxx example program"/*, "[!hide]"*/) {
             main_params_list_id));
     scope::pop(top_level);
 
-//    program::debug_dump(pgm);
     REQUIRE(OK(cxx::program::finalize(pgm)));
 
     stopwatch::stop(build_time);
     stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
 
-    stopwatch_t serialize_time{};
-    stopwatch::start(serialize_time);
+//    {
+//        fmt_buf_t buf{};
+//        program::debug_dump(pgm, buf);
+//        format::print("{}\n", slice::make(buf.data(), buf.size()));
+//    }
 
-    cxx::serializer_t s{};
-    cxx::serializer::init(s, pgm, alloc);
+    status_t status{};
+    {
+        stopwatch_t serialize_time{};
+        stopwatch::start(serialize_time);
 
-    auto status = cxx::serializer::serialize(s);
-    stopwatch::stop(serialize_time);
-    stopwatch::print_elapsed("total serialize time"_ss, 40, stopwatch::elapsed(serialize_time));
+        cxx::serializer_t s{};
+        cxx::serializer::init(s, pgm, alloc);
 
-    format::print(stderr, "{}\n", program::status_name(status));
+        status = cxx::serializer::serialize(s);
+
+        stopwatch::stop(serialize_time);
+        stopwatch::print_elapsed("total serialize time"_ss, 40, stopwatch::elapsed(serialize_time));
+
+        auto modules = symtab::pairs(s.modules);
+        for (auto& module : modules) {
+            format::print("{:<40} {} bytes\n", module.key, module.value->length);
+            format::print("{}\n", *module.value);
+        }
+    }
 
     auto proxies = memory::proxy::active();
     defer(array::free(proxies));
     for (auto proxy : proxies) {
-        format::print(stderr, "{:<32} {:>10}\n", memory::proxy::name(proxy), proxy->total_allocated);
+        format::print(stderr, "{:<32} {:>10}\n", proxy->name, proxy->alloc->total_allocated);
     }
 
     REQUIRE(OK(status));

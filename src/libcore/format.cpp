@@ -16,22 +16,39 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "format.h"
+#include <basecode/core/format.h>
 
 namespace basecode::format {
-    u0 hex_dump(memory_buffer_t& buf, const u0* data, u32 size) {
+    static str::slice_t s_byte_units[] = {
+        "bytes"_ss, "KB"_ss, "MB"_ss, "GB"_ss, "TB"_ss,
+        "PB"_ss,    "EB"_ss, "ZB"_ss, "YB"_ss
+    };
+
+    u0 unitized_byte_size(fmt_buf_t& buf, u64 size) {
+        u64 i{};
+        while (size > 1024) {
+            size /= 1024;
+            i++;
+        }
+        if (i > 1) {
+            format::format_to(buf, "{}.{}{}", i, size, s_byte_units[i]);
+        } else {
+            format::format_to(buf, "{}", size, s_byte_units[i]);
+        }
+    }
+
+    u0 hex_dump(fmt_buf_t& buf, const u0* data, u32 size) {
         const u8* bytes = (const u8*) data;
-        s32 i, j;
-        for (i = 0; i < size; i += 16) {
+        for (u32 i = 0; i < size; i += 16) {
             format::format_to(buf, "${:016x}:{:08x}: ", (u64) (bytes + i), i);
-            for (j = 0; j < 16; j++) {
+            for (u32 j = 0; j < 16; j++) {
                 if (i + j < size)
                     format::format_to(buf, "{:02x} ", bytes[i + j]);
                 else
                     format::format_to(buf, "   ");
             }
             format::format_to(buf, " ");
-            for (j = 0; j < 16; j++) {
+            for (u32 j = 0; j < 16; j++) {
                 if (i + j < size) {
                     format::format_to(
                         buf,
@@ -43,16 +60,16 @@ namespace basecode::format {
         }
     }
 
-    string_t vformat(alloc_t* allocator, fmt::string_view format_str, fmt::format_args args) {
-        format::allocator_t alloc(allocator);
-        memory_buffer_t buf(alloc);
+    str_t vformat(alloc_t* alloc, fmt::string_view format_str, fmt::format_args args) {
+        fmt_alloc_t fmt_alloc(alloc);
+        fmt_buf_t buf(fmt_alloc);
         fmt::vformat_to(buf, format_str, args);
         return to_string(buf);
     }
 
-    u0 vprint(alloc_t* allocator, FILE* file, fmt::string_view format_str, fmt::format_args args) {
-        format::allocator_t alloc(allocator);
-        memory_buffer_t buf(alloc);
+    u0 vprint(alloc_t* alloc, FILE* file, fmt::string_view format_str, fmt::format_args args) {
+        fmt_alloc_t fmt_alloc(alloc);
+        fmt_buf_t buf(fmt_alloc);
         fmt::vformat_to(buf, format_str, args);
         std::fwrite(buf.data(), 1, buf.size(), file);
     }

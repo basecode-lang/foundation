@@ -16,20 +16,20 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "bass.h"
-#include "memory/bump_system.h"
-#include "memory/page_system.h"
-#include "memory/proxy_system.h"
+#include <basecode/core/bass.h>
+#include <basecode/core/memory/system/bump.h>
+#include <basecode/core/memory/system/page.h>
+#include <basecode/core/memory/system/proxy.h>
 
 namespace basecode {
-    static string::slice_t s_kinds[] = {
+    static str::slice_t s_kinds[] = {
         "none"_ss,
         "blob"_ss,
         "field"_ss,
         "header"_ss,
     };
 
-    string::slice_t kind::name(u8 value) {
+    str::slice_t kind::name(u8 value) {
         return s_kinds[value];
     }
 
@@ -90,6 +90,7 @@ namespace basecode {
             } else {
                 cursor.offset += cursor.end_offset - cursor.offset;
             }
+            ++cursor.id;
             cursor.field = {};
             cursor.header = (field_t*) (cursor.page + cursor.offset);
             cursor.end_offset = cursor.offset + cursor.header->value;
@@ -101,14 +102,7 @@ namespace basecode {
         }
 
         b8 seek_first(bass_t& storage, cursor_t& cursor) {
-            cursor.id = {};
-            cursor.field = {};
-            cursor.storage = &storage;
-            cursor.page = (u8*) memory::bump::buf(storage.bump_alloc);
-            cursor.header = (field_t*) (cursor.page);
-            cursor.end_offset = cursor.header->value;
-            cursor.offset = cursor.start_offset = {};
-            return cursor.header && cursor.header->kind == kind::header;
+            return seek_record(storage, 1, cursor);
         }
 
         b8 seek_current(bass_t& storage, cursor_t& cursor) {
@@ -149,6 +143,23 @@ namespace basecode {
             return move_next(cursor);
         }
 
+        u0 init(bass_t& storage, alloc_t* alloc, u8 num_pages) {
+            storage.id    = 1;
+            storage.alloc = memory::proxy::make(alloc, "bass"_ss);
+
+            array::init(storage.index, memory::proxy::make(storage.alloc, "bass::index"_ss));
+
+            page_config_t page_config{};
+            page_config.num_pages = num_pages;
+            page_config.backing   = storage.alloc;
+            storage.page_alloc    = memory::proxy::make(memory::system::make(alloc_type_t::page, &page_config), "bass::page"_ss, true);
+
+            bump_config_t bump_config{};
+            bump_config.type          = bump_type_t::allocator;
+            bump_config.backing.alloc = storage.page_alloc;
+            storage.bump_alloc        = memory::proxy::make(memory::system::make(alloc_type_t::bump, &bump_config), "bass::bump"_ss, true);
+        }
+
         b8 new_record(cursor_t& cursor, u8 type, u32 num_fields) {
             const u32 record_size = RECORD_BYTE_SIZE(num_fields + 2);
             memory::alloc(cursor.storage->bump_alloc, record_size, alignof(field_t));
@@ -176,32 +187,31 @@ namespace basecode {
             return write_field(cursor, field::id, cursor.id);
         }
 
-        u0 init(bass_t& storage, alloc_t* alloc, u32 num_pages) {
-            storage.id = 1;
-            storage.alloc = memory::proxy::make(alloc, "bass"_ss);
-
-            array::init(storage.index, memory::proxy::make(storage.alloc, "bass::index"_ss));
-
-            page_config_t page_config{};
-            page_config.backing = storage.alloc;
-            page_config.page_size = memory::system::os_page_size() * num_pages;
-            storage.page_alloc = memory::proxy::make(memory::system::make(alloc_type_t::page, &page_config), "bass::page"_ss, true);
-
-            bump_config_t bump_config{};
-            bump_config.type = bump_type_t::allocator;
-            bump_config.backing.alloc = storage.page_alloc;
-            storage.bump_alloc = memory::proxy::make(memory::system::make(alloc_type_t::bump, &bump_config), "bass::bump"_ss, true);
-        }
-
         b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor) {
             if (id == 0 || id > storage.index.size)
                 return false;
             const auto& index = storage.index[id - 1];
+            cursor.id = id;
             cursor.page = index.page;
+            cursor.storage = &storage;
             cursor.offset = cursor.start_offset = index.offset;
             cursor.header = (field_t*) (cursor.page + cursor.offset);
             cursor.end_offset = cursor.offset + cursor.header->value;
             return cursor.header && cursor.header->kind == kind::header;
+        }
+
+        b8 format_record(bass_t& ast, fmt_buf_t& buf, u32 id, format_record_callback_t record_cb, u0* ctx) {
+            u32 value{};
+            cursor_t cursor{};
+            if (!bass::seek_record(ast, id, cursor))
+                return false;
+            if (!record_cb(format_type_t::header, cursor, buf, ctx))
+                return false;
+            while (bass::next_field(cursor, value)) {
+                if (!record_cb(format_type_t::field, cursor, buf, ctx))
+                    return false;
+            }
+            return true;
         }
     }
 }

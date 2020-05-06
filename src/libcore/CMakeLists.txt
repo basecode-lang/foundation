@@ -5,86 +5,131 @@ set(VERSION_MAJOR 0)
 set(VERSION_MINOR 1)
 set(PRODUCT_NAME  "Basecode Foundation Core Library")
 
-include_directories(
-        ${PROJECT_SOURCE_DIR}
-        ${CMAKE_BINARY_DIR}/include/basecode/core
-)
+set(INC_DIR "${CMAKE_SOURCE_DIR}/include/basecode/core")
 
 configure_file (
         configure.in.h
         "${CMAKE_BINARY_DIR}/include/basecode/core/configure.h"
 )
 
-add_library(
-        ${PROJECT_NAME}
+set(
+        SOURCES
 
-        defer.h
-        types.h
+        ${INC_DIR}/defer.h
+        ${INC_DIR}/types.h
 
-        array.h
+        ${INC_DIR}/array.h
 
-        bass.cpp bass.h
+        base64.cpp ${INC_DIR}/base64.h
 
-        bitset.cpp bitset.h
+        bass.cpp ${INC_DIR}/bass.h
 
-        buffer.cpp buffer.h
+        ${INC_DIR}/bintree.h
 
-        context.cpp context.h
+        bits.cpp ${INC_DIR}/bits.h
+
+        bitset.cpp ${INC_DIR}/bitset.h
+
+        buffer.cpp ${INC_DIR}/buffer.h
+
+        context.cpp ${INC_DIR}/context.h
 
         cxx/scope.cpp
         cxx/module.cpp
         cxx/program.cpp
         cxx/serializer.cpp
-        cxx/cxx.cpp cxx/cxx.h
+        cxx/cxx.cpp ${INC_DIR}/cxx/cxx.h
 
-        error.cpp error.h
+        ${INC_DIR}/digraph.h
 
-        format.cpp format.h
+        error.cpp ${INC_DIR}/error.h
 
-        gfx.h
+        filesys.cpp ${INC_DIR}/filesys.h
 
-        hashable.h
+        ffi.cpp ${INC_DIR}/ffi.h
 
-        hashing/crc.cpp hashing/crc.h
-        hashing/adler.cpp hashing/adler.h
-        hashing/murmur.cpp hashing/murmur.h
-        hashing/blake3.cpp hashing/blake3.h
-        hashing/symbol.cpp hashing/symbol.h
+        format.cpp ${INC_DIR}/format.h ${INC_DIR}/format_types.h
 
-        hashtable.h
+        ${INC_DIR}/gfx.h
 
-        intern.cpp intern.h
+        ${INC_DIR}/hashable.h
 
-        memory/std_allocator.h
-        memory/dlmalloc_config.h
-        memory/memory.cpp memory/memory.h
-        memory/dlmalloc.c memory/dlmalloc.h
-        memory/page_system.cpp memory/page_system.h
-        memory/slab_system.cpp memory/slab_system.h
-        memory/bump_system.cpp memory/bump_system.h
-        memory/trace_system.cpp memory/trace_system.h
-        memory/proxy_system.cpp memory/proxy_system.h
-        memory/default_system.cpp memory/default_system.h
-        memory/dlmalloc_system.cpp memory/dlmalloc_system.h
+        hash/crc.cpp ${INC_DIR}/hash/crc.h
+        hash/adler.cpp ${INC_DIR}/hash/adler.h
+        hash/murmur.cpp ${INC_DIR}/hash/murmur.h
+        hash/blake3.cpp ${INC_DIR}/hash/blake3.h
+        hash/symbol.cpp ${INC_DIR}/hash/symbol.h
 
-        profiler.cpp profiler.h
+        ${INC_DIR}/hashtab.h
 
-        slice.h
+        intern.cpp ${INC_DIR}/intern.h
 
-        stack.h
+        ${INC_DIR}/iterator.h
 
-        stable_array.h
+        ${INC_DIR}/list.h
 
-        stopwatch.cpp stopwatch.h
+        log.cpp ${INC_DIR}/log.h
 
-        str.cpp str.h
+        log/system/syslog.cpp ${INC_DIR}/log/system/syslog.h
+        log/system/spdlog.cpp ${INC_DIR}/log/system/spdlog.h
+        log/system/default.cpp ${INC_DIR}/log/system/default.h
 
-        timer.cpp timer.h
+        memory.cpp ${INC_DIR}/memory.h
+
+        memory/dyn_alloc.cpp
+        memory/meta.cpp ${INC_DIR}/memory/meta.h
+        memory/std_alloc.cpp ${INC_DIR}/memory/std_alloc.h
+        memory/system/dl.cpp ${INC_DIR}/memory/system/dl.h
+        memory/system/page.cpp ${INC_DIR}/memory/system/page.h
+        memory/system/slab.cpp ${INC_DIR}/memory/system/slab.h
+        memory/system/bump.cpp ${INC_DIR}/memory/system/bump.h
+        memory/system/trace.cpp ${INC_DIR}/memory/system/trace.h
+        memory/system/proxy.cpp ${INC_DIR}/memory/system/proxy.h
+        memory/system/stack.cpp ${INC_DIR}/memory/system/stack.h
+        memory/system/default.cpp ${INC_DIR}/memory/system/default.h
+        memory/system/dlmalloc.c ${INC_DIR}/memory/system/dlmalloc.h ${INC_DIR}/memory/system/dlmalloc_config.h
+
+        network.cpp ${INC_DIR}/network.h
+
+        numbers.cpp ${INC_DIR}/numbers.h
+
+        path.cpp ${INC_DIR}/path.h
+
+        profiler.cpp ${INC_DIR}/profiler.h
+
+        ${INC_DIR}/queue.h
+
+        ${INC_DIR}/set.h
+
+        ${INC_DIR}/slice.h
+        slice_utils.cpp ${INC_DIR}/slice_utils.h
+
+        ${INC_DIR}/stack.h
+
+        ${INC_DIR}/stable_array.h
+
+        stopwatch.cpp ${INC_DIR}/stopwatch.h
+
+        str.cpp ${INC_DIR}/str.h
+
+        symtab.cpp ${INC_DIR}/symtab.h
+
+        timer.cpp ${INC_DIR}/timer.h
 )
+add_library(${PROJECT_NAME} ${SOURCES})
 target_link_libraries(
         ${PROJECT_NAME}
 
         utf8proc
         blake3
         fmt-header-only
+        spdlog::spdlog
+        dyncall_s
+        dynload_s
+        ${DL_LIBRARY}
+)
+target_include_directories(
+        ${PROJECT_NAME}
+
+        PUBLIC ${CMAKE_SOURCE_DIR}/include
 )

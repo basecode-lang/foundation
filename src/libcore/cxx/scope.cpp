@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "cxx.h"
+#include <basecode/core/cxx/cxx.h>
 
 namespace basecode::cxx::scope {
     static u32 make_unary(
@@ -65,7 +65,23 @@ namespace basecode::cxx::scope {
             integral_size_t size,
             u64 lit,
             u32 radix = 10) {
-        auto r = intern::intern(scope.pgm->intern, slice::make(format::to_radix(lit, radix)));
+        switch (size) {
+            case integral_size_t::zero:
+                break;
+            case integral_size_t::byte:
+                meta_type == meta_type_t::signed_integer ? format::to_radix(scope.pgm->scratch, s8(lit), radix) : format::to_radix(scope.pgm->scratch, u8(lit), radix);
+                break;
+            case integral_size_t::word:
+                meta_type == meta_type_t::signed_integer ? format::to_radix(scope.pgm->scratch, s16(lit), radix) : format::to_radix(scope.pgm->scratch, u16(lit), radix);
+                break;
+            case integral_size_t::dword:
+                meta_type == meta_type_t::signed_integer ? format::to_radix(scope.pgm->scratch, s32(lit), radix) : format::to_radix(scope.pgm->scratch, u32(lit), radix);
+                break;
+            case integral_size_t::qword:
+                meta_type == meta_type_t::signed_integer ? format::to_radix(scope.pgm->scratch, s64(lit), radix) : format::to_radix(scope.pgm->scratch, u64(lit), radix);
+                break;
+        }
+        auto r = intern::intern(scope.pgm->intern, slice::make(scope.pgm->scratch));
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::num_lit, 4);
@@ -149,46 +165,6 @@ namespace basecode::cxx::scope {
         return c.id;
     }
 
-    u32 stmt::if_(
-            scope_t& scope,
-            u32 predicate_id,
-            u32 true_expr_id,
-            u32 false_expr_id,
-            u32 label_id) {
-        cursor_t c{};
-        bass::seek_current(scope.pgm->storage, c);
-        bass::new_record(c, element::header::statement, 6);
-        bass::write_field(c, element::field::scope, scope.id);
-        bass::write_field(c, element::field::lhs, predicate_id);
-        bass::write_field(c, element::field::label, label_id);
-        bass::write_field(c, element::field::tbranch, true_expr_id);
-        bass::write_field(c, element::field::fbranch, false_expr_id);
-        bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::if_, 0));
-        array::append(scope.statements, c.id);
-        return c.id;
-    }
-
-    u32 stmt::for_(
-            scope_t& scope,
-            u32 predicate_id,
-            u32 expr_id,
-            u32 init_expr_id,
-            u32 post_expr_id,
-            u32 label_id) {
-        cursor_t c{};
-        bass::seek_current(scope.pgm->storage, c);
-        bass::new_record(c, element::header::statement, 7);
-        bass::write_field(c, element::field::scope, scope.id);
-        bass::write_field(c, element::field::label, label_id);
-        bass::write_field(c, element::field::lhs, predicate_id);
-        bass::write_field(c, element::field::rhs, post_expr_id);
-        bass::write_field(c, element::field::init, init_expr_id);
-        bass::write_field(c, element::field::tbranch, expr_id);
-        bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::for_, 0));
-        array::append(scope.statements, c.id);
-        return c.id;
-    }
-
     u0 pop(scope_t& scope) {
         stack::pop(scope.stack);
     }
@@ -196,11 +172,10 @@ namespace basecode::cxx::scope {
     u0 free(scope_t& scope) {
         stack::free(scope.stack);
         array::free(scope.types);
-        array::free(scope.labels);
-        array::free(scope.interns);
+        symtab::free(scope.labels);
         array::free(scope.children);
         array::free(scope.statements);
-        array::free(scope.identifiers);
+        symtab::free(scope.identifiers);
     }
 
     u32 push(scope_t& scope) {
@@ -351,6 +326,23 @@ namespace basecode::cxx::scope {
         return make_integral(scope, ident_id, meta_type_t::floating_point, integral_size_t::qword);
     }
 
+    u32 label(scope_t& scope, str::slice_t name) {
+        ident_t ident{};
+        if (symtab::find(scope.labels, name, ident))
+            return ident.record_id;
+        auto     r = intern::intern(scope.pgm->intern, name);
+        cursor_t c{};
+        bass::seek_current(scope.pgm->storage, c);
+        bass::new_record(c, element::header::label, 1);
+        bass::write_field(c, element::field::intern, r.id);
+        ident_t* new_ident{};
+        if (symtab::emplace(scope.labels, name, &new_ident)) {
+            new_ident->record_id = c.id;
+            new_ident->intern_id = r.id;
+        }
+        return c.id;
+    }
+
     u32 stmt::empty(scope_t& scope, u32 label_id) {
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
@@ -359,6 +351,15 @@ namespace basecode::cxx::scope {
         bass::write_field(c, element::field::label, label_id);
         bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::empty, 0));
         array::append(scope.statements, c.id);
+        return c.id;
+    }
+
+    u32 lit::str(scope_t& scope, str::slice_t lit) {
+        auto r = intern::intern(scope.pgm->intern, lit);
+        cursor_t c{};
+        bass::seek_current(scope.pgm->storage, c);
+        bass::new_record(c, element::header::str_lit, 1);
+        bass::write_field(c, element::field::intern, r.id);
         return c.id;
     }
 
@@ -384,16 +385,6 @@ namespace basecode::cxx::scope {
         return c.id;
     }
 
-    u32 label(scope_t& scope, string::slice_t name) {
-        auto result = intern::intern(scope.pgm->intern, name);
-        cursor_t c{};
-        bass::seek_current(scope.pgm->storage, c);
-        bass::new_record(c, element::header::label, 1);
-        bass::write_field(c, element::field::intern, result.id);
-        array::append(scope.labels, c.id);
-        return c.id;
-    }
-
     u32 stmt::continue_(scope_t& scope, u32 label_id) {
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
@@ -405,15 +396,6 @@ namespace basecode::cxx::scope {
         return c.id;
     }
 
-    u32 lit::str(scope_t& scope, string::slice_t lit) {
-        auto r = intern::intern(scope.pgm->intern, lit);
-        cursor_t c{};
-        bass::seek_current(scope.pgm->storage, c);
-        bass::new_record(c, element::header::str_lit, 1);
-        bass::write_field(c, element::field::intern, r.id);
-        return c.id;
-    }
-
     u32 expr::unary::neg(scope_t& scope, u32 expr_id) {
         return make_unary(scope, expr_id, unary_op_type_t::neg);
     }
@@ -422,8 +404,49 @@ namespace basecode::cxx::scope {
         return make_unary(scope, expr_id, unary_op_type_t::bnot);
     }
 
+    u32 expr::raw(scope_t& scope, str::slice_t source) {
+        auto r = intern::intern(scope.pgm->intern, source);
+        cursor_t c{};
+        bass::seek_current(scope.pgm->storage, c);
+        bass::new_record(c, element::header::expression, 3);
+        bass::write_field(c, element::field::scope, scope.id);
+        bass::write_field(c, element::field::intern, r.id);
+        bass::write_field(c, element::field::type, MAKE_TYPE(expression_type_t::raw, 0));
+        return c.id;
+    }
+
+    u32 stmt::raw(scope_t& scope, str::slice_t source) {
+        auto r = intern::intern(scope.pgm->intern, source);
+        cursor_t c{};
+        bass::seek_current(scope.pgm->storage, c);
+        bass::new_record(c, element::header::statement, 3);
+        bass::write_field(c, element::field::scope, scope.id);
+        bass::write_field(c, element::field::intern, r.id);
+        bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::raw, 0));
+        array::append(scope.statements, c.id);
+        return c.id;
+    }
+
     u32 expr::unary::lnot(scope_t& scope, u32 expr_id) {
         return make_unary(scope, expr_id, unary_op_type_t::lnot);
+    }
+
+    u32 expr::ident(scope_t& scope, str::slice_t name) {
+        ident_t ident{};
+        if (symtab::find(scope.identifiers, name, ident))
+            return ident.record_id;
+        auto r = intern::intern(scope.pgm->intern, name);
+        cursor_t c{};
+        bass::seek_current(scope.pgm->storage, c);
+        bass::new_record(c, element::header::ident, 2);
+        bass::write_field(c, element::field::scope, scope.id);
+        bass::write_field(c, element::field::intern, r.id);
+        ident_t* new_ident{};
+        if (symtab::emplace(scope.identifiers, name, &new_ident)) {
+            new_ident->record_id = c.id;
+            new_ident->intern_id = r.id;
+        }
+        return c.id;
     }
 
     u32 expr::unary::deref(scope_t& scope, u32 expr_id) {
@@ -436,45 +459,6 @@ namespace basecode::cxx::scope {
 
     u32 expr::unary::addrof(scope_t& scope, u32 expr_id) {
         return make_unary(scope, expr_id, unary_op_type_t::addrof);
-    }
-
-    u32 expr::raw(scope_t& scope, string::slice_t source) {
-        auto r = intern::intern(scope.pgm->intern, source);
-        cursor_t c{};
-        bass::seek_current(scope.pgm->storage, c);
-        bass::new_record(c, element::header::expression, 3);
-        bass::write_field(c, element::field::scope, scope.id);
-        bass::write_field(c, element::field::intern, r.id);
-        bass::write_field(c, element::field::type, MAKE_TYPE(expression_type_t::raw, 0));
-        return c.id;
-    }
-
-    u32 stmt::raw(scope_t& scope, string::slice_t source) {
-        auto r = intern::intern(scope.pgm->intern, source);
-        cursor_t c{};
-        bass::seek_current(scope.pgm->storage, c);
-        bass::new_record(c, element::header::statement, 3);
-        bass::write_field(c, element::field::scope, scope.id);
-        bass::write_field(c, element::field::intern, r.id);
-        bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::raw, 0));
-        array::append(scope.statements, c.id);
-        return c.id;
-    }
-
-    u32 expr::ident(scope_t& scope, string::slice_t name) {
-        auto r = intern::intern(scope.pgm->intern, name);
-        auto idx = array::contains(scope.interns, r.id);
-        if (idx == -1) {
-            cursor_t c{};
-            bass::seek_current(scope.pgm->storage, c);
-            bass::new_record(c, element::header::ident, 2);
-            bass::write_field(c, element::field::scope, scope.id);
-            bass::write_field(c, element::field::intern, r.id);
-            array::append(scope.identifiers, c.id);
-            array::append(scope.interns, r.id);
-            return c.id;
-        }
-        return scope.identifiers[idx];
     }
 
     u32 type::array(scope_t& scope, u32 type_id, u32 size) {
@@ -496,6 +480,18 @@ namespace basecode::cxx::scope {
         bass::write_field(c, element::field::scope, scope.id);
         for (u32 i = 0; i < size; ++i)
             bass::write_field(c, element::field::child, id_list[i]);
+        return c.id;
+    }
+
+    u32 stmt::pp::pragma(scope_t &scope, str::slice_t expr) {
+        auto r = intern::intern(scope.pgm->intern, expr);
+        cursor_t c{};
+        bass::seek_current(scope.pgm->storage, c);
+        bass::new_record(c, element::header::statement, 3);
+        bass::write_field(c, element::field::scope, scope.id);
+        bass::write_field(c, element::field::intern, r.id);
+        bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::pp, preprocessor_type_t::pragma));
+        array::append(scope.statements, c.id);
         return c.id;
     }
 
@@ -538,18 +534,6 @@ namespace basecode::cxx::scope {
         return make_unary(scope, expr_id, unary_op_type_t::addrof_label);
     }
 
-    u32 stmt::pp::pragma(scope_t &scope, string::slice_t expr) {
-        auto r = intern::intern(scope.pgm->intern, expr);
-        cursor_t c{};
-        bass::seek_current(scope.pgm->storage, c);
-        bass::new_record(c, element::header::statement, 3);
-        bass::write_field(c, element::field::scope, scope.id);
-        bass::write_field(c, element::field::intern, r.id);
-        bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::pp, preprocessor_type_t::pragma));
-        array::append(scope.statements, c.id);
-        return c.id;
-    }
-
     u32 stmt::goto_(scope_t& scope, u32 expr_id, u32 label_id) {
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
@@ -560,6 +544,13 @@ namespace basecode::cxx::scope {
         bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::goto_, 0));
         array::append(scope.statements, c.id);
         return c.id;
+    }
+
+    u32 stmt::comment::line(scope_t& scope, str::slice_t value) {
+        auto r = intern::intern(scope.pgm->intern, value);
+        auto id = make_comment(scope, r.id);
+        array::append(scope.statements, id);
+        return id;
     }
 
     u32 stmt::using_(scope_t& scope, u32 ident_id, u32 type_id) {
@@ -596,6 +587,13 @@ namespace basecode::cxx::scope {
         bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::default_, 0));
         array::append(scope.statements, c.id);
         return c.id;
+    }
+
+    u32 stmt::comment::block(scope_t& scope, str::slice_t value) {
+        auto r = intern::intern(scope.pgm->intern, value);
+        auto id = make_comment(scope, r.id, true);
+        array::append(scope.statements, id);
+        return id;
     }
 
     u32 expr::binary::eq(scope_t& scope, u32 lhs_id, u32 rhs_id) {
@@ -698,8 +696,17 @@ namespace basecode::cxx::scope {
         return make_assign(scope, lhs_id, rhs_id, assignment_type_t::band);
     }
 
+    u32 stmt::pp::include_local(scope_t &scope, str::slice_t path) {
+        auto r = intern::intern(scope.pgm->intern, path);
+        auto id = make_include(scope, r.id, true);
+        array::append(scope.statements, id);
+        return id;
+    }
+
     u32 lit::float_(scope_t& scope, f64 lit, integral_size_t size) {
-        auto r = intern::intern(scope.pgm->intern, slice::make(format::to_radix(lit, 10)));
+        str_buf_t buf(&scope.pgm->scratch);
+        format::format_to(buf, "{}", lit);
+        auto r = intern::intern(scope.pgm->intern, slice::make(scope.pgm->scratch));
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::num_lit, 3);
@@ -717,13 +724,6 @@ namespace basecode::cxx::scope {
         return make_assign(scope, lhs_id, rhs_id, assignment_type_t::diff);
     }
 
-    u32 stmt::comment::line(scope_t& scope, string::slice_t value) {
-        auto r = intern::intern(scope.pgm->intern, value);
-        auto id = make_comment(scope, r.id);
-        array::append(scope.statements, id);
-        return id;
-    }
-
     u32 expr::binary::comma(scope_t& scope, u32 lhs_id, u32 rhs_id) {
         return make_binary(scope, lhs_id, rhs_id, binary_op_type_t::comma);
     }
@@ -732,9 +732,9 @@ namespace basecode::cxx::scope {
         return make_binary(scope, lhs_id, rhs_id, binary_op_type_t::range);
     }
 
-    u32 stmt::comment::block(scope_t& scope, string::slice_t value) {
-        auto r = intern::intern(scope.pgm->intern, value);
-        auto id = make_comment(scope, r.id, true);
+    u32 stmt::pp::include_system(scope_t &scope, str::slice_t path) {
+        auto r = intern::intern(scope.pgm->intern, path);
+        auto id = make_include(scope, r.id);
         array::append(scope.statements, id);
         return id;
     }
@@ -747,49 +747,8 @@ namespace basecode::cxx::scope {
         return make_assign(scope, lhs_id, rhs_id, assignment_type_t::direct);
     }
 
-    u0 init(program_t* pgm, module_t* module, scope_t& scope, scope_t* parent, alloc_t* alloc) {
-        cursor_t c{};
-        bass::seek_current(pgm->storage, c);
-        bass::new_record(c, element::header::scope, 3);
-        scope.id = c.id;
-        scope.pgm = pgm;
-        scope.module_idx = module->idx;
-        if (parent) {
-            bass::write_field(c, element::field::scope, parent->id);
-            bass::write_field(c, element::field::parent, parent->id);
-            array::append(parent->children, scope.id);
-            scope.parent_idx = parent->idx;
-        } else {
-            bass::write_field(c, element::field::scope, 0);
-            bass::write_field(c, element::field::parent, module->id);
-            scope.parent_idx = 0;
-        }
-        bass::write_field(c, element::field::list, 0);
-        stack::init(scope.stack, alloc);
-        array::init(scope.types, alloc);
-        array::init(scope.labels, alloc);
-        array::init(scope.interns, alloc);
-        array::init(scope.children, alloc);
-        array::init(scope.statements, alloc);
-        array::init(scope.identifiers, alloc);
-    }
-
     u32 expr::assign::product(scope_t& scope, u32 lhs_id, u32 rhs_id) {
         return make_assign(scope, lhs_id, rhs_id, assignment_type_t::product);
-    }
-
-    u32 stmt::pp::include_local(scope_t &scope, string::slice_t path) {
-        auto r = intern::intern(scope.pgm->intern, path);
-        auto id = make_include(scope, r.id, true);
-        array::append(scope.statements, id);
-        return id;
-    }
-
-    u32 stmt::pp::include_system(scope_t &scope, string::slice_t path) {
-        auto r = intern::intern(scope.pgm->intern, path);
-        auto id = make_include(scope, r.id);
-        array::append(scope.statements, id);
-        return id;
     }
 
     u32 expr::assign::quotient(scope_t& scope, u32 lhs_id, u32 rhs_id) {
@@ -908,6 +867,47 @@ namespace basecode::cxx::scope {
         return c.id;
     }
 
+    u0 init(program_t* pgm, module_t* module, scope_t& scope, scope_t* parent, alloc_t* alloc) {
+        cursor_t c{};
+        bass::seek_current(pgm->storage, c);
+        bass::new_record(c, element::header::scope, 3);
+        scope.id = c.id;
+        scope.pgm = pgm;
+        scope.module_idx = module->idx;
+        if (parent) {
+            bass::write_field(c, element::field::scope, parent->id);
+            bass::write_field(c, element::field::parent, parent->id);
+            array::append(parent->children, scope.id);
+            scope.parent_idx = parent->idx;
+        } else {
+            bass::write_field(c, element::field::scope, 0);
+            bass::write_field(c, element::field::parent, module->id);
+            scope.parent_idx = 0;
+        }
+        bass::write_field(c, element::field::list, 0);
+        stack::init(scope.stack, alloc);
+        array::init(scope.types, alloc);
+        symtab::init(scope.labels, alloc);
+        array::init(scope.children, alloc);
+        array::init(scope.statements, alloc);
+        symtab::init(scope.identifiers, alloc);
+    }
+
+
+    u32 stmt::if_(scope_t& scope, u32 predicate_id, u32 true_expr_id, u32 false_expr_id, u32 label_id) {
+        cursor_t c{};
+        bass::seek_current(scope.pgm->storage, c);
+        bass::new_record(c, element::header::statement, 6);
+        bass::write_field(c, element::field::scope, scope.id);
+        bass::write_field(c, element::field::lhs, predicate_id);
+        bass::write_field(c, element::field::label, label_id);
+        bass::write_field(c, element::field::tbranch, true_expr_id);
+        bass::write_field(c, element::field::fbranch, false_expr_id);
+        bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::if_, 0));
+        array::append(scope.statements, c.id);
+        return c.id;
+    }
+
     u32 type::func(scope_t& scope, u32 block_id, u32 return_type_id, u32 ident_id, u32 params_list_id) {
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
@@ -918,6 +918,21 @@ namespace basecode::cxx::scope {
         bass::write_field(c, element::field::rhs, params_list_id);
         bass::write_field(c, element::field::tbranch, block_id);
         bass::write_field(c, element::field::type, MAKE_TYPE(meta_type_t::function, integral_size_t::qword));
+        return c.id;
+    }
+
+    u32 stmt::for_(scope_t& scope, u32 predicate_id, u32 expr_id, u32 init_expr_id, u32 post_expr_id, u32 label_id) {
+        cursor_t c{};
+        bass::seek_current(scope.pgm->storage, c);
+        bass::new_record(c, element::header::statement, 7);
+        bass::write_field(c, element::field::scope, scope.id);
+        bass::write_field(c, element::field::label, label_id);
+        bass::write_field(c, element::field::lhs, predicate_id);
+        bass::write_field(c, element::field::rhs, post_expr_id);
+        bass::write_field(c, element::field::init, init_expr_id);
+        bass::write_field(c, element::field::tbranch, expr_id);
+        bass::write_field(c, element::field::type, MAKE_TYPE(statement_type_t::for_, 0));
+        array::append(scope.statements, c.id);
         return c.id;
     }
 }

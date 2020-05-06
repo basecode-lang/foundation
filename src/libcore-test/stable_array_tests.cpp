@@ -37,12 +37,11 @@ TEST_CASE("basecode::stable_array insert") {
 
     s32 k = 0;
     s32 j = 0;
-    for (u32 i = 0; i < numbers.size; ++i) {
-        auto n = numbers[i];
+    for (auto n : numbers) {
         if (j == 3) {
-            REQUIRE(n == 30);
+            REQUIRE(*n == 30);
         } else {
-            REQUIRE(n == k++);
+            REQUIRE(*n == k++);
         }
         ++j;
     }

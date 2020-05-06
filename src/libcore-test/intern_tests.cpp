@@ -72,12 +72,12 @@ TEST_CASE("basecode::intern") {
         format::print("memory_used = {}\n", memory_used);
     });
 
-    string_t str[expected_intern_count];
+    str_t str[expected_intern_count];
     for (u32 i = 0; i < expected_intern_count; ++i) {
-        string::init(str[i], context::top()->alloc);
-        string::reserve(str[i], 64);
-        string::append(str[i], "aaaaaAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBCCCCCCC");
-        str[i] = str[i] + string::random(2);
+        str::init(str[i], context::top()->alloc);
+        str::reserve(str[i], 64);
+        str::append(str[i], "aaaaaAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBCCCCCCC");
+        str[i] = str[i] + str::random(2);
     }
 
     stopwatch_t intern_time{};

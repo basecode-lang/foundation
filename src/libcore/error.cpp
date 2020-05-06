@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include "error.h"
+#include <basecode/core/error.h>
 
 namespace basecode {
     namespace error {
