@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <cstring>
 #include <basecode/core/timer.h>
 #include <basecode/core/profiler.h>
 
@@ -24,13 +25,14 @@ namespace basecode::timer {
     thread_local timer_t        t_timers[timer_max_count];
     thread_local timer_t*       t_available_timer = &t_timers[0];
 
-    u0 shutdown() {
+    u0 fini() {
         t_available_timer = {};
         for (u32 i = 0; i < timer_max_count; ++i)
             t_timers[i].active = false;
     }
 
-    status_t initialize() {
+    status_t init() {
+        std::memset(t_timers, 0, timer_max_count * sizeof(timer_t));
         return status_t::ok;
     }
 

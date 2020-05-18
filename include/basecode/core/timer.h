@@ -39,9 +39,9 @@ namespace basecode {
             error
         };
 
-        u0 shutdown();
+        u0 fini();
 
-        status_t initialize();
+        status_t init();
 
         u0 stop(timer_t* timer);
 

@@ -45,8 +45,10 @@ namespace basecode {
     namespace stack {
         template<typename T> u0 clear(stack_t<T>& stack);
         template<typename T> u32 push(stack_t<T>& stack, T&& value);
+        template<typename T> inline decltype(auto) top(stack_t<T>& stack);
         template<typename T> u0 reserve(stack_t<T>& stack, u32 new_capacity);
         template<typename T> u0 grow(stack_t<T>& stack, u32 min_capacity = 8);
+        template<typename T> inline decltype(auto) top(const stack_t<T>& stack);
         template<typename T> stack_t<T> make(alloc_t* alloc = context::top()->alloc);
         template<typename T> u0 init(stack_t<T>& stack, alloc_t* alloc = context::top()->alloc);
         template<typename T> stack_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc);
@@ -121,6 +123,14 @@ namespace basecode {
             reserve(stack, min_capacity * 2 + 8);
         }
 
+        template<typename T> inline decltype(auto) top(stack_t<T>& stack) {
+            if constexpr (std::is_pointer_v<T>) {
+                return (T) (stack.size == 0 ? nullptr : stack.data[stack.size - 1]);
+            } else {
+                return (T*) (stack.size == 0 ? nullptr : &stack.data[stack.size - 1]);
+            }
+        }
+
         template<typename T> inline decltype(auto) push(stack_t<T>& stack) {
             if (stack.size + 1 > stack.capacity)
                 grow(stack);
@@ -168,9 +178,9 @@ namespace basecode {
 
         template<typename T> inline decltype(auto) top(const stack_t<T>& stack) {
             if constexpr (std::is_pointer_v<T>) {
-                return (T) (stack.size == 0 ? nullptr : stack.data[stack.size - 1]);
+                return (const T) (stack.size == 0 ? nullptr : stack.data[stack.size - 1]);
             } else {
-                return (T*) (stack.size == 0 ? nullptr : &stack.data[stack.size - 1]);
+                return (const T*) (stack.size == 0 ? nullptr : &stack.data[stack.size - 1]);
             }
         }
 
