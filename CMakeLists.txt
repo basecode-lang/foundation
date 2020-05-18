@@ -106,5 +106,8 @@ target_compile_definitions(dynload_s PRIVATE malloc=dyn_alloc free=dyn_free)
 #
 # -----------------------------------------------------------------------------
 
+set(INC_DIR_BASE "${PROJECT_SOURCE_DIR}/include")
+set(PROJECT_DIR_BASE ${PROJECT_SOURCE_DIR})
+
 add_subdirectory(src/libcore)
 add_subdirectory(src/libcore-test)

@@ -31,12 +31,12 @@ target_include_directories(
         ${PROJECT_NAME} PRIVATE
 
         ${PROJECT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/include
+        ${INC_DIR_BASE}/include
         ${CMAKE_BINARY_DIR}/include
 )
 add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD
 
         COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/etc
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_SOURCE_DIR}/etc/ut.txt ${CMAKE_BINARY_DIR}/etc
+        COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_DIR_BASE}/etc/ut.txt ${CMAKE_BINARY_DIR}/etc
 )

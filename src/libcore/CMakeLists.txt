@@ -5,7 +5,7 @@ set(VERSION_MAJOR 0)
 set(VERSION_MINOR 1)
 set(PRODUCT_NAME  "Basecode Foundation Core Library")
 
-set(INC_DIR "${CMAKE_SOURCE_DIR}/include/basecode/core")
+set(INC_DIR "${INC_DIR_BASE}/basecode/core")
 
 configure_file (
         configure.in.h
@@ -128,8 +128,4 @@ target_link_libraries(
         dynload_s
         ${DL_LIBRARY}
 )
-target_include_directories(
-        ${PROJECT_NAME}
-
-        PUBLIC ${CMAKE_SOURCE_DIR}/include
-)
+target_include_directories(${PROJECT_NAME} PUBLIC ${INC_DIR_BASE})
