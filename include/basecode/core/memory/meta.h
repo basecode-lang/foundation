@@ -27,7 +27,7 @@ namespace basecode::memory::meta {
 
     u0 untrack(alloc_t* alloc);
 
-    const bintree_node_t* root();
+    const bintree_t<alloc_t*>& tree();
 
     u0 init(alloc_t* alloc = context::top()->alloc);
 }
