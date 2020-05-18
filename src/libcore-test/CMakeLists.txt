@@ -22,17 +22,14 @@ add_executable(
         hashtab_tests.cpp
         stable_array_tests.cpp
 )
-target_link_libraries(
+target_link_libraries(${PROJECT_NAME} core)
+target_include_directories(
         ${PROJECT_NAME}
 
-        core
-)
-target_include_directories(
-        ${PROJECT_NAME} PRIVATE
-
-        ${PROJECT_SOURCE_DIR}
-        ${INC_DIR_BASE}/include
-        ${CMAKE_BINARY_DIR}/include
+        PRIVATE ${PROJECT_SOURCE_DIR}
+                ${INC_DIR_BASE}/include
+                ${CMAKE_BINARY_DIR}/include
+                ${PROJECT_DIR_BASE}/ext/catch2-2.8.0/single_include
 )
 add_custom_command(
         TARGET ${PROJECT_NAME} POST_BUILD

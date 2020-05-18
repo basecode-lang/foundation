@@ -64,9 +64,6 @@ endif()
 #
 # -----------------------------------------------------------------------------
 
-# catch2
-include_directories(ext/catch2-2.8.0/single_include)
-
 # libfmt
 add_subdirectory(ext/fmt-6.2.0 EXCLUDE_FROM_ALL)
 
@@ -79,10 +76,8 @@ add_subdirectory(ext/spdlog-1.5.0 EXCLUDE_FROM_ALL)
 
 # utf8proc
 add_subdirectory(ext/utf8proc-2.5.0 EXCLUDE_FROM_ALL)
-include_directories(ext/utf8proc-2.5.0)
 
 # blake3
-include_directories(ext/blake3-0.3.1)
 set(
         BLAKE3_SOURCES
         ext/blake3-0.3.1/blake3.c
@@ -93,12 +88,14 @@ set(
         ext/blake3-0.3.1/blake3_avx512_x86-64_unix.S
 )
 add_library(blake3 ${BLAKE3_SOURCES})
+target_include_directories(blake3 INTERFACE ext/blake3-0.3.1)
 
 # dyncall
-include_directories(ext/dyncall-1.1.0)
 add_subdirectory(ext/dyncall-1.1.0 EXCLUDE_FROM_ALL)
 target_compile_definitions(dyncall_s PRIVATE malloc=dyn_alloc free=dyn_free)
+target_include_directories(dyncall_s INTERFACE ext/dyncall-1.1.0)
 target_compile_definitions(dynload_s PRIVATE malloc=dyn_alloc free=dyn_free)
+target_include_directories(dynload_s INTERFACE ext/dyncall-1.1.0)
 
 # -----------------------------------------------------------------------------
 #
@@ -106,8 +103,8 @@ target_compile_definitions(dynload_s PRIVATE malloc=dyn_alloc free=dyn_free)
 #
 # -----------------------------------------------------------------------------
 
-set(INC_DIR_BASE "${PROJECT_SOURCE_DIR}/include")
-set(PROJECT_DIR_BASE ${PROJECT_SOURCE_DIR})
+set(INC_DIR_BASE        "${PROJECT_SOURCE_DIR}/include")
+set(PROJECT_DIR_BASE    ${PROJECT_SOURCE_DIR})
 
 add_subdirectory(src/libcore)
 add_subdirectory(src/libcore-test)
