@@ -18,32 +18,59 @@
 
 #include <unistd.h>
 #include <sys/stat.h>
+#include <basecode/core/symtab.h>
 #include <basecode/core/filesys.h>
 
 namespace basecode::filesys {
     struct system_t final {
         alloc_t*                alloc;
+        symtab_t<str_t>         env;
     };
 
-    static str::slice_t s_status_names[] = {
+    static str::slice_t         s_status_names[] = {
         "ok"_ss,
         "not dir"_ss,
         "not file"_ss,
         "not exists"_ss,
         "invalid dir"_ss,
+        "chdir failure"_ss,
+        "file writable"_ss,
         "mkdir failure"_ss,
         "rename failure"_ss,
         "remove failure"_ss,
+        "mkdtemp failure"_ss,
         "not implemented"_ss,
+        "unexpected path"_ss,
         "realpath failure"_ss,
         "cannot modify root"_ss,
         "unexpected empty path"_ss,
         "cannot rename to existing file"_ss,
     };
 
-    thread_local system_t       t_filesys_system = {};
+    thread_local system_t       t_file_sys = {};
+
+    namespace glob {
+        u0 free(glob_result_t& r) {
+            ::globfree(&r.buf);
+            array::free(r.paths);
+        }
+
+        u0 init(glob_result_t& r, alloc_t* alloc) {
+            array::init(r.paths, alloc);
+            ZERO_MEM(&r.buf, sizeof(glob_t));
+        }
+
+        status_t find(glob_result_t& r, str::slice_t pattern, u32 flags) {
+            if ((flags & GLOB_APPEND) == 0) array::reset(r.paths);
+            WITH_SLICE_AS_CSTR(pattern, ::glob(pattern, flags, nullptr, &r.buf););
+            for (u32 i = r.buf.gl_offs; i < r.buf.gl_pathc; ++i)
+                array::append(r.paths, (str_t) r.buf.gl_pathv[i]);
+            return status_t::ok;
+        }
+    }
 
     u0 fini() {
+        symtab::free(t_file_sys.env);
     }
 
     status_t pwd(path_t& path) {
@@ -63,14 +90,13 @@ namespace basecode::filesys {
         //      additionally, we should grab all of the env vars we need up front
         //      and put the results into a symtab_t
         //
-        t_filesys_system.alloc = alloc;
+        t_file_sys.alloc = alloc;
+        symtab::init(t_file_sys.env, t_file_sys.alloc);
         return status_t::ok;
     }
 
-    status_t mkdir(const path_t& path) {
-        if (path::empty(path))    return status_t::unexpected_empty_path;
-        if (path.is_root)   return status_t::cannot_modify_root;
-        return ::mkdir(str::c_str(const_cast<str_t&>(path.str)), S_IRWXU) == 0 ? status_t::ok : status_t::mkdir_failure;
+    status_t cwd(const path_t& path) {
+        return ::chdir(str::c_str(const_cast<str_t&>(path.str))) == 0 ? status_t::ok : status_t::chdir_failure;
     }
 
     status_t exists(const path_t& path) {
@@ -103,6 +129,10 @@ namespace basecode::filesys {
     status_t places::user::data(path_t& path) {
         UNUSED(path);
         return status_t::not_implemented;
+    }
+
+    status_t is_read_only(const path_t& path) {
+        return ::access(str::c_str(const_cast<str_t&>(path.str)), W_OK) == 0 ? status_t::ok : status_t::file_writable;
     }
 
     str::slice_t status_name(status_t status) {
@@ -154,6 +184,16 @@ namespace basecode::filesys {
         return status_t::not_implemented;
     }
 
+    status_t rm(const path_t& path, b8 recursive) {
+        if (path::empty(path))    return status_t::unexpected_empty_path;
+        if (path.is_root)   return status_t::cannot_modify_root;
+        if (recursive) {
+            return status_t::not_implemented;
+        } else {
+            return std::remove(str::c_str(const_cast<str_t&>(path.str))) == 0 ? status_t::ok : status_t::remove_failure;
+        }
+    }
+
     status_t places::user::documents(path_t& path) {
         UNUSED(path);
         return status_t::not_implemented;
@@ -179,24 +219,51 @@ namespace basecode::filesys {
         return status_t::not_implemented;
     }
 
+    status_t mkdir(const path_t& path, b8 recursive) {
+        if (path::empty(path))      return status_t::unexpected_empty_path;
+        if (path.is_root)           return status_t::cannot_modify_root;
+        if (!recursive) {
+            return ::mkdir(str::c_str(const_cast<str_t&>(path.str)), S_IRWXU) == 0 ? status_t::ok : status_t::mkdir_failure;
+        }
+
+        s8 temp[PATH_MAX];
+        std::memcpy(temp, path.str.data, path.str.length);
+        temp[path.str.length] = '\0';
+
+        for (auto p = temp + 1; *p; ++p) {
+            if (*p == '/') {
+                *p = '\0';
+                if (::mkdir(temp, S_IRWXU) != 0) {
+                    if (errno != EEXIST)
+                        return status_t::mkdir_failure;
+                }
+                *p = '/';
+            }
+        }
+
+        if (::mkdir(temp, S_IRWXU) != 0) {
+            if (errno != EEXIST)
+                return status_t::mkdir_failure;
+        }
+
+        return status_t::ok;
+    }
+
     status_t places::user::public_share(path_t& path) {
         UNUSED(path);
         return status_t::not_implemented;
     }
 
-    status_t remove(const path_t& path, b8 recursive) {
-        if (path::empty(path))    return status_t::unexpected_empty_path;
-        if (path.is_root)   return status_t::cannot_modify_root;
-        if (recursive) {
-            return status_t::not_implemented;
-        } else {
-            return std::remove(str::c_str(const_cast<str_t&>(path.str))) == 0 ? status_t::ok : status_t::remove_failure;
-        }
-    }
-
     status_t mktmpdir(str::slice_t name, path_t& path) {
-        UNUSED(name); UNUSED(path);
-        return status_t::not_implemented;
+        if (!path::empty(path)) return status_t::unexpected_path;
+        s8 temp[PATH_MAX];
+        std::memcpy(temp, name.data, name.length);
+        std::memset(temp + name.length, 'X', 6);
+        temp[name.length + 6] = '\0';
+        auto temp_str = ::mkdtemp(temp);
+        if (!temp_str) return status_t::mkdtemp_failure;
+        str::append(path.str, temp_str);
+        return status_t::ok;
     }
 
     status_t file_size(const path_t& path, usize& size) {
@@ -208,6 +275,15 @@ namespace basecode::filesys {
         return status_t::ok;
     }
 
+    status_t mkabs(const path_t& path, path_t& new_path) {
+        if (path::empty(path)) return status_t::unexpected_empty_path;
+        s8 temp[PATH_MAX];
+        if (!realpath(str::c_str(const_cast<str_t&>(path.str)), temp))
+            return status_t::realpath_failure;
+        path::set(new_path, temp);
+        return status_t::ok;
+    }
+
     status_t places::system::cache(path_t& path, b8 local) {
         auto status = path::set(path, local ? "/var/local/cache"_ss : "/var/cache"_ss);
         return OK(status) ? status_t::ok : status_t::invalid_dir;
@@ -216,15 +292,6 @@ namespace basecode::filesys {
     status_t places::system::config(path_t& path, b8 local) {
         auto status = path::set(path, local ? "/usr/local/etc"_ss : "/etc"_ss);
         return OK(status) ? status_t::ok : status_t::invalid_dir;
-    }
-
-    status_t make_abs(const path_t& path, path_t& new_path) {
-        if (path::empty(path)) return status_t::unexpected_empty_path;
-        s8 temp[PATH_MAX];
-        if (!realpath(str::c_str(const_cast<str_t&>(path.str)), temp))
-            return status_t::realpath_failure;
-        path::set(new_path, temp);
-        return status_t::ok;
     }
 
     status_t places::system::runtime(path_t& path, b8 local) {
@@ -247,7 +314,7 @@ namespace basecode::filesys {
         return OK(status) ? status_t::ok : status_t::invalid_dir;
     }
 
-    status_t rename(const path_t& old_filename, const path_t& new_filename) {
+    status_t mv(const path_t& old_filename, const path_t& new_filename) {
         if (path::empty(old_filename) || path::empty(new_filename))
             return status_t::unexpected_empty_path;
         if (old_filename.is_root)
@@ -257,10 +324,5 @@ namespace basecode::filesys {
         if (OK(exists(new_filename)))
             return status_t::cannot_rename_to_existing_file;
         return std::rename(str::c_str(const_cast<str_t&>(old_filename.str)), str::c_str(const_cast<str_t&>(new_filename.str))) == 0 ? status_t::ok : status_t::rename_failure;
-    }
-
-    status_t glob(glob_result_t& r, str::slice_t pattern, u32 flags, alloc_t* alloc) {
-        UNUSED(r); UNUSED(pattern); UNUSED(flags); UNUSED(alloc);
-        return status_t::not_implemented;
     }
 }

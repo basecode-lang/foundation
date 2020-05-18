@@ -18,14 +18,15 @@
 
 #pragma once
 
+#include <glob.h>
 #include <basecode/core/path.h>
 
 namespace basecode {
     struct glob_result_t final {
-        alloc_t*            alloc;
-        u32                 length;
+        glob_t              buf;
+        array_t<str_t>      paths;
     };
-    static_assert(sizeof(glob_result_t) <= 16, "glob_result_t is now bigger than 16 bytes!");
+    static_assert(sizeof(glob_result_t) <= 112, "glob_result_t is now bigger than 112 bytes!");
 
     namespace filesys {
         enum class status_t : u8 {
@@ -34,16 +35,32 @@ namespace basecode {
             not_file,
             not_exists,
             invalid_dir,
+            chdir_failure,
+            file_writable,
             mkdir_failure,
             getcwd_failure,
             rename_failure,
             remove_failure,
+            mkdtemp_failure,
             not_implemented,
+            unexpected_path,
             realpath_failure,
             cannot_modify_root,
             unexpected_empty_path,
             cannot_rename_to_existing_file,
         };
+
+        namespace glob {
+            u0 free(glob_result_t& r);
+
+            inline u32 size(const glob_result_t& r) {
+                return r.paths.size;
+            }
+
+            u0 init(glob_result_t& r, alloc_t* alloc = context::top()->alloc);
+
+            status_t find(glob_result_t& r, str::slice_t pattern, u32 flags = {});
+        }
 
         namespace places {
             namespace user {
@@ -99,11 +116,9 @@ namespace basecode {
 
         u0 fini();
 
-        status_t init(alloc_t* alloc = context::top()->alloc);
-
         status_t pwd(path_t& path);
 
-        status_t mkdir(const path_t& path);
+        status_t cwd(const path_t& path);
 
         status_t exists(const path_t& path);
 
@@ -111,18 +126,22 @@ namespace basecode {
 
         status_t is_file(const path_t& path);
 
+        status_t is_read_only(const path_t& path);
+
         str::slice_t status_name(status_t status);
 
         status_t mktmpdir(str::slice_t name, path_t& path);
 
+        status_t rm(const path_t& path, b8 recursive = {});
+
         status_t file_size(const path_t& path, usize& size);
 
-        status_t remove(const path_t& path, b8 recursive = {});
+        status_t mkabs(const path_t& path, path_t& new_path);
 
-        status_t make_abs(const path_t& path, path_t& new_path);
+        status_t mkdir(const path_t& path, b8 recursive = {});
 
-        status_t rename(const path_t& old_filename, const path_t& new_filename);
+        status_t init(alloc_t* alloc = context::top()->alloc);
 
-        status_t glob(glob_result_t& r, str::slice_t pattern, u32 flags = {}, alloc_t* alloc = context::top()->alloc);
+        status_t mv(const path_t& old_filename, const path_t& new_filename);
     }
 }

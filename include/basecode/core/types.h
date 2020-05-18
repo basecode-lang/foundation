@@ -57,6 +57,7 @@
 #define UNUSED(x)               ((void) x)
 #define OK(x)                   (0 == (u32) x)
 #define SAFE_SCOPE(x)           do { x } while (false)
+#define ZERO_MEM(x, s)          std::memset((x), 0, sizeof((s)))
 
 namespace basecode {
     using u0    = void;
