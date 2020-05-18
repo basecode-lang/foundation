@@ -53,13 +53,14 @@ namespace basecode::memory {
     };
 
     static str::slice_t         s_type_names[] = {
-       "default"_ss,
-       "bump"_ss,
-       "page"_ss,
-       "slab"_ss,
-       "proxy"_ss,
-       "trace"_ss,
-       "dlmalloc"_ss,
+        "default"_ss,
+        "bump"_ss,
+        "page"_ss,
+        "slab"_ss,
+        "proxy"_ss,
+        "trace"_ss,
+        "stack"_ss,
+        "dlmalloc"_ss,
     };
 
     thread_local system_t       t_system{};
