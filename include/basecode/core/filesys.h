@@ -41,6 +41,7 @@ namespace basecode {
             getcwd_failure,
             rename_failure,
             remove_failure,
+            not_equivalent,
             mkdtemp_failure,
             not_implemented,
             unexpected_path,
@@ -141,6 +142,8 @@ namespace basecode {
         status_t mkdir(const path_t& path, b8 recursive = {});
 
         status_t init(alloc_t* alloc = context::top()->alloc);
+
+        status_t equivalent(const path_t& path1, const path_t& path2);
 
         status_t mv(const path_t& old_filename, const path_t& new_filename);
     }

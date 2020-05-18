@@ -38,6 +38,7 @@ namespace basecode::filesys {
         "mkdir failure"_ss,
         "rename failure"_ss,
         "remove failure"_ss,
+        "not equivalent"_ss,
         "mkdtemp failure"_ss,
         "not implemented"_ss,
         "unexpected path"_ss,
@@ -307,6 +308,17 @@ namespace basecode::filesys {
     status_t places::system::mutable_data(path_t& path, b8 local) {
         auto status = path::set(path, local ? "/var/local/lib"_ss : "/var/lib"_ss);
         return OK(status) ? status_t::ok : status_t::invalid_dir;
+    }
+
+    status_t equivalent(const path_t& path1, const path_t& path2) {
+        if (path::empty(path1) || path::empty(path2)) return status_t::unexpected_empty_path;
+        struct stat sb1;
+        struct stat sb2;
+        if (stat(str::c_str(const_cast<str_t&>(path1.str)), &sb1))
+            return status_t::not_exists;
+        if (stat(str::c_str(const_cast<str_t&>(path2.str)), &sb2))
+            return status_t::not_exists;
+        return sb1.st_dev == sb2.st_dev && sb1.st_ino == sb2.st_ino ? status_t::ok : status_t::not_equivalent;
     }
 
     status_t places::system::immutable_data(path_t& path, b8 local) {
