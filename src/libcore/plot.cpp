@@ -35,6 +35,7 @@ namespace basecode::plot {
     }
 
     u0 rolled::append_point(rolled_view_t& view, f32 x, f32 y) {
+        if (y > view.max_y) view.max_y = y;
         f32 xmod = fmodf(x, view.span);
         if (!array::empty(view.values) && xmod < array::back(view.values)->x)
             array::shrink(view.values, 0);
@@ -42,6 +43,7 @@ namespace basecode::plot {
     }
 
     u0 scrolled::append_point(scrolled_view_t& view, f32 x, f32 y) {
+        if (y > view.max_y) view.max_y = y;
         if (view.values.size < view.max_size) {
             array::append(view.values, data_point_t{x, y});
         } else {
@@ -52,15 +54,15 @@ namespace basecode::plot {
 
     u0 rolled::init(rolled_view_t& view, f32 span, u32 capacity, alloc_t* alloc) {
         view.span = span;
-        view.time = {};
+        view.time = view.max_y = {};
         array::init(view.values, alloc);
         array::reserve(view.values, capacity);
     }
 
     u0 scrolled::init(scrolled_view_t& view, s32 offset, s32 max_size, alloc_t* alloc) {
-        view.time     = {};
         view.offset   = offset;
         view.max_size = max_size;
+        view.time     = view.max_y = {};
         array::init(view.values, alloc);
         array::reserve(view.values, max_size);
     }

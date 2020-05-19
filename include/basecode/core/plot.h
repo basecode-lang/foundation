@@ -29,11 +29,13 @@ namespace basecode {
         array_t<data_point_t>   values;
         f32                     span;
         f32                     time;
+        f32                     max_y;
     };
 
     struct scrolled_view_t final {
         array_t<data_point_t>   values;
         f32                     time;
+        f32                     max_y;
         s32                     offset;
         s32                     max_size;
     };
