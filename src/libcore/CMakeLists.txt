@@ -95,6 +95,8 @@ set(
 
         path.cpp ${INC_DIR}/path.h
 
+        plot.cpp ${INC_DIR}/plot.h
+
         profiler.cpp ${INC_DIR}/profiler.h
 
         ${INC_DIR}/queue.h

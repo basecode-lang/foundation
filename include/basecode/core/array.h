@@ -123,6 +123,10 @@ namespace basecode {
             array.data[array.size++] = value;
         }
 
+        template<typename T> u0 shrink(array_t<T>& array, u32 new_size) {
+            if (new_size < array.size) array.size = new_size;
+        }
+
         template<typename T> u0 resize(array_t<T>& array, u32 new_size) {
             if (new_size > array.capacity)
                 grow(array, new_size);

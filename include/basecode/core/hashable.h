@@ -47,6 +47,8 @@ namespace basecode::hash {
 
     inline u64 hash64(const u64& key)   { return murmur::hash64(&key, sizeof(u64)); }
 
+    inline u64 hash64(const u0* key)    { return murmur::hash64(&key, sizeof(u0*)); }
+
     template <typename T> concept Hashable = requires(T hashable) {
         { hash::hash32(hashable) } -> convertible_to<u32>;
         { hash::hash64(hashable) } -> convertible_to<u64>;
