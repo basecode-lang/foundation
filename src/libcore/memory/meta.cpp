@@ -47,21 +47,17 @@ namespace basecode::memory::meta {
         return curr_node;
     }
 
-    static bintree_node_t* find_leaf_left(bintree_node_t* parent_node) {
+    static bintree_node_t* find_left_leaf(bintree_node_t* parent_node) {
         auto curr_node = parent_node;
-        while (curr_node) {
-            if (!curr_node->value || !curr_node->left) break;
+        while (curr_node && curr_node->left)
             curr_node = bintree::left(t_meta_system.tree, curr_node);
-        }
         return curr_node;
     }
 
-    static bintree_node_t* find_leaf_right(bintree_node_t* parent_node) {
+    static bintree_node_t* find_right_leaf(bintree_node_t* parent_node) {
         auto curr_node = parent_node;
-        while (curr_node) {
-            if (!curr_node->value || !curr_node->right) break;
+        while (curr_node && curr_node->right)
             curr_node = bintree::right(t_meta_system.tree, curr_node);
-        }
         return curr_node;
     }
 
@@ -92,21 +88,22 @@ namespace basecode::memory::meta {
             auto parent_node = find_alloc_node(root_node, alloc->backing);
             if (find_alloc_node(parent_node, alloc))
                 return;
-            alloc_node = find_leaf_right(parent_node);
-            if (!alloc_node->left) {
-                alloc_node->left = bintree::append_node(t_meta_system.tree, &new_node);
+            alloc_node = find_right_leaf(parent_node);
+            if (!alloc_node->right && !alloc_node->left) {
+                alloc_node->right = bintree::append_node(t_meta_system.tree, &new_node);
+                alloc_node = new_node;
+                alloc_node->left  = bintree::append_node(t_meta_system.tree, &new_node);
                 alloc_node = new_node;
             }
-            bintree::insert_value(t_meta_system.tree, alloc_node, alloc);
         } else {
             alloc_node = find_alloc_node(root_node, alloc);
-            if (!alloc_node)
-                alloc_node = root_node;
-            alloc_node     = find_leaf_left(alloc_node);
-            bintree::insert_value(t_meta_system.tree, alloc_node, alloc);
         }
-        alloc_node->left  = bintree::append_node(t_meta_system.tree, &new_node);
-        alloc_node->right = bintree::append_node(t_meta_system.tree, &new_node);
+        alloc_node = find_left_leaf(alloc_node ? alloc_node : root_node);
+        if (alloc_node->value) {
+            alloc_node->left = bintree::append_node(t_meta_system.tree, &new_node);
+            alloc_node = new_node;
+        }
+        bintree::insert_value(t_meta_system.tree, alloc_node, alloc);
     }
 
     u0 untrack(alloc_t* alloc) {
