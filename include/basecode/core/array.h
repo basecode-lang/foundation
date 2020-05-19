@@ -71,7 +71,6 @@ namespace basecode {
         }
 
         template<typename T> u0 clear(array_t<T>& array) {
-            assert(array.alloc);
             memory::free(array.alloc, array.data);
             array.data = {};
             array.size = array.capacity = {};

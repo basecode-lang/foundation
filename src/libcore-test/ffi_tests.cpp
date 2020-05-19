@@ -31,6 +31,7 @@ extern "C" u32 simple(u32 a, u32 b) {
 TEST_CASE("basecode::ffi basics") {
     path_t proc_path{};
     path::init(proc_path, slice::make(context::top()->argv[0]));
+    defer(path::free(proc_path));
 
     lib_t* proc_lib{};
     auto status = ffi::lib::load(proc_path, &proc_lib);

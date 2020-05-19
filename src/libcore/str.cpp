@@ -214,6 +214,6 @@ namespace basecode::str {
             }
             ++i;
         }
-        return 0;
+        return true;
     }
 }

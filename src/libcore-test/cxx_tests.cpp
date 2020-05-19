@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
+#include <basecode/core/log.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/cxx/cxx.h>
 #include <basecode/core/profiler.h>
@@ -150,30 +151,35 @@ TEST_CASE("basecode::cxx declare s32 type within scope") {
 }
 
 TEST_CASE("basecode::cxx example program") {
-    alloc_t region_alloc{};
+    alloc_t     region_alloc{};
     dl_config_t region_config{};
     region_config.heap_size = 512 * 1024;
     memory::init(&region_alloc, alloc_type_t::dlmalloc, &region_config);
-    defer({
-        memory::system::print_allocators();
-        memory::fini(&region_alloc, false);
-    });
 
     alloc_t* alloc = &region_alloc;
     stopwatch_t build_time{};
     stopwatch::start(build_time);
 
+    auto pgm_proxy = memory::proxy::make(alloc, "pgm"_ss);
+    auto ser_proxy = memory::proxy::make(alloc, "ser"_ss);
     cxx::program_t pgm{};
-    cxx::program::init(pgm, alloc);
-    defer(cxx::program::free(pgm));
+    cxx::program::init(pgm, pgm_proxy);
+    cxx::serializer_t s{};
+    cxx::serializer::init(s, pgm, ser_proxy);
+    defer({
+        cxx::serializer::free(s);
+        cxx::program::free(pgm);
+        memory::proxy::reset();
+        memory::fini(&region_alloc);
+    });
 
     const auto expected_main_ident = "main"_ss;
-    const auto expected_filename = "test.cpp"_ss;
-    const auto expected_int_ident = "int"_ss;
+    const auto expected_filename   = "test.cpp"_ss;
+    const auto expected_int_ident  = "int"_ss;
     const auto expected_char_ident = "char"_ss;
-    const auto expected_revision = cxx::revision_t::cpp20;
+    const auto expected_revision   = cxx::revision_t::cpp20;
 
-    auto& mod = cxx::program::add_module(pgm, expected_filename, expected_revision);
+    auto& mod       = cxx::program::add_module(pgm, expected_filename, expected_revision);
     auto& top_level = module::get_scope(mod, mod.root_scope_idx);
 
     auto int_ident_id       = scope::expr::ident(top_level, expected_int_ident);
@@ -265,14 +271,7 @@ TEST_CASE("basecode::cxx example program") {
     scope::stmt::empty(top_level);
     scope::stmt::pp::include_system(top_level, "cstdio"_ss);
     scope::stmt::empty(top_level);
-    scope::stmt::def(
-        top_level,
-        scope::type::func(
-            top_level,
-            main_scope.id,
-            int_type_id,
-            main_ident_id,
-            main_params_list_id));
+    scope::stmt::def(top_level, scope::type::func(top_level, main_scope.id, int_type_id, main_ident_id, main_params_list_id));
     scope::pop(top_level);
 
     REQUIRE(OK(cxx::program::finalize(pgm)));
@@ -291,15 +290,17 @@ TEST_CASE("basecode::cxx example program") {
         stopwatch_t serialize_time{};
         stopwatch::start(serialize_time);
 
-        cxx::serializer_t s{};
-        cxx::serializer::init(s, pgm, alloc);
-
         status = cxx::serializer::serialize(s);
 
         stopwatch::stop(serialize_time);
         stopwatch::print_elapsed("total serialize time"_ss, 40, stopwatch::elapsed(serialize_time));
 
         auto modules = symtab::pairs(s.modules);
+        defer(
+            for (auto& pair : modules) {
+                str::free(pair.key);
+            }
+            array::free(modules));
         for (auto& module : modules) {
             format::print("{:<40} {} bytes\n", module.key, module.value->length);
             format::print("{}\n", *module.value);

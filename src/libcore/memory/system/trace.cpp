@@ -56,7 +56,7 @@ namespace basecode::memory::trace {
         memory_event_map_t          memory_events;
     };
 
-    static u0 fini(alloc_t* alloc) {
+    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {

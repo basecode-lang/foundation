@@ -20,43 +20,42 @@
 #include <basecode/core/memory/system/bump.h>
 
 namespace basecode::memory::bump {
-    static u0 fini(alloc_t* alloc) {
-        auto subclass = &alloc->subclass.bump;
-        subclass->buf = {};
-        subclass->offset = subclass->end_offset = {};
-    }
-
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
-        auto bump_config = (bump_config_t*) config;
-        auto subclass = &alloc->subclass.bump;
-        switch (bump_config->type) {
-            case bump_type_t::existing:
-                subclass->buf = bump_config->backing.buf;
-                break;
-            case bump_type_t::allocator:
-                alloc->backing = bump_config->backing.alloc;
-                assert(alloc->backing);
-                break;
+        auto cfg   = (bump_config_t*) config;
+        auto sc    = &alloc->subclass.bump;
+        switch (cfg->type) {
+            case bump_type_t::existing: sc->buf         = cfg->backing.buf;                             break;
+            case bump_type_t::allocator:alloc->backing  = cfg->backing.alloc; assert(alloc->backing);   break;
         }
-        subclass->offset = subclass->end_offset = {};
+        sc->offset = sc->end_offset = {};
     }
 
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& allocated_size) {
-        auto subclass = &alloc->subclass.bump;
-        if (!subclass->buf || subclass->offset + (size + align) > subclass->end_offset) {
+    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
+        UNUSED(enforce);
+        auto sc = &alloc->subclass.bump;
+        if (freed_size) *freed_size = alloc->total_allocated;
+        sc->buf                = {};
+        alloc->total_allocated = {};
+        sc->offset             = sc->end_offset = {};
+    }
+
+    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
+        u32 temp_size{};
+        alloc_size = 0;
+        auto sc  = &alloc->subclass.bump;
+        if (!sc->buf || sc->offset + (size + align) > sc->end_offset) {
             if (alloc->backing) {
-                subclass->buf = alloc->backing->system->alloc(alloc->backing, size, align, allocated_size);
+                sc->buf = alloc->backing->system->alloc(alloc->backing, size, align, temp_size);
             } else {
                 // XXX:
                 assert(false);
             }
-            subclass->offset = {};
-            subclass->end_offset = allocated_size;
+            sc->offset     = {};
+            sc->end_offset = temp_size;
         }
-        u32 align_adjust{};
-        auto mem = memory::system::align_forward((u8*) subclass->buf + subclass->offset, align, align_adjust);
-        subclass->offset += size + align_adjust;
-        allocated_size = size + align_adjust;
+        u32  align_adjust{};
+        auto mem = memory::system::align_forward((u8*) sc->buf + sc->offset, align, align_adjust);
+        sc->offset += size + align_adjust;
         return mem;
     }
 
@@ -76,17 +75,17 @@ namespace basecode::memory::bump {
     u0 reset(alloc_t* alloc) {
         auto a = unwrap(alloc);
         assert(a && a->system->type == alloc_type_t::bump);
-        auto subclass = &a->subclass.bump;
-        subclass->buf = {};
-        subclass->offset = subclass->end_offset = {};
+        auto sc = &a->subclass.bump;
+        sc->buf    = {};
+        sc->offset = sc->end_offset = {};
     }
 
     u0 buf(alloc_t* alloc, u0* buf, u32 size) {
         auto a = unwrap(alloc);
         assert(a && a->system->type == alloc_type_t::bump);
-        auto subclass = &a->subclass.bump;
-        subclass->buf = buf;
-        subclass->offset = {};
-        subclass->end_offset = size;
+        auto sc = &a->subclass.bump;
+        sc->buf        = buf;
+        sc->offset     = {};
+        sc->end_offset = size;
     }
 }

@@ -90,9 +90,9 @@ namespace basecode {
         }
 
         template <typename V> u0 clear(symtab_t<V>& symtab) {
-            symtab.size = {};
             array::free(symtab.nodes);
             array::free(symtab.values);
+            symtab.size = {};
         }
 
         template <typename V> symtab_t<V> make(alloc_t* alloc) {
@@ -327,6 +327,7 @@ namespace basecode {
             str_t key{};
             str::init(key, symtab.alloc);
             str::reserve(key, 32);
+            defer(str::free(key));
             if (!slice::empty(prefix)) {
                 auto node = find_node(symtab, prefix);
                 if (node) {

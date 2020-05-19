@@ -37,7 +37,7 @@ namespace basecode::log::spdlog {
 
     static u0 fini(logger_t* logger) {
         auto sc  = &logger->subclass.spdlog;
-        sc->logger = {};
+        sc->logger.reset();
         ::spdlog::shutdown();
     }
 

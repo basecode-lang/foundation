@@ -20,20 +20,6 @@
 #include <basecode/core/memory/system/page.h>
 
 namespace basecode::memory::page {
-    static u0 fini(alloc_t* alloc) {
-        u32 freed_size{};
-        auto backing   = alloc->backing->system;
-        auto sc        = &alloc->subclass.page;
-        auto curr_page = sc->head;
-        while (curr_page) {
-            auto prev_page = curr_page->prev;
-            backing->free(alloc->backing, curr_page, freed_size);
-            alloc->total_allocated -= freed_size;
-            curr_page = prev_page;
-        }
-        assert(alloc->total_allocated == 0);
-    }
-
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto cfg = (page_config_t*) config;
         auto sc  = &alloc->subclass.page;
@@ -56,7 +42,23 @@ namespace basecode::memory::page {
         alloc->total_allocated -= freed_size;
     }
 
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& allocated_size) {
+    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
+        auto backing   = alloc->backing->system;
+        auto sc        = &alloc->subclass.page;
+        auto curr_page = sc->head;
+        u32 temp_freed{}, total_freed{};
+        while (curr_page) {
+            auto prev_page = curr_page->prev;
+            backing->free(alloc->backing, curr_page, temp_freed);
+            alloc->total_allocated -= temp_freed;
+            total_freed += temp_freed;
+            curr_page = prev_page;
+        }
+        if (freed_size) *freed_size = total_freed;
+        if (enforce) assert(alloc->total_allocated == 0);
+    }
+
+    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
         auto sc      = &alloc->subclass.page;
         auto backing = alloc->backing;
         page_header_t* page{};
@@ -65,9 +67,9 @@ namespace basecode::memory::page {
             sc->cursor = sc->cursor->next;
         }
         if (!page) {
-            page = (page_header_t*) backing->system->alloc(backing, sc->page_size, alignof(page_header_t), allocated_size);
+            page = (page_header_t*) backing->system->alloc(backing, sc->page_size, alignof(page_header_t), alloc_size);
             sc->count++;
-            alloc->total_allocated += allocated_size;
+            alloc->total_allocated += alloc_size;
             if (!sc->tail) sc->tail = page;
             if (sc->head) {
                 page->prev     = sc->head;
@@ -77,7 +79,6 @@ namespace basecode::memory::page {
             }
             sc->head = page;
         }
-        allocated_size = sc->page_size;
         return ++page;
     }
 

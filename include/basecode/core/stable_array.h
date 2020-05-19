@@ -97,11 +97,10 @@ namespace basecode {
         }
 
         template<typename T> u0 clear(stable_array_t<T>& array) {
-            assert(array.alloc);
-            array.data = {};
-            array.size = array.capacity = {};
             memory::free(array.alloc, array.data);
             memory::system::free(array.slab_alloc);
+            array.data = {};
+            array.size = array.capacity = {};
         }
 
         template<typename T> b8 empty(stable_array_t<T>& array) {

@@ -107,7 +107,7 @@ namespace basecode {
 
         u0 clear(bitset_t& set) {
             memory::free(set.allocator, set.data);
-            set.data = {};
+            set.data     = {};
             set.capacity = {};
         }
 

@@ -114,7 +114,9 @@ namespace basecode::log {
     }
 
     u0 fini(logger_t* logger) {
-        if (logger->system && !logger->system->fini)
+        for (auto child_logger : logger->children)
+            fini(child_logger);
+        if (logger->system && logger->system->fini)
             logger->system->fini(logger);
         array::free(logger->children);
     }
@@ -150,20 +152,11 @@ namespace basecode::log {
         if (!logger)
             return status_t::invalid_logger;
         switch (type) {
-            case logger_type_t::default_: {
-                logger->system = default_::system();
-                break;
-            }
-            case logger_type_t::spdlog: {
-                logger->system = spdlog::system();
-                break;
-            }
-            case logger_type_t::syslog: {
-                logger->system = syslog::system();
-                break;
-            }
+            case logger_type_t::default_:   logger->system = default_::system();    break;
+            case logger_type_t::spdlog:     logger->system = spdlog::system();      break;
+            case logger_type_t::syslog:     logger->system = syslog::system();      break;
         }
-        logger->mask = mask;
+        logger->mask  = mask;
         logger->alloc = alloc;
         array::init(logger->children, logger->alloc);
         if (logger->system && logger->system->init)

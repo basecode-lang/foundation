@@ -19,10 +19,8 @@
 #include <basecode/core/slice_utils.h>
 
 namespace basecode::slice {
-    b8 to_fields(str::slice_t value, array_t<str::slice_t>& fields, s8 sep, alloc_t* alloc) {
-        array::init(fields, alloc);
-
-        u32       curr_pos{}, start_pos{};
+    b8 to_fields(const str::slice_t& value, array_t<str::slice_t>& fields, s8 sep) {
+        u32 curr_pos{}, start_pos{};
         for (auto c : value) {
             if (c == sep) {
                 array::append(fields, str::slice_t{.data = value.data + start_pos, .length = curr_pos - start_pos});
@@ -30,11 +28,9 @@ namespace basecode::slice {
             }
             ++curr_pos;
         }
-
         if (curr_pos > start_pos) {
             array::append(fields, str::slice_t{.data = value.data + start_pos, .length = curr_pos - start_pos});
         }
-
         return true;
     }
 }

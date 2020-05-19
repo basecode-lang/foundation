@@ -44,10 +44,12 @@ template <typename V>
 template <typename V>
 [[maybe_unused]] static u0 format_pairs(symtab_t<V>& symtab, str::slice_t prefix = {}) {
     auto pairs = symtab::pairs(symtab, prefix);
-    for (const auto& pair : pairs) {
+    defer(
+        for (auto& pair : pairs)
+            str::free(pair.key);
+        array::free(pairs));
+    for (const auto& pair : pairs)
         format::print("{:<20}: {}\n", pair.key, *pair.value);
-    }
-    array::free(pairs);
 }
 
 TEST_CASE("basecode::symtab_t remove key") {
@@ -106,16 +108,22 @@ TEST_CASE("basecode::symtab_t names") {
 
     auto buf = buffer::make();
     REQUIRE(OK(buffer::load((str_t) "../etc/ut.txt"_ss, buf)));
-    defer(buffer::free(buf));
 
     array_t<name_record_t> records{};
     array::init(records);
-    defer(array::free(records));
+    defer(
+        for (auto& record : records)
+            array::free(record.fields);
+        array::free(records);
+        buffer::free(buf);
+        symtab::free(symbols);
+        );
 
     buffer::each_line(
         buf,
-        [&records](str::slice_t line) {
+        [&records](const str::slice_t& line) {
             auto& record = array::append(records);
+            array::init(record.fields);
             slice::to_fields(line, record.fields);
             return true;
         });

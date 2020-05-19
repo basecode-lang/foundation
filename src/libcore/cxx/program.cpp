@@ -120,10 +120,10 @@ namespace basecode::cxx::program {
     }
 
     u0 free(program_t& pgm) {
+        str::free(pgm.scratch);
         bass::free(pgm.storage);
         for (auto& module : pgm.modules)
             module::free(module);
-        str::free(pgm.scratch);
         array::free(pgm.modules);
         intern::free(pgm.intern);
     }

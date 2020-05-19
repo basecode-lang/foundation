@@ -20,12 +20,75 @@
 #include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::cxx::serializer {
-    static str::slice_t s_var_flags[] = {
-        "const"_ss,
-        "static"_ss,
-        "volatile"_ss,
-        "register"_ss,
-        "constexpr"_ss,
+    static str::slice_t s_var_flags[] = {"const"_ss, "static"_ss, "volatile"_ss, "register"_ss, "constexpr"_ss};
+
+    static str::slice_t s_bin_op_tokens[]     = {
+        [(u32) binary_op_type_t::eq]                = "=="_ss,
+        [(u32) binary_op_type_t::lt]                = "<"_ss,
+        [(u32) binary_op_type_t::gt]                = ">"_ss,
+        [(u32) binary_op_type_t::lor]               = "||"_ss,
+        [(u32) binary_op_type_t::add]               = "+"_ss,
+        [(u32) binary_op_type_t::sub]               = "-"_ss,
+        [(u32) binary_op_type_t::mul]               = "*"_ss,
+        [(u32) binary_op_type_t::div]               = "/"_ss,
+        [(u32) binary_op_type_t::mod]               = "%"_ss,
+        [(u32) binary_op_type_t::shl]               = "<<"_ss,
+        [(u32) binary_op_type_t::shr]               = ">>"_ss,
+        [(u32) binary_op_type_t::bor]               = "|"_ss,
+        [(u32) binary_op_type_t::neq]               = "!="_ss,
+        [(u32) binary_op_type_t::lte]               = "<="_ss,
+        [(u32) binary_op_type_t::gte]               = ">="_ss,
+        [(u32) binary_op_type_t::band]              = "&"_ss,
+        [(u32) binary_op_type_t::bxor]              = "^"_ss,
+        [(u32) binary_op_type_t::land]              = "&&"_ss,
+        [(u32) binary_op_type_t::cast]              = ""_ss,
+        [(u32) binary_op_type_t::comma]             = ","_ss,
+        [(u32) binary_op_type_t::scope]             = "::"_ss,
+        [(u32) binary_op_type_t::range]             = ":"_ss,
+        [(u32) binary_op_type_t::member]            = ""_ss,
+        [(u32) binary_op_type_t::subscript]         = ""_ss,
+    };
+
+    static str::slice_t s_unary_op_tokens[]   = {
+        [(u32) unary_op_type_t::neg]                = "-"_ss,
+        [(u32) unary_op_type_t::inc]                = "++"_ss,
+        [(u32) unary_op_type_t::dec]                = "--"_ss,
+        [(u32) unary_op_type_t::lnot]               = "!"_ss,
+        [(u32) unary_op_type_t::bnot]               = "~"_ss,
+        [(u32) unary_op_type_t::deref]              = "*"_ss,
+        [(u32) unary_op_type_t::addrof]             = "&"_ss,
+        [(u32) unary_op_type_t::addrof_label]       = "&&"_ss,
+    };
+
+    static str::slice_t s_assignment_tokens[] = {
+        [(u32) assignment_type_t::direct]           = "="_ss,
+        [(u32) assignment_type_t::bor]              = "|="_ss,
+        [(u32) assignment_type_t::sum]              = "+="_ss,
+        [(u32) assignment_type_t::shl]              = "<<="_ss,
+        [(u32) assignment_type_t::shr]              = ">>="_ss,
+        [(u32) assignment_type_t::diff]             = "-="_ss,
+        [(u32) assignment_type_t::band]             = "&="_ss,
+        [(u32) assignment_type_t::bxor]             = "^="_ss,
+        [(u32) assignment_type_t::product]          = "*="_ss,
+        [(u32) assignment_type_t::quotient]         = "/="_ss,
+        [(u32) assignment_type_t::remainder]        = "%="_ss,
+    };
+
+    static const s8* s_pp_templates[]  = {
+        [(u32) preprocessor_type_t::if_]            = "#if{}",
+        [(u32) preprocessor_type_t::pragma]         = "#pragma {}",
+        [(u32) preprocessor_type_t::define]         = "#define{}",
+        [(u32) preprocessor_type_t::endif_]         = "#endif",
+        [(u32) preprocessor_type_t::local_include]  = "#include \"{}\"",
+        [(u32) preprocessor_type_t::system_include] = "#include <{}>",
+    };
+
+    static str::slice_t s_aggregate_type_tokens[] = {
+        [(u32) aggregate_type_t::enum_]             = "enum"_ss,
+        [(u32) aggregate_type_t::union_]            = "union"_ss,
+        [(u32) aggregate_type_t::class_]            = "class"_ss,
+        [(u32) aggregate_type_t::struct_]           = "struct"_ss,
+        [(u32) aggregate_type_t::enum_class]        = "enum class"_ss,
     };
 
     static u0 newline(serializer_t& s, str_buf_t& buf);
@@ -201,39 +264,16 @@ namespace basecode::cxx::serializer {
             }
             case expression_type_t::unary: {
                 auto op_type = (unary_op_type_t) SUB_TYPE(type_field);
+                const auto unary_op_token = s_unary_op_tokens[(u32) op_type];
                 switch (op_type) {
-                    case unary_op_type_t::neg:
-                        at_indent(s, buf, "-");
-                        break;
-                    case unary_op_type_t::inc: {
-                        auto pos_type = (position_type_t) POS_TYPE(type_field);
-                        switch (pos_type) {
-                            case position_type_t::none:
-                                return status_t::invalid_pos_type;
-                            case position_type_t::prefix: {
-                                at_indent(s, buf, "++");
-                                status = process_expr(s, buf, lhs_cursor);
-                                if (unlikely(!OK(status)))
-                                    return status;
-                                break;
-                            }
-                            case position_type_t::postfix: {
-                                status = process_expr(s, buf, lhs_cursor);
-                                if (unlikely(!OK(status)))
-                                    return status;
-                                at_indent(s, buf, "++");
-                                break;
-                            }
-                        }
-                        break;
-                    }
+                    case unary_op_type_t::inc:
                     case unary_op_type_t::dec: {
                         auto pos_type = (position_type_t) POS_TYPE(type_field);
                         switch (pos_type) {
                             case position_type_t::none:
                                 return status_t::invalid_pos_type;
                             case position_type_t::prefix: {
-                                at_indent(s, buf, "--");
+                                at_indent(s, buf, "{}", unary_op_token);
                                 status = process_expr(s, buf, lhs_cursor);
                                 if (unlikely(!OK(status)))
                                     return status;
@@ -243,26 +283,14 @@ namespace basecode::cxx::serializer {
                                 status = process_expr(s, buf, lhs_cursor);
                                 if (unlikely(!OK(status)))
                                     return status;
-                                at_indent(s, buf, "--");
+                                at_indent(s, buf, "{}", unary_op_token);
                                 break;
                             }
                         }
                         break;
                     }
-                    case unary_op_type_t::lnot:
-                        at_indent(s, buf, "!");
-                        break;
-                    case unary_op_type_t::bnot:
-                        at_indent(s, buf, "~");
-                        break;
-                    case unary_op_type_t::deref:
-                        at_indent(s, buf, "*");
-                        break;
-                    case unary_op_type_t::addrof:
-                        at_indent(s, buf, "&");
-                        break;
-                    case unary_op_type_t::addrof_label:
-                        at_indent(s, buf, "&&");
+                    default:
+                        at_indent(s, buf, "{}", unary_op_token);
                         break;
                 }
                 break;
@@ -279,127 +307,53 @@ namespace basecode::cxx::serializer {
                     return status_t::rhs_not_found;
 
                 auto op_type = (binary_op_type_t) SUB_TYPE(type_field);
-                switch (op_type) {
-                    case binary_op_type_t::eq:
-                        at_indent(s, buf, " == ");
-                        goto bin_op_done;
-                    case binary_op_type_t::lt:
-                        at_indent(s, buf, " < ");
-                        goto bin_op_done;
-                    case binary_op_type_t::gt:
-                        at_indent(s, buf, " > ");
-                        goto bin_op_done;
-                    case binary_op_type_t::lor:
-                        at_indent(s, buf, " || ");
-                        goto bin_op_done;
-                    case binary_op_type_t::add:
-                        at_indent(s, buf, " + ");
-                        goto bin_op_done;
-                    case binary_op_type_t::sub:
-                        at_indent(s, buf, " - ");
-                        goto bin_op_done;
-                    case binary_op_type_t::mul:
-                        at_indent(s, buf, " * ");
-                        goto bin_op_done;
-                    case binary_op_type_t::div:
-                        at_indent(s, buf, " / ");
-                        goto bin_op_done;
-                    case binary_op_type_t::mod:
-                        at_indent(s, buf, " % ");
-                        goto bin_op_done;
-                    case binary_op_type_t::shl:
-                        at_indent(s, buf, " << ");
-                        goto bin_op_done;
-                    case binary_op_type_t::shr:
-                        at_indent(s, buf, " >> ");
-                        goto bin_op_done;
-                    case binary_op_type_t::bor:
-                        at_indent(s, buf, " | ");
-                        goto bin_op_done;
-                    case binary_op_type_t::neq:
-                        at_indent(s, buf, " != ");
-                        goto bin_op_done;
-                    case binary_op_type_t::lte:
-                        at_indent(s, buf, " <= ");
-                        goto bin_op_done;
-                    case binary_op_type_t::gte:
-                        at_indent(s, buf, " >= ");
-                        goto bin_op_done;
-                    case binary_op_type_t::band:
-                        at_indent(s, buf, " & ");
-                        goto bin_op_done;
-                    case binary_op_type_t::bxor:
-                        at_indent(s, buf, " ^ ");
-                        goto bin_op_done;
-                    case binary_op_type_t::land:
-                        at_indent(s, buf, " && ");
-                        goto bin_op_done;
-                    case binary_op_type_t::comma:
-                        at_indent(s, buf, ", ");
-                        goto bin_op_done;
-                    case binary_op_type_t::scope:
-                        at_indent(s, buf, "::");
-                        goto bin_op_done;
-                    case binary_op_type_t::range:
-                        at_indent(s, buf, " : ");
-                        goto bin_op_done;
-                    case binary_op_type_t::member: {
-                        // XXX: REFACTOR THIS PILE OF SHIT
-                        //      The majority of this logic should move to the var function when
-                        //      the element is created.  Either a mask could be added to field::type
-                        //      -or- a new field type created that encodes what type of member access, if any,
-                        //      would be valid for the variable.
-                        if (lhs_cursor.header->type != element::header::variable)
-                            return status_t::error;
-                        cursor_t type_cursor{};
-                        if (!bass::seek_record(store, bass::dict::get(lhs_dict, element::field::lhs), type_cursor))
-                            return status_t::error;
-                        u32 type_value{};
-                        if (!bass::next_field(type_cursor, type_value, element::field::type))
-                            return status_t::error;
-                        auto meta_type = (meta_type_t) BASE_TYPE(type_value);
-                        switch (meta_type) {
-                            case meta_type_t::alias: {
-                                // XXX: need to find base
+                auto bin_op_token = s_bin_op_tokens[(u32) op_type];
+                if (slice::empty(bin_op_token)) {
+                    switch (op_type) {
+                        case binary_op_type_t::member: {
+                            if (lhs_cursor.header->type != element::header::variable)
                                 return status_t::error;
+                            cursor_t type_cursor{};
+                            if (!bass::seek_record(store, bass::dict::get(lhs_dict, element::field::lhs), type_cursor))
+                                return status_t::error;
+                            u32 type_value{};
+                            if (!bass::next_field(type_cursor, type_value, element::field::type))
+                                return status_t::error;
+                            auto meta_type = (meta_type_t) BASE_TYPE(type_value);
+                            switch (meta_type) {
+                                case meta_type_t::pointer:
+                                    at_indent(s, buf, "->");
+                                    break;
+                                case meta_type_t::aggregate:
+                                case meta_type_t::reference:
+                                    at_indent(s, buf, ".");
+                                    break;
+                                default:
+                                    return status_t::error;
                             }
-                            case meta_type_t::none:
-                            case meta_type_t::void_:
-                            case meta_type_t::array:
-                            case meta_type_t::boolean:
-                            case meta_type_t::bit_mask:
-                            case meta_type_t::function:
-                            case meta_type_t::signed_integer:
-                            case meta_type_t::floating_point:
-                            case meta_type_t::unsigned_integer:
-                                return status_t::error;
-                            case meta_type_t::pointer:
-                                at_indent(s, buf, "->");
-                                break;
-                            case meta_type_t::aggregate:
-                            case meta_type_t::reference:
-                                at_indent(s, buf, ".");
-                                break;
+                            goto bin_op_done;
                         }
-                        goto bin_op_done;
+                        case binary_op_type_t::cast:
+                            at_indent(s, buf, "(");
+                            status = process_expr(s, buf, rhs_cursor);
+                            if (unlikely(!OK(status)))
+                                return status;
+                            at_indent(s, buf, ")");
+                            break;
+                        case binary_op_type_t::subscript:
+                            at_indent(s, buf, "[");
+                            status = process_expr(s, buf, rhs_cursor);
+                            if (unlikely(!OK(status)))
+                                return status;
+                            at_indent(s, buf, "]");
+                            break;
+                        default:
+                            return status_t::error;
                     }
-                    case binary_op_type_t::cast:
-                        at_indent(s, buf, "(");
-                        status = process_expr(s, buf, rhs_cursor);
-                        if (unlikely(!OK(status)))
-                            return status;
-                        at_indent(s, buf, ")");
-                        break;
-                    case binary_op_type_t::subscript:
-                        at_indent(s, buf, "[");
-                        status = process_expr(s, buf, rhs_cursor);
-                        if (unlikely(!OK(status)))
-                            return status;
-                        at_indent(s, buf, "]");
-                        break;
+                    break;
+                } else {
+                    at_indent(s, buf, " {} ", bin_op_token);
                 }
-
-                break;
 
             bin_op_done:
                 status = process_expr(s, buf, rhs_cursor);
@@ -411,48 +365,11 @@ namespace basecode::cxx::serializer {
                 cursor_t rhs_cursor{};
                 if (unlikely(!bass::seek_record(store, bass::dict::get(dict, element::field::rhs), rhs_cursor)))
                     return status_t::rhs_not_found;
-
                 status = process_expr(s, buf, lhs_cursor);
                 if (unlikely(!OK(status)))
                     return status;
-
                 auto op_type = (assignment_type_t) SUB_TYPE(type_field);
-                switch (op_type) {
-                    case assignment_type_t::direct:
-                        at_indent(s, buf, " = ");
-                        break;
-                    case assignment_type_t::bor:
-                        at_indent(s, buf, " |= ");
-                        break;
-                    case assignment_type_t::sum:
-                        at_indent(s, buf, " += ");
-                        break;
-                    case assignment_type_t::shl:
-                        at_indent(s, buf, " <<= ");
-                        break;
-                    case assignment_type_t::shr:
-                        at_indent(s, buf, " >>= ");
-                        break;
-                    case assignment_type_t::diff:
-                        at_indent(s, buf, " -= ");
-                        break;
-                    case assignment_type_t::band:
-                        at_indent(s, buf, " &= ");
-                        break;
-                    case assignment_type_t::bxor:
-                        at_indent(s, buf, " ^= ");
-                        break;
-                    case assignment_type_t::product:
-                        at_indent(s, buf, " *= ");
-                        break;
-                    case assignment_type_t::quotient:
-                        at_indent(s, buf, " /= ");
-                        break;
-                    case assignment_type_t::remainder:
-                        at_indent(s, buf, " %= ");
-                        break;
-                }
-
+                at_indent(s, buf, " {} ", s_assignment_tokens[(u32) op_type]);
                 status = process_expr(s, buf, rhs_cursor);
                 break;
             }
@@ -482,11 +399,11 @@ namespace basecode::cxx::serializer {
     static status_t process_stmt(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         status_t status{};
         auto& intern = *s.intern;
-        auto& store = *s.store;
-        auto dict = bass::dict::make(cursor);
+        auto& store  = *s.store;
+        auto dict       = bass::dict::make(cursor);
         auto type_field = bass::dict::get(dict, element::field::type);
-        auto type = (statement_type_t) BASE_TYPE(type_field);
-        auto label_id = bass::dict::get(dict, element::field::label);
+        auto type       = (statement_type_t) BASE_TYPE(type_field);
+        auto label_id   = bass::dict::get(dict, element::field::label);
         if (label_id) {
             cursor_t label_cursor{};
             if (!bass::seek_record(store, label_id, label_cursor))
@@ -500,24 +417,9 @@ namespace basecode::cxx::serializer {
         switch (type) {
             case statement_type_t::pp: {
                 auto pp_type = (preprocessor_type_t) SUB_TYPE(type_field);
-                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
-                switch (pp_type) {
-                    case preprocessor_type_t::pragma: {
-                        at_indent(s, buf, "#pragma {}", interned.slice);
-                        break;
-                    }
-                    case preprocessor_type_t::local_include: {
-                        at_indent(s, buf, "#include \"{}\"", interned.slice);
-                        break;
-                    }
-                    case preprocessor_type_t::system_include: {
-                        at_indent(s, buf, "#include <{}>", interned.slice);
-                        break;
-                    }
-                    default: {
-                        return status_t::invalid_pp_type;
-                    }
-                }
+                auto interned           = intern::get(intern, bass::dict::get(dict, element::field::intern));
+                const auto pp_template  = s_pp_templates[(u32) pp_type];
+                at_indent(s, buf, pp_template, interned.slice);
                 newline(s, buf);
                 break;
             }
@@ -606,23 +508,8 @@ namespace basecode::cxx::serializer {
                         switch (meta_type) {
                             case meta_type_t::aggregate: {
                                 auto agg_type = (aggregate_type_t) SUB_TYPE(type_flags);
-                                switch (agg_type) {
-                                    case aggregate_type_t::enum_:
-                                        at_indent(s, buf, "enum ");
-                                        break;
-                                    case aggregate_type_t::union_:
-                                        at_indent(s, buf, "union ");
-                                        break;
-                                    case aggregate_type_t::class_:
-                                        at_indent(s, buf, "class ");
-                                        break;
-                                    case aggregate_type_t::struct_:
-                                        at_indent(s, buf, "struct ");
-                                        break;
-                                    case aggregate_type_t::enum_class:
-                                        at_indent(s, buf, "enum class ");
-                                        break;
-                                }
+                                const auto agg_token = s_aggregate_type_tokens[(u32) agg_type];
+                                at_indent(s, buf, "{} ", agg_token);
                                 status = process_expr(s, buf, expr_cursor);
                                 break;
                             }
@@ -780,9 +667,9 @@ namespace basecode::cxx::serializer {
                 cursor_t expr_cursor{};
                 if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
-                const auto type_dict = bass::dict::make(expr_cursor);
+                const auto type_dict  = bass::dict::make(expr_cursor);
                 const auto type_flags = bass::dict::get(type_dict, element::field::type);
-                auto meta_type = (meta_type_t) BASE_TYPE(type_flags);
+                auto       meta_type  = (meta_type_t) BASE_TYPE(type_flags);
                 switch (meta_type) {
                     case meta_type_t::function: {
                         cursor_t lhs_cursor{};
@@ -809,23 +696,8 @@ namespace basecode::cxx::serializer {
                     case meta_type_t::aggregate: {
                         const auto flags = bass::dict::get(type_dict, element::field::lhs);
                         auto agg_type = (aggregate_type_t) SUB_TYPE(type_flags);
-                        switch (agg_type) {
-                            case aggregate_type_t::enum_:
-                                at_indent(s, buf, "enum ");
-                                break;
-                            case aggregate_type_t::union_:
-                                at_indent(s, buf, "union ");
-                                break;
-                            case aggregate_type_t::class_:
-                                at_indent(s, buf, "class ");
-                                break;
-                            case aggregate_type_t::struct_:
-                                at_indent(s, buf, "struct ");
-                                break;
-                            case aggregate_type_t::enum_class:
-                                at_indent(s, buf, "enum class ");
-                                break;
-                        }
+                        const auto agg_token = s_aggregate_type_tokens[(u32) agg_type];
+                        at_indent(s, buf, "{} ", agg_token);
                         status = process_expr(s, buf, expr_cursor);
                         if (unlikely(!OK(status)))
                             return status;
@@ -963,9 +835,12 @@ namespace basecode::cxx::serializer {
     u0 free(serializer_t& s) {
         str::free(s.scratch);
         auto pairs = symtab::pairs(s.modules);
-        for (auto& pair : pairs)
+        for (auto& pair : pairs) {
+            str::free(pair.key);
             str::free(*pair.value);
+        }
         symtab::free(s.modules);
+        array::free(pairs);
     }
 
     status_t serialize(serializer_t& s) {
@@ -1012,10 +887,10 @@ namespace basecode::cxx::serializer {
             return status_t::element_not_found;
 
         for (;;) {
-            const auto type_dict = bass::dict::make(type_cursor);
+            const auto type_dict  = bass::dict::make(type_cursor);
             const auto type_field = bass::dict::get(type_dict, element::field::type);
-            const auto meta_type = (meta_type_t) BASE_TYPE(type_field);
-            const auto size_type = (integral_size_t) SUB_TYPE(type_field);
+            const auto meta_type  = (meta_type_t) BASE_TYPE(type_field);
+            const auto size_type  = (integral_size_t) SUB_TYPE(type_field);
             switch (meta_type) {
                 case meta_type_t::array: {
                     if (!bass::seek_record(storage, bass::dict::get(type_dict, element::field::lhs), type_cursor))

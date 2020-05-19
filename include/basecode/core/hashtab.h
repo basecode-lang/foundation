@@ -170,7 +170,6 @@ namespace basecode {
         }
 
         template<typename K, typename V> u0 clear(hashtab_t<K, V>& table) {
-            assert(table.alloc);
             memory::free(table.alloc, table.hashes);
             table.keys      = {};
             table.values    = {};

@@ -19,15 +19,17 @@
 #include <basecode/core/memory/system/default.h>
 
 namespace basecode::memory::default_ {
-    static u0 fini(alloc_t* alloc) {
-        alloc->total_allocated = {};
-    }
-
     static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
         auto h = system::header(mem);
         freed_size = h->size;
         alloc->total_allocated -= freed_size;
         std::free(h);
+    }
+
+    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
+        if (freed_size) *freed_size = alloc->total_allocated;
+        if (enforce) assert(alloc->total_allocated == 0);
+        alloc->total_allocated = {};
     }
 
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {

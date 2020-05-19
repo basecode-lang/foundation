@@ -22,7 +22,8 @@
 
 namespace basecode::log::default_ {
     static u0 fini(logger_t* logger) {
-        UNUSED(logger);
+        auto sc  = &logger->subclass.default_;
+        str::free(sc->process_name);
     }
 
     static u0 init(logger_t* logger, logger_config_t* config) {

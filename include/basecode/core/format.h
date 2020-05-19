@@ -23,6 +23,11 @@
 #include <basecode/core/format_types.h>
 
 namespace basecode {
+    static inline str::slice_t s_byte_units[] = {
+        "bytes"_ss, "KB"_ss, "MB"_ss, "GB"_ss, "TB"_ss,
+        "PB"_ss,    "EB"_ss, "ZB"_ss, "YB"_ss
+    };
+
     class str_buf_t : public fmt::internal::buffer<s8> {
         str_t*                                                  _str;
     public: explicit str_buf_t(str_t* str) : _str(str)          { set((s8*) _str->data, str->capacity); }
@@ -33,7 +38,6 @@ namespace basecode {
     };
 
     namespace format {
-        u0 unitized_byte_size(fmt_buf_t& buf, u64 size);
         u0 hex_dump(fmt_buf_t& buf, const u0* data, u32 size);
         str_t vformat(alloc_t* alloc, fmt_str_t format_str, fmt_args_t args);
         u0 vprint(alloc_t* alloc, FILE* file, fmt_str_t format_str, fmt_args_t args);
@@ -86,6 +90,19 @@ namespace basecode {
         template <typename Buffer, typename... Args>
         inline decltype(auto) format_to(Buffer& buf, fmt_str_t format_str, const Args&... args) {
             return fmt::vformat_to(buf, format_str, fmt::make_format_args(args...));
+        }
+
+        template <typename Buffer> inline u0 unitized_byte_size(Buffer& buf, u64 size) {
+            u64 i{};
+            while (size > 1024) {
+                size /= 1024;
+                i++;
+            }
+            if (i > 1) {
+                format::format_to(buf, "{}.{}{}", i, size, s_byte_units[i]);
+            } else {
+                format::format_to(buf, "{}", size, s_byte_units[i]);
+            }
         }
 
         inline u0 to_radix(str_t& str, Integer_Concept auto value, Radix_Concept auto radix = 10) {

@@ -22,5 +22,5 @@
 #include <basecode/core/array.h>
 
 namespace basecode::slice {
-    b8 to_fields(str::slice_t value, array_t<str::slice_t>& fields, s8 sep = ',', alloc_t* alloc = context::top()->alloc);
+    b8 to_fields(const str::slice_t& value, array_t<str::slice_t>& fields, s8 sep = ',');
 }

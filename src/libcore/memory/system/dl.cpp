@@ -20,11 +20,6 @@
 #include <basecode/core/memory/system/dlmalloc_config.h>
 
 namespace basecode::memory::dl {
-    static u0 fini(alloc_t* alloc) {
-        destroy_mspace(alloc->subclass.dl.heap);
-        alloc->total_allocated = {};
-    }
-
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto subclass = &alloc->subclass.dl;
         auto dl_config = (dl_config_t*) config;
@@ -44,6 +39,13 @@ namespace basecode::memory::dl {
         freed_size = h->size;
         alloc->total_allocated -= freed_size;
         mspace_free(alloc->subclass.dl.heap, h);
+    }
+
+    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
+        if (freed_size) *freed_size = alloc->total_allocated;
+        if (enforce) assert(alloc->total_allocated == 0);
+        destroy_mspace(alloc->subclass.dl.heap);
+        alloc->total_allocated = {};
     }
 
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {

@@ -28,6 +28,7 @@ TEST_CASE("string::slice_t formatting") {
 
     buffer_t buf{};
     buffer::init(buf);
+    buffer::free(buf);
 
     error::print(stdout, buf, "test: {}", 10);
 }

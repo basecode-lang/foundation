@@ -20,10 +20,6 @@
 #include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::memory::proxy {
-    static u0 fini(alloc_t* alloc) {
-        alloc->total_allocated = {};
-    }
-
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto proxy_config = (proxy_config_t*) config;
         alloc->backing = proxy_config->backing;
@@ -34,7 +30,21 @@ namespace basecode::memory::proxy {
     static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
         auto backing = alloc->backing->system;
         backing->free(alloc->backing, mem, freed_size);
+        assert(freed_size <= alloc->total_allocated);
         alloc->total_allocated -= freed_size;
+    }
+
+    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
+        auto sc = &alloc->subclass.proxy;
+        if (sc->owner) {
+            u32 temp_freed{};
+            system::free(alloc->backing, enforce, &temp_freed);
+            assert(temp_freed <= alloc->total_allocated);
+            alloc->total_allocated -= temp_freed;
+            if (freed_size) *freed_size = temp_freed;
+            if (enforce) assert(alloc->total_allocated == 0);
+        }
+        alloc->total_allocated = {};
     }
 
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
@@ -47,7 +57,7 @@ namespace basecode::memory::proxy {
     static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size) {
         auto backing = alloc->backing->system;
         auto new_mem = backing->realloc(alloc->backing, mem, size, align, old_size);
-        alloc->total_allocated += (s32) (size - old_size);
+        alloc->total_allocated += (s32) (system::size_with_padding(size, align) - old_size);
         return new_mem;
     }
 

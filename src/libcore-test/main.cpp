@@ -80,19 +80,18 @@ s32 main(s32 argc, const s8** argv) {
     if (!OK(filesys::init()))           return 1;
     if (!OK(network::system::init()))   return 1;
 
-    defer({
-        log::notice("in defer shutdown");
-        log::fini(&spdlog);
-        log::fini(&syslog);
-        network::system::fini();
-        filesys::fini();
-        ffi::system::fini();
-        profiler::fini();
-        memory::proxy::fini();
-        log::system::fini();
-        memory::system::fini();
-        context::pop();
-    });
+    auto rc = Catch::Session().run(argc, argv);
 
-    return Catch::Session().run(argc, argv);
+    log::notice("shutdown test program");
+
+    network::system::fini();
+    filesys::fini();
+    ffi::system::fini();
+    profiler::fini();
+    memory::proxy::fini();
+    log::system::fini();
+    memory::system::fini();
+    context::pop();
+
+    return rc;
 }

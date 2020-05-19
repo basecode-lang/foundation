@@ -185,18 +185,18 @@ namespace basecode::intern {
     }
 
     u0 init(intern_t& pool, alloc_t* alloc, f32 load_factor, u8 num_pages) {
-        pool.id = 1;
-        pool.alloc = alloc;
+        pool.id          = 1;
+        pool.alloc       = alloc;
         pool.load_factor = load_factor;
 
         page_config_t page_config{};
-        page_config.backing = pool.alloc;
+        page_config.backing   = pool.alloc;
         page_config.num_pages = num_pages;
-        pool.page_alloc = memory::system::make(alloc_type_t::page, &page_config);
+        pool.page_alloc       = memory::system::make(alloc_type_t::page, &page_config);
 
         bump_config_t bump_config{};
-        bump_config.type = bump_type_t::allocator;
+        bump_config.type          = bump_type_t::allocator;
         bump_config.backing.alloc = pool.page_alloc;
-        pool.bump_alloc = memory::system::make(alloc_type_t::bump, &bump_config);
+        pool.bump_alloc           = memory::system::make(alloc_type_t::bump, &bump_config);
     }
 }

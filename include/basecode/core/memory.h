@@ -43,8 +43,8 @@ namespace basecode {
     };
 
     using alloc_init_callback_t     = u0  (*)(alloc_t*, alloc_config_t*);
-    using alloc_fini_callback_t     = u0  (*)(alloc_t*);
     using alloc_free_callback_t     = u0  (*)(alloc_t*, u0* mem, u32& freed_size);
+    using alloc_fini_callback_t     = u0  (*)(alloc_t*, b8 enforce, u32* freed_size);
     using alloc_alloc_callback_t    = u0* (*)(alloc_t*, u32 size, u32 align, u32& allocated_size);
     using alloc_realloc_callback_t  = u0* (*)(alloc_t*, u0* mem, u32 size, u32 align, u32& old_size);
 
@@ -127,8 +127,6 @@ namespace basecode {
                 return reinterpret_cast<alloc_header_t*>(p - 1);
             }
 
-            u0 free(alloc_t* alloc, b8 enforce = true);
-
             b8 set_page_executable(u0* ptr, usize size);
 
             inline u32 size_with_padding(u32 size, u32 align) {
@@ -157,6 +155,8 @@ namespace basecode {
 
             alloc_t* make(alloc_type_t type, alloc_config_t* config = {});
 
+            u0 free(alloc_t* alloc, b8 enforce = true, u32* freed_size = {});
+
             status_t init(alloc_type_t type, u32 heap_size = 32 * 1024 * 1024, u0* base = {});
         }
 
@@ -166,11 +166,11 @@ namespace basecode {
 
         str::slice_t status_name(status_t status);
 
-        u0 fini(alloc_t* alloc, b8 enforce = true);
-
         u0* alloc(alloc_t* alloc, u32* alloc_size = {});
 
         u0 free(alloc_t* alloc, u0* mem, u32* freed_size = {});
+
+        u0 fini(alloc_t* alloc, b8 enforce = true, u32* freed_size = {});
 
         u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align = sizeof(u32));
 

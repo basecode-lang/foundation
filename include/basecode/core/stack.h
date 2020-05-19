@@ -67,7 +67,6 @@ namespace basecode {
         }
 
         template<typename T> u0 clear(stack_t<T>& stack) {
-            assert(stack.alloc);
             memory::free(stack.alloc, stack.data);
             stack.data = {};
             stack.size = stack.capacity = {};

@@ -92,15 +92,6 @@ namespace basecode::memory {
             return &t_system.default_alloc;
         }
 
-        u0 free(alloc_t* alloc, b8 enforce) {
-            if (!array::erase(t_system.allocators, alloc))
-                return;
-            if (alloc->system->type == alloc_type_t::proxy && alloc->subclass.proxy.owner)
-                system::free(alloc->backing, enforce);
-            memory::fini(alloc, enforce);
-            memory::free(&t_system.slab_alloc, alloc);
-        }
-
         b8 set_page_executable(u0* ptr, usize size) {
             const auto page_size = t_system.os_page_size;
             u64 start, end;
@@ -111,6 +102,15 @@ namespace basecode::memory {
                 (u0*) start,
                 end - start,
                 PROT_READ | PROT_WRITE | PROT_EXEC) == 0;
+        }
+
+        u0 free(alloc_t* alloc, b8 enforce, u32* freed_size) {
+            if (!array::erase(t_system.allocators, alloc))
+                return;
+            u32 temp_freed{};
+            memory::fini(alloc, enforce, &temp_freed);
+            memory::free(&t_system.slab_alloc, alloc);
+            if (freed_size) *freed_size = temp_freed;
         }
 
         alloc_t* make(alloc_type_t type, alloc_config_t* config) {
@@ -168,22 +168,6 @@ namespace basecode::memory {
         return alloc;
     }
 
-    u0 fini(alloc_t* alloc, b8 enforce) {
-        if (!alloc->system || !alloc->system->fini) return;
-        alloc->system->fini(alloc);
-        if (enforce) assert(alloc->total_allocated == 0);
-        meta::untrack(alloc);
-        alloc->backing = {};
-    }
-
-    u0* alloc(alloc_t* alloc, u32* alloc_size) {
-        if (!alloc->system || !alloc->system->alloc) return {};
-        u32 temp;
-        auto mem = alloc->system->alloc(alloc, 0, 0, temp);
-        if (alloc_size) *alloc_size = temp;
-        return mem;
-    }
-
     str::slice_t type_name(alloc_type_t type) {
         return s_type_names[(u32) type];
     }
@@ -192,22 +176,39 @@ namespace basecode::memory {
         return s_status_names[(u32) status];
     }
 
+    u0* alloc(alloc_t* alloc, u32* alloc_size) {
+        if (!alloc->system || !alloc->system->alloc) return {};
+        u32 temp{};
+        auto mem = alloc->system->alloc(alloc, 0, 0, temp);
+        if (alloc_size) *alloc_size = temp;
+        return mem;
+    }
+
     u0 free(alloc_t* alloc, u0* mem, u32* freed_size) {
         if (!mem || !alloc->system || !alloc->system->free) return;
-        u32 temp;
+        u32 temp{};
         alloc->system->free(alloc, mem, temp);
+        if (freed_size) *freed_size = temp;
+    }
+
+    u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
+        if (!alloc->system || !alloc->system->fini) return;
+        u32 temp{};
+        alloc->system->fini(alloc, enforce, &temp);
+        meta::untrack(alloc);
+        alloc->backing = {};
         if (freed_size) *freed_size = temp;
     }
 
     u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
         if (!alloc->system || !alloc->system->realloc) return {};
-        u32 old_size;
+        u32 old_size{};
         return alloc->system->realloc(alloc, mem, size, align, old_size);
     }
 
     u0* alloc(alloc_t* alloc, u32 size, u32 align, u32* alloc_size) {
         if (!size || !alloc->system || !alloc->system->alloc) return {};
-        u32 temp;
+        u32 temp{};
         auto mem = alloc->system->alloc(alloc, size, align, temp);
         if (alloc_size) *alloc_size = temp;
         return mem;
@@ -217,40 +218,16 @@ namespace basecode::memory {
         if (!alloc)
             return status_t::invalid_allocator;
         switch (type) {
-            case alloc_type_t::bump: {
-                alloc->system = bump::system();
-                break;
-            }
-            case alloc_type_t::slab: {
-                alloc->system = slab::system();
-                break;
-            }
-            case alloc_type_t::page: {
-                alloc->system = page::system();
-                break;
-            }
-            case alloc_type_t::proxy: {
-                alloc->system = proxy::system();
-                break;
-            }
-            case alloc_type_t::trace: {
-                alloc->system = trace::system();
-                break;
-            }
-            case alloc_type_t::stack: {
-                alloc->system = stack::system();
-                break;
-            }
-            case alloc_type_t::default_: {
-                alloc->system = default_::system();
-                break;
-            }
-            case alloc_type_t::dlmalloc: {
-                alloc->system = dl::system();
-                break;
-            }
+            case alloc_type_t::bump:        alloc->system = bump::system();     break;
+            case alloc_type_t::slab:        alloc->system = slab::system();     break;
+            case alloc_type_t::page:        alloc->system = page::system();     break;
+            case alloc_type_t::proxy:       alloc->system = proxy::system();    break;
+            case alloc_type_t::trace:       alloc->system = trace::system();    break;
+            case alloc_type_t::stack:       alloc->system = stack::system();    break;
+            case alloc_type_t::default_:    alloc->system = default_::system(); break;
+            case alloc_type_t::dlmalloc:    alloc->system = dl::system();       break;
         }
-        alloc->backing = {};
+        alloc->backing         = {};
         alloc->total_allocated = {};
         if (alloc->system->init)
             alloc->system->init(alloc, config);

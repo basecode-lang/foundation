@@ -19,24 +19,6 @@
 #include <basecode/core/format.h>
 
 namespace basecode::format {
-    static str::slice_t s_byte_units[] = {
-        "bytes"_ss, "KB"_ss, "MB"_ss, "GB"_ss, "TB"_ss,
-        "PB"_ss,    "EB"_ss, "ZB"_ss, "YB"_ss
-    };
-
-    u0 unitized_byte_size(fmt_buf_t& buf, u64 size) {
-        u64 i{};
-        while (size > 1024) {
-            size /= 1024;
-            i++;
-        }
-        if (i > 1) {
-            format::format_to(buf, "{}.{}{}", i, size, s_byte_units[i]);
-        } else {
-            format::format_to(buf, "{}", size, s_byte_units[i]);
-        }
-    }
-
     u0 hex_dump(fmt_buf_t& buf, const u0* data, u32 size) {
         const u8* bytes = (const u8*) data;
         for (u32 i = 0; i < size; i += 16) {

@@ -114,7 +114,7 @@ set(
 
         str.cpp ${INC_DIR}/str.h
 
-        symtab.cpp ${INC_DIR}/symtab.h
+        ${INC_DIR}/symtab.h
 
         timer.cpp ${INC_DIR}/timer.h
 )

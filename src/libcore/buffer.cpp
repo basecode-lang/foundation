@@ -22,6 +22,9 @@
 namespace basecode::buffer {
     u0 free(buffer_t& buf) {
         memory::free(buf.alloc, buf.data);
+        buf.data = {};
+        buf.idx  = buf.length = {};
+        buf.line = buf.column = {};
     }
 
     b8 has_more(buffer_t& buf) {
@@ -50,10 +53,10 @@ namespace basecode::buffer {
     }
 
     u0 init(buffer_t& buf, alloc_t* alloc) {
-        buf.data = {};
-        buf.alloc = alloc;
-        buf.idx = buf.length = {};
-        buf.column = buf.line = {};
+        buf.data   = {};
+        buf.alloc  = alloc;
+        buf.idx    = buf.length = {};
+        buf.column = buf.line   = {};
     }
 
     status_t load(const str_t& path, buffer_t& buf) {
@@ -66,7 +69,7 @@ namespace basecode::buffer {
         buf.length = ftell(file) + 1;
         fseek(file, 0, SEEK_SET);
 
-        buf.data = (u8*) memory::alloc(context::top()->alloc, buf.length);
+        buf.data = (u8*) memory::alloc(buf.alloc, buf.length);
         fread(buf.data, 1, buf.length, file);
         buf.data[buf.length - 1] = 255;
 
@@ -86,6 +89,6 @@ namespace basecode::buffer {
             }
             ++i;
         }
-        return 0;
+        return true;
     }
 }

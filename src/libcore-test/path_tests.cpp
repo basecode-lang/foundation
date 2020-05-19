@@ -33,7 +33,6 @@ TEST_CASE("basecode::path basics") {
 
     path_t path{};
     path::init(path, expected_path);
-
     defer(path::free(path));
 
     REQUIRE(path::length(path) == expected_path.length);
