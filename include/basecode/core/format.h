@@ -99,9 +99,9 @@ namespace basecode {
                 i++;
             }
             if (i > 1) {
-                format::format_to(buf, "{}.{}{}", i, size, s_byte_units[i]);
+                format::format_to(buf, "{}.{} {}", i, size, s_byte_units[i]);
             } else {
-                format::format_to(buf, "{}", size, s_byte_units[i]);
+                format::format_to(buf, "{} {}", size, s_byte_units[i]);
             }
         }
 
