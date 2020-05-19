@@ -82,8 +82,9 @@ namespace basecode::memory::meta {
         if (!t_meta_system.init) return;
         const auto tree_size = bintree::size(t_meta_system.tree);
         const auto tree_cap  = bintree::capacity(t_meta_system.tree);
-        if (tree_size + 2 > tree_cap)
+        if (tree_size + 4 > tree_cap)
             bintree::reserve(t_meta_system.tree, tree_size * 2 + 8);
+        bintree_node_t* new_node{};
         bintree_node_t* alloc_node;
         const b8 is_child = alloc->backing != nullptr;
         auto root_node = bintree::root(t_meta_system.tree);
@@ -92,6 +93,10 @@ namespace basecode::memory::meta {
             if (find_alloc_node(parent_node, alloc))
                 return;
             alloc_node = find_leaf_right(parent_node);
+            if (!alloc_node->left) {
+                alloc_node->left = bintree::append_node(t_meta_system.tree, &new_node);
+                alloc_node = new_node;
+            }
             bintree::insert_value(t_meta_system.tree, alloc_node, alloc);
         } else {
             alloc_node = find_alloc_node(root_node, alloc);
@@ -100,7 +105,6 @@ namespace basecode::memory::meta {
             alloc_node     = find_leaf_left(alloc_node);
             bintree::insert_value(t_meta_system.tree, alloc_node, alloc);
         }
-        bintree_node_t* new_node{};
         alloc_node->left  = bintree::append_node(t_meta_system.tree, &new_node);
         alloc_node->right = bintree::append_node(t_meta_system.tree, &new_node);
     }
