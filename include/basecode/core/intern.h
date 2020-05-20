@@ -22,21 +22,19 @@
 #include <basecode/core/array.h>
 #include <basecode/core/slice.h>
 #include <basecode/core/hashtab.h>
+#include <basecode/core/assoc_array.h>
 
 namespace basecode {
     struct intern_t final {
         alloc_t*                        alloc;
-        alloc_t*                        page_alloc;
-        alloc_t*                        bump_alloc;
         u32*                            ids;
         u64*                            hashes;
-        str::slice_t*                   slices;
-        u32                             id;
+        assoc_array_t<u32>              buf;
         u32                             size;
         u32                             capacity;
         f32                             load_factor;
     };
-    static_assert(sizeof(intern_t) <= 64, "intern_t is now larger than 64 bytes!");
+    static_assert(sizeof(intern_t) <= 88, "intern_t is now larger than 88 bytes!");
 
     namespace intern {
         enum class status_t : u8 {
@@ -59,11 +57,15 @@ namespace basecode {
 
         result_t get(intern_t& pool, u32 id);
 
-        result_t intern(intern_t& pool, str::slice_t value);
+        str::slice_t status_name(status_t status);
 
         intern_t make(alloc_t* alloc = context::top()->alloc);
 
-        u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc, f32 load_factor = .5f, u8 num_pages = 16);
+        result_t intern(intern_t& pool, const str::slice_t& value);
+
+        u0 reserve(intern_t& pool, u32 key_capacity, u32 value_capacity);
+
+        u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc, f32 load_factor = .5f);
     }
 }
 

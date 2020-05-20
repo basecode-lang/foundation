@@ -319,7 +319,7 @@ namespace basecode::cxx {
         bass_t*                 store;
         alloc_t*                alloc;
         symtab_t<str_t>         modules;
-        str_t                   scratch;
+        str_t                   scratch[2];
         u32                     line;
         u16                     indent;
         u16                     column;
@@ -329,9 +329,7 @@ namespace basecode::cxx {
 
     struct type_info_t final {
         str_t*                  name;
-        u32                     size;
-        integral_size_t         size_type;
-        meta_type_t             meta_type;
+        str_t*                  var_suffix;
     };
 
     namespace scope {

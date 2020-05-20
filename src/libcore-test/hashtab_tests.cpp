@@ -17,33 +17,37 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
+#include <basecode/core/buf.h>
 #include <basecode/core/str.h>
 #include <basecode/core/defer.h>
-#include <basecode/core/buffer.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/core/stopwatch.h>
+#include <basecode/core/str_array.h>
 #include <basecode/core/slice_utils.h>
 #include "test.h"
 
 using namespace basecode;
 
 TEST_CASE("basecode::hashtab names") {
+    auto path = "../etc/ut.txt"_path;
+    auto buf = buf::make();
+    REQUIRE(OK(buf::load(buf, path)));
+
     hashtab_t<str::slice_t, baby_name_t> table{};
     hashtab::init(table, context::top()->alloc, 0.7f);
 
-    auto buf = buffer::make();
-    REQUIRE(OK(buffer::load((str_t) "../etc/ut.txt"_ss, buf)));
-
     array_t<name_record_t> records{};
     array::init(records);
-    defer(
-        for (auto& record : records)
-            array::free(record.fields);
-        array::free(records);
-        buffer::free(buf);
-        hashtab::free(table));
+    defer({
+              path::free(path);
+              for (auto& record : records)
+                  array::free(record.fields);
+              array::free(records);
+              buf::free(buf);
+              hashtab::free(table);
+          });
 
-    buffer::each_line(
+    buf::each_line(
         buf,
         [&records](const str::slice_t& line) {
             auto& record = array::append(records);
@@ -75,29 +79,38 @@ TEST_CASE("basecode::hashtab names") {
 TEST_CASE("basecode::hashtab payload with random string keys") {
     hashtab_t<str::slice_t, payload_t> table{};
     hashtab::init(table, context::top()->alloc, .65f);
-    defer(hashtab::free(table));
 
-    str_t str[4096];
+    str_array_t strings{};
+    str_array::init(strings);
+    str_array::reserve_index(strings, 4096);
+    str_array::reserve_data(strings, 4096 * 33);
+
+    str_t temp{};
+    str::init(temp);
+    str::reserve(temp, 32);
+    defer({
+              str::free(temp);
+              str_array::free(strings);
+              hashtab::free(table);
+          });
+
     for (u32 i = 0; i < 4096; ++i) {
-        str::init(str[i], context::top()->alloc);
-        str::reserve(str[i], 32);
-        str[i] = str::random(32);
+        str::random(temp, 32);
+        str_array::append(strings, temp);
+        str::reset(temp);
     }
 
     stopwatch_t time{};
     stopwatch::start(time);
 
     for (u32 i = 0; i < 4096; ++i) {
-        auto payload = hashtab::emplace(table, slice::make(str[i]));
+        auto payload = hashtab::emplace(table, strings[i]);
         payload->ptr = {};
         payload->offset = i * 100;
     }
 
     stopwatch::stop(time);
     stopwatch::print_elapsed("hashtab payload + string key"_ss, 40, stopwatch::elapsed(time));
-
-    for (u32 i = 0; i < 4096; ++i)
-        str::free(str[i]);
 }
 
 TEST_CASE("basecode::hashtab payload with integer keys") {

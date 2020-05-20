@@ -43,7 +43,7 @@ namespace basecode::str {
     }
 
     u0 clear(str_t& str) {
-        memory::free(str.allocator, str.data);
+        memory::free(str.alloc, str.data);
         str.data = {};
         str.length = str.capacity = {};
     }
@@ -68,6 +68,12 @@ namespace basecode::str {
         set_capacity(str, str.length);
     }
 
+    str_t make(alloc_t* alloc) {
+        str_t str{};
+        init(str, alloc);
+        return str;
+    }
+
     b8 empty(const str_t& str) {
         return str.length == 0 || str.data == nullptr;
     }
@@ -79,16 +85,21 @@ namespace basecode::str {
         return (const s8*) str.data;
     }
 
-    str_t make(alloc_t* allocator) {
-        str_t str{};
-        init(str, allocator);
-        return str;
-    }
-
     u0 append(str_t& str, u8 value) {
         if (str.length + 1 > str.capacity)
             grow(str);
         str.data[str.length++] = value;
+    }
+
+    u0 random(str_t& str, u32 length) {
+        while(length--)
+            append(str, s_chars[t_pick(t_rg)]);
+    }
+
+    u0 init(str_t& str, alloc_t* alloc) {
+        str.data   = {};
+        str.alloc  = alloc;
+        str.length = str.capacity = {};
     }
 
     u0 append(str_t& str, slice_t value) {
@@ -111,17 +122,10 @@ namespace basecode::str {
     }
 
     b8 erase(str_t& str, u32 pos, u32 len) {
-        if (pos + len < str.length) {
+        if (pos + len < str.length)
             std::memmove(str.data + pos, str.data + pos + 1, len * sizeof(u8));
-        }
         str.length -= len;
         return true;
-    }
-
-    u0 init(str_t& str, alloc_t* allocator) {
-        str.data      = {};
-        str.allocator = allocator;
-        str.length    = str.capacity = {};
     }
 
     u0 reserve(str_t& str, u32 new_capacity) {
@@ -137,15 +141,6 @@ namespace basecode::str {
         append(str, value.data, value.length);
     }
 
-    str_t random(u32 length, alloc_t* allocator) {
-        str_t str;
-        init(str, allocator);
-        reserve(str, length);
-        while(length--)
-            append(str, s_chars[t_pick(t_rg)]);
-        return str;
-    }
-
     u0 insert(str_t& str, u32 pos, slice_t value) {
         insert(str, pos, value.data, value.length);
     }
@@ -155,13 +150,13 @@ namespace basecode::str {
             return;
 
         if (new_capacity == 0) {
-            memory::free(str.allocator, str.data);
+            memory::free(str.alloc, str.data);
             str.data = {};
             str.length = str.capacity = {};
             return;
         }
 
-        str.data = (u8*) memory::realloc(str.allocator, str.data, new_capacity * sizeof(u8));
+        str.data = (u8*) memory::realloc(str.alloc, str.data, new_capacity * sizeof(u8));
         str.capacity = new_capacity;
         if (new_capacity < str.length)
             str.length = new_capacity;

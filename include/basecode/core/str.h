@@ -57,6 +57,8 @@ namespace basecode {
 
         u0 append(str_t& str, u8 value);
 
+        u0 random(str_t& str, u32 length);
+
         u0 resize(str_t& str, u32 new_size);
 
         u0 trunc(str_t& str, u32 new_length);
@@ -79,33 +81,29 @@ namespace basecode {
 
         u0 insert(str_t& str, u32 pos, const str_t& value);
 
+        str_t make(alloc_t* alloc = context::top()->alloc);
+
         u0 insert(str_t& str, u32, const u8*, s32 len = -1);
 
         u0 append(str_t& str, const u8* value, s32 len = -1);
 
         u0 append(str_t& str, const s8* value, s32 len = -1);
 
-        str_t make(alloc_t* allocator = context::top()->alloc);
-
-        u0 init(str_t& str, alloc_t* allocator = context::top()->alloc);
-
-        str_t random(u32 length, alloc_t* allocator = context::top()->alloc);
+        u0 init(str_t& str, alloc_t* alloc = context::top()->alloc);
     }
 
     struct str_t final {
+        alloc_t*                alloc{};
         u8*                     data{};
-        alloc_t*                allocator{};
         u32                     length{};
         u32                     capacity{};
 
         str_t() = default;
         ~str_t()                                                  { str::clear(*this); }
         str_t(str_t&& other) noexcept                             { operator=(other); }
-        str_t(const str_t& other) : allocator(other.allocator)    { operator=(other); }
+        str_t(const str_t& other) : alloc(other.alloc)            { operator=(other); }
 
-        explicit str_t(
-                const char* value,
-                alloc_t* allocator = context::top()->alloc) : allocator(allocator) {
+        explicit str_t(const s8* value, alloc_t* alloc = context::top()->alloc) : alloc(alloc) {
             const auto n = strlen(value) + 1;
             str::grow(*this, n);
             std::memcpy(data, value, n * sizeof(u8));
@@ -113,9 +111,7 @@ namespace basecode {
             length = n;
         }
 
-        explicit str_t(
-            str::slice_t value,
-            alloc_t* allocator = context::top()->alloc) : allocator(allocator) {
+        explicit str_t(str::slice_t value, alloc_t* alloc = context::top()->alloc) : alloc(alloc) {
             str::grow(*this, value.length);
             std::memcpy(data, value.data, value.length * sizeof(u8));
             length = value.length;
@@ -140,8 +136,8 @@ namespace basecode {
 
         str_t& operator=(const str_t& other) {
             if (this != &other) {
-                if (!allocator)
-                    allocator = other.allocator;
+                if (!alloc)
+                    alloc = other.alloc;
                 const auto n = other.length;
                 str::grow(*this, n);
                 std::memcpy(data, other.data, n * sizeof(u8));
@@ -170,12 +166,12 @@ namespace basecode {
 
         str_t& operator=(str_t&& other) noexcept {
             if (this != &other) {
-                if (allocator)
-                    memory::free(allocator, data);
+                if (alloc)
+                    memory::free(alloc, data);
                 data = other.data;
                 length = other.length;
                 capacity = other.capacity;
-                allocator = other.allocator;
+                alloc    = other.alloc;
                 other.data = {};
                 other.length = other.capacity = {};
             }

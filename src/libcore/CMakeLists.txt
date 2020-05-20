@@ -15,6 +15,8 @@ configure_file (
 set(
         SOURCES
 
+        ${INC_DIR}/assoc_array.h
+
         ${INC_DIR}/defer.h
         ${INC_DIR}/types.h
 
@@ -30,7 +32,7 @@ set(
 
         bitset.cpp ${INC_DIR}/bitset.h
 
-        buffer.cpp ${INC_DIR}/buffer.h
+        buf.cpp ${INC_DIR}/buf.h
 
         context.cpp ${INC_DIR}/context.h
 
@@ -49,6 +51,8 @@ set(
         ffi.cpp ${INC_DIR}/ffi.h
 
         format.cpp ${INC_DIR}/format.h ${INC_DIR}/format_types.h
+
+        gap_buf.cpp ${INC_DIR}/gap_buf.h
 
         ${INC_DIR}/gfx.h
 
@@ -113,6 +117,7 @@ set(
         stopwatch.cpp ${INC_DIR}/stopwatch.h
 
         str.cpp ${INC_DIR}/str.h
+        str_array.cpp ${INC_DIR}/str_array.h
 
         ${INC_DIR}/symtab.h
 

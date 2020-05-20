@@ -84,6 +84,22 @@ namespace basecode {
             static_cast<To>(f());
         };
 
+    template <typename T, typename U>
+    concept same_helper = std::is_same_v<T, U>;
+
+    template <typename T, typename U>
+    concept same_as = same_helper<T, U> && same_helper<U, T>;
+
+    template <typename T> concept Slice_Concept = requires(const T& t) {
+        {t.data}    -> same_as<const u8*>;
+        {t.length}  -> same_as<u32>;
+    };
+
+    template <typename T> concept String_Concept  = Slice_Concept<T> || requires(const T& t) {
+        {t.data}    -> same_as<u8*>;
+        {t.length}  -> same_as<u32>;
+    };
+
     template <typename T> concept Integer_Concept = std::is_integral_v<T>;
 
     template <typename T> concept Radix_Concept   = Integer_Concept<T> && requires(T radix) {

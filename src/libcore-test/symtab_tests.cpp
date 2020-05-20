@@ -17,10 +17,10 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
+#include <basecode/core/buf.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/slice.h>
 #include <basecode/core/format.h>
-#include <basecode/core/buffer.h>
 #include <basecode/core/symtab.h>
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/slice_utils.h>
@@ -41,15 +41,16 @@ template <typename V>
     }
 }
 
-template <typename V>
+template <typename V, typename B=std::remove_pointer_t<V>>
 [[maybe_unused]] static u0 format_pairs(symtab_t<V>& symtab, str::slice_t prefix = {}) {
-    auto pairs = symtab::pairs(symtab, prefix);
-    defer(
-        for (auto& pair : pairs)
-            str::free(pair.key);
-        array::free(pairs));
-    for (const auto& pair : pairs)
+    assoc_array_t<B*> pairs{};
+    assoc_array::init(pairs);
+    symtab::find_prefix(symtab, pairs, prefix);
+    defer(assoc_array::free(pairs));
+    for (u32 i = 0; i < pairs.size; ++i) {
+        auto pair = pairs[i];
         format::print("{:<20}: {}\n", pair.key, *pair.value);
+    }
 }
 
 TEST_CASE("basecode::symtab_t remove key") {
@@ -102,24 +103,25 @@ TEST_CASE("basecode::symtab_t remove key") {
 }
 
 TEST_CASE("basecode::symtab_t names") {
+    auto path = "../etc/ut.txt"_path;
+    auto buf = buf::make();
+    REQUIRE(OK(buf::load(buf, path)));
+
     symtab_t<baby_name_t> symbols{};
     symtab::init(symbols);
-    defer(symtab::free(symbols));
-
-    auto buf = buffer::make();
-    REQUIRE(OK(buffer::load((str_t) "../etc/ut.txt"_ss, buf)));
 
     array_t<name_record_t> records{};
     array::init(records);
-    defer(
-        for (auto& record : records)
-            array::free(record.fields);
-        array::free(records);
-        buffer::free(buf);
-        symtab::free(symbols);
-        );
+    defer({
+              path::free(path);
+              for (auto& record : records)
+                  array::free(record.fields);
+              array::free(records);
+              buf::free(buf);
+              symtab::free(symbols);
+          });
 
-    buffer::each_line(
+    buf::each_line(
         buf,
         [&records](const str::slice_t& line) {
             auto& record = array::append(records);

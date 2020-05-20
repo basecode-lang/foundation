@@ -18,8 +18,11 @@ add_executable(
         intern_tests.cpp
         bitset_tests.cpp
         symtab_tests.cpp
+        gap_buf_tests.cpp
         bintree_tests.cpp
         hashtab_tests.cpp
+        str_array_tests.cpp
+        assoc_array_tests.cpp
         stable_array_tests.cpp
 )
 target_link_libraries(${PROJECT_NAME} core)

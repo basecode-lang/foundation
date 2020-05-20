@@ -133,38 +133,27 @@ namespace basecode::cxx::serializer {
     }
 
     static status_t decl_var(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
-        auto& intern = *s.intern;
-        auto& store = *s.store;
+        auto&       intern = *s.intern;
+        auto&       store  = *s.store;
+        cursor_t    init_cursor{};
+        cursor_t    rhs_cursor{};
+        type_info_t type_info{.name = &s.scratch[0], .var_suffix = &s.scratch[1]};
 
-        auto dict = bass::dict::make(cursor);
-        process_var_flags(s, buf, bass::dict::get(dict, element::field::type));
-        type_info_t type_info{};
-        type_info.name = &s.scratch;
-        expand_type(store, intern, bass::dict::get(dict, element::field::lhs), type_info);
-        at_indent(s, buf, "{} ", s.scratch);
-        cursor_t rhs_cursor{};
-        if (unlikely(!bass::seek_record(store, bass::dict::get(dict, element::field::rhs), rhs_cursor)))
+        auto       dict    = bass::dict::make(cursor);
+        const auto lhs_id  = DICTV(dict, element::field::lhs);
+        const auto rhs_id  = DICTV(dict, element::field::rhs);
+        const auto init_id = DICTV(dict, element::field::init);
+        const auto type_id = DICTV(dict, element::field::type);
+        process_var_flags(s, buf, type_id);
+        expand_type(store, intern, lhs_id, type_info);
+        at_indent(s, buf, "{} ", *type_info.name);
+        if (unlikely(!bass::seek_record(store, rhs_id, rhs_cursor)))
             return status_t::rhs_not_found;
         auto status = process_expr(s, buf, rhs_cursor);
         if (unlikely(!OK(status)))
             return status;
-        switch (type_info.meta_type) {
-            case meta_type_t::array: {
-                at_indent(s, buf, "[");
-                if (likely(type_info.size))
-                    at_indent(s, buf, "{}", type_info.size);
-                at_indent(s, buf, "] ");
-                break;
-            }
-            case meta_type_t::bit_mask: {
-                at_indent(s, buf, ":{}", type_info.size);
-                break;
-            }
-            default: break;
-        }
-        auto init_id = bass::dict::get(dict, element::field::init);
+        at_indent(s, buf, "{}", *type_info.var_suffix);
         if (init_id) {
-            cursor_t init_cursor{};
             if (unlikely(!bass::seek_record(store, init_id, init_cursor)))
                 return status_t::element_not_found;
             status = process_expr(s, buf, init_cursor);
@@ -173,75 +162,77 @@ namespace basecode::cxx::serializer {
     }
 
     static status_t process_list(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
-        u32 id{};
-        b8 first = true;
-        auto& store = *s.store;
-        cursor_t element_cursor{};
-        while (bass::next_field(cursor, id, element::field::child)) {
+        auto&       store = *s.store;
+        status_t    status{};
+        cursor_t    element_cursor{};
+        u32         id{};
+
+        // first
+        const b8 has_more = bass::next_field(cursor, id, element::field::child);
+        if (!has_more) return status;
+        if (unlikely(!bass::seek_record(store, id, element_cursor)))
+            return status_t::element_not_found;
+        switch (element_cursor.header->type) {
+            case element::header::scope:                                                                break;
+            case element::header::variable:     status = decl_var(s, buf, element_cursor);      break;
+            case element::header::statement:    status = process_stmt(s, buf, element_cursor);  break;
+            case element::header::expression:   status = process_expr(s, buf, element_cursor);  break;
+            default:                            return status_t::invalid_list_entry;
+        }
+        if (!has_more) return status;
+
+        // rest
+        while (OK(status) && bass::next_field(cursor, id, element::field::child)) {
             if (unlikely(!bass::seek_record(store, id, element_cursor)))
                 return status_t::element_not_found;
             switch (element_cursor.header->type) {
-                case element::header::variable: {
-                    if (!first) at_indent(s, buf, ", ");
-                    auto status = decl_var(s, buf, element_cursor);
-                    if (unlikely(!OK(status)))
-                        return status;
+                case element::header::variable:
+                    at_indent(s, buf, ", ");
+                    status = decl_var(s, buf, element_cursor);
                     break;
-                }
-                case element::header::statement: {
-                    auto status = process_stmt(s, buf, element_cursor);
-                    if (unlikely(!OK(status)))
-                        return status;
+                case element::header::statement:
+                    status = process_stmt(s, buf, element_cursor);
                     break;
-                }
-                case element::header::expression: {
-                    if (!first) at_indent(s, buf, ", ");
-                    auto status = process_expr(s, buf, element_cursor);
-                    if (unlikely(!OK(status)))
-                        return status;
+                case element::header::expression:
+                    at_indent(s, buf, ", ");
+                    status = process_expr(s, buf, element_cursor);
                     break;
-                }
                 case element::header::scope:    break;
                 default:                        return status_t::invalid_list_entry;
             }
-            first = false;
         }
-        return status_t::ok;
+
+        return status;
     }
 
     static status_t process_expr(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         status_t status{};
         auto& intern = *s.intern;
-        auto& store = *s.store;
+        auto& store  = *s.store;
+        cursor_t ident_cursor{};
         auto dict = bass::dict::make(cursor);
         switch (cursor.header->type) {
             case element::header::type: {
-                cursor_t ident_cursor{};
-                bass::seek_record(store, bass::dict::get(dict, element::field::ident), ident_cursor);
+                bass::seek_record(store, DICTV(dict, element::field::ident), ident_cursor);
                 return process_expr(s, buf, ident_cursor);
             }
             case element::header::ident:
             case element::header::num_lit: {
-                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
                 at_indent(s, buf, "{}", interned.slice);
                 return status_t::ok;
             }
             case element::header::str_lit: {
-                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
                 at_indent(s, buf, "\"{}\"", interned.slice);
                 return status_t::ok;
             }
             case element::header::char_lit: {
-                at_indent(
-                    s,
-                    buf,
-                    "'{}'",
-                    (s8) bass::dict::get(dict, element::field::lit));
+                at_indent(s, buf, "'{}'", (s8) DICTV(dict, element::field::lit));
                 return status_t::ok;
             }
             case element::header::variable: {
-                cursor_t ident_cursor{};
-                bass::seek_record(store, bass::dict::get(dict, element::field::rhs), ident_cursor);
+                bass::seek_record(store, DICTV(dict, element::field::rhs), ident_cursor);
                 return process_expr(s, buf, ident_cursor);
             }
             case element::header::scope:        return process_scope(s, buf, cursor);
@@ -249,29 +240,28 @@ namespace basecode::cxx::serializer {
             case element::header::expression:   break;
             default:                            return status_t::invalid_expr_element;
         }
-        auto type_field = bass::dict::get(dict, element::field::type);
-        auto type = (expression_type_t) BASE_TYPE(type_field);
-        cursor_t lhs_cursor{};
-        if (unlikely(!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), lhs_cursor)))
+        auto type_field = DICTV(dict, element::field::type);
+        auto type       = (expression_type_t) BASE_TYPE(type_field);
+        cursor_t lhs_cursor{}, rhs_cursor{};
+        if (unlikely(!bass::seek_record(store, DICTV(dict, element::field::lhs), lhs_cursor)))
             return status_t::lhs_not_found;
         switch (type) {
             case expression_type_t::raw: {
-                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
                 if (unlikely(!OK(interned.status)))
                     return status_t::intern_not_found;
                 at_indent(s, buf, "{}", interned.slice);
                 break;
             }
             case expression_type_t::unary: {
-                auto op_type = (unary_op_type_t) SUB_TYPE(type_field);
+                auto       op_type        = (unary_op_type_t) SUB_TYPE(type_field);
                 const auto unary_op_token = s_unary_op_tokens[(u32) op_type];
                 switch (op_type) {
                     case unary_op_type_t::inc:
                     case unary_op_type_t::dec: {
                         auto pos_type = (position_type_t) POS_TYPE(type_field);
                         switch (pos_type) {
-                            case position_type_t::none:
-                                return status_t::invalid_pos_type;
+                            case position_type_t::none: return status_t::invalid_pos_type;
                             case position_type_t::prefix: {
                                 at_indent(s, buf, "{}", unary_op_token);
                                 status = process_expr(s, buf, lhs_cursor);
@@ -302,8 +292,7 @@ namespace basecode::cxx::serializer {
                 if (unlikely(!OK(status)))
                     return status;
 
-                cursor_t rhs_cursor{};
-                if (unlikely(!bass::seek_record(store, bass::dict::get(dict, element::field::rhs), rhs_cursor)))
+                if (unlikely(!bass::seek_record(store, DICTV(dict, element::field::rhs), rhs_cursor)))
                     return status_t::rhs_not_found;
 
                 auto op_type = (binary_op_type_t) SUB_TYPE(type_field);
@@ -314,7 +303,7 @@ namespace basecode::cxx::serializer {
                             if (lhs_cursor.header->type != element::header::variable)
                                 return status_t::error;
                             cursor_t type_cursor{};
-                            if (!bass::seek_record(store, bass::dict::get(lhs_dict, element::field::lhs), type_cursor))
+                            if (!bass::seek_record(store, DICTV(lhs_dict, element::field::lhs), type_cursor))
                                 return status_t::error;
                             u32 type_value{};
                             if (!bass::next_field(type_cursor, type_value, element::field::type))
@@ -362,8 +351,7 @@ namespace basecode::cxx::serializer {
                 break;
             }
             case expression_type_t::assignment: {
-                cursor_t rhs_cursor{};
-                if (unlikely(!bass::seek_record(store, bass::dict::get(dict, element::field::rhs), rhs_cursor)))
+                if (unlikely(!bass::seek_record(store, DICTV(dict, element::field::rhs), rhs_cursor)))
                     return status_t::rhs_not_found;
                 status = process_expr(s, buf, lhs_cursor);
                 if (unlikely(!OK(status)))
@@ -401,9 +389,9 @@ namespace basecode::cxx::serializer {
         auto& intern = *s.intern;
         auto& store  = *s.store;
         auto dict       = bass::dict::make(cursor);
-        auto type_field = bass::dict::get(dict, element::field::type);
+        auto type_field = DICTV(dict, element::field::type);
+        auto label_id   = DICTV(dict, element::field::label);
         auto type       = (statement_type_t) BASE_TYPE(type_field);
-        auto label_id   = bass::dict::get(dict, element::field::label);
         if (label_id) {
             cursor_t label_cursor{};
             if (!bass::seek_record(store, label_id, label_cursor))
@@ -417,14 +405,14 @@ namespace basecode::cxx::serializer {
         switch (type) {
             case statement_type_t::pp: {
                 auto pp_type = (preprocessor_type_t) SUB_TYPE(type_field);
-                auto interned           = intern::get(intern, bass::dict::get(dict, element::field::intern));
+                auto interned           = intern::get(intern, DICTV(dict, element::field::intern));
                 const auto pp_template  = s_pp_templates[(u32) pp_type];
                 at_indent(s, buf, pp_template, interned.slice);
                 newline(s, buf);
                 break;
             }
             case statement_type_t::raw: {
-                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
                 if (unlikely(!OK(interned.status)))
                     return status_t::intern_not_found;
                 at_indent(s, buf, "{}", interned.slice);
@@ -433,17 +421,17 @@ namespace basecode::cxx::serializer {
             case statement_type_t::if_: {
                 at_indent(s, buf, "if (");
                 cursor_t expr_cursor{};
-                if (unlikely(!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor)))
+                if (unlikely(!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor)))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, ") ");
-                auto true_branch_id = bass::dict::get(dict, element::field::tbranch);
+                auto true_branch_id = DICTV(dict, element::field::tbranch);
                 if (true_branch_id) {
                     cursor_t branch_cursor{};
                     bass::seek_record(store, true_branch_id, branch_cursor);
                     status = process_expr(s, buf, branch_cursor);
                 }
-                auto false_branch_id = bass::dict::get(dict, element::field::fbranch);
+                auto false_branch_id = DICTV(dict, element::field::fbranch);
                 if (false_branch_id) {
                     at_indent(s, buf, " else ");
                     cursor_t branch_cursor{};
@@ -456,11 +444,11 @@ namespace basecode::cxx::serializer {
             case statement_type_t::do_: {
                 at_indent(s, buf, "do ");
                 cursor_t branch_cursor{};
-                bass::seek_record(store, bass::dict::get(dict, element::field::tbranch), branch_cursor);
+                bass::seek_record(store, DICTV(dict, element::field::tbranch), branch_cursor);
                 status = process_expr(s, buf, branch_cursor);
                 at_indent(s, buf, "while (");
                 cursor_t expr_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, "); ");
@@ -472,24 +460,24 @@ namespace basecode::cxx::serializer {
                 cursor_t rhs_cursor{};
                 cursor_t init_cursor{};
                 cursor_t branch_cursor{};
-                if (bass::seek_record(store, bass::dict::get(dict, element::field::init), init_cursor))
+                if (bass::seek_record(store, DICTV(dict, element::field::init), init_cursor))
                     status = process_expr(s, buf, init_cursor);
-                if (bass::seek_record(store, bass::dict::get(dict, element::field::lhs), lhs_cursor)) {
+                if (bass::seek_record(store, DICTV(dict, element::field::lhs), lhs_cursor)) {
                     at_indent(s, buf, "; ");
                     status = process_expr(s, buf, lhs_cursor);
                 }
-                if (bass::seek_record(store, bass::dict::get(dict, element::field::rhs), rhs_cursor)) {
+                if (bass::seek_record(store, DICTV(dict, element::field::rhs), rhs_cursor)) {
                     at_indent(s, buf, "; ");
                     status = process_expr(s, buf, rhs_cursor);
                 }
                 at_indent(s, buf, ") ");
-                bass::seek_record(store, bass::dict::get(dict, element::field::tbranch), branch_cursor);
+                bass::seek_record(store, DICTV(dict, element::field::tbranch), branch_cursor);
                 status = process_expr(s, buf, branch_cursor);
                 break;
             }
             case statement_type_t::expr: {
                 cursor_t expr_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, ";");
@@ -498,13 +486,13 @@ namespace basecode::cxx::serializer {
             }
             case statement_type_t::decl: {
                 cursor_t expr_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 switch (expr_cursor.header->type) {
                     case element::header::type: {
-                        auto type_dict = bass::dict::make(expr_cursor);
-                        const auto type_flags = bass::dict::get(type_dict, element::field::type);
-                        auto meta_type = (meta_type_t) BASE_TYPE(type_flags);
+                        auto       type_dict  = bass::dict::make(expr_cursor);
+                        const auto type_flags = DICTV(type_dict, element::field::type);
+                        auto       meta_type  = (meta_type_t) BASE_TYPE(type_flags);
                         switch (meta_type) {
                             case meta_type_t::aggregate: {
                                 auto agg_type = (aggregate_type_t) SUB_TYPE(type_flags);
@@ -516,7 +504,7 @@ namespace basecode::cxx::serializer {
                             case meta_type_t::function: {
                                 cursor_t lhs_cursor{};
                                 cursor_t rhs_cursor{};
-                                if (!bass::seek_record(store, bass::dict::get(type_dict, element::field::lhs), lhs_cursor))
+                                if (!bass::seek_record(store, DICTV(type_dict, element::field::lhs), lhs_cursor))
                                     return status_t::lhs_not_found;
                                 if (lhs_cursor.header->type != element::header::type)
                                     return status_t::lhs_not_found;
@@ -527,7 +515,7 @@ namespace basecode::cxx::serializer {
                                 status = process_expr(s, buf, expr_cursor);
                                 if (unlikely(!OK(status)))
                                     return status;
-                                if (!bass::seek_record(store, bass::dict::get(type_dict, element::field::rhs), rhs_cursor))
+                                if (!bass::seek_record(store, DICTV(type_dict, element::field::rhs), rhs_cursor))
                                     return status_t::rhs_not_found;
                                 if (rhs_cursor.header->type != element::header::list)
                                     return status_t::rhs_not_found;
@@ -559,18 +547,18 @@ namespace basecode::cxx::serializer {
                 at_indent(s, buf, "case ");
                 cursor_t expr_cursor{};
                 cursor_t branch_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, ":");
-                bass::seek_record(store, bass::dict::get(dict, element::field::tbranch), branch_cursor);
+                bass::seek_record(store, DICTV(dict, element::field::tbranch), branch_cursor);
                 status = process_expr(s, buf, branch_cursor);
                 break;
             }
             case statement_type_t::goto_: {
                 at_indent(s, buf, "goto ");
                 cursor_t expr_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, ";");
@@ -586,18 +574,18 @@ namespace basecode::cxx::serializer {
                 at_indent(s, buf, "while (");
                 cursor_t expr_cursor{};
                 cursor_t branch_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, ") ");
-                if (bass::seek_record(store, bass::dict::get(dict, element::field::tbranch), branch_cursor))
+                if (bass::seek_record(store, DICTV(dict, element::field::tbranch), branch_cursor))
                     status = process_expr(s, buf, branch_cursor);
                 break;
             }
             case statement_type_t::using_: {
                 at_indent(s, buf, "using ");
                 cursor_t expr_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, ";");
@@ -607,7 +595,7 @@ namespace basecode::cxx::serializer {
             case statement_type_t::return_: {
                 at_indent(s, buf, "return ");
                 cursor_t expr_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, ";");
@@ -623,18 +611,18 @@ namespace basecode::cxx::serializer {
                 at_indent(s, buf, "switch (");
                 cursor_t expr_cursor{};
                 cursor_t branch_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, ") ");
-                if (bass::seek_record(store, bass::dict::get(dict, element::field::tbranch), branch_cursor))
+                if (bass::seek_record(store, DICTV(dict, element::field::tbranch), branch_cursor))
                     status = process_expr(s, buf, branch_cursor);
                 break;
             }
             case statement_type_t::default_: {
                 at_indent(s, buf, "default: ");
                 cursor_t branch_cursor{};
-                if (bass::seek_record(store, bass::dict::get(dict, element::field::tbranch), branch_cursor))
+                if (bass::seek_record(store, DICTV(dict, element::field::tbranch), branch_cursor))
                     status = process_expr(s, buf, branch_cursor);
                 break;
             }
@@ -651,7 +639,7 @@ namespace basecode::cxx::serializer {
             case statement_type_t::using_ns_:{
                 at_indent(s, buf, "using namespace ");
                 cursor_t expr_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, ";");
@@ -665,17 +653,17 @@ namespace basecode::cxx::serializer {
             }
             case statement_type_t::definition: {
                 cursor_t expr_cursor{};
-                if (!bass::seek_record(store, bass::dict::get(dict, element::field::lhs), expr_cursor))
+                if (!bass::seek_record(store, DICTV(dict, element::field::lhs), expr_cursor))
                     return status_t::lhs_not_found;
                 const auto type_dict  = bass::dict::make(expr_cursor);
-                const auto type_flags = bass::dict::get(type_dict, element::field::type);
+                const auto type_flags = DICTV(type_dict, element::field::type);
                 auto       meta_type  = (meta_type_t) BASE_TYPE(type_flags);
                 switch (meta_type) {
                     case meta_type_t::function: {
                         cursor_t lhs_cursor{};
                         cursor_t rhs_cursor{};
                         cursor_t branch_cursor{};
-                        if (!bass::seek_record(store, bass::dict::get(type_dict, element::field::lhs), lhs_cursor))
+                        if (!bass::seek_record(store, DICTV(type_dict, element::field::lhs), lhs_cursor))
                             return status_t::lhs_not_found;
                         status = process_expr(s, buf, lhs_cursor);
                         if (unlikely(!OK(status)))
@@ -684,18 +672,18 @@ namespace basecode::cxx::serializer {
                         status = process_expr(s, buf, expr_cursor);
                         if (unlikely(!OK(status)))
                             return status;
-                        if (!bass::seek_record(store, bass::dict::get(type_dict, element::field::rhs), rhs_cursor))
+                        if (!bass::seek_record(store, DICTV(type_dict, element::field::rhs), rhs_cursor))
                             return status_t::rhs_not_found;
                         at_indent(s, buf, "(");
                         status = process_list(s, buf, rhs_cursor);
                         at_indent(s, buf, ") ");
-                        bass::seek_record(store, bass::dict::get(type_dict, element::field::tbranch), branch_cursor);
+                        bass::seek_record(store, DICTV(type_dict, element::field::tbranch), branch_cursor);
                         status = process_expr(s, buf, branch_cursor);
                         break;
                     }
                     case meta_type_t::aggregate: {
-                        const auto flags = bass::dict::get(type_dict, element::field::lhs);
-                        auto agg_type = (aggregate_type_t) SUB_TYPE(type_flags);
+                        const auto flags     = DICTV(type_dict, element::field::lhs);
+                        auto       agg_type  = (aggregate_type_t) SUB_TYPE(type_flags);
                         const auto agg_token = s_aggregate_type_tokens[(u32) agg_type];
                         at_indent(s, buf, "{} ", agg_token);
                         status = process_expr(s, buf, expr_cursor);
@@ -703,7 +691,7 @@ namespace basecode::cxx::serializer {
                             return status;
                         if ((flags & aggregate::final_) == aggregate::final_)
                             at_indent(s, buf, " final ");
-                        const auto inheritance_list_id = bass::dict::get(type_dict, element::field::rhs);
+                        const auto inheritance_list_id = DICTV(type_dict, element::field::rhs);
                         if (inheritance_list_id) {
                             cursor_t list_cursor{};
                             bass::seek_record(store, inheritance_list_id, list_cursor);
@@ -711,7 +699,7 @@ namespace basecode::cxx::serializer {
                             if (unlikely(!OK(status)))
                                 return status;
                         }
-                        auto block_id = bass::dict::get(dict, element::field::tbranch);
+                        auto block_id = DICTV(dict, element::field::tbranch);
                         if (block_id) {
                             cursor_t block_cursor{};
                             if (!bass::seek_record(store, block_id, block_cursor))
@@ -727,13 +715,13 @@ namespace basecode::cxx::serializer {
                 break;
             }
             case statement_type_t::line_comment: {
-                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
                 at_indent(s, buf, "//{}", interned.slice);
                 newline(s, buf);
                 break;
             }
             case statement_type_t::block_comment: {
-                auto interned = intern::get(intern, bass::dict::get(dict, element::field::intern));
+                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
                 at_indent(s, buf, "/*{}*/", interned.slice);
                 break;
             }
@@ -809,16 +797,16 @@ namespace basecode::cxx::serializer {
         auto& store = *s.store;
         cursor_t cursor{};
         if (!bass::seek_record(store, id, cursor)) return status_t::element_not_found;
-        auto dict = bass::dict::make(cursor);
-        auto filename_lit = bass::dict::get(dict, element::field::lit);
-        auto revision = (revision_t) bass::dict::get(dict, element::field::revision);
+        auto dict         = bass::dict::make(cursor);
+        auto filename_lit = DICTV(dict, element::field::lit);
+        auto revision     = (revision_t) DICTV(dict, element::field::revision);
         str::slice_t filename = "(module)"_ss;
         if (filename_lit) {
             cursor_t lit_cursor{};
             if (!bass::seek_record(store, filename_lit, lit_cursor))
                 return status_t::intern_not_found;
             auto lit_dict = bass::dict::make(lit_cursor);
-            auto interned = intern::get(*s.intern, bass::dict::get(lit_dict, element::field::intern));
+            auto interned = intern::get(*s.intern, DICTV(lit_dict, element::field::intern));
             if (unlikely(!OK(interned.status)))
                 return status_t::intern_not_found;
             filename = interned.slice;
@@ -833,14 +821,15 @@ namespace basecode::cxx::serializer {
     }
 
     u0 free(serializer_t& s) {
-        str::free(s.scratch);
-        auto pairs = symtab::pairs(s.modules);
-        for (auto& pair : pairs) {
-            str::free(pair.key);
-            str::free(*pair.value);
-        }
+        for (u32 i = 0; i < 2; ++i)
+            str::free(s.scratch[i]);
+        assoc_array_t<str_t*> pairs{};
+        assoc_array::init(pairs, s.alloc);
+        symtab::find_prefix(s.modules, pairs);
+        for (u32 i = 0; i < pairs.size; ++i)
+            str::free(*pairs[i].value);
         symtab::free(s.modules);
-        array::free(pairs);
+        assoc_array::free(pairs);
     }
 
     status_t serialize(serializer_t& s) {
@@ -869,105 +858,83 @@ namespace basecode::cxx::serializer {
         s.intern    = &pgm.intern;
         s.tab_width = tab_width;
         symtab::init(s.modules, s.alloc);
-        str::init(s.scratch, s.alloc);
-        str::reserve(s.scratch, 32);
+        for (u32 i = 0; i < 2; ++i) {
+            str::init(s.scratch[i], s.alloc);
+            str::reserve(s.scratch[i], 32);
+        }
+    }
+
+    static u0 apply_type_suffix(meta_type_t meta_type, u8* suffix, s32& suffix_len) {
+        if      (meta_type == meta_type_t::pointer)     suffix[suffix_len++] = '*';
+        else if (meta_type == meta_type_t::reference)   suffix[suffix_len++] = '&';
     }
 
     status_t expand_type(bass_t& storage, intern_t& intern, u32 type_id, type_info_t& type_info) {
-        u8 suffix[8];
-        s32 suffix_len{};
-
-        type_info.meta_type = meta_type_t::none;
-        type_info.size_type = integral_size_t::zero;
-        type_info.size = 0;
-        str::reset(*type_info.name);
-
         cursor_t type_cursor{};
         if (!bass::seek_record(storage, type_id, type_cursor))
             return status_t::element_not_found;
 
-        for (;;) {
-            const auto type_dict  = bass::dict::make(type_cursor);
-            const auto type_field = bass::dict::get(type_dict, element::field::type);
-            const auto meta_type  = (meta_type_t) BASE_TYPE(type_field);
-            const auto size_type  = (integral_size_t) SUB_TYPE(type_field);
-            switch (meta_type) {
-                case meta_type_t::array: {
-                    if (!bass::seek_record(storage, bass::dict::get(type_dict, element::field::lhs), type_cursor))
-                        return status_t::element_not_found;
-                    type_info.size_type = size_type;
-                    type_info.meta_type = meta_type;
-                    type_info.size = bass::dict::get(type_dict, element::field::rhs);
-                    break;
-                }
-                case meta_type_t::aggregate: {
-                    type_info.size_type = size_type;
-                    type_info.meta_type = meta_type;
-                    type_info.size = bass::dict::get(type_dict, element::field::rhs);
-                    // N.B fallthrough intentional
-                }
-                case meta_type_t::void_:
-                case meta_type_t::alias:
-                case meta_type_t::boolean:
-                case meta_type_t::signed_integer:
-                case meta_type_t::floating_point:
-                case meta_type_t::unsigned_integer: {
-                    if (type_info.meta_type == meta_type_t::none) {
-                        type_info.meta_type = meta_type;
-                        type_info.size_type = size_type;
-                        type_info.size = program::integral_size_in_bytes(size_type);
-                    }
-                    cursor_t ident_cursor{};
-                    if (!bass::seek_record(storage, bass::dict::get(type_dict, element::field::ident), ident_cursor))
-                        return status_t::element_not_found;
-                    u32 intern_id{};
-                    if (!bass::next_field(ident_cursor, intern_id, element::field::intern))
-                        return status_t::intern_not_found;
-                    auto interned = intern::get(intern, intern_id);
-                    str::append(*type_info.name, interned.slice);
-                    if (suffix_len > 0) {
-                        str::append(*type_info.name, suffix, suffix_len);
-                        suffix_len = {};
-                    }
-                    return status_t::ok;
-                }
-                case meta_type_t::pointer: {
-                    if (!bass::seek_record(storage, bass::dict::get(type_dict, element::field::lhs), type_cursor))
-                        return status_t::element_not_found;
-                    suffix[suffix_len++] = '*';
-                    type_info.size_type = size_type;
-                    type_info.meta_type = meta_type;
-                    type_info.size = program::integral_size_in_bytes(size_type);
-                    break;
-                }
-                case meta_type_t::function: {
-                    type_info.size_type = size_type;
-                    type_info.meta_type = meta_type;
-                    type_info.size = program::integral_size_in_bytes(size_type);
-                    // XXX: finish
-                    break;
-                }
-                case meta_type_t::bit_mask: {
-                    if (!bass::seek_record(storage, bass::dict::get(type_dict, element::field::lhs), type_cursor))
-                        return status_t::element_not_found;
-                    type_info.size_type = integral_size_t::byte;
-                    type_info.meta_type = meta_type;
-                    type_info.size = SUB_TYPE(type_field);
-                    break;
-                }
-                case meta_type_t::reference: {
-                    if (!bass::seek_record(storage, bass::dict::get(type_dict, element::field::lhs), type_cursor))
-                        return status_t::element_not_found;
-                    suffix[suffix_len++] = '&';
-                    type_info.size_type = size_type;
-                    type_info.meta_type = meta_type;
-                    type_info.size = program::integral_size_in_bytes(size_type);
-                    break;
-                }
-                default: return status_t::invalid_meta_type;
-            }
+        u8 suffix[8];
+        s32 suffix_len{};
+
+        auto type_dict  = bass::dict::make(type_cursor);
+        auto lhs_id     = DICTV(type_dict, element::field::lhs);
+        auto type_field = DICTV(type_dict, element::field::type);
+        auto meta_type  = (meta_type_t) BASE_TYPE(type_field);
+
+        if (meta_type == meta_type_t::bit_mask) {
+            str::append(*type_info.var_suffix, format::format(":{}", SUB_TYPE(type_field)));
         }
 
-        return status_t::element_not_found;
+        str::reset(*type_info.name);
+        str::reset(*type_info.var_suffix);
+        apply_type_suffix(meta_type, suffix, suffix_len);
+        while (lhs_id) {
+            if (!bass::seek_record(storage, lhs_id, type_cursor))
+                return status_t::element_not_found;
+            type_dict  = bass::dict::make(type_cursor);
+            lhs_id     = DICTV(type_dict, element::field::lhs);
+            type_field = DICTV(type_dict, element::field::type);
+            meta_type  = (meta_type_t) BASE_TYPE(type_field);
+            apply_type_suffix(meta_type, suffix, suffix_len);
+        }
+
+        switch (meta_type) {
+            case meta_type_t::void_:
+            case meta_type_t::alias:
+            case meta_type_t::array:
+            case meta_type_t::boolean:
+            case meta_type_t::function:
+            case meta_type_t::aggregate:
+            case meta_type_t::signed_integer:
+            case meta_type_t::floating_point:
+            case meta_type_t::unsigned_integer: {
+                cursor_t ident_cursor{};
+                u32 intern_id{};
+                u32 ident_id = DICTV(type_dict, element::field::ident);
+                if (!bass::seek_record(storage, ident_id, ident_cursor))
+                    return status_t::element_not_found;
+                if (!bass::next_field(ident_cursor, intern_id, element::field::intern))
+                    return status_t::intern_not_found;
+                auto interned = intern::get(intern, intern_id);
+                str::append(*type_info.name, interned.slice);
+                if (suffix_len > 0) {
+                    str::append(*type_info.name, suffix, suffix_len);
+                    suffix_len = {};
+                }
+                if (meta_type == meta_type_t::array) {
+                    auto size_field = DICTV(type_dict, element::field::rhs);
+                    if (size_field > 0) {
+                        str::append(*type_info.var_suffix, format::format("[{}]", size_field));
+                    } else {
+                        str::append(*type_info.var_suffix, "[]");
+                    }
+                }
+                break;
+            }
+            default: return status_t::invalid_meta_type;
+        }
+
+        return status_t::ok;
     }
 }

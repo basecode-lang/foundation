@@ -102,10 +102,6 @@ namespace basecode::ffi {
         return s_status_names[(u32) status];
     }
 
-    symbol_array_t lib::syms(const lib_t* lib) {
-        return symtab::pairs(lib->symbols);
-    }
-
     proto_t* proto::find(str::slice_t symbol) {
         auto pair = hashtab::find(g_ffi_system.proto_map, symbol);
         return pair ? pair->proto : nullptr;
@@ -179,6 +175,10 @@ namespace basecode::ffi {
                 break;
         }
         return status_t::ok;
+    }
+
+    u0 lib::syms(const lib_t* lib, symbol_array_t& syms) {
+        return symtab::find_prefix(lib->symbols, syms);
     }
 
     status_t init(ffi_t& ffi, u32 heap_size, alloc_t* alloc) {

@@ -20,6 +20,7 @@
 
 #include <basecode/core/array.h>
 
+#define DICTV(d, k)             ((d).values[(k)])
 #define RECORD_BYTE_SIZE(n)     ((n) * sizeof(field_t))
 #define RECORD_FIELD_COUNT(n)   (((n) / sizeof(field_t)) - 1)
 

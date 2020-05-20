@@ -22,6 +22,7 @@
 #include <basecode/core/intern.h>
 #include <basecode/core/format.h>
 #include <basecode/core/profiler.h>
+#include <basecode/core/str_array.h>
 #include <basecode/core/stopwatch.h>
 
 using namespace basecode;
@@ -56,35 +57,39 @@ TEST_CASE("basecode::intern simple") {
 TEST_CASE("basecode::intern") {
     constexpr auto expected_intern_count = 200;
 
-    const auto allocated_before = context::top()->alloc->total_allocated;
-
     intern_t pool{};
     intern::init(pool);
     defer(intern::free(pool));
+    intern::reserve(pool, expected_intern_count * 65, expected_intern_count);
 
     array_t<intern::result_t> interned_list{};
     array::init(interned_list);
     array::reserve(interned_list, expected_intern_count);
     defer(array::free(interned_list));
 
-    defer({
-        const auto memory_used = context::top()->alloc->total_allocated - allocated_before;
-        format::print("memory_used = {}\n", memory_used);
-    });
+    str_array_t strings{};
+    str_array::init(strings);
+    str_array::reserve_index(strings, expected_intern_count);
+    str_array::reserve_data(strings, expected_intern_count * 65);
 
-    str_t str[expected_intern_count];
+    str_t temp{};
+    str::init(temp);
+    str::reserve(temp, 64);
+    defer(str::free(temp); str_array::free(strings));
+
     for (u32 i = 0; i < expected_intern_count; ++i) {
-        str::init(str[i], context::top()->alloc);
-        str::reserve(str[i], 64);
-        str::append(str[i], "aaaaaAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBCCCCCCC");
-        str[i] = str[i] + str::random(2);
+        str::append(temp, "aaaaaAAAAAAAAAAAAAAAAAABBBBBBBBBBBBBBBBBCCCCCCC");
+        str::random(temp, 2);
+        str_array::append(strings, temp);
+        str::reset(temp);
     }
 
+    const auto allocated_before = context::top()->alloc->total_allocated;
     stopwatch_t intern_time{};
     stopwatch::start(intern_time);
 
     for (u32 i = 0; i < expected_intern_count; ++i) {
-        auto r = intern::intern(pool, slice::make(str[i]));
+        auto r = intern::intern(pool, strings[i]);
         REQUIRE(r.status == intern::status_t::ok);
         REQUIRE(r.slice.data);
         REQUIRE(r.slice.length > 0);
@@ -93,6 +98,8 @@ TEST_CASE("basecode::intern") {
 
     stopwatch::stop(intern_time);
     stopwatch::print_elapsed("total intern time"_ss, 40, stopwatch::elapsed(intern_time));
+    const auto memory_used = context::top()->alloc->total_allocated - allocated_before;
+    format::print("memory_used = {}\n", memory_used);
 
     REQUIRE(interned_list.size == expected_intern_count);
 

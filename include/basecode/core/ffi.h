@@ -30,7 +30,7 @@ namespace basecode {
         symtab_t<u0*>           symbols;
         str::slice_t            path;
     };
-    using symbol_array_t        = array_t<symtab_pair_t<u0*>>;
+    using symbol_array_t        = assoc_array_t<u0*>;
 
     enum class call_mode_t : u8 {
         system                  = 1,
@@ -115,9 +115,9 @@ namespace basecode {
         namespace lib {
             status_t unload(lib_t* lib);
 
-            symbol_array_t syms(const lib_t* lib);
-
             status_t load(const path_t& path, lib_t** lib);
+
+            u0 syms(const lib_t* lib, symbol_array_t& syms);
 
             status_t symaddr(lib_t* lib, str::slice_t name, u0** address);
         }

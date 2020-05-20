@@ -24,15 +24,9 @@
 #include <basecode/core/defer.h>
 #include <basecode/core/format.h>
 #include <basecode/core/memory.h>
-#include <basecode/core/stable_array.h>
+#include <basecode/core/assoc_array.h>
 
 namespace basecode {
-    template <typename V, typename B=std::remove_pointer_t<V>>
-    struct symtab_pair_t final {
-        str_t                           key;
-        B*                              value;
-    };
-
     constexpr u8 empty = 0b00;
     constexpr u8 used  = 0b01;
     constexpr u8 leaf  = 0b10;
@@ -74,7 +68,7 @@ namespace basecode {
         template <typename V> b8 insert_key(symtab_t<V>& symtab, str::slice_t key, symtab_node_t** leaf_node);
         template <typename V> u32 append_node(symtab_t<V>& symtab, u8 sym = 0, u32 next = 0, u32 child = 0, u8 type = empty);
         template <typename V> b8 has_children(const symtab_t<V>& symtab, const symtab_node_t* node, const symtab_node_t* end_node = {});
-        template <typename V> u0 walk(const symtab_t<V>& symtab, const symtab_node_t* node, str_t& key, array_t<symtab_pair_t<V>>& keys);
+        template <typename V, typename B=std::remove_pointer_t<V>> u0 walk(const symtab_t<V>& symtab, const symtab_node_t* node, str_t& key, assoc_array_t<B*>& pairs);
 
         template <typename V> u0 free(symtab_t<V>& symtab) {
             clear(symtab);
@@ -321,25 +315,6 @@ namespace basecode {
             return node->type != leaf;
         }
 
-        template <typename V> array_t<symtab_pair_t<V>> pairs(const symtab_t<V>& symtab, str::slice_t prefix = {}) {
-            array_t<symtab_pair_t<V>> pairs{};
-            array::init(pairs, symtab.alloc);
-            str_t key{};
-            str::init(key, symtab.alloc);
-            str::reserve(key, 32);
-            defer(str::free(key));
-            if (!slice::empty(prefix)) {
-                auto node = find_node(symtab, prefix);
-                if (node) {
-                    str::append(key, prefix);
-                    walk(symtab, node, key, pairs);
-                }
-            } else {
-                walk(symtab, get_node(symtab, 1), key, pairs);
-            }
-            return pairs;
-        }
-
         template <typename V> b8 has_children(const symtab_t<V>& symtab, const symtab_node_t* node, const symtab_node_t* end_node) {
             while (true) {
                 if (node->type == leaf) return true;
@@ -356,18 +331,15 @@ namespace basecode {
             }
         }
 
-        template <typename V> u0 walk(const symtab_t<V>& symtab, const symtab_node_t* node, str_t& key, array_t<symtab_pair_t<V>>& pairs) {
+        template <typename V, typename B> u0 walk(const symtab_t<V>& symtab, const symtab_node_t* node, str_t& key, assoc_array_t<B*>& pairs) {
             while (true) {
                 str::append(key, node->sym);
                 if (node->type == leaf) {
-                    symtab_pair_t<V> pair{};
-                    pair.key = key;
                     if constexpr (std::is_pointer_v<V>) {
-                        pair.value = const_cast<V>(symtab.values[node->value - 1]);
+                        assoc_array::append(pairs, key, (B*) symtab.values[node->value - 1]);
                     } else {
-                        pair.value = const_cast<V*>(&symtab.values[node->value - 1]);
+                        assoc_array::append(pairs, key, (B*) &symtab.values[node->value - 1]);
                     }
-                    array::append(pairs, pair);
                 }
                 if (node->child) {
                     auto child_node = get_node(symtab, node->child);
@@ -377,6 +349,22 @@ namespace basecode {
                 if (!node->next)
                     break;
                 node = get_node(symtab, node->next);
+            }
+        }
+
+        template <typename V, typename B=std::remove_pointer_t<V>> u0 find_prefix(const symtab_t<V>& symtab, assoc_array_t<B*>& pairs, str::slice_t prefix = {}) {
+            str_t key{};
+            str::init(key, symtab.alloc);
+            str::reserve(key, 32);
+            defer(str::free(key));
+            if (!slice::empty(prefix)) {
+                auto node = find_node(symtab, prefix);
+                if (node) {
+                    str::append(key, prefix);
+                    walk(symtab, node, key, pairs);
+                }
+            } else {
+                walk(symtab, get_node(symtab, 1), key, pairs);
             }
         }
     }

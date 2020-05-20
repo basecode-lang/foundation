@@ -17,19 +17,36 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
-#include <basecode/core/str.h>
-#include <basecode/core/error.h>
+#include <basecode/core/defer.h>
 #include <basecode/core/format.h>
+#include <basecode/core/str_array.h>
+#include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
-TEST_CASE("string::slice_t formatting") {
-    format::print("{:<20}", "test with alignment\n"_ss);
+TEST_CASE("basecode::str_array basics") {
+    str_array_t array{};
+    str_array::init(array);
+    defer(str_array::free(array));
 
-    buf_t buf{};
-    buf::init(buf);
-    buf::free(buf);
+    str_t temp{};
+    str::init(temp);
+    str::reserve(temp, 32);
+    defer(str::free(temp));
 
-    auto cursor = buf::cursor::make(buf);
-    error::print(stdout, cursor, "test: {}", 10);
+    stopwatch_t time{};
+    stopwatch::start(time);
+
+    for (u32 i = 0; i < 100; ++i) {
+        str::random(temp, 32);
+        str_array::append(array, temp);
+        str::reset(temp);
+    }
+
+    stopwatch::stop(time);
+    stopwatch::print_elapsed("str_array: append"_ss, 40, stopwatch::elapsed(time));
+    //format::print("{}\n", array);
+
+    REQUIRE(array.size == 100);
+    REQUIRE(array.buf.size == (100 * 33));
 }

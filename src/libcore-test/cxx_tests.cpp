@@ -295,13 +295,12 @@ TEST_CASE("basecode::cxx example program") {
         stopwatch::stop(serialize_time);
         stopwatch::print_elapsed("total serialize time"_ss, 40, stopwatch::elapsed(serialize_time));
 
-        auto modules = symtab::pairs(s.modules);
-        defer(
-            for (auto& pair : modules) {
-                str::free(pair.key);
-            }
-            array::free(modules));
-        for (auto& module : modules) {
+        assoc_array_t<str_t*> modules{};
+        assoc_array::init(modules);
+        defer(assoc_array::free(modules));
+        symtab::find_prefix(s.modules, modules);
+        for (u32 i = 0; i < modules.size; ++i) {
+            auto module = modules[i];
             format::print("{:<40} {} bytes\n", module.key, module.value->length);
             format::print("{}\n", *module.value);
         }
