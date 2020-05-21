@@ -20,8 +20,15 @@
 
 #include <basecode/core/path.h>
 
-#define CURSOR(b)   (b.data[b.idx])
-#define PEEK(b, c)  (b.data[b.idx + c])
+#define CRSR_POS(c)      (c.pos)
+#define CRSR_MARK(c)     SAFE_SCOPE(c.mark = c.pos;)
+#define CRSR_MARKLEN(c)  (c.pos - c.mark)
+#define CRSR_MORE(c)     (c.pos < c.buf->length)
+#define CRSR_NEXT(c)     SAFE_SCOPE(c.pos++; c.column++;)
+#define CRSR_PREV(c)     SAFE_SCOPE(c.pos--; c.column--;)
+#define CRSR_READ(c)     (c.buf->data[c.pos])
+#define CRSR_PEEK(c, n)  (c.buf->data[c.pos + n])
+#define CRSR_NEWLINE(c)  SAFE_SCOPE(c.line++; c.column=0;)
 
 namespace basecode {
     struct buf_t final {
@@ -33,7 +40,8 @@ namespace basecode {
 
     struct buf_cursor_t final {
         buf_t*                  buf;
-        u32                     idx;
+        u32                     pos;
+        u32                     mark;
         u32                     line;
         u32                     column;
     };

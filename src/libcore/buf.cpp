@@ -28,16 +28,16 @@ namespace basecode::buf {
         }
 
         b8 has_more(buf_cursor_t& cursor) {
-            return cursor.idx < cursor.buf->length;
+            return cursor.pos < cursor.buf->length;
         }
 
         u0 prev_char(buf_cursor_t& cursor) {
-            cursor.idx--;
+            cursor.pos--;
             cursor.column--;
         }
 
         u0 next_char(buf_cursor_t& cursor) {
-            cursor.idx++;
+            cursor.pos++;
             cursor.column++;
         }
 
@@ -47,8 +47,9 @@ namespace basecode::buf {
         }
 
         u0 init(buf_cursor_t& cursor, buf_t& buf) {
-            cursor.buf = &buf;
-            cursor.idx = cursor.line = cursor.column = {};
+            cursor.buf  = &buf;
+            cursor.pos  = cursor.mark   = {};
+            cursor.line = cursor.column = {};
         }
     }
 
