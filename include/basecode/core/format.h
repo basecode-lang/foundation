@@ -29,12 +29,25 @@ namespace basecode {
     };
 
     class str_buf_t : public fmt::internal::buffer<s8> {
-        str_t*                                                  _str;
-    public: explicit str_buf_t(str_t* str) : _str(str)          { set((s8*) _str->data, str->capacity); }
-        str_buf_t(str_buf_t&& other) FMT_NOEXCEPT               { _str->operator=(*other._str);                   }
-        ~str_buf_t()                                            { _str->length = size();                          }
-        str_buf_t& operator=(str_buf_t&& other) FMT_NOEXCEPT    { _str->operator=(*other._str); return *this;     }
-    protected: u0 grow(usize capacity) FMT_OVERRIDE             { str::grow(*_str, capacity);                  }
+        str_t*      _str;
+    public: explicit str_buf_t(str_t* str) : _str(str) {
+            set((s8*) _str->data, str->capacity);
+        }
+        str_buf_t(str_buf_t&& other) FMT_NOEXCEPT {
+            _str->operator=(*other._str);
+        }
+        ~str_buf_t() {
+            _str->length = size();
+        }
+        str_buf_t& operator=(str_buf_t&& other) FMT_NOEXCEPT {
+            _str->operator=(*other._str);
+            return *this;
+        }
+    protected:
+        u0 grow(usize capacity) FMT_OVERRIDE {
+            str::grow(*_str, capacity);
+            set((s8*) _str->data, _str->capacity);
+        }
     };
 
     namespace format {

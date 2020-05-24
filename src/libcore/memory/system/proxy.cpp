@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/str_array.h>
 #include <basecode/core/stable_array.h>
 #include <basecode/core/memory/system/proxy.h>
 
@@ -63,8 +64,10 @@ namespace basecode::memory::proxy {
 
     struct system_t final {
         alloc_t*                        alloc;
-        proxy_map_t                     proxies;
-        stable_array_t<proxy_pair_t>    proxy_pairs;
+        proxy_symtab_t                  proxies;
+        str_array_t                     names;
+        stable_array_t<proxy_pair_t>    pairs;
+        u16                             count;
     };
 
     alloc_system_t                      g_alloc_system{
@@ -79,90 +82,86 @@ namespace basecode::memory::proxy {
     thread_local system_t               t_proxy_system{};
 
     u0 fini() {
-        for (auto pair : t_proxy_system.proxy_pairs)
+        for (auto pair : t_proxy_system.pairs)
             system::free(pair->alloc);
         symtab::free(t_proxy_system.proxies);
-        stable_array::free(t_proxy_system.proxy_pairs);
+        str_array::free(t_proxy_system.names);
+        stable_array::free(t_proxy_system.pairs);
+        t_proxy_system.count = {};
     }
 
     u0 reset(b8 enforce) {
-        for (auto pair : t_proxy_system.proxy_pairs)
+        for (auto pair : t_proxy_system.pairs)
             system::free(pair->alloc, enforce);
         symtab::reset(t_proxy_system.proxies);
-        stable_array::reset(t_proxy_system.proxy_pairs);
-    }
-
-    proxy_list_t active() {
-        proxy_list_t list{};
-        array::init(list, t_proxy_system.alloc);
-        array::reserve(list, t_proxy_system.proxy_pairs.size);
-        for (auto pair : t_proxy_system.proxy_pairs)
-            array::append(list, pair);
-        return list;
+        str_array::reset(t_proxy_system.names);
+        stable_array::reset(t_proxy_system.pairs);
+        t_proxy_system.count = {};
     }
 
     alloc_system_t* system() {
         return &g_alloc_system;
     }
 
+    u0 active(proxy_array_t& list) {
+        array::reserve(list, t_proxy_system.pairs.size);
+        for (auto pair : t_proxy_system.pairs)
+            array::append(list, pair);
+    }
+
     str::slice_t name(alloc_t* alloc) {
         assert(alloc && alloc->system->type == alloc_type_t::proxy);
-        const auto pair = alloc->subclass.proxy.pair;
-        return slice::make(pair->name, pair->length);
+        return t_proxy_system.names[alloc->subclass.proxy.pair->name_id - 1];
     }
 
     u0 free(alloc_t* proxy, b8 enforce) {
-        // XXX: need to erase the proxy_pair_t entry in the stable_array. use
-        //      the proxy_pair_t::id for index to stable_array::erase call.
-
-        // XXX: the api supports mutating the name on the proxy_pair_t. if we do
-        //      this though, the symtab won't be able to find it again.  i'm not
-        //      sure if changing the name makes any sense.
+        assert(proxy && proxy->system->type == alloc_type_t::proxy);
         if (symtab::remove(t_proxy_system.proxies, proxy::name(proxy))) {
+            stable_array::erase(t_proxy_system.pairs, proxy->subclass.proxy.pair->id - 1);
+            str_array::erase(t_proxy_system.names, proxy->subclass.proxy.pair->name_id - 1);
             system::free(proxy, enforce);
-            // XXX: need to add remove to intern pool which removes the entry
-            //      from the internal hashtable *and* makes the block of memory
-            //      for the byte data available again.  need a free list inside
-            //      of the intern pool to do this.
         }
     }
 
     status_t init(alloc_t* alloc) {
+        t_proxy_system.count = {};
         t_proxy_system.alloc = alloc;
         symtab::init(t_proxy_system.proxies, alloc);
-        stable_array::init(t_proxy_system.proxy_pairs, alloc);
+        str_array::init(t_proxy_system.names, alloc);
+        stable_array::init(t_proxy_system.pairs, alloc);
         return status_t::ok;
     }
 
-    u0 name(alloc_t* alloc, str::slice_t name) {
-        assert(alloc && alloc->system->type == alloc_type_t::proxy);
-        auto       pair = alloc->subclass.proxy.pair;
-        const auto len  = std::min<u32>(max_proxy_name_len - 1, name.length);
-        std::memcpy(pair->name, name.data, len);
-        pair->name[len] = '\0';
-        pair->length = len;
+    alloc_t* find(str::slice_t name) {
+        proxy_pair_t* pair{};
+        return symtab::find(t_proxy_system.proxies, name, pair) ? pair->alloc : nullptr;
     }
 
     alloc_t* make(alloc_t* backing, str::slice_t name, b8 owner) {
-        proxy_pair_t* pair{};
-        if (symtab::find(t_proxy_system.proxies, name, pair))
-            return pair->alloc;
+        t_proxy_system.count++;
+
+        str_t temp_name{};
+        str::init(temp_name, t_proxy_system.alloc);
+        str::reserve(temp_name, name.length + 12);
+        defer(str::free(temp_name));
+        {
+            str_buf_t buf(&temp_name);
+            format::format_to(buf, "[proxy:{:04x}] {}", t_proxy_system.count, name);
+        }
+
+        str_array::append(t_proxy_system.names, temp_name);
+        auto unique_name = t_proxy_system.names[t_proxy_system.names.size - 1];
 
         proxy_config_t config{};
         config.owner   = owner;
         config.backing = backing;
         auto proxy = system::make(alloc_type_t::proxy, &config);
-
-        const auto len = std::min<u32>(max_proxy_name_len - 1, name.length);
-        auto new_pair = &stable_array::append(t_proxy_system.proxy_pairs);
-        if (!symtab::insert(t_proxy_system.proxies, name, new_pair)) {
+        auto new_pair = &stable_array::append(t_proxy_system.pairs);
+        if (!symtab::insert(t_proxy_system.proxies, unique_name, new_pair))
             return nullptr;
-        }
-        new_pair->alloc = proxy;
-        new_pair->id = t_proxy_system.proxy_pairs.size;
-        std::memcpy(new_pair->name, name.data, len);
-        new_pair->name[len] = '\0';
-        new_pair->length           = name.length;
+        new_pair->alloc            = proxy;
+        new_pair->name_id          = t_proxy_system.names.size;
+        new_pair->id               = t_proxy_system.pairs.size;
         proxy->subclass.proxy.pair = new_pair;
 
         return proxy;

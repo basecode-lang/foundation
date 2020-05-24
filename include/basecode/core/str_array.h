@@ -54,6 +54,8 @@ namespace basecode {
 
         b8 empty(const str_array_t& array);
 
+        u0 erase(str_array_t& array, u32 index);
+
         u0 append(str_array_t& array, const s8* str);
 
         u0 reserve_data(str_array_t& array, u32 new_capacity);

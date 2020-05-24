@@ -28,17 +28,15 @@ namespace basecode {
         b8                      owner;
     };
 
-    constexpr u32 max_proxy_name_len = 55;
     struct proxy_pair_t final {
         alloc_t*                alloc;
+        u32                     name_id;
         u32                     id;
-        u8                      name[max_proxy_name_len];
-        u8                      length;
     };
 
     namespace memory::proxy {
-        using proxy_map_t   = symtab_t<proxy_pair_t*>;
-        using proxy_list_t  = array_t<proxy_pair_t*>;
+        using proxy_array_t     = array_t<proxy_pair_t*>;
+        using proxy_symtab_t    = symtab_t<proxy_pair_t*>;
 
         enum class status_t : u8 {
             ok,
@@ -46,17 +44,17 @@ namespace basecode {
 
         u0 fini();
 
-        proxy_list_t active();
-
         alloc_system_t* system();
 
         u0 reset(b8 enforce = true);
 
+        u0 active(proxy_array_t& list);
+
+        alloc_t* find(str::slice_t name);
+
         str::slice_t name(alloc_t* alloc);
 
         u0 free(alloc_t* proxy, b8 enforce = true);
-
-        u0 name(alloc_t* alloc, str::slice_t name);
 
         status_t init(alloc_t* alloc = context::top()->alloc);
 

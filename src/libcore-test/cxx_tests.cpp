@@ -306,10 +306,12 @@ TEST_CASE("basecode::cxx example program") {
         }
     }
 
-    auto proxies = memory::proxy::active();
+    memory::proxy::proxy_array_t proxies{};
+    array::init(proxies);
     defer(array::free(proxies));
+    memory::proxy::active(proxies);
     for (auto proxy : proxies) {
-        format::print(stderr, "{:<32} {:>10}\n", proxy->name, proxy->alloc->total_allocated);
+        format::print(stderr, "{:<32} {:>10}\n", memory::proxy::name(proxy->alloc), proxy->alloc->total_allocated);
     }
 
     REQUIRE(OK(status));

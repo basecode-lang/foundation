@@ -50,6 +50,12 @@ namespace basecode::str_array {
         array.buf.size += length;
     }
 
+    // XXX: need to implement
+    u0 erase(str_array_t& array, u32 index) {
+        UNUSED(array);
+        UNUSED(index);
+    }
+
     u0 init(str_array_t& array, alloc_t* alloc) {
         array.alloc    = alloc;
         array.index    = {};
