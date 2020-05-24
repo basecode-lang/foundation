@@ -23,9 +23,9 @@
 
 namespace basecode {
     namespace error {
-        template<typename ...Args> inline u0 print(FILE* file, buf_cursor_t& cursor, fmt::string_view fmt_msg, Args&& ... args) {
-            const auto msg = format::format(cursor.buf->alloc, fmt_msg, std::forward<Args>(args)...);
-            format::print(cursor.buf->alloc, file, "error({}:{}): {}\n", cursor.line + 1, cursor.column + 1, msg);
+        template<typename ...Args> inline u0 print(FILE* file, const buf_t& buf, u32 line, u32 col, fmt::string_view fmt_msg, Args&& ... args) {
+            const auto msg = format::format(buf.alloc, fmt_msg, std::forward<Args>(args)...);
+            format::print(buf.alloc, file, "error({}:{}): {}\n", line, col, msg);
         }
     }
 }

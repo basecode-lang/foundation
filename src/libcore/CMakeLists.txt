@@ -124,6 +124,7 @@ set(
         timer.cpp ${INC_DIR}/timer.h
 )
 add_library(${PROJECT_NAME} ${SOURCES})
+set_source_files_properties(buf.cpp PROPERTIES COMPILE_FLAGS "-march=native")
 target_link_libraries(
         ${PROJECT_NAME}
 

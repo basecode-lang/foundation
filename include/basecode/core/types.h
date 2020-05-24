@@ -58,6 +58,7 @@
 #define OK(x)                   (0 == (u32) x)
 #define SAFE_SCOPE(x)           do { x } while (false)
 #define ZERO_MEM(x, s)          std::memset((x), 0, sizeof((s)))
+#define HAS_ZERO(v)             (((v)-UINT64_C(0x0101010101010101)) & ~(v)&UINT64_C(0x8080808080808080))
 
 namespace basecode {
     using u0    = void;

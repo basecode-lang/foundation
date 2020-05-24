@@ -16,40 +16,23 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/defer.h>
+#include <emmintrin.h>
+#include <smmintrin.h>
 #include <basecode/core/buf.h>
+#include <basecode/core/defer.h>
+#include <basecode/core/format.h>
 
 namespace basecode::buf {
     namespace cursor {
-        buf_cursor_t make(buf_t& buf) {
-            buf_cursor_t cursor{};
-            init(cursor, buf);
-            return cursor;
+        buf_crsr_t make(buf_t& buf) {
+            buf_crsr_t crsr{};
+            init(crsr, buf);
+            return crsr;
         }
 
-        b8 has_more(buf_cursor_t& cursor) {
-            return cursor.pos < cursor.buf->length;
-        }
-
-        u0 prev_char(buf_cursor_t& cursor) {
-            cursor.pos--;
-            cursor.column--;
-        }
-
-        u0 next_char(buf_cursor_t& cursor) {
-            cursor.pos++;
-            cursor.column++;
-        }
-
-        u0 next_line(buf_cursor_t& cursor) {
-            cursor.line++;
-            cursor.column = 0;
-        }
-
-        u0 init(buf_cursor_t& cursor, buf_t& buf) {
-            cursor.buf  = &buf;
-            cursor.pos  = cursor.mark   = {};
-            cursor.line = cursor.column = {};
+        u0 init(buf_crsr_t& crsr, buf_t& buf) {
+            crsr.buf = &buf;
+            crsr.pos = {};
         }
     }
 
@@ -59,6 +42,7 @@ namespace basecode::buf {
     }
 
     u0 free(buf_t& buf) {
+        array::free(buf.lines);
         memory::free(buf.alloc, buf.data);
         buf.data = {};
         buf.length = buf.capacity = {};
@@ -66,6 +50,33 @@ namespace basecode::buf {
 
     u0 reset(buf_t& buf) {
         buf.length = {};
+    }
+
+    u0 index(buf_t& buf) {
+        array::reset(buf.lines);
+        array::reserve(buf.lines, (buf.length / 80) * 3);
+        const __m128i   newline = _mm_set1_epi8('\n');
+        __m128i x,      xnewline;
+        buf_line_t*     line;
+        u64             start_pos{}, i{};
+        u32             mask, k, c, ffs;
+        for (; i < buf.length; i += 16) {
+            x        = _mm_loadu_si128((const __m128i*) (buf.data + i));
+            xnewline = _mm_cmpeq_epi8(x, newline);
+            mask     = _mm_movemask_epi8(xnewline);
+            if (mask > 0) {
+                c = _mm_popcnt_u32(mask);
+                while (c-- > 0) {
+                    ffs  = __builtin_ffs(mask) - 1;
+                    mask &= ~(u32(1) << ffs);
+                    k    = i + ffs;
+                    line = &array::append(buf.lines);
+                    line->pos = start_pos;
+                    line->len = k - start_pos;
+                    start_pos = k + 1;
+                }
+            }
+        }
     }
 
     buf_t make(alloc_t* alloc) {
@@ -78,6 +89,7 @@ namespace basecode::buf {
         buf.data   = {};
         buf.alloc  = alloc;
         buf.length = buf.capacity = {};
+        array::init(buf.lines, buf.alloc);
     }
 
     u0 reserve(buf_t& buf, u32 new_capacity) {
@@ -92,7 +104,8 @@ namespace basecode::buf {
             return;
 
         new_capacity = std::max(buf.length, new_capacity);
-        buf.data = (u8*) memory::realloc(buf.alloc, buf.data, new_capacity);
+        new_capacity = new_capacity + (-new_capacity & 15);
+        buf.data = (u8*) memory::realloc(buf.alloc, buf.data, new_capacity, 16);
         buf.capacity = new_capacity;
     }
 

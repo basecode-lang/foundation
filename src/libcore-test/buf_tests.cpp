@@ -17,18 +17,33 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
-#include <basecode/core/str.h>
 #include <basecode/core/error.h>
+#include <basecode/core/defer.h>
 #include <basecode/core/format.h>
+#include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
-TEST_CASE("string::slice_t formatting") {
-    format::print("{:<20}", "test with alignment\n"_ss);
+TEST_CASE("basecode::buf basics") {
+    auto path = "../etc/instructions.ig"_path;
+    auto buf = buf::make();
+    REQUIRE(OK(buf::load(buf, path)));
+    defer({
+            buf::free(buf);
+            path::free(path);
+          });
 
-    buf_t buf{};
-    buf::init(buf);
-    buf::free(buf);
+    stopwatch_t time{};
+    stopwatch::start(time);
 
-    error::print(stdout, buf, 1, 1, "test: {}", 10);
+    buf::index(buf);
+
+    stopwatch::stop(time);
+    stopwatch::print_elapsed("index buf"_ss, 40, stopwatch::elapsed(time));
+
+//    u32 lineno{};
+//    for (const auto& line : buf.lines) {
+//        format::print("{:04}: {}\n", ++lineno, slice::make(buf.data + line.pos, line.len));
+//    }
+    format::print("indexed lines: {}\n", buf.lines.size);
 }

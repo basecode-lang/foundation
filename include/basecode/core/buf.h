@@ -21,29 +21,27 @@
 #include <basecode/core/path.h>
 
 #define CRSR_POS(c)      (c.pos)
-#define CRSR_MARK(c)     SAFE_SCOPE(c.mark = c.pos;)
-#define CRSR_MARKLEN(c)  (c.pos - c.mark)
-#define CRSR_MORE(c)     (c.pos < c.buf->length)
-#define CRSR_NEXT(c)     SAFE_SCOPE(c.pos++; c.column++;)
-#define CRSR_PREV(c)     SAFE_SCOPE(c.pos--; c.column--;)
+#define CRSR_NEXT(c)     (c.pos++)
 #define CRSR_READ(c)     (c.buf->data[c.pos])
-#define CRSR_PEEK(c, n)  (c.buf->data[c.pos + n])
-#define CRSR_NEWLINE(c)  SAFE_SCOPE(c.line++; c.column=0;)
+#define CRSR_MORE(c)     (c.pos < c.buf->length)
 
 namespace basecode {
+    struct buf_line_t final {
+        u32                     pos;
+        u32                     len;
+    };
+
     struct buf_t final {
         alloc_t*                alloc;
         u8*                     data;
+        array_t<buf_line_t>     lines;
         u32                     length;
         u32                     capacity;
     };
 
-    struct buf_cursor_t final {
+    struct buf_crsr_t final {
         buf_t*                  buf;
         u32                     pos;
-        u32                     mark;
-        u32                     line;
-        u32                     column;
     };
 
     namespace buf {
@@ -53,22 +51,16 @@ namespace basecode {
         };
 
         namespace cursor {
-            buf_cursor_t make(buf_t& buf);
+            buf_crsr_t make(buf_t& buf);
 
-            b8 has_more(buf_cursor_t& cursor);
-
-            u0 prev_char(buf_cursor_t& cursor);
-
-            u0 next_char(buf_cursor_t& cursor);
-
-            u0 next_line(buf_cursor_t& cursor);
-
-            u0 init(buf_cursor_t& cursor, buf_t& buf);
+            u0 init(buf_crsr_t& crsr, buf_t& buf);
         }
 
         u0 free(buf_t& buf);
 
         u0 reset(buf_t& buf);
+
+        u0 index(buf_t& buf);
 
         u0 reserve(buf_t& buf, u32 new_capacity);
 

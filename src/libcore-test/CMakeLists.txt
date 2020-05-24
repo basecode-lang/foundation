@@ -9,6 +9,7 @@ add_executable(
         ffi_tests.cpp
         cxx_tests.cpp
         set_tests.cpp
+        buf_tests.cpp
         path_tests.cpp
         list_tests.cpp
         array_tests.cpp
