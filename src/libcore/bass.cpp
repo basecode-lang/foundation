@@ -101,6 +101,10 @@ namespace basecode {
             cursor.offset = cursor.start_offset;
         }
 
+        u32 reserve_record(bass_t& storage) {
+            return storage.id++;
+        }
+
         b8 seek_first(bass_t& storage, cursor_t& cursor) {
             return seek_record(storage, 1, cursor);
         }
@@ -148,14 +152,27 @@ namespace basecode {
             storage.bump_alloc        = memory::system::make(alloc_type_t::bump, &bump_config);
         }
 
-        b8 new_record(cursor_t& cursor, u8 type, u32 num_fields) {
+        b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor) {
+            if (id == 0 || id > storage.index.size)
+                return false;
+            const auto& index = storage.index[id - 1];
+            cursor.id         = id;
+            cursor.page       = index.page;
+            cursor.storage    = &storage;
+            cursor.offset     = cursor.start_offset = index.offset;
+            cursor.header     = (field_t*) (cursor.page + cursor.offset);
+            cursor.end_offset = cursor.offset + cursor.header->value;
+            return cursor.header && cursor.header->kind == kind::header;
+        }
+
+        b8 new_record(cursor_t& cursor, u8 type, u32 num_fields, u32 id) {
             const u32 record_size = RECORD_BYTE_SIZE(num_fields + 2);
             memory::alloc(cursor.storage->bump_alloc, record_size, alignof(field_t));
             cursor.page = (u8*) memory::bump::buf(cursor.storage->bump_alloc);
             std::memset(cursor.page + cursor.offset, 0, record_size);
 
             cursor.field         = {};
-            cursor.id            = cursor.storage->id++;
+            cursor.id            = id != 0 ? id : cursor.storage->id++;
             cursor.end_offset    = cursor.offset + record_size;
             cursor.header        = (field_t*) (cursor.page + cursor.offset);
             cursor.header->type  = type;
@@ -173,19 +190,6 @@ namespace basecode {
             if (!next_field(cursor, value))
                 return false;
             return write_field(cursor, field::id, cursor.id);
-        }
-
-        b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor) {
-            if (id == 0 || id > storage.index.size)
-                return false;
-            const auto& index = storage.index[id - 1];
-            cursor.id         = id;
-            cursor.page       = index.page;
-            cursor.storage    = &storage;
-            cursor.offset     = cursor.start_offset = index.offset;
-            cursor.header     = (field_t*) (cursor.page + cursor.offset);
-            cursor.end_offset = cursor.offset + cursor.header->value;
-            return cursor.header && cursor.header->kind == kind::header;
         }
 
         b8 format_record(bass_t& ast, fmt_buf_t& buf, u32 id, format_record_callback_t record_cb, u0* ctx) {

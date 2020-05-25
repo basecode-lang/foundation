@@ -97,6 +97,8 @@ namespace basecode {
 
         u0 reset_cursor(cursor_t& cursor);
 
+        u32 reserve_record(bass_t& storage);
+
         b8 seek_first(bass_t& storage, cursor_t& cursor);
 
         b8 seek_current(bass_t& storage, cursor_t& cursor);
@@ -105,9 +107,9 @@ namespace basecode {
 
         b8 next_field(cursor_t& cursor, u32& value, u8 type = 0);
 
-        b8 new_record(cursor_t& cursor, u8 type, u32 num_fields);
-
         b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor);
+
+        b8 new_record(cursor_t& cursor, u8 type, u32 num_fields, u32 id = {});
 
         u0 init(bass_t& storage, alloc_t* alloc = context::top()->alloc, u8 num_pages = 16);
 
