@@ -156,6 +156,7 @@ namespace basecode {
             if (id == 0 || id > storage.index.size)
                 return false;
             const auto& index = storage.index[id - 1];
+            if (!index.page) return false;
             cursor.id         = id;
             cursor.page       = index.page;
             cursor.storage    = &storage;
@@ -179,10 +180,10 @@ namespace basecode {
             cursor.header->value = record_size;
             cursor.header->kind  = kind::header;
 
-            if (cursor.storage->index.capacity < cursor.id)
-                array::grow(cursor.storage->index);
             ++cursor.storage->index.size;
-            auto& index = cursor.storage->index[cursor.id - 1];
+            if (cursor.storage->index.capacity <= cursor.id)
+                array::grow(cursor.storage->index);
+            auto& index  = cursor.storage->index[cursor.id - 1];
             index.page   = cursor.page;
             index.offset = cursor.offset;
 
