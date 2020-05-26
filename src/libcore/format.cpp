@@ -19,10 +19,11 @@
 #include <basecode/core/format.h>
 
 namespace basecode::format {
-    u0 hex_dump(fmt_buf_t& buf, const u0* data, u32 size) {
+    u0 hex_dump(fmt_buf_t& buf, const u0* data, u32 size, b8 show_address) {
         const u8* bytes = (const u8*) data;
         for (u32 i = 0; i < size; i += 16) {
-            format::format_to(buf, "${:016x}:{:08x}: ", (u64) (bytes + i), i);
+            if (show_address)
+                format::format_to(buf, "${:016x}:{:08x}: ", (u64) (bytes + i), i);
             for (u32 j = 0; j < 16; j++) {
                 if (i + j < size)
                     format::format_to(buf, "{:02x} ", bytes[i + j]);

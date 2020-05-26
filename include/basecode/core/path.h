@@ -39,13 +39,18 @@ namespace basecode {
             no_parent_path,
             unexpected_empty_path,
             expected_relative_path,
+            unexpected_empty_extension,
         };
 
         u0 free(path_t& path);
 
+        u0 tokenize(path_t& path);
+
         b8 empty(const path_t& path);
 
         u16 length(const path_t& path);
+
+        str::slice_t stem(const path_t& path);
 
         str::slice_t status_name(status_t status);
 
@@ -57,15 +62,41 @@ namespace basecode {
 
         status_t set(path_t& path, const s8* value);
 
-        status_t set(path_t& path, str::slice_t value);
-
-        status_t set(path_t& path, const str_t& value);
-
         status_t append(path_t& lhs, const path_t& rhs);
 
         status_t parent_path(const path_t& path, path_t& new_path);
 
-        status_t init(path_t& path, str::slice_t value = {}, alloc_t* alloc = context::top()->alloc);
+        status_t set(path_t& path, const String_Concept auto& value) {
+            if (value.length > PATH_MAX)    return status_t::path_too_long;
+            str::reset(path.str);
+            str::append(path.str, value);
+            tokenize(path);
+            return status_t::ok;
+        }
+
+        status_t replace_extension(path_t& path, const String_Concept auto& ext) {
+            if (ext.length == 0)    return status_t::unexpected_empty_extension;
+            b8 ext_has_dot = ext[0] == '.';
+            if (!path.ext_mark) {
+                if (!ext_has_dot)   str::append(path.str, ".");
+                str::append(path.str, ext);
+            } else {
+                if (path.ext_mark + ext.length > PATH_MAX)  return status_t::path_too_long;
+                if (path.ext_mark + ext.length > path.str.capacity)
+                    str::reserve(path.str, path.ext_mark + ext.length);
+                std::memcpy(path.str.data + path.ext_mark + 1, ext.data + ext_has_dot, ext.length - ext_has_dot);
+                const auto diff = s32(ext.length - (path.str.length - path.ext_mark));
+                path.str.length += diff;
+            }
+            tokenize(path);
+            return status_t::ok;
+        }
+
+        status_t init(path_t& path, const String_Concept auto& value, alloc_t* alloc = context::top()->alloc) {
+            str::init(path.str, alloc);
+            array::init(path.marks, alloc);
+            return set(path, value);
+        }
     }
 
     namespace slice {

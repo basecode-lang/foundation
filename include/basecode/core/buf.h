@@ -31,10 +31,16 @@ namespace basecode {
         u32                     len;
     };
 
+    struct buf_token_t final {
+        u32                     pos;
+        u32                     len;
+    };
+
     struct buf_t final {
         alloc_t*                alloc;
         u8*                     data;
         array_t<buf_line_t>     lines;
+        array_t<buf_token_t>    tokens;
         u32                     length;
         u32                     capacity;
     };
@@ -63,6 +69,8 @@ namespace basecode {
         u0 index(buf_t& buf);
 
         u0 reserve(buf_t& buf, u32 new_capacity);
+
+        status_t load(buf_t& buf, const str_t& value);
 
         status_t load(buf_t& buf, const path_t& path);
 

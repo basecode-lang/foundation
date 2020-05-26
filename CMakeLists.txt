@@ -8,7 +8,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# common commands in a shorter form
+set(MKDIR COMMAND ${CMAKE_COMMAND} -E make_directory)
+set(CPR   COMMAND ${CMAKE_COMMAND} -E copy_directory)
+set(LN    COMMAND ${CMAKE_COMMAND} -E create_symlink)
 
 find_program(CCACHE_FOUND ccache)
 if(CCACHE_FOUND)
@@ -108,3 +114,4 @@ set(PROJECT_DIR_BASE    ${PROJECT_SOURCE_DIR})
 
 add_subdirectory(src/libcore)
 add_subdirectory(src/libcore-test)
+add_subdirectory(src/scm)

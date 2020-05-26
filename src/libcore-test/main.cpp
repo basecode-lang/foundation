@@ -20,6 +20,7 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/log.h>
 #include <basecode/core/ffi.h>
+#include <basecode/core/scm.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/memory.h>
 #include <basecode/core/filesys.h>
@@ -79,11 +80,13 @@ s32 main(s32 argc, const s8** argv) {
     if (!OK(ffi::system::init()))       return 1;
     if (!OK(filesys::init()))           return 1;
     if (!OK(network::system::init()))   return 1;
+    if (!OK(scm::system::init()))       return 1;
 
     auto rc = Catch::Session().run(argc, argv);
 
     log::notice("shutdown test program");
 
+    scm::system::fini();
     network::system::fini();
     filesys::fini();
     ffi::system::fini();

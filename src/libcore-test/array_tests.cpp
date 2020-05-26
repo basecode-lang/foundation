@@ -100,6 +100,10 @@ TEST_CASE("array_t reserve space; fill") {
 
     for (s32 i = 0; i < 4096; i++)
         REQUIRE(numbers[i] == 4095 - i);
+
+    for (s32 i = 4095; i > 2048; i--) {
+        REQUIRE(array::contains(numbers, i) == 4095 - i);
+    }
 }
 
 TEST_CASE("basecode::array initializer list") {

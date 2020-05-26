@@ -29,8 +29,35 @@ TEST_CASE("basecode::buf basics") {
     auto buf = buf::make();
     REQUIRE(OK(buf::load(buf, path)));
     defer({
-            buf::free(buf);
-            path::free(path);
+              buf::free(buf);
+              path::free(path);
+          });
+
+    stopwatch_t time{};
+    stopwatch::start(time);
+
+    buf::index(buf);
+
+    stopwatch::stop(time);
+    stopwatch::print_elapsed("index buf"_ss, 40, stopwatch::elapsed(time));
+
+//    u32 lineno{};
+//    for (const auto& line : buf.lines) {
+//        format::print("{:04}: {}\n", ++lineno, slice::make(buf.data + line.pos, line.len));
+//    }
+    format::print("indexed lines: {}\n", buf.lines.size);
+}
+
+TEST_CASE("basecode::buf extended indexing") {
+    str_t src{};
+    str::init(src);
+    str::append(src, "foo(x=22, y='some string') {\r\n}\r\n");
+
+    auto buf = buf::make();
+    REQUIRE(OK(buf::load(buf, src)));
+    defer({
+              buf::free(buf);
+              str::free(src);
           });
 
     stopwatch_t time{};

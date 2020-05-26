@@ -27,7 +27,6 @@ using namespace basecode;
 TEST_CASE("basecode::path basics") {
     const auto expected_path = "/Users/jeff/ut.txt"_ss;
 
-    format::print("{}\n", sizeof(path_t));
     stopwatch_t time{};
     stopwatch::start(time);
 
@@ -50,6 +49,61 @@ TEST_CASE("basecode::path basics") {
     stopwatch::stop(time);
     stopwatch::print_elapsed("path basic operations"_ss, 40, stopwatch::elapsed(time));
 }
+
+TEST_CASE("basecode::path only a file name") {
+    const auto expected_ext  = ".txt"_ss;
+    const auto expected_stem = "ut"_ss;
+    const auto expected_path = "ut.txt"_ss;
+
+    stopwatch_t time{};
+    stopwatch::start(time);
+
+    path_t path{};
+    path::init(path, expected_path);
+    defer(path::free(path));
+
+    REQUIRE(path::length(path) == expected_path.length);
+    REQUIRE(!path.is_abs);
+    REQUIRE(path.ext_mark);
+    REQUIRE(!path.is_root);
+    REQUIRE(!path::empty(path));
+    REQUIRE(path::stem(path) == expected_stem);
+    REQUIRE(path::extension(path) == expected_ext);
+    REQUIRE(path::filename(path) == expected_path);
+
+    stopwatch::stop(time);
+    stopwatch::print_elapsed("path only a file name"_ss, 40, stopwatch::elapsed(time));
+}
+
+TEST_CASE("basecode::path change extension") {
+    const auto expected_ext     = ".txt"_ss;
+    const auto expected_stem    = "ut"_ss;
+    const auto expected_path    = "ut.txt"_ss;
+    const auto new_expected_ext = ".text"_ss;
+
+    stopwatch_t time{};
+    stopwatch::start(time);
+
+    path_t path{};
+    path::init(path, expected_path);
+    defer(path::free(path));
+
+    REQUIRE(path::length(path) == expected_path.length);
+    REQUIRE(!path.is_abs);
+    REQUIRE(path.ext_mark);
+    REQUIRE(!path.is_root);
+    REQUIRE(!path::empty(path));
+    REQUIRE(path::stem(path) == expected_stem);
+    REQUIRE(path::extension(path) == expected_ext);
+    REQUIRE(path::filename(path) == expected_path);
+
+    REQUIRE(OK(path::replace_extension(path, new_expected_ext)));
+    REQUIRE(path::extension(path) == new_expected_ext);
+
+    stopwatch::stop(time);
+    stopwatch::print_elapsed("path change extension"_ss, 40, stopwatch::elapsed(time));
+}
+
 
 TEST_CASE("basecode::path append") {
     const auto expected_base_path = "/Users/jeff"_ss;

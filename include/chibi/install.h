@@ -1,0 +1,5 @@
+#define sexp_so_extension ".dylib"
+#define sexp_default_module_path "../share/chibi:../lib"
+#define sexp_platform "macosx"
+#define sexp_version "0.8.0"
+#define sexp_release_name "oxygen"

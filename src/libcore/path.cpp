@@ -25,9 +25,10 @@ namespace basecode::path {
         "no parent path"_ss,
         "unexpected empty path"_ss,
         "expected relative path"_ss,
+        "expected empty extension"_ss,
     };
 
-    static u0 tokenize(path_t& path) {
+    u0 tokenize(path_t& path) {
         array::reset(path.marks);
         path.ext_mark = path.is_abs = path.is_root = {};
         if (path.str.length == 0) return;
@@ -39,7 +40,7 @@ namespace basecode::path {
                 last_ext_mark = i;
             }
         }
-        if (!array::empty(path.marks) && last_ext_mark > *array::back(path.marks)) {
+        if (array::empty(path.marks) || last_ext_mark > *array::back(path.marks)) {
             path.ext_mark = last_ext_mark;
         }
         path.is_abs   = path.str[0] == '/';
@@ -60,20 +61,26 @@ namespace basecode::path {
         return path.str.length;
     }
 
+    str::slice_t stem(const path_t& path) {
+        if (empty(path)) return {};
+        const auto last_idx = path.marks.size > 0 ? (*array::back(path.marks)) + 1 : 0;
+        return str::slice_t{.data = path.str.data + last_idx, .length = u32(path.ext_mark ? path.ext_mark - last_idx : path.str.length)};
+    }
+
     str::slice_t status_name(status_t status) {
         return s_status_names[(u32) status];
     }
 
     str::slice_t filename(const path_t& path) {
         if (empty(path)) return {};
-        const auto last_idx = *array::back(path.marks);
-        return str::slice_t{.data = path.str.data + last_idx + 1, .length = u32(path.str.length - last_idx - 1)};
+        const auto last_idx = path.marks.size > 0 ? (*array::back(path.marks)) + 1 : 0;
+        return str::slice_t{.data = path.str.data + last_idx, .length = u32(path.str.length - last_idx)};
     }
 
     str::slice_t directory(const path_t& path) {
         if (empty(path)) return {};
-        const auto last_idx = *array::back(path.marks);
-        return str::slice_t{.data = path.str.data, .length = last_idx};
+        const auto last_idx = path.marks.size > 0 ? *array::back(path.marks) : 0;
+        return str::slice_t{.data = path.str.data, .length = u32(last_idx)};
     }
 
     str::slice_t extension(const path_t& path) {
@@ -83,18 +90,6 @@ namespace basecode::path {
 
     status_t set(path_t& path, const s8* value) {
         return set(path, str::slice_t{.data = (const u8*) value, .length = u32(strlen(value))});
-    }
-
-    status_t set(path_t& path, str::slice_t value) {
-        if (value.length > PATH_MAX) return status_t::path_too_long;
-        str::reset(path.str);
-        str::append(path.str, value);
-        tokenize(path);
-        return status_t::ok;
-    }
-
-    status_t set(path_t& path, const str_t& value) {
-        return set(path, slice::make(value));
     }
 
     status_t append(path_t& lhs, const path_t& rhs) {
@@ -112,21 +107,14 @@ namespace basecode::path {
     status_t parent_path(const path_t& path, path_t& new_path) {
         if (empty(path))                                        return status_t::unexpected_empty_path;
         if (path.str.length == 1 || array::empty(path.marks))   return status_t::no_parent_path;
+        const u16 len = std::max<u16>(*array::back(path.marks), 1);
         if (&path != &new_path) {
             str::reset(new_path.str);
-            str::append(new_path.str, path.str);
+            str::append(new_path.str, path.str.data, len);
         } else {
-            const u16 len = std::max<u16>(*array::back(path.marks), 1);
             str::resize(new_path.str, len);
         }
         tokenize(new_path);
-        return status_t::ok;
-    }
-
-    status_t init(path_t& path, str::slice_t value, alloc_t* alloc) {
-        str::init(path.str, alloc);
-        array::init(path.marks, alloc);
-        set(path, value);
         return status_t::ok;
     }
 }

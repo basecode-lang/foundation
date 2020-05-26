@@ -16,8 +16,6 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <emmintrin.h>
-#include <smmintrin.h>
 #include <basecode/core/buf.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/format.h>
@@ -43,6 +41,7 @@ namespace basecode::buf {
 
     u0 free(buf_t& buf) {
         array::free(buf.lines);
+        array::free(buf.tokens);
         memory::free(buf.alloc, buf.data);
         buf.data = {};
         buf.length = buf.capacity = {};
@@ -52,29 +51,42 @@ namespace basecode::buf {
         buf.length = {};
     }
 
+
     u0 index(buf_t& buf) {
+        const __m128i cr = _mm_set1_epi8('\r');
+        const __m128i lf = _mm_set1_epi8('\n');
+
+        m128i_bytes_t dqw;
+        buf_line_t* line;
+        u32 start_pos{};
+        u32 end_pos;
+        u32 mask;
+        u32 i{};
+
         array::reset(buf.lines);
         array::reserve(buf.lines, (buf.length / 80) * 3);
-        const __m128i   newline = _mm_set1_epi8('\n');
-        __m128i x,      xnewline;
-        buf_line_t*     line;
-        u64             start_pos{}, i{};
-        u32             mask, k, c, ffs;
-        for (; i < buf.length; i += 16) {
-            x        = _mm_loadu_si128((const __m128i*) (buf.data + i));
-            xnewline = _mm_cmpeq_epi8(x, newline);
-            mask     = _mm_movemask_epi8(xnewline);
-            if (mask > 0) {
-                c = _mm_popcnt_u32(mask);
-                while (c-- > 0) {
-                    ffs  = __builtin_ffs(mask) - 1;
-                    mask &= ~(u32(1) << ffs);
-                    k    = i + ffs;
-                    line = &array::append(buf.lines);
-                    line->pos = start_pos;
-                    line->len = k - start_pos;
-                    start_pos = k + 1;
+
+        while (i < buf.length) {
+            dqw.value = _mm_loadu_si128((const __m128i*) (buf.data + i));
+            mask = _mm_movemask_epi8(_mm_or_si128(_mm_cmpeq_epi8(dqw.value, cr), _mm_cmpeq_epi8(dqw.value, lf)));
+            if (!mask) {
+                i += 16;
+            } else {
+                while (mask) {
+                    u32 bit = __builtin_ffs(mask) - 1;
+                    end_pos = i + bit;
+                    mask &= ~(u32(1) << bit);
+                    if (dqw.bytes[bit] == '\r') {
+                        dqw.bytes[bit] = ' ';
+                    } else {
+                        line = &array::append(buf.lines);
+                        line->pos = start_pos;
+                        line->len = end_pos - start_pos;
+                    }
+                    start_pos = end_pos + 1;
                 }
+                _mm_storeu_si128((__m128i*) (buf.data + i), dqw.value);
+                i = start_pos;
             }
         }
     }
@@ -90,6 +102,7 @@ namespace basecode::buf {
         buf.alloc  = alloc;
         buf.length = buf.capacity = {};
         array::init(buf.lines, buf.alloc);
+        array::init(buf.tokens, buf.alloc);
     }
 
     u0 reserve(buf_t& buf, u32 new_capacity) {
@@ -107,6 +120,15 @@ namespace basecode::buf {
         new_capacity = new_capacity + (-new_capacity & 15);
         buf.data = (u8*) memory::realloc(buf.alloc, buf.data, new_capacity, 16);
         buf.capacity = new_capacity;
+    }
+
+    status_t load(buf_t& buf, const str_t& value) {
+        auto file = ::fmemopen(value.data, value.length, "r");
+        if (!file)
+            return status_t::unable_to_open_file;
+        defer(::fclose(file));
+        write(buf, 0, file, value.length);
+        return status_t::ok;
     }
 
     status_t load(buf_t& buf, const path_t& path) {

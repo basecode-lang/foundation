@@ -20,7 +20,6 @@
 #include <basecode/core/context.h>
 
 namespace basecode::context {
-
     static constexpr u32        stack_size = 512;
 
     thread_local u32            t_index = stack_size;

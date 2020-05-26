@@ -34,6 +34,8 @@
 
 namespace basecode {
     template<typename T> struct slice_t final {
+        using is_static     = std::integral_constant<b8, true>;
+
         const T*            data;
         u32                 length;
 

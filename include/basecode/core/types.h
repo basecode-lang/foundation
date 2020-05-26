@@ -21,6 +21,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <sys/types.h>
+#include <x86intrin.h>
 
 #if defined(__GNUC__)
 #   define force_inline inline __attribute__((always_inline, unused))
@@ -51,6 +52,7 @@
 #   endif
 #endif
 
+#define ALIGNED16               __attribute__((aligned(16)))
 #define UNIQUE_NAME_1(x, y)     x##y
 #define UNIQUE_NAME_2(x, y)     UNIQUE_NAME_1(x, y)
 #define UNIQUE_NAME(x)    _     UNIQUE_NAME_2(x, __COUNTER__)
@@ -78,32 +80,100 @@ namespace basecode {
     using usize = std::size_t;
     using ssize = ssize_t;
 
-    template <typename From, typename To>
-    concept convertible_to =
-        std::is_convertible_v<From, To> &&
-        requires(std::add_rvalue_reference_t<From> (&f)()) {
-            static_cast<To>(f());
-        };
+    struct alloc_t;
 
-    template <typename T, typename U>
-    concept same_helper = std::is_same_v<T, U>;
+    union u16_bytes_t final {
+        u16             value;
+        u8              bytes[2];
+    };
 
-    template <typename T, typename U>
-    concept same_as = same_helper<T, U> && same_helper<U, T>;
+    union u32_bytes_t final {
+        u32             value;
+        u8              bytes[4];
+    };
+
+    union u64_bytes_t final {
+        u64             value;
+        u8              bytes[8];
+    };
+
+    union m128i_bytes_t final {
+        __m128i         value;
+        u8              bytes[16];
+    };
+
+    template <typename From, typename To> concept convertible_to = std::is_convertible_v<From, To> && requires(std::add_rvalue_reference_t<From> (&f)()) {
+        static_cast<To>(f());
+    };
+
+    template <typename T, typename U> concept same_helper = std::is_same_v<T, U>;
+
+    template <typename T, typename U> concept same_as = same_helper<T, U> && same_helper<U, T>;
 
     template <typename T> concept Slice_Concept = requires(const T& t) {
-        {t.data}    -> same_as<const u8*>;
-        {t.length}  -> same_as<u32>;
+        typename        T::is_static;
+        {t.data}        -> same_as<const u8*>;
+        {t.length}      -> same_as<u32>;
     };
 
-    template <typename T> concept String_Concept  = Slice_Concept<T> || requires(const T& t) {
-        {t.data}    -> same_as<u8*>;
-        {t.length}  -> same_as<u32>;
+    template <typename T> concept Static_Stack_Concept = requires(const T& t) {
+        typename        T::is_static;
+        typename        T::value_type;
+        {t.data}        -> same_as<typename T::value_type*>;
+        {t.size}        -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
     };
 
-    template <typename T> concept Integer_Concept = std::is_integral_v<T>;
+    template <typename T> concept Dynamic_Stack_Concept = requires(const T& t) {
+        typename        T::is_static;
+        typename        T::value_type;
+        {t.alloc}       -> same_as<alloc_t*>;
+        {t.data}        -> same_as<typename T::value_type*>;
+        {t.size}        -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
 
-    template <typename T> concept Radix_Concept   = Integer_Concept<T> && requires(T radix) {
+    template <typename T> concept Static_Array_Concept = requires(const T& t) {
+        typename        T::is_static;
+        typename        T::value_type;
+        {t.data}        -> same_as<typename T::value_type*>;
+        {t.size}        -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
+
+    template <typename T> concept Dynamic_Array_Concept = requires(const T& t) {
+        typename        T::is_static;
+        typename        T::value_type;
+        {t.alloc}       -> same_as<alloc_t*>;
+        {t.data}        -> same_as<typename T::value_type*>;
+        {t.size}        -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
+
+    template <typename T> concept Static_String_Concept  = requires(const T& t) {
+        typename        T::is_static;
+        {t.data}        -> same_as<u8*>;
+        {t.length}      -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
+
+    template <typename T> concept Dynamic_String_Concept  = requires(const T& t) {
+        typename        T::is_static;
+        {t.alloc}       -> same_as<alloc_t*>;
+        {t.data}        -> same_as<u8*>;
+        {t.length}      -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
+
+    template <typename T> concept Stack_Concept     = Static_Stack_Concept<T> || Dynamic_Stack_Concept<T>;
+
+    template <typename T> concept String_Concept    = Slice_Concept<T> || Static_String_Concept<T> || Dynamic_String_Concept<T>;
+
+    template <typename T> concept Array_Concept     = Static_Array_Concept<T> || Dynamic_Array_Concept<T>;
+
+    template <typename T> concept Integer_Concept   = std::is_integral_v<T>;
+
+    template <typename T> concept Radix_Concept     = Integer_Concept<T> && requires(T radix) {
         radix == 2 || radix == 8 || radix == 10 || radix == 16;
     };
 }

@@ -31,75 +31,27 @@ namespace basecode {
     struct str_t;
 
     namespace str {
-        u0 free(str_t& str);
-
-        u0 trim(str_t& str);
-
-        u0 clear(str_t& str);
-
-        u0 ltrim(str_t& str);
-
-        u0 rtrim(str_t& str);
-
-        u0 reset(str_t& str);
-
-        u0 upper(str_t& str);
-
-        u0 lower(str_t& str);
-
-        u8& back(str_t& str);
-
-        u0 shrink(str_t& str);
-
-        b8 empty(const str_t& str);
-
-        const s8* c_str(str_t& str);
-
-        u0 append(str_t& str, u8 value);
-
-        u0 random(str_t& str, u32 length);
-
-        u0 resize(str_t& str, u32 new_size);
-
-        u0 trunc(str_t& str, u32 new_length);
-
-        u0 append(str_t& str, slice_t value);
-
-        u0 grow(str_t&, u32 min_capacity = 8);
-
-        b8 erase(str_t& str, u32 pos, u32 len);
-
-        u0 insert(str_t& str, u32 pos, u8 value);
-
-        u0 reserve(str_t& str, u32 new_capacity);
-
-        u0 append(str_t& str, const str_t& value);
-
-        u0 set_capacity(str_t& str, u32 new_capacity);
-
-        u0 insert(str_t& str, u32 pos, slice_t value);
-
-        u0 insert(str_t& str, u32 pos, const str_t& value);
+        u0 free(String_Concept auto& str);
 
         str_t make(alloc_t* alloc = context::top()->alloc);
 
-        u0 insert(str_t& str, u32, const u8*, s32 len = -1);
+        u0 grow(Dynamic_String_Concept auto&, u32 min_capacity = 8);
 
-        u0 append(str_t& str, const u8* value, s32 len = -1);
+        u0 append(String_Concept auto& str, String_Concept auto& value);
 
-        u0 append(str_t& str, const s8* value, s32 len = -1);
-
-        u0 init(str_t& str, alloc_t* alloc = context::top()->alloc);
+        u0 init(String_Concept auto& str, alloc_t* alloc = context::top()->alloc);
     }
 
     struct str_t final {
+        using is_static         = std::integral_constant<b8, false>;
+
         alloc_t*                alloc{};
         u8*                     data{};
         u32                     length{};
         u32                     capacity{};
 
         str_t() = default;
-        ~str_t()                                                  { str::clear(*this); }
+        ~str_t()                                                  { str::free(*this); }
         str_t(str_t&& other) noexcept                             { operator=(other); }
         str_t(const str_t& other) : alloc(other.alloc)            { operator=(other); }
 
@@ -199,12 +151,208 @@ namespace basecode {
     }
 
     namespace str {
-        b8 each_line(const str_t& str, const line_callback_t& cb, str::slice_t sep = "\n"_ss);
+        u8 random_char();
+
+        u0 trim(String_Concept auto& str) {
+            ltrim(str);
+            rtrim(str);
+        }
+
+        u0 free(String_Concept auto& str) {
+            using T = std::remove_reference_t<decltype(str)>;
+            if constexpr (!T::is_static::value) {
+                memory::free(str.alloc, str.data);
+                str.data     = {};
+                str.capacity = {};
+            }
+            str.length = {};
+        }
+
+        u0 clear(String_Concept auto& str) {
+            free(str);
+        }
+
+        u0 ltrim(String_Concept auto& str) {
+            erase(str, *str.begin(), *std::find_if(str.begin(), str.end(), [](u8 c) { return !std::isspace(c); }));
+        }
+
+        u0 rtrim(String_Concept auto& str) {
+            erase(str, *std::find_if(str.rbegin(), str.rend(), [](u8 c) { return !std::isspace(c); }), *str.end());
+        }
+
+        u0 reset(String_Concept auto& str) {
+            str.length = 0;
+        }
+
+        u0 upper(String_Concept auto& str) {
+            std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+        }
+
+        u0 lower(String_Concept auto& str) {
+            std::transform(str.begin(), str.end(), str.begin(), ::tolower);
+        }
+
+        u8& back(String_Concept auto& str) {
+            return str.data[str.length - 1];
+        }
+
+        b8 empty(const String_Concept auto& str) {
+            return str.length == 0;
+        }
+
+        const s8* c_str(String_Concept auto& str) {
+            using T = std::remove_reference_t<decltype(str)>;
+            if constexpr (T::is_static::value) {
+                assert(str.length + 1 < str.capacity);
+            } else {
+                if (str.length + 1 > str.capacity)
+                    grow(str);
+            }
+            str.data[str.length] = '\0';
+            return (const s8*) str.data;
+        }
+
+        u0 append(String_Concept auto& str, u8 value) {
+            using T = std::remove_reference_t<decltype(str)>;
+            if constexpr (T::is_static::value) {
+                assert(str.length + 1 < str.capacity);
+            } else {
+                if (str.length + 1 > str.capacity)
+                    grow(str);
+            }
+            str.data[str.length++] = value;
+        }
+
+        u0 random(String_Concept auto& str, u32 length) {
+            while(length--)
+                append(str, random_char());
+        }
+
+        u0 init(String_Concept auto& str, alloc_t* alloc) {
+            using T = std::remove_reference_t<decltype(str)>;
+            if constexpr (!T::is_static::value) {
+                str.data     = {};
+                str.capacity = {};
+                str.alloc    = alloc;
+            }
+            str.length = {};
+        }
+
+        u0 trunc(String_Concept auto& str, u32 new_length) {
+            str.length = new_length;
+        }
+
+        b8 erase(String_Concept auto& str, u32 pos, u32 len) {
+            if (pos + len < str.length)
+                std::memmove(str.data + pos, str.data + pos + 1, len * sizeof(u8));
+            str.length -= len;
+            return true;
+        }
+
+        u0 insert(String_Concept auto& str, u32 pos, u8 value) {
+            insert(str, pos, &value, 1);
+        }
+
+        u0 reserve(Dynamic_String_Concept auto& str, u32 new_capacity) {
+            if (new_capacity == str.capacity)
+                return;
+
+            if (new_capacity == 0) {
+                memory::free(str.alloc, str.data);
+                str.data = {};
+                str.length = str.capacity = {};
+                return;
+            }
+
+            str.data = (u8*) memory::realloc(str.alloc, str.data, new_capacity * sizeof(u8));
+            str.capacity = new_capacity;
+            if (new_capacity < str.length)
+                str.length = new_capacity;
+        }
+
+        u0 resize(Dynamic_String_Concept auto& str, u32 new_length) {
+            if (new_length > str.capacity)
+                grow(str, new_length);
+            str.length = new_length;
+        }
+
+        u0 grow(Dynamic_String_Concept auto& str, u32 min_capacity) {
+            auto new_capacity = std::max(str.capacity, std::max(min_capacity, (u32) 8));
+            reserve(str, new_capacity * 2 + 8);
+        }
+
+        u0 append(String_Concept auto& str, const u8* value, s32 len = -1) {
+            using T = std::remove_reference_t<decltype(str)>;
+            if (len == 0) return;
+            const auto n = len != -1 ? len : strlen((const char*) value);
+            if constexpr (T::is_static::value) {
+                assert(str.length + n < str.capacity);
+            } else {
+                if (str.length + n > str.capacity)
+                    grow(str, n);
+            }
+            u32 i{};
+            while (i < n)
+                str.data[str.length++] = value[i++];
+        }
+
+        u0 append(String_Concept auto& str, String_Concept auto& value) {
+            append(str, value.data, value.length);
+        }
+
+        u0 insert(String_Concept auto& str, u32 pos, const u8* value, s32 len = -1) {
+            using T = std::remove_reference_t<decltype(str)>;
+            if (len == 0) return;
+            auto const n = len == -1 ? strlen((const char*) value) : len;
+            const auto offset = (ptrdiff_t) str.data + pos;
+            if constexpr (T::is_static::value) {
+                assert(str.length + n < str.capacity);
+            } else {
+                if (str.length + n > str.capacity)
+                    grow(str, n);
+            }
+            if (offset < str.length) {
+                std::memmove(
+                    str.data + offset + n,
+                    str.data + offset,
+                    (str.length + n - offset) * sizeof(u8));
+            }
+            std::memcpy(str.data + offset, value, n * sizeof(u8));
+            str.length += n;
+        }
+
+        u0 append(String_Concept auto& str, const s8* value, s32 len = -1) {
+            append(str, (const u8*) value, len != -1 ? len : strlen(value));
+        }
+
+        u0 append(String_Concept auto& str, const String_Concept auto& value) {
+            append(str, value.data, value.length);
+        }
+
+        u0 insert(String_Concept auto& str, u32 pos, const String_Concept auto& value) {
+            insert(str, pos, value.data, value.length);
+        }
+
+        b8 each_line(const String_Concept auto& str, const line_callback_t& cb, str::slice_t sep = "\n"_ss) {
+            s32 i{}, start_pos{};
+            while (i < str.length) {
+                if (std::memcmp(str.data + i, sep.data, sep.length) == 0) {
+                    str::slice_t line;
+                    line.data = str.data + start_pos;
+                    line.length = (i - start_pos) - 1;
+                    if (!cb(line))
+                        return false;
+                    start_pos = i + sep.length;
+                }
+                ++i;
+            }
+            return true;
+        }
     }
 }
 
 namespace basecode::hash {
-    inline u64 hash64(const str_t& key) {
+    inline u64 hash64(const String_Concept auto& key) {
         return murmur::hash64(key.data, key.length);
     }
 }

@@ -27,6 +27,7 @@ add_executable(
         stable_array_tests.cpp
 )
 target_link_libraries(${PROJECT_NAME} core)
+set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "-march=native")
 target_include_directories(
         ${PROJECT_NAME}
 
