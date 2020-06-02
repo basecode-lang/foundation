@@ -29,8 +29,11 @@ namespace basecode {
         sexp                    heap;
         sexp                    env;
         sexp                    ctx;
+        sexp                    in;
+        sexp                    out;
+        sexp                    err;
     };
-    static_assert(sizeof(scm_t) <= 32, "sizeof(scm_t) is now greater than 32 bytes!");
+    static_assert(sizeof(scm_t) <= 56, "sizeof(scm_t) is now greater than 56 bytes!");
 
     namespace scm {
         enum class status_t : u8 {
@@ -48,9 +51,15 @@ namespace basecode {
 
         status_t load(scm_t& scm, const path_t& path);
 
-        status_t global_set(scm_t& scm, sexp val, s32 slot);
+        status_t get_output_str(scm_t& scm, str_t& str);
 
         status_t global_ref(scm_t& scm, sexp* obj, s32 slot);
+
+        status_t parameter_ref(scm_t& scm, sexp* obj, sexp key);
+
+        status_t parameter_set(scm_t& scm, sexp key, sexp value);
+
+        status_t repl_write(scm_t& scm, sexp obj, sexp port = {});
 
         status_t eval(scm_t& scm, sexp* obj, const String_Concept auto& str) {
             sexp_gc_var1(s);
@@ -70,6 +79,8 @@ namespace basecode {
             return sexp_exceptionp(*obj) ? status_t::error : status_t::ok;
         }
 
+        status_t create_ports(scm_t& scm, sexp in, sexp out, sexp err, b8 no_close = true);
+
         status_t init(scm_t& scm, alloc_t* alloc = context::top()->alloc, scm_t* parent = {});
 
         status_t env_define(scm_t& scm, sexp* obj, const String_Concept auto& str, sexp value) {
@@ -84,6 +95,8 @@ namespace basecode {
             *obj = sexp_env_define(scm.ctx, scm.env, s, value);
             return sexp_exceptionp(*obj) ? status_t::error : status_t::ok;
         }
+
+        status_t create_ports(scm_t& scm, FILE* in, FILE* out, FILE* err, b8 no_close = true);
 
         status_t env_ref(scm_t& scm, sexp* obj, const String_Concept auto& str, sexp dft_val = {}) {
             sexp_gc_var1(s);

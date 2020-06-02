@@ -200,7 +200,7 @@ set(
 )
 add_library(${LIBRARY_TARGET} ${CORE_SOURCES} ${SCM_SOURCES})
 target_include_directories(${LIBRARY_TARGET} PUBLIC ${INC_DIR_BASE} ${CMAKE_BINARY_DIR}/include)
-target_compile_options(${LIBRARY_TARGET} PUBLIC -march=native)
+target_compile_options(${LIBRARY_TARGET} PUBLIC -march=native PRIVATE -Wno-array-bounds)
 #set_target_properties(${LIBRARY_TARGET} PROPERTIES LINK_FLAGS "-ftls-model=global-dynamic")
 set_target_properties(${LIBRARY_TARGET} PROPERTIES LIBRARY_OUTPUT_NAME ${LIBRARY_NAME})
 target_link_libraries(${LIBRARY_TARGET} PRIVATE utf8proc blake3 fmt-header-only spdlog::spdlog dyncall_s dynload_s ${DL_LIBRARY})
