@@ -51,8 +51,6 @@ namespace basecode {
 
         status_t load(scm_t& scm, const path_t& path);
 
-        status_t get_output_str(scm_t& scm, str_t& str);
-
         status_t global_ref(scm_t& scm, sexp* obj, s32 slot);
 
         status_t parameter_ref(scm_t& scm, sexp* obj, sexp key);
@@ -60,6 +58,8 @@ namespace basecode {
         status_t parameter_set(scm_t& scm, sexp key, sexp value);
 
         status_t repl_write(scm_t& scm, sexp obj, sexp port = {});
+
+        status_t get_output_str(scm_t& scm, str_t& str, sexp port);
 
         status_t eval(scm_t& scm, sexp* obj, const String_Concept auto& str) {
             sexp_gc_var1(s);
