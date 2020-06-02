@@ -33,9 +33,9 @@ namespace basecode::scm {
 
     u0 free(scm_t& scm) {
         sexp_destroy_context(scm.ctx);
-        sexp_destroy_context(scm.heap);
-        scm.ctx = scm.heap = scm.env = {};
-        scm.in  = scm.out  = scm.err = {};
+        scm.parent = {};
+        scm.ctx    = scm.env = {};
+        scm.in     = scm.out = scm.err = {};
     }
 
     status_t repl_write(scm_t& scm, sexp obj, sexp port) {
@@ -85,11 +85,11 @@ namespace basecode::scm {
     }
 
     status_t init(scm_t& scm, alloc_t* alloc, scm_t* parent) {
-        scm.alloc = alloc;
-        scm.in    = scm.out = scm.err = {};
-        scm.heap  = sexp_make_context(alloc, parent ? parent->heap : nullptr, 0, 0);
-        scm.ctx   = sexp_make_eval_context(alloc, scm.heap, nullptr, nullptr, 0, 0);
-        scm.env   = sexp_load_standard_env(scm.ctx, sexp_context_env(scm.ctx), SEXP_SEVEN);
+        scm.alloc  = alloc;
+        scm.parent = parent;
+        scm.in     = scm.out = scm.err = {};
+        scm.ctx    = sexp_make_eval_context(alloc, parent ? parent->ctx : nullptr, nullptr, nullptr, 0, 0);
+        scm.env    = sexp_load_standard_env(scm.ctx, sexp_context_env(scm.ctx), SEXP_SEVEN);
         return status_t::ok;
     }
 

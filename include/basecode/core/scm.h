@@ -26,7 +26,7 @@
 namespace basecode {
     struct scm_t final {
         alloc_t*                alloc;
-        sexp                    heap;
+        scm_t*                  parent;
         sexp                    env;
         sexp                    ctx;
         sexp                    in;
@@ -70,7 +70,7 @@ namespace basecode {
                 *obj = s;
                 return status_t::error;
             }
-            *obj = sexp_eval(scm.ctx, s, nullptr);
+            *obj = sexp_eval(scm.ctx, s, scm.env);
             return sexp_exceptionp(*obj) ? status_t::error : status_t::ok;
         }
 
