@@ -1,15 +1,16 @@
 cmake_minimum_required(VERSION 3.15)
-project(basecode-foundation)
+project(basecode-foundation C CXX ASM)
 
 set(CMAKE_CXX_STANDARD 20)
-enable_language(C CXX ASM)
+if (MSVC)
+    message(FATAL "Microsoft Visual C++ not supported.")
+endif()
 
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_STANDARD_REQUIRED     ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS   ON)
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY  ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY  ${CMAKE_BINARY_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY  ${CMAKE_BINARY_DIR}/bin)
 
 # common commands in a shorter form
 set(MKDIR COMMAND ${CMAKE_COMMAND} -E make_directory)
@@ -17,38 +18,13 @@ set(CPR   COMMAND ${CMAKE_COMMAND} -E copy_directory)
 set(LN    COMMAND ${CMAKE_COMMAND} -E create_symlink)
 
 find_program(CCACHE_FOUND ccache)
-if(CCACHE_FOUND)
+if (CCACHE_FOUND)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_COMPILE ccache)
     set_property(GLOBAL PROPERTY RULE_LAUNCH_LINK ccache)
     message(STATUS "${PROJECT_NAME} using ccache.")
 endif(CCACHE_FOUND)
 
-set(CMAKE_ASM_FLAGS "${CMAKE_ASM_FLAGS} -x assembler-with-cpp")
-
-if (UNIX AND NOT APPLE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
-endif()
-
-set(DL_LIBRARY "")
-
-if ("${CMAKE_SYSTEM_NAME}" MATCHES "FreeBSD")
-    add_definitions(-D__USE_ISOC99)
-elseif ("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
-    set(DL_LIBRARY "dl")
-endif()
-
-if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-string-plus-int" CACHE STRING "compile flags" FORCE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wno-cast-qual -Wno-string-plus-int -Wno-auto-var-id -Wno-unused-private-field -Wno-unknown-pragmas -Wno-inconsistent-missing-override -Wno-c99-designator" CACHE STRING "compile flags" FORCE)
-    message(STATUS "${PROJECT_NAME} using clang flags: ${CMAKE_CXX_FLAGS}")
-elseif ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++2a -Wall -Wno-string-plus-int -Wno-unknown-pragmas -Wno-parentheses -Wno-sequence-point" CACHE STRING "compile flags" FORCE)
-    message(STATUS "${PROJECT_NAME} using gcc flags: ${CMAKE_CXX_FLAGS}")
-else ()
-    message(FATAL_ERROR "${PROJECT_NAME} unknown compiler: ${CMAKE_CXX_COMPILER_ID}")
-endif()
-
-if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(CMAKE_C_ARCHIVE_CREATE   "<CMAKE_AR> Scr <TARGET> <LINK_FLAGS> <OBJECTS>")
     set(CMAKE_CXX_ARCHIVE_CREATE "<CMAKE_AR> Scr <TARGET> <LINK_FLAGS> <OBJECTS>")
     set(CMAKE_C_ARCHIVE_FINISH   "<CMAKE_RANLIB> -no_warning_for_no_symbols -c <TARGET>")
@@ -64,6 +40,13 @@ if (${FORCE_COLORED_OUTPUT})
     endif()
 endif()
 
+add_compile_options(-Wall)
+add_compile_options(-Wno-string-plus-int)
+add_compile_options(-Wno-cast-qual -Wno-auto-var-id -Wno-unused-private-field -Wno-unknown-pragmas -Wno-inconsistent-missing-override -Wno-c99-designator)
+if ("${CMAKE_CXX_COMPILER_ID}" MATCHES "GNU")
+    add_compile_options(-Wno-parentheses -Wno-sequence-point)
+endif()
+
 # -----------------------------------------------------------------------------
 #
 # Dependencies
@@ -74,10 +57,10 @@ endif()
 add_subdirectory(ext/fmt-6.2.0 EXCLUDE_FROM_ALL)
 
 # spdlog
-option(SPDLOG_FMT_EXTERNAL "" ON)
-option(SPDLOG_INSTALL "" OFF)
-option(SPDLOG_BUILD_TESTS "" OFF)
-option(SPDLOG_BUILD_EXAMPLE "" OFF)
+option(SPDLOG_FMT_EXTERNAL  ""  ON)
+option(SPDLOG_INSTALL       ""  OFF)
+option(SPDLOG_BUILD_TESTS   ""  OFF)
+option(SPDLOG_BUILD_EXAMPLE ""  OFF)
 add_subdirectory(ext/spdlog-1.5.0 EXCLUDE_FROM_ALL)
 
 # utf8proc

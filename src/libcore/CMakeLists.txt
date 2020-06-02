@@ -1,17 +1,35 @@
 cmake_minimum_required(VERSION 3.15)
-project(core)
+project(basecode-core C CXX ASM)
+
+# -----------------------------------------------------------------------------
+#
+# Project Configuration
+#
+# -----------------------------------------------------------------------------
 
 set(VERSION_MAJOR   0)
 set(VERSION_MINOR   1)
 set(PRODUCT_NAME    "Basecode Foundation Core Library")
 set(LIBRARY_NAME    "basecode-core")
-
+set(LIBRARY_TARGET  "${PROJECT_NAME}-lib")
 set(SCM_INC_DIR     "${INC_DIR_BASE}/chibi")
 set(CORE_INC_DIR    "${INC_DIR_BASE}/basecode/core")
 set(MOD_LIB         "${CMAKE_BINARY_DIR}/lib/lib")
 set(MOD_SHARE       "${CMAKE_BINARY_DIR}/share/chibi")
 set(MOD_SUFFIX      "${CMAKE_SHARED_LIBRARY_SUFFIX}")
 
+set(DL_LIBRARY "")
+if ("${CMAKE_SYSTEM_NAME}" MATCHES "FreeBSD")
+    add_definitions(-D__USE_ISOC99)
+elseif ("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
+    set(DL_LIBRARY "dl")
+endif()
+
+# -----------------------------------------------------------------------------
+#
+# Scheme Module Helper Functions
+#
+# -----------------------------------------------------------------------------
 function(add_module)
     cmake_parse_arguments(MOD "" "PATH;TARGET;LINK_TARGET" "MODULES" ${ARGN})
     set(MOD_SOURCES "")
@@ -19,13 +37,15 @@ function(add_module)
         list(APPEND MOD_SOURCES chibi/lib/${MOD_PATH}/${arg}.c)
     endforeach()
     add_library(${MOD_TARGET} SHARED ${MOD_SOURCES})
-    target_link_libraries(${MOD_TARGET} ${PROJECT_NAME})
+    target_include_directories(${MOD_TARGET} PRIVATE ${INC_DIR_BASE})
+    target_link_libraries(${MOD_TARGET} ${LIBRARY_TARGET})
 #    set_target_properties(${MODE_TARGET} PROPERTIES LINK_FLAGS "-ftls-model=global-dynamic")
     add_custom_command(
-            TARGET ${MOD_TARGET} POST_BUILD
+            TARGET  ${MOD_TARGET} POST_BUILD
             COMMENT "Symlink ${MOD_TARGET}"
             ${LN} ${MOD_LIB}${MOD_TARGET}${MOD_SUFFIX} ${MOD_SHARE}/${MOD_PATH}/${MOD_LINK_TARGET}${MOD_SUFFIX}
     )
+    add_dependencies(${PROJECT_NAME} ${MOD_TARGET})
 endfunction()
 
 function(add_modules)
@@ -35,10 +55,22 @@ function(add_modules)
     endforeach()
 endfunction()
 
+# -----------------------------------------------------------------------------
+#
+# Library Configuration Header
+#
+# -----------------------------------------------------------------------------
+
 configure_file (
         configure.in.h
         "${CMAKE_BINARY_DIR}/include/basecode/core/configure.h"
 )
+
+# -----------------------------------------------------------------------------
+#
+# libbasecode-core static library
+#
+# -----------------------------------------------------------------------------
 
 set(
         SCM_SOURCES
@@ -166,18 +198,34 @@ set(
 
         timer.cpp ${CORE_INC_DIR}/timer.h
 )
-add_library(${PROJECT_NAME} ${CORE_SOURCES} ${SCM_SOURCES})
-set_target_properties(${PROJECT_NAME} PROPERTIES COMPILE_FLAGS "-march=native")
-#set_target_properties(${PROJECT_NAME} PROPERTIES LINK_FLAGS "-ftls-model=global-dynamic")
-set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME ${LIBRARY_NAME})
-target_link_libraries(${PROJECT_NAME} utf8proc blake3 fmt-header-only spdlog::spdlog dyncall_s dynload_s ${DL_LIBRARY})
-target_include_directories(${PROJECT_NAME} PUBLIC ${INC_DIR_BASE})
+add_library(${LIBRARY_TARGET} ${CORE_SOURCES} ${SCM_SOURCES})
+target_include_directories(${LIBRARY_TARGET} PUBLIC ${INC_DIR_BASE} ${CMAKE_BINARY_DIR}/include)
+target_compile_options(${LIBRARY_TARGET} PUBLIC -march=native)
+#set_target_properties(${LIBRARY_TARGET} PROPERTIES LINK_FLAGS "-ftls-model=global-dynamic")
+set_target_properties(${LIBRARY_TARGET} PROPERTIES LIBRARY_OUTPUT_NAME ${LIBRARY_NAME})
+target_link_libraries(${LIBRARY_TARGET} PRIVATE utf8proc blake3 fmt-header-only spdlog::spdlog dyncall_s dynload_s ${DL_LIBRARY})
 add_custom_command(
-        TARGET      ${PROJECT_NAME} POST_BUILD
+        TARGET      ${LIBRARY_TARGET} POST_BUILD
         COMMENT     "Create share/chibi directory; copy lib"
         ${MKDIR}    ${CMAKE_BINARY_DIR}/share/chibi
         ${CPR}      ${CMAKE_CURRENT_SOURCE_DIR}/chibi/lib ${CMAKE_BINARY_DIR}/share/chibi
 )
+
+# -----------------------------------------------------------------------------
+#
+# Interface Library
+#
+# -----------------------------------------------------------------------------
+
+add_library(${PROJECT_NAME} INTERFACE)
+target_include_directories(${PROJECT_NAME} INTERFACE ${INC_DIR_BASE} ${CMAKE_BINARY_DIR}/include)
+target_link_libraries(${PROJECT_NAME} INTERFACE ${LIBRARY_TARGET} utf8proc blake3 fmt-header-only spdlog::spdlog dyncall_s dynload_s)
+
+# -----------------------------------------------------------------------------
+#
+# Scheme Module Definitions
+#
+# -----------------------------------------------------------------------------
 
 add_modules(
         PATH chibi
@@ -196,12 +244,3 @@ add_modules(PATH srfi/98 MODULES env)
 add_modules(PATH srfi/144 MODULES math)
 add_modules(PATH srfi/160 MODULES uvprims)
 add_module(PATH scheme TARGET scheme-time LINK_TARGET time MODULES time)
-
-#add_library(disasm SHARED chibi/lib/chibi/disasm.cpp)
-#target_link_libraries(disasm ${PROJECT_NAME})
-#set_target_properties(disasm PROPERTIES LINK_FLAGS "-ftls-model=global-dynamic")
-#add_custom_command(
-#        TARGET disasm POST_BUILD
-#        COMMENT "Symlink disasm"
-#        ${LN} ${MOD_LIB}disasm${MOD_SUFFIX} ${MOD_SHARE}/chibi/disasm${MOD_SUFFIX}
-#)
