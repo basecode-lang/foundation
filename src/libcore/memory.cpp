@@ -109,6 +109,8 @@ namespace basecode::memory {
                 return;
             u32 temp_freed{};
             memory::fini(alloc, enforce, &temp_freed);
+            if (IS_PROXY(alloc))
+                memory::proxy::remove(alloc);
             memory::free(&t_system.slab_alloc, alloc);
             if (freed_size) *freed_size = temp_freed;
         }

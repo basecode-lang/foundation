@@ -31,7 +31,7 @@ namespace basecode {
     struct proxy_pair_t final {
         alloc_t*                alloc;
         u32                     name_id;
-        u32                     id;
+        u32                     pair_id;
     };
 
     namespace memory::proxy {
@@ -45,6 +45,8 @@ namespace basecode {
         u0 fini();
 
         alloc_system_t* system();
+
+        b8 remove(alloc_t* proxy);
 
         u0 reset(b8 enforce = true);
 
@@ -61,3 +63,5 @@ namespace basecode {
         alloc_t* make(alloc_t* backing, str::slice_t name, b8 owner = false);
     }
 }
+
+FORMAT_TYPE(basecode::proxy_pair_t, format_to(ctx.out(), "[alloc: {}, name_id: {}, paid_id: {}]", (basecode::u0*) data.alloc, data.name_id, data.pair_id));

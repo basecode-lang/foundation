@@ -103,24 +103,18 @@ namespace basecode::memory::proxy {
         return &g_alloc_system;
     }
 
-    u0 active(proxy_array_t& list) {
-        array::reserve(list, t_proxy_system.pairs.size);
-        for (auto pair : t_proxy_system.pairs)
-            array::append(list, pair);
-    }
-
-    str::slice_t name(alloc_t* alloc) {
-        assert(alloc && alloc->system->type == alloc_type_t::proxy);
-        return t_proxy_system.names[alloc->subclass.proxy.pair->name_id - 1];
-    }
-
-    u0 free(alloc_t* proxy, b8 enforce) {
-        assert(proxy && proxy->system->type == alloc_type_t::proxy);
-        if (symtab::remove(t_proxy_system.proxies, proxy::name(proxy))) {
-            stable_array::erase(t_proxy_system.pairs, proxy->subclass.proxy.pair->id - 1);
-            str_array::erase(t_proxy_system.names, proxy->subclass.proxy.pair->name_id - 1);
-            system::free(proxy, enforce);
+    b8 remove(alloc_t* proxy) {
+        if (!proxy || proxy->system->type != alloc_type_t::proxy)
+            return false;
+        auto pair = proxy->subclass.proxy.pair;
+        const auto name = proxy::name(proxy);
+        if (symtab::remove(t_proxy_system.proxies, name)) {
+            stable_array::erase(t_proxy_system.pairs, pair->pair_id - 1);
+            str_array::erase(t_proxy_system.names, pair->name_id - 1);
+            --t_proxy_system.count;
+            return true;
         }
+        return false;
     }
 
     status_t init(alloc_t* alloc) {
@@ -132,13 +126,29 @@ namespace basecode::memory::proxy {
         return status_t::ok;
     }
 
+    u0 active(proxy_array_t& list) {
+        array::reserve(list, t_proxy_system.pairs.size);
+        for (auto pair : t_proxy_system.pairs)
+            array::append(list, pair);
+    }
+
     alloc_t* find(str::slice_t name) {
         proxy_pair_t* pair{};
         return symtab::find(t_proxy_system.proxies, name, pair) ? pair->alloc : nullptr;
     }
 
+    str::slice_t name(alloc_t* alloc) {
+        assert(alloc && alloc->system->type == alloc_type_t::proxy);
+        return t_proxy_system.names[alloc->subclass.proxy.pair->name_id - 1];
+    }
+
+    u0 free(alloc_t* proxy, b8 enforce) {
+        if (remove(proxy))
+            system::free(proxy, enforce);
+    }
+
     alloc_t* make(alloc_t* backing, str::slice_t name, b8 owner) {
-        t_proxy_system.count++;
+        ++t_proxy_system.count;
 
         str_t temp_name{};
         str::init(temp_name, t_proxy_system.alloc);
@@ -153,17 +163,16 @@ namespace basecode::memory::proxy {
         auto unique_name = t_proxy_system.names[t_proxy_system.names.size - 1];
 
         proxy_config_t config{};
-        config.owner   = owner;
-        config.backing = backing;
-        auto proxy = system::make(alloc_type_t::proxy, &config);
-        auto new_pair = &stable_array::append(t_proxy_system.pairs);
-        if (!symtab::insert(t_proxy_system.proxies, unique_name, new_pair))
-            return nullptr;
+        config.owner               = owner;
+        config.backing             = backing;
+        auto proxy                 = system::make(alloc_type_t::proxy, &config);
+        auto new_pair              = &stable_array::append(t_proxy_system.pairs);
         new_pair->alloc            = proxy;
         new_pair->name_id          = t_proxy_system.names.size;
-        new_pair->id               = t_proxy_system.pairs.size;
+        new_pair->pair_id          = t_proxy_system.pairs.size;
         proxy->subclass.proxy.pair = new_pair;
-
+        if (!symtab::insert(t_proxy_system.proxies, unique_name, new_pair))
+            return nullptr;
         return proxy;
     }
 }

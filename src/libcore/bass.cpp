@@ -73,9 +73,11 @@ namespace basecode {
         }
 
         u0 free(bass_t& storage) {
+            auto index_alloc = storage.index.alloc;
             array::free(storage.index);
             memory::system::free(storage.bump_alloc);
             memory::system::free(storage.page_alloc);
+            memory::system::free(index_alloc);
             memory::system::free(storage.alloc);
         }
 

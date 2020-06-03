@@ -42,22 +42,24 @@ namespace basecode {
         };
 
         namespace system {
-            status_t init();
-
             status_t fini();
+
+            status_t init(alloc_t* alloc = context::top()->alloc);
         }
 
         u0 free(scm_t& scm);
 
+        status_t load_base(scm_t& scm);
+
         status_t load(scm_t& scm, const path_t& path);
+
+        status_t write(scm_t& scm, sexp obj, sexp port = {});
 
         status_t global_ref(scm_t& scm, sexp* obj, s32 slot);
 
         status_t parameter_ref(scm_t& scm, sexp* obj, sexp key);
 
         status_t parameter_set(scm_t& scm, sexp key, sexp value);
-
-        status_t repl_write(scm_t& scm, sexp obj, sexp port = {});
 
         status_t get_output_str(scm_t& scm, str_t& str, sexp port);
 
@@ -79,9 +81,11 @@ namespace basecode {
             return sexp_exceptionp(*obj) ? status_t::error : status_t::ok;
         }
 
+        status_t add_module_dir(scm_t& scm, const path_t& path, b8 append = true);
+
         status_t create_ports(scm_t& scm, sexp in, sexp out, sexp err, b8 no_close = true);
 
-        status_t init(scm_t& scm, alloc_t* alloc = context::top()->alloc, scm_t* parent = {});
+        status_t init(scm_t& scm, alloc_t* alloc = context::top()->alloc, u32 size = 0, u32 max_size = 0, scm_t* parent = {});
 
         status_t env_define(scm_t& scm, sexp* obj, const String_Concept auto& str, sexp value) {
             sexp_gc_var1(s);

@@ -30,36 +30,23 @@
 
 namespace basecode {
     template<typename T> struct stable_array_t final {
-        T**                 data;
-        alloc_t*            alloc;
-        alloc_t*            slab_alloc;
-        u32                 size;
-        u32                 capacity;
+        T**                     data;
+        alloc_t*                alloc;
+        alloc_t*                slab_alloc;
+        u32                     size;
+        u32                     capacity;
 
-        T& operator[](u32 index)                { return *data[index]; }
-        const T& operator[](u32 index) const    { return *data[index]; }
+        T& operator[](u32 index)                            { return *data[index];      }
+        const T& operator[](u32 index) const                { return *data[index];      }
 
         struct iterator_state_t {
             u32                 pos;
-
-            inline T* get(stable_array_t* ref) {
-                return ref->data[pos];
-            }
-            inline u0 end(const stable_array_t* ref) {
-                pos = ref->size;
-            }
-            inline u0 next(const stable_array_t* ref) {
-                ++pos;
-            }
-            inline u0 begin(const stable_array_t* ref) {
-                pos = 0;
-            }
-            inline b8 cmp(const iterator_state_t& s) const {
-                return pos != s.pos;
-            }
-            inline const T* get(const stable_array_t* ref) {
-                return ref->data[pos];
-            }
+            inline T* get(stable_array_t* ref)              { return ref->data[pos];    }
+            inline u0 end(const stable_array_t* ref)        { pos = ref->size;          }
+            inline u0 next(const stable_array_t* ref)       { ++pos;                    }
+            inline u0 begin(const stable_array_t* ref)      { pos = 0;                  }
+            inline b8 cmp(const iterator_state_t& s) const  { return pos != s.pos;      }
+            inline const T* get(const stable_array_t* ref)  { return ref->data[pos];    }
         };
         DECL_ITERS(stable_array_t, T*, iterator_state_t);
     };

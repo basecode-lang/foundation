@@ -68,6 +68,7 @@ namespace basecode {
         template <typename V> b8 insert_key(symtab_t<V>& symtab, str::slice_t key, symtab_node_t** leaf_node);
         template <typename V> u32 append_node(symtab_t<V>& symtab, u8 sym = 0, u32 next = 0, u32 child = 0, u8 type = empty);
         template <typename V> b8 has_children(const symtab_t<V>& symtab, const symtab_node_t* node, const symtab_node_t* end_node = {});
+        template <typename V, typename B=std::remove_pointer_t<V>> u0 find_prefix(const symtab_t<V>& symtab, assoc_array_t<B*>& pairs, str::slice_t prefix = {});
         template <typename V, typename B=std::remove_pointer_t<V>> u0 walk(const symtab_t<V>& symtab, const symtab_node_t* node, str_t& key, assoc_array_t<B*>& pairs);
 
         template <typename V> u0 free(symtab_t<V>& symtab) {
@@ -95,11 +96,20 @@ namespace basecode {
             return symtab;
         }
 
+        template <typename V> u0 format_nodes(symtab_t<V>& symtab) {
+            u32 n = 1;
+            format::print("symtab: size = {}, nodes.size = {}, values.size = {}\n", symtab.size, symtab.nodes.size, symtab.values.size);
+            for (const auto& node : symtab.nodes) {
+                s8 c = (s8) node.sym;
+                format::print("{:04}: sym: {} type: {} next: {:>4} child: {:>4} value: {:>4}\n", n++, isprint(c) ? c : '.', node.type, node.next, node.child, node.value);
+            }
+        }
+
         template <typename V> u0 init(symtab_t<V>& symtab, alloc_t* alloc) {
             symtab.size  = {};
             symtab.alloc = alloc;
-            array::init(symtab.nodes, alloc);
-            array::init(symtab.values, alloc);
+            array::init(symtab.nodes, symtab.alloc);
+            array::init(symtab.values, symtab.alloc);
             append_node(symtab, 0, 0, 0, empty);
         }
 
@@ -110,21 +120,24 @@ namespace basecode {
 
         template <typename V> b8 remove(symtab_t<V>& symtab, str::slice_t prefix) {
             symtab_node_t* node;
-            symtab_node_t* prefix_nodes[prefix.length];
-            s32 prefix_count{};
+            array_t<u32> prefix_nodes{};
+            array::init(prefix_nodes, symtab.alloc);
+            array::reserve(prefix_nodes, prefix.length * 2);
+            defer(array::free(prefix_nodes));
             u32 next_node_id = 1;
             for (u32 i = 0; i < prefix.length; ++i) {
                 node = get_node(symtab, next_node_id);
                 while (node) {
                     if (i < prefix.length - 1)
-                        prefix_nodes[prefix_count++] = node;
+                        array::append(prefix_nodes, next_node_id);
                     if (node->sym == prefix[i]) {
                         next_node_id = node->child;
                         break;
                     }
                     if (!node->next)
                         return false;
-                    node = get_node(symtab, node->next);
+                    next_node_id = node->next;
+                    node = get_node(symtab, next_node_id);
                 }
             }
             if (node && node->type == leaf) {
@@ -137,8 +150,8 @@ namespace basecode {
                     node->sym       = {};
                     parent_cleared  = true;
                 }
-                for (s32 i = prefix_count - 1; i >= 0; --i) {
-                    const auto prefix_node = prefix_nodes[i];
+                for (s32 i = prefix_nodes.size - 1; i >= 0; --i) {
+                    const auto prefix_node = get_node(symtab, prefix_nodes[i]);
                     if (!has_children(symtab, prefix_node, node) || parent_cleared) {
                         prefix_node->type   = empty;
                         prefix_node->sym    = {};
@@ -315,6 +328,22 @@ namespace basecode {
             return node->type != leaf;
         }
 
+        template <typename V, typename B> u0 find_prefix(const symtab_t<V>& symtab, assoc_array_t<B*>& pairs, str::slice_t prefix) {
+            str_t key{};
+            str::init(key, symtab.alloc);
+            str::reserve(key, 32);
+            defer(str::free(key));
+            if (!slice::empty(prefix)) {
+                auto node = find_node(symtab, prefix);
+                if (node) {
+                    str::append(key, prefix);
+                    walk(symtab, node, key, pairs);
+                }
+            } else {
+                walk(symtab, get_node(symtab, 1), key, pairs);
+            }
+        }
+
         template <typename V> b8 has_children(const symtab_t<V>& symtab, const symtab_node_t* node, const symtab_node_t* end_node) {
             while (true) {
                 if (node->type == leaf) return true;
@@ -328,6 +357,17 @@ namespace basecode {
                 node = get_node(symtab, node->next);
                 if (end_node && node == end_node)
                     return false;
+            }
+        }
+
+        template <typename V, typename B=std::remove_pointer_t<V>> u0 format_pairs(symtab_t<V>& symtab, str::slice_t prefix = {}) {
+            assoc_array_t<B*> pairs{};
+            assoc_array::init(pairs);
+            find_prefix(symtab, pairs, prefix);
+            defer(assoc_array::free(pairs));
+            for (u32 i = 0; i < pairs.size; ++i) {
+                auto pair = pairs[i];
+                format::print("{:<20}: {}\n", pair.key, *pair.value);
             }
         }
 
@@ -349,22 +389,6 @@ namespace basecode {
                 if (!node->next)
                     break;
                 node = get_node(symtab, node->next);
-            }
-        }
-
-        template <typename V, typename B=std::remove_pointer_t<V>> u0 find_prefix(const symtab_t<V>& symtab, assoc_array_t<B*>& pairs, str::slice_t prefix = {}) {
-            str_t key{};
-            str::init(key, symtab.alloc);
-            str::reserve(key, 32);
-            defer(str::free(key));
-            if (!slice::empty(prefix)) {
-                auto node = find_node(symtab, prefix);
-                if (node) {
-                    str::append(key, prefix);
-                    walk(symtab, node, key, pairs);
-                }
-            } else {
-                walk(symtab, get_node(symtab, 1), key, pairs);
             }
         }
     }

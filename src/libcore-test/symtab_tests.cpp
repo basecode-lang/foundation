@@ -28,31 +28,6 @@
 
 using namespace basecode;
 
-template <typename V>
-[[maybe_unused]] static u0 format_nodes(symtab_t<V>& symtab) {
-    u32 n = 1;
-    format::print("symtab: size = {}, nodes.size = {}, values.size = {}\n",
-                  symtab.size,
-                  symtab.nodes.size,
-                  symtab.values.size);
-    for (const auto& node : symtab.nodes) {
-        s8 c = (s8) node.sym;
-        format::print("{:>4}: sym: {} type: {} next: {:>4} child: {:>4} value: {:>4}\n", n++, isprint(c) ? c : '.', node.type, node.next, node.child, node.value);
-    }
-}
-
-template <typename V, typename B=std::remove_pointer_t<V>>
-[[maybe_unused]] static u0 format_pairs(symtab_t<V>& symtab, str::slice_t prefix = {}) {
-    assoc_array_t<B*> pairs{};
-    assoc_array::init(pairs);
-    symtab::find_prefix(symtab, pairs, prefix);
-    defer(assoc_array::free(pairs));
-    for (u32 i = 0; i < pairs.size; ++i) {
-        auto pair = pairs[i];
-        format::print("{:<20}: {}\n", pair.key, *pair.value);
-    }
-}
-
 TEST_CASE("basecode::symtab_t remove key") {
     symtab_t<s32> symbols{};
     symtab::init(symbols);
@@ -69,7 +44,7 @@ TEST_CASE("basecode::symtab_t remove key") {
 
         stopwatch::stop(time);
         stopwatch::print_elapsed("add key/values step 1"_ss, 40, stopwatch::elapsed(time));
-        format_pairs(symbols);
+        symtab::format_pairs(symbols);
     }
 
     {
@@ -83,7 +58,7 @@ TEST_CASE("basecode::symtab_t remove key") {
 
         stopwatch::stop(time);
         stopwatch::print_elapsed("remove key/values from step 1"_ss, 40, stopwatch::elapsed(time));
-        format_pairs(symbols);
+        symtab::format_pairs(symbols);
     }
 
     {
@@ -98,7 +73,7 @@ TEST_CASE("basecode::symtab_t remove key") {
 
         stopwatch::stop(time);
         stopwatch::print_elapsed("add key/values step 2"_ss, 40, stopwatch::elapsed(time));
-        format_pairs(symbols);
+        symtab::format_pairs(symbols);
     }
 }
 

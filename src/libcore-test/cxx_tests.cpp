@@ -34,10 +34,7 @@ TEST_CASE("basecode::cxx create program_t") {
 
     cxx::program_t pgm{};
     cxx::program::init(pgm);
-    defer({
-        cxx::program::free(pgm);
-        memory::proxy::reset();
-    });
+    defer(cxx::program::free(pgm));
     REQUIRE(pgm.storage.alloc);
     REQUIRE(pgm.modules.alloc);
     REQUIRE(pgm.storage.index.alloc);
@@ -55,10 +52,7 @@ TEST_CASE("basecode::cxx create module_t") {
 
     cxx::program_t pgm{};
     cxx::program::init(pgm);
-    defer({
-        cxx::program::free(pgm);
-        memory::proxy::reset();
-    });
+    defer(cxx::program::free(pgm));
 
     const auto expected_filename = "test.cpp"_ss;
     const auto expected_revision = cxx::revision_t::cpp20;
@@ -95,10 +89,7 @@ TEST_CASE("basecode::cxx create identifier within scope") {
 
     cxx::program_t pgm{};
     cxx::program::init(pgm);
-    defer({
-        cxx::program::free(pgm);
-        memory::proxy::reset();
-    });
+    defer(cxx::program::free(pgm));
 
     const auto expected_filename = "test.cpp"_ss;
     const auto expected_revision = cxx::revision_t::cpp20;
@@ -130,10 +121,7 @@ TEST_CASE("basecode::cxx declare s32 type within scope") {
 
     cxx::program_t pgm{};
     cxx::program::init(pgm);
-    defer({
-        cxx::program::free(pgm);
-        memory::proxy::reset();
-    });
+    defer(cxx::program::free(pgm));
 
     const auto expected_ident = "int"_ss;
     const auto expected_filename = "test.cpp"_ss;
@@ -169,7 +157,8 @@ TEST_CASE("basecode::cxx example program") {
     defer({
         cxx::serializer::free(s);
         cxx::program::free(pgm);
-        memory::proxy::reset();
+        memory::system::free(pgm_proxy);
+        memory::system::free(ser_proxy);
         memory::fini(&region_alloc);
     });
 
@@ -311,7 +300,7 @@ TEST_CASE("basecode::cxx example program") {
     defer(array::free(proxies));
     memory::proxy::active(proxies);
     for (auto proxy : proxies) {
-        format::print(stderr, "{:<32} {:>10}\n", memory::proxy::name(proxy->alloc), proxy->alloc->total_allocated);
+        format::print("{:<32} {:>10}\n", memory::proxy::name(proxy->alloc), proxy->alloc->total_allocated);
     }
 
     REQUIRE(OK(status));

@@ -18,16 +18,29 @@
 
 #include <chibi/gc_heap.h>
 #include <basecode/core/scm.h>
+#include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::scm {
+    struct system_t final {
+        alloc_t*                    alloc;
+        scm_t                       terp;
+    };
+
+    static system_t s_system;
+
     namespace system {
-        status_t init() {
-            sexp_scheme_init();
+        status_t fini() {
+            scm::free(s_system.terp);
+            if (IS_PROXY(s_system.alloc))
+                memory::proxy::free(s_system.alloc);
             return status_t::ok;
         }
 
-        status_t fini() {
-            return status_t::ok;
+        status_t init(alloc_t* alloc) {
+            sexp_scheme_init();
+            s_system.alloc = memory::proxy::make(alloc, "scm::sys"_ss);
+            scm::init(s_system.terp, s_system.alloc);
+            return scm::load_base(s_system.terp);
         }
     }
 
@@ -38,7 +51,12 @@ namespace basecode::scm {
         scm.in     = scm.out = scm.err = {};
     }
 
-    status_t repl_write(scm_t& scm, sexp obj, sexp port) {
+    status_t load_base(scm_t& scm) {
+        scm.env = sexp_load_standard_env(scm.ctx, sexp_context_env(scm.ctx), SEXP_SEVEN);
+        return status_t::ok;
+    }
+
+    status_t write(scm_t& scm, sexp obj, sexp port) {
         sexp_gc_var1(tmp);
         sexp_gc_preserve1(scm.ctx, tmp);
         port = port ? port : scm.out;
@@ -84,15 +102,6 @@ namespace basecode::scm {
         return status_t::ok;
     }
 
-    status_t init(scm_t& scm, alloc_t* alloc, scm_t* parent) {
-        scm.alloc  = alloc;
-        scm.parent = parent;
-        scm.in     = scm.out = scm.err = {};
-        scm.ctx    = sexp_make_eval_context(alloc, parent ? parent->ctx : nullptr, nullptr, nullptr, 0, 0);
-        scm.env    = sexp_load_standard_env(scm.ctx, sexp_context_env(scm.ctx), SEXP_SEVEN);
-        return status_t::ok;
-    }
-
     status_t get_output_str(scm_t& scm, str_t& str, sexp port) {
         sexp_gc_var1(out_str);
         sexp_gc_preserve1(scm.ctx, out_str);
@@ -102,6 +111,15 @@ namespace basecode::scm {
         str::append(str, cstr);
         sexp_gc_release1(scm.ctx);
         return status_t::ok;
+    }
+
+    status_t add_module_dir(scm_t& scm, const path_t& path, b8 append) {
+        sexp_gc_var2(dir, res);
+        sexp_gc_preserve2(scm.ctx, dir, res);
+        dir = sexp_c_string(scm.ctx, (const s8*) path.str.data, path.str.length);
+        res = sexp_add_module_directory(scm.ctx, dir, append ? SEXP_TRUE : SEXP_FALSE);
+        sexp_gc_release2(scm.ctx);
+        return sexp_exceptionp(res) ? status_t::error : status_t::ok;
     }
 
     status_t create_ports(scm_t& scm, sexp in, sexp out, sexp err, b8 no_close) {
@@ -128,6 +146,15 @@ namespace basecode::scm {
         if (in)  parameter_ref(scm, &scm.in,  sexp_global(scm.ctx, SEXP_G_CUR_IN_SYMBOL));
         if (out) parameter_ref(scm, &scm.out, sexp_global(scm.ctx, SEXP_G_CUR_OUT_SYMBOL));
         if (err) parameter_ref(scm, &scm.err, sexp_global(scm.ctx, SEXP_G_CUR_ERR_SYMBOL));
+        return status_t::ok;
+    }
+
+    status_t init(scm_t& scm, alloc_t* alloc, u32 size, u32 max_size, scm_t* parent) {
+        scm.alloc  = alloc;
+        scm.parent = parent;
+        scm.in     = scm.out = scm.err = {};
+        scm.ctx    = sexp_make_eval_context(alloc, parent ? parent->ctx : nullptr, nullptr, nullptr, size, max_size);
+        scm.env    = sexp_context_env(scm.ctx);
         return status_t::ok;
     }
 }

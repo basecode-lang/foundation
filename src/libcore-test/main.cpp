@@ -91,8 +91,8 @@ s32 main(s32 argc, const s8** argv) {
     filesys::fini();
     ffi::system::fini();
     profiler::fini();
-    memory::proxy::fini();
     log::system::fini();
+    memory::proxy::fini();
     memory::system::fini();
     context::pop();
 
