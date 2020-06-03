@@ -31,8 +31,7 @@ namespace basecode::scm {
     namespace system {
         status_t fini() {
             scm::free(s_system.terp);
-            if (IS_PROXY(s_system.alloc))
-                memory::proxy::free(s_system.alloc);
+            memory::system::free(s_system.alloc);
             return status_t::ok;
         }
 
