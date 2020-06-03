@@ -104,7 +104,10 @@ namespace basecode::scm {
     status_t get_output_str(scm_t& scm, str_t& str, sexp port) {
         sexp_gc_var1(out_str);
         sexp_gc_preserve1(scm.ctx, out_str);
+        if (sexp_buffered_flush(scm.ctx, port, true) != 0)
+            return status_t::error;
         out_str = sexp_get_output_string(scm.ctx, port);
+        sexp_cdr(sexp_port_cookie(port)) = SEXP_NULL;
         auto cstr = sexp_string_data(out_str);
         str::reset(str);
         str::append(str, cstr);
