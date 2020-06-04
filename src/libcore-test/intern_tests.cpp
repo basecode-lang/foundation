@@ -20,7 +20,6 @@
 #include <basecode/core/defer.h>
 #include <basecode/core/array.h>
 #include <basecode/core/intern.h>
-#include <basecode/core/format.h>
 #include <basecode/core/profiler.h>
 #include <basecode/core/str_array.h>
 #include <basecode/core/stopwatch.h>
@@ -32,22 +31,22 @@ TEST_CASE("basecode::intern simple") {
     intern::init(pool);
     defer(intern::free(pool));
 
-    auto r1 = intern::intern(pool, "test1"_ss);
+    auto r1 = intern::fold(pool, "test1");
     REQUIRE(r1.status == intern::status_t::ok);
     REQUIRE(r1.slice.data);
     REQUIRE(r1.slice.length > 0);
 
-    auto r2 = intern::intern(pool, "test2"_ss);
+    auto r2 = intern::fold(pool, "test2"_ss);
     REQUIRE(r2.status == intern::status_t::ok);
     REQUIRE(r2.slice.data);
     REQUIRE(r2.slice.length > 0);
 
-    auto r3 = intern::intern(pool, "test3"_ss);
+    auto r3 = intern::fold(pool, "test3");
     REQUIRE(r3.status == intern::status_t::ok);
     REQUIRE(r3.slice.data);
     REQUIRE(r3.slice.length > 0);
 
-    auto r4 = intern::intern(pool, "test1"_ss);
+    auto r4 = intern::fold(pool, "test1"_ss);
     REQUIRE(r4.id == r1.id);
     REQUIRE(r4.hash == r1.hash);
     REQUIRE(r4.slice == r1.slice);
@@ -60,7 +59,7 @@ TEST_CASE("basecode::intern") {
     intern_t pool{};
     intern::init(pool);
     defer(intern::free(pool));
-    intern::reserve(pool, expected_intern_count * 65, expected_intern_count);
+    intern::reserve(pool, expected_intern_count);
 
     array_t<intern::result_t> interned_list{};
     array::init(interned_list);
@@ -89,7 +88,7 @@ TEST_CASE("basecode::intern") {
     stopwatch::start(intern_time);
 
     for (u32 i = 0; i < expected_intern_count; ++i) {
-        auto r = intern::intern(pool, strings[i]);
+        auto r = intern::fold(pool, strings[i]);
         REQUIRE(r.status == intern::status_t::ok);
         REQUIRE(r.slice.data);
         REQUIRE(r.slice.length > 0);
@@ -97,7 +96,7 @@ TEST_CASE("basecode::intern") {
     }
 
     stopwatch::stop(intern_time);
-    stopwatch::print_elapsed("total intern time"_ss, 40, stopwatch::elapsed(intern_time));
+    stopwatch::print_elapsed("total intern time"_ss, 40, intern_time);
     const auto memory_used = context::top()->alloc->total_allocated - allocated_before;
     format::print("memory_used = {}\n", memory_used);
 
@@ -110,15 +109,10 @@ TEST_CASE("basecode::intern") {
             return lhs.id < rhs.id;
         });
 
-//    format::print("\n");
-//    for (const auto& r : interned_list) {
-//        format::print("id = {:0>6}; hash = {}; slice = {}\n", r.id, r.hash, r.slice);
-//    }
-
     u32 last_id{};
     for (const auto& r : interned_list) {
         REQUIRE(last_id <= r.id);
-        auto existing_slice = intern::intern(pool, r.slice);
+        auto existing_slice = intern::fold(pool, r.slice);
         REQUIRE(existing_slice.slice == r.slice);
         last_id = r.id;
     }

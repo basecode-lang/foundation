@@ -20,23 +20,40 @@
 #include <basecode/core/ffi.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/format.h>
+#include <basecode/core/filesys.h>
 #include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
-extern "C" u32 simple(u32 a, u32 b) {
-    return a * b;
-}
+TEST_CASE("basecode::ffi basics", "[hide]") {
+#ifdef _MSC_VER
+    auto lib_filename = "ffi-test-kernel.dll"_path;
+#elif _WIN32
+    auto lib_filename = "libffi-test-kernel.dll"_path;
+#else
+    auto lib_filename = "lib/libffi-test-kernel.so"_path;
+#endif
 
-TEST_CASE("basecode::ffi basics") {
     path_t proc_path{};
     path::init(proc_path, slice::make(context::top()->argv[0]));
-    defer(path::free(proc_path));
+    if (!proc_path.is_abs)
+        filesys::mkabs(proc_path, proc_path);
+
+    path::parent_path(proc_path, proc_path);
+#ifndef _WIN32
+    path::parent_path(proc_path, proc_path);
+#endif
+    path::append(proc_path, lib_filename);
+    format::print_ellipsis("ffi test library path", 40, "{}\n", proc_path.str);
 
     lib_t* proc_lib{};
     auto status = ffi::lib::load(proc_path, &proc_lib);
+    defer({
+        ffi::lib::unload(proc_lib);
+        path::free(proc_path);
+        path::free(lib_filename);
+    });
     REQUIRE(OK(status));
-    defer(ffi::lib::unload(proc_lib));
 
     proto_t* simple_proto{};
     status = ffi::proto::make(proc_lib, "simple"_ss, &simple_proto);
@@ -55,8 +72,6 @@ TEST_CASE("basecode::ffi basics") {
     stopwatch::start(time);
 
     ffi::reset(vm);
-//    ffi::push(vm, ffi::arg(5));
-//    ffi::push(vm, ffi::arg(6));
     ffi::push(vm, 5);
     ffi::push(vm, 6);
     param_alias_t ret{};
@@ -65,5 +80,5 @@ TEST_CASE("basecode::ffi basics") {
     REQUIRE(ret.dw == 30);
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("ffi call simple function"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("ffi call simple function"_ss, 40, time);
 }

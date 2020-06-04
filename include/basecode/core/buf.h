@@ -19,11 +19,14 @@
 #pragma once
 
 #include <basecode/core/path.h>
+#include <basecode/core/defer.h>
 
-#define CRSR_POS(c)      (c.pos)
-#define CRSR_NEXT(c)     (c.pos++)
-#define CRSR_READ(c)     (c.buf->data[c.pos])
-#define CRSR_MORE(c)     (c.pos < c.buf->length)
+#define CRSR_POS(c)             ((c).pos)
+#define CRSR_NEXT(c)            SAFE_SCOPE(++(c).pos; ++(c).column;)
+#define CRSR_READ(c)            ((c).buf->data[(c).pos])
+#define CRSR_PEEK(c)            ((c).buf->data[(c).pos + 1])
+#define CRSR_MORE(c)            ((c).pos < (c).buf->length)
+#define CRSR_NEWLINE(c)         SAFE_SCOPE((c).column = 0; ++(c).line;)
 
 namespace basecode {
     struct buf_line_t final {
@@ -48,6 +51,8 @@ namespace basecode {
     struct buf_crsr_t final {
         buf_t*                  buf;
         u32                     pos;
+        u32                     line;
+        u32                     column;
     };
 
     namespace buf {
@@ -70,8 +75,6 @@ namespace basecode {
 
         u0 reserve(buf_t& buf, u32 new_capacity);
 
-        status_t load(buf_t& buf, const str_t& value);
-
         status_t load(buf_t& buf, const path_t& path);
 
         buf_t make(alloc_t* alloc = context::top()->alloc);
@@ -81,6 +84,15 @@ namespace basecode {
         u0 init(buf_t& buf, alloc_t* alloc = context::top()->alloc);
 
         u0 write(buf_t& buf, u32 offset, const u8* data, u32 length);
+
+        status_t load(buf_t& buf, const String_Concept auto& value) {
+            auto file = ::fmemopen((u0*) value.data, value.length, "r");
+            if (!file)
+                return status_t::unable_to_open_file;
+            defer(::fclose(file));
+            write(buf, 0, file, value.length);
+            return status_t::ok;
+        }
 
         status_t save(buf_t& buf, const path_t& path, u32 offset = {}, u32 length = {});
 

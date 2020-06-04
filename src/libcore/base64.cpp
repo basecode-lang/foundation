@@ -20,7 +20,7 @@
 
 namespace basecode::base64 {
     static const s8* s_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    static const s32 s_index[256] = {
+    static const u32 s_index[256] = {
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 62, 63, 62, 62, 63,
@@ -37,24 +37,26 @@ namespace basecode::base64 {
         str::resize(buf, length);
         std::memset(buf.data, '=', length);
 
-        auto p = (s8*) src.data;
+        auto p = (u8*) src.data;
         auto buffer = buf.data;
         u32 j = 0, pad = src.length % 3;
         const u32 last = src.length - pad;
 
         for (u32 i = 0; i < last; i += 3) {
-            auto n = s32(p[i]) << 16 | s32(p[i + 1]) << 8 | p[i + 2];
-            buffer[j++] = s_chars[n >> 18];
-            buffer[j++] = s_chars[n >> 12 & 0x3F];
-            buffer[j++] = s_chars[n >> 6 & 0x3F];
-            buffer[j++] = s_chars[n & 0x3F];
+            u32 n = p[i] << u32(16) |
+                p[i + 1] << u32(8) |
+                p[i + 2];
+            buffer[j++] = s_chars[n >> u32(18)];
+            buffer[j++] = s_chars[n >> u32(12) & u32(0x3f)];
+            buffer[j++] = s_chars[n >> u32(6) & u32(0x3f)];
+            buffer[j++] = s_chars[n & u32(0x3f)];
         }
 
         if (pad) {
-            auto n = --pad ? s32(p[last]) << 8 | p[last + 1] : p[last];
-            buffer[j++] = s_chars[pad ? n >> 10 & 0x3F : n >> 2];
-            buffer[j++] = s_chars[pad ? n >> 4 & 0x03F : n << 4 & 0x3F];
-            buffer[j++] = pad ? s_chars[n << 2 & 0x3F] : '=';
+            u32 n = --pad ? p[last] << u32(8) | p[last + 1] : p[last];
+            buffer[j++] = s_chars[pad ? n >> u32(10) & u32(0x3f) : n >> u32(2)];
+            buffer[j++] = s_chars[pad ? n >> u32(4) & u32(0x3f) : n << u32(4) & u32(0x3f)];
+            buffer[j] = pad ? s_chars[n << u32(2) & u32(0x3f)] : '=';
         }
 
         return true;
@@ -68,25 +70,29 @@ namespace basecode::base64 {
         u32 j = 0,
              pad1 = src.length % 4 || p[src.length - 1] == '=',
              pad2 = pad1 && (src.length % 4 > 2 || p[src.length - 2] != '=');
-        const u32 last = (src.length - pad1) / 4 << 2;
+        const u32 last = (src.length - pad1) / 4 << u32(2);
         str::resize(buf, last / 4 * 3 + pad1 + pad2);
         std::memset(buf.data, 0, buf.length);
 
         auto buffer = buf.data;
 
         for (u32 i = 0; i < last; i += 4) {
-            auto n = s_index[p[i]] << 18 | s_index[p[i + 1]] << 12 | s_index[p[i + 2]] << 6 | s_index[p[i + 3]];
-            buffer[j++] = n >> 16;
-            buffer[j++] = n >> 8 & 0xFF;
-            buffer[j++] = n & 0xFF;
+            auto n = s_index[p[i]] << u32(18) |
+                s_index[p[i + 1]] << u32(12) |
+                s_index[p[i + 2]] << u32(6) |
+                s_index[p[i + 3]];
+            buffer[j++] = n >> u32(16);
+            buffer[j++] = n >> u32(8 & 0xff);
+            buffer[j++] = n & u32(0xff);
         }
 
         if (pad1) {
-            auto n = s_index[p[last]] << 18 | s_index[p[last + 1]] << 12;
-            buffer[j++] = n >> 16;
+            auto n = s_index[p[last]] << u32(18) |
+                s_index[p[last + 1]] << u32(12);
+            buffer[j++] = n >> u32(16);
             if (pad2) {
-                n |= s_index[p[last + 2]] << 6;
-                buffer[j++] = n >> 8 & 0xFF;
+                n |= s_index[p[last + 2]] << u32(6);
+                buffer[j] = n >> u32(8 & 0xff);
             }
         }
 

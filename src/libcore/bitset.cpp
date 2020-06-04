@@ -18,7 +18,6 @@
 
 #include <cstring>
 #include <algorithm>
-#include <x86intrin.h>
 #include <basecode/core/bits.h>
 #include <basecode/core/bitset.h>
 

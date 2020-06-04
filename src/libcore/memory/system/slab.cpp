@@ -153,6 +153,8 @@ namespace basecode::memory::slab {
     }
 
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
+        UNUSED(size);
+        UNUSED(align);
         auto sc        = &alloc->subclass.slab;
         auto head_slab = sc->head;
         if (!head_slab || head_slab->buf_count == sc->buf_max_count) {

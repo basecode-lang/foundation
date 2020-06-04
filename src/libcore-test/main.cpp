@@ -20,11 +20,16 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/log.h>
 #include <basecode/core/ffi.h>
-#include <basecode/core/scm.h>
+#include <basecode/core/job.h>
+#include <basecode/core/event.h>
 #include <basecode/core/defer.h>
+#include <basecode/core/config.h>
+#include <basecode/core/thread.h>
 #include <basecode/core/memory.h>
+#include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/network.h>
+#include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
 #include <basecode/core/log/system/spdlog.h>
 #include <basecode/core/log/system/syslog.h>
@@ -54,44 +59,47 @@ s32 main(s32 argc, const s8** argv) {
     auto ctx = context::make(argc, argv, memory::system::default_alloc(), log::system::default_logger());
     context::push(&ctx);
 
-    spdlog_color_config_t spdlog_config{};
-    spdlog_config.color_type = spdlog_color_type_t::out;
+    if (!OK(buf_pool::system::init()))  return 1;
+    if (!OK(string::system::init()))    return 1;
+    if (!OK(config::system::init()))    return 1;
 
-    logger_t spdlog{};
-    spdlog.name = "console"_ss;
-    log::init(&spdlog, logger_type_t::spdlog, &spdlog_config);
-    log::append_child(context::top()->logger, &spdlog);
-
-    syslog_config_t syslog_config{};
-    syslog_config.ident    = "bc-libcore-tests";
-    syslog_config.opts     = opt_pid | opt_ndelay | opt_cons;
-    syslog_config.facility = facility_local0;
-
-    logger_t syslog{};
-    log::init(&syslog, logger_type_t::syslog, &syslog_config);
-    log::append_child(context::top()->logger, &syslog);
-
-    log::info("example log message!");
-    log::warn("oh, shit!");
-    log::error("this should really stick out");
+    auto core_config_path = "../etc/core.fe"_path;
+    path_t config_path{};
+    path::init(config_path, slice::make(context::top()->argv[0]));
+    path::parent_path(config_path, config_path);
+    path::append(config_path, core_config_path);
+    if (!config_path.is_abs)
+        filesys::mkabs(config_path, config_path);
+    fe_Object* result{};
+    if (!OK(config::eval(config_path, &result))) return 1;
 
     if (!OK(profiler::init()))          return 1;
     if (!OK(memory::proxy::init()))     return 1;
+    if (!OK(event::system::init()))     return 1;
+    if (!OK(thread::system::init()))    return 1;
+    if (!OK(job::system::init()))       return 1;
     if (!OK(ffi::system::init()))       return 1;
     if (!OK(filesys::init()))           return 1;
     if (!OK(network::system::init()))   return 1;
-    if (!OK(scm::system::init()))       return 1;
 
     auto rc = Catch::Session().run(argc, argv);
 
     log::notice("shutdown test program");
 
-    scm::system::fini();
+    path::free(config_path);
+    path::free(core_config_path);
+
     network::system::fini();
     filesys::fini();
     ffi::system::fini();
     profiler::fini();
+    job::system::fini();
+    event::system::fini();
+    thread::system::fini();
+    config::system::fini();
     log::system::fini();
+    string::system::fini();
+    buf_pool::system::fini();
     memory::proxy::fini();
     memory::system::fini();
     context::pop();

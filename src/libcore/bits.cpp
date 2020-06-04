@@ -40,31 +40,31 @@ namespace basecode {
     }
 
     u8 unybble(u8 value) {
-        return u8((value & 0xf0) >> 4);
+        return u8((value & u32(0xf0)) >> u32(4));
     }
 
     u8 lnybble(u8 value) {
-        return u8(value & 0x0f);
+        return u8(value & u32(0x0f));
     }
 
     u64 rotl(u64 n, u8 c) {
         const u64 mask = (CHAR_BIT * sizeof(n) - 1);
         c &= mask;
-        return (n << c) | (n >> ((-c) & mask));
+        return (n << c) | (n >> (-c & mask));
     }
 
     u64 rotr(u64 n, u8 c) {
         const u64 mask = (CHAR_BIT * sizeof(n) - 1);
         c &= mask;
-        return (n >> c) | (n << ((-c) & mask));
+        return (n >> c) | (n << (-c & mask));
     }
 
     u64 power(u64 x, u64 n) {
-        uint64_t pow = 1;
+        u64 pow = 1;
         while (n) {
-            if (n & 1)
+            if (n & u32(1))
                 pow *= x;
-            n = n >> 1;
+            n = n >> u32(1);
             x = x * x;
         }
         return pow;
@@ -78,30 +78,30 @@ namespace basecode {
 
     u32 next_power_of_two(u32 n) {
         n--;
-        n |= n >> 1;
-        n |= n >> 2;
-        n |= n >> 4;
-        n |= n >> 8;
-        n |= n >> 16;
+        n |= n >> u32(1);
+        n |= n >> u32(2);
+        n |= n >> u32(4);
+        n |= n >> u32(8);
+        n |= n >> u32(16);
         n++;
         return n;
     }
 
     u64 next_power_of_two(u64 n) {
         n--;
-        n |= n >> 1;
-        n |= n >> 2;
-        n |= n >> 4;
-        n |= n >> 8;
-        n |= n >> 16;
-        n |= n >> 32;
+        n |= n >> u32(1);
+        n |= n >> u32(2);
+        n |= n >> u32(4);
+        n |= n >> u32(8);
+        n |= n >> u32(16);
+        n |= n >> u32(32);
         n++;
         return n;
     }
 
     b8 is_platform_little_endian() {
         s32 n = 1;
-        return (*(s8*)&n) == 1;
+        return (*(s8*) & n) == 1;
     }
 
     u64 align(u64 size, u64 align) {
@@ -113,26 +113,26 @@ namespace basecode {
     }
 
     u16 endian_swap_word(u16 value) {
-        return (value >> 8) | (value << 8);
+        return (value >> u16(8)) | (value << u16(8));
     }
 
     u32 previous_power_of_two(u32 n) {
-        n |= n >> 1;
-        n |= n >> 2;
-        n |= n >> 4;
-        n |= n >> 8;
-        n |= n >> 16;
-        return n - (n >> 1);
+        n |= n >> u32(1);
+        n |= n >> u32(2);
+        n |= n >> u32(4);
+        n |= n >> u32(8);
+        n |= n >> u32(16);
+        return n - (n >> u32(1));
     }
 
     u64 previous_power_of_two(u64 n) {
-        n |= n >> 1;
-        n |= n >> 2;
-        n |= n >> 4;
-        n |= n >> 8;
-        n |= n >> 16;
-        n |= n >> 32;
-        return n - (n >> 1);
+        n |= n >> u32(1);
+        n |= n >> u32(2);
+        n |= n >> u32(4);
+        n |= n >> u32(8);
+        n |= n >> u32(16);
+        n |= n >> u32(32);
+        return n - (n >> u32(1));
     }
 
     u32 endian_swap_dword(u32 value) {
@@ -155,15 +155,15 @@ namespace basecode {
 
     u8 lnybble(u8 original, u8 value) {
         u8 res = original;
-        res &= 0xF0;
-        res |= (value & 0x0F);
+        res &= u32(0xf0);
+        res |= (value & u32(0x0f));
         return res;
     }
 
     u8 unybble(u8 original, u8 value) {
         u8 res = original;
-        res &= 0x0F;
-        res |= ((value << 4) & 0xF0);
+        res &= u32(0x0f);
+        res |= ((value << u32(4)) & u32(0xf0));
         return res;
     }
 

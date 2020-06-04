@@ -19,9 +19,9 @@
 #pragma once
 
 #include <memory>
-#include <pthread.h>
 #include <basecode/core/str.h>
 #include <basecode/core/array.h>
+#include <basecode/core/mutex.h>
 #include <basecode/core/format.h>
 
 namespace spdlog {
@@ -37,7 +37,9 @@ namespace basecode {
 
     struct logger_t;
     struct logger_system_t;
-    struct logger_config_t {};
+    struct logger_config_t {
+        str::slice_t            name;
+    };
 
     using logger_array_t        = array_t<logger_t*>;
     using shared_logger_t       = std::shared_ptr<::spdlog::logger>;
@@ -57,7 +59,8 @@ namespace basecode {
         struct default_t {
             FILE*                   file;
             str_t                   process_name;
-            pthread_mutex_t         mutex = PTHREAD_MUTEX_INITIALIZER;
+            str_t                   buf;
+            mutex_t                 mutex;
         }                           default_;
         struct {
             const s8*               ident;
@@ -80,15 +83,15 @@ namespace basecode {
         log_level_t                 mask;
     };
 
-    using logger_init_callback_t    = u0 (*)(logger_t*, logger_config_t*);
     using logger_fini_callback_t    = u0 (*)(logger_t*);
-    using logger_emit_callback_t    = u0 (*)(logger_t*, log_level_t, str::slice_t);
+    using logger_init_callback_t    = u0 (*)(logger_t*, logger_config_t*);
+    using logger_emit_callback_t    = u0 (*)(logger_t*, log_level_t, fmt_str_t, const fmt_args_t&);
 
     struct logger_system_t final {
-        logger_init_callback_t  init;
-        logger_fini_callback_t  fini;
-        logger_emit_callback_t  emit;
-        logger_type_t           type;
+        logger_init_callback_t      init;
+        logger_fini_callback_t      fini;
+        logger_emit_callback_t      emit;
+        logger_type_t               type;
     };
 
     namespace log {
@@ -127,16 +130,12 @@ namespace basecode {
 
         b8 remove_child(logger_t* logger, logger_t* child);
 
-        u0 emit(log_level_t level, str::slice_t msg, logger_t* logger = context::top()->logger);
+        u0 emit(log_level_t level, fmt_str_t format_str, const fmt_args_t& args, logger_t* logger = context::top()->logger);
 
         status_t init(logger_t* logger, logger_type_t type, logger_config_t* config = {}, log_level_t mask = log_level_t::debug, alloc_t* alloc = context::top()->alloc);
 
         template <typename... Args> u0 info(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            auto& buf = system::buf();
-            buf.clear();
-            fmt::vformat_to(buf, format_str, fmt::make_format_args(args...));
-            format::format_to(buf, "{}", '\0');
-            emit(log_level_t::info, slice::make(buf.data(), buf.size() - 1), logger);
+            emit(log_level_t::info, format_str, fmt::make_format_args(args...), logger);
         }
 
         template <typename... Args> u0 info(fmt_str_t format_str, Args&&... args) {
@@ -144,11 +143,7 @@ namespace basecode {
         }
 
         template <typename... Args> u0 warn(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            auto& buf = system::buf();
-            buf.clear();
-            fmt::vformat_to(buf, format_str, fmt::make_format_args(args...));
-            format::format_to(buf, "{}", '\0');
-            emit(log_level_t::warn, slice::make(buf.data(), buf.size() - 1), logger);
+            emit(log_level_t::warn, format_str, fmt::make_format_args(args...), logger);
         }
 
         template <typename... Args> u0 warn(fmt_str_t format_str, Args&&... args) {
@@ -156,11 +151,7 @@ namespace basecode {
         }
 
         template <typename... Args> u0 debug(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            auto& buf = system::buf();
-            buf.clear();
-            fmt::vformat_to(buf, format_str, fmt::make_format_args(args...));
-            format::format_to(buf, "{}", '\0');
-            emit(log_level_t::debug, slice::make(buf.data(), buf.size() - 1), logger);
+            emit(log_level_t::debug, format_str, fmt::make_format_args(args...), logger);
         }
 
         template <typename... Args> u0 debug(fmt_str_t format_str, Args&&... args) {
@@ -168,11 +159,7 @@ namespace basecode {
         }
 
         template <typename... Args> u0 error(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            auto& buf = system::buf();
-            buf.clear();
-            fmt::vformat_to(buf, format_str, fmt::make_format_args(args...));
-            format::format_to(buf, "{}", '\0');
-            emit(log_level_t::error, slice::make(buf.data(), buf.size() - 1), logger);
+            emit(log_level_t::error, format_str, fmt::make_format_args(args...), logger);
         }
 
         template <typename... Args> u0 error(fmt_str_t format_str, Args&&... args) {
@@ -180,11 +167,7 @@ namespace basecode {
         }
 
         template <typename... Args> u0 notice(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            auto& buf = system::buf();
-            buf.clear();
-            fmt::vformat_to(buf, format_str, fmt::make_format_args(args...));
-            format::format_to(buf, "{}", '\0');
-            emit(log_level_t::notice, slice::make(buf.data(), buf.size() - 1), logger);
+            emit(log_level_t::notice, format_str, fmt::make_format_args(args...), logger);
         }
 
         template <typename... Args> u0 notice(fmt_str_t format_str, Args&&... args) {
@@ -192,11 +175,7 @@ namespace basecode {
         }
 
         template <typename... Args> u0 alert(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            auto& buf = system::buf();
-            buf.clear();
-            fmt::vformat_to(buf, format_str, fmt::make_format_args(args...));
-            format::format_to(buf, "{}", '\0');
-            emit(log_level_t::alert, slice::make(buf.data(), buf.size() - 1), logger);
+            emit(log_level_t::alert, format_str, fmt::make_format_args(args...), logger);
         }
 
         template <typename... Args> u0 alert(fmt_str_t format_str, Args&&... args) {
@@ -204,11 +183,7 @@ namespace basecode {
         }
 
         template <typename... Args> u0 critical(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            auto& buf = system::buf();
-            buf.clear();
-            fmt::vformat_to(buf, format_str, fmt::make_format_args(args...));
-            format::format_to(buf, "{}", '\0');
-            emit(log_level_t::critical, slice::make(buf.data(), buf.size() - 1), logger);
+            emit(log_level_t::critical, format_str, fmt::make_format_args(args...), logger);
         }
 
         template <typename... Args> u0 critical(fmt_str_t format_str, Args&&... args) {
@@ -216,11 +191,7 @@ namespace basecode {
         }
 
         template <typename... Args> u0 emergency(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            auto& buf = system::buf();
-            buf.clear();
-            fmt::vformat_to(buf, format_str, fmt::make_format_args(args...));
-            format::format_to(buf, "{}", '\0');
-            emit(log_level_t::emergency, slice::make(buf.data(), buf.size() - 1), logger);
+            emit(log_level_t::emergency, format_str, fmt::make_format_args(args...), logger);
         }
 
         template <typename... Args> u0 emergency(fmt_str_t format_str, Args&&... args) {

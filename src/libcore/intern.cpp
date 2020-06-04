@@ -17,8 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/intern.h>
-#include <basecode/core/memory/system/bump.h>
-#include <basecode/core/memory/system/page.h>
+#include <basecode/core/buf_pool.h>
 
 namespace basecode::intern {
     static str::slice_t s_status_names[] = {
@@ -28,7 +27,7 @@ namespace basecode::intern {
     };
 
     static b8 requires_rehash(const intern_t& pool) {
-        return pool.capacity == 0 || pool.size + 1 > (pool.capacity - 1) * pool.load_factor;
+        return pool.capacity == 0 || pool.size + 1 > u32(f32(pool.capacity - 1) * pool.load_factor);
     }
 
     static b8 find_bucket(const u32* ids, u32 capacity, u32& bucket_index) {
@@ -51,7 +50,7 @@ namespace basecode::intern {
         for (u32 i = bucket_index; i < pool.capacity; ++i) {
             const auto id = pool.ids[i];
             if (id == 0) return false;
-            if (pool.hashes[i] == hash && pool.buf[id - 1].key == key) {
+            if (pool.hashes[i] == hash && pool.strings[id - 1].value == key) {
                 bucket_index = i;
                 return true;
             }
@@ -59,7 +58,7 @@ namespace basecode::intern {
         for (u32 i = 0; i < bucket_index; ++i) {
             const auto id = pool.ids[i];
             if (id == 0) return false;
-            if (pool.hashes[i] == hash && pool.buf[id - 1].key == key) {
+            if (pool.hashes[i] == hash && pool.strings[id - 1].value == key) {
                 bucket_index = i;
                 return true;
             }
@@ -68,7 +67,7 @@ namespace basecode::intern {
     }
 
     u0 free(intern_t& pool) {
-        assoc_array::free(pool.buf);
+        array::free(pool.strings);
         memory::free(pool.alloc, pool.ids);
         pool.ids    = {};
         pool.hashes = {};
@@ -76,7 +75,9 @@ namespace basecode::intern {
     }
 
     u0 reset(intern_t& pool) {
-        assoc_array::reset(pool.buf);
+        for (auto& str : pool.strings)
+            buf_pool::release((u8*) str.value.data);
+        array::reset(pool.strings);
         pool.size   = {};
         std::memset(pool.ids, 0, pool.capacity * sizeof(u32));
     }
@@ -87,12 +88,26 @@ namespace basecode::intern {
         return pool;
     }
 
+    b8 remove(intern_t& pool, u32 id) {
+        if (id == 0 || id > pool.strings.size)
+            return false;
+        const auto& str = pool.strings[id - 1];
+        buf_pool::release((u8*) str.value.data);
+        pool.hashes[str.bucket_index] = pool.ids[str.bucket_index] = {};
+        --pool.size;
+        array::erase(pool.strings, id - 1);
+        return true;
+    }
+
     result_t get(intern_t& pool, u32 id) {
-        if (id == 0 || id > pool.buf.size)
+        if (id == 0 || id > pool.strings.size)
             return result_t{.status = status_t::not_found};
-        auto pair = pool.buf[id - 1];
-        u32 bucket_index = *pair.value;
-        return result_t{pool.hashes[bucket_index], pair.key, id, status_t::ok, false};
+        const auto& str = pool.strings[id - 1];
+        return result_t{pool.hashes[str.bucket_index], str.value, id, status_t::ok, false};
+    }
+
+    u0 reserve(intern_t& pool, u32 capacity) {
+        array::reserve(pool.strings, capacity);
     }
 
     str::slice_t status_name(status_t status) {
@@ -118,13 +133,13 @@ namespace basecode::intern {
             if (id == 0) continue;
 
             const u64 hash = pool.hashes[i];
-            u32 bucket_index = ((u128) hash * (u128) new_capacity) >> 64;
+            u32 bucket_index = (u128(hash) * u128(new_capacity)) >> u128(64);
             if (!find_bucket(ids, new_capacity, bucket_index))
                 return status_t::no_bucket;
 
-            ids[bucket_index]       = id;
-            hashes[bucket_index]    = hash;
-            pool.buf.values[id - 1] = bucket_index;
+            ids[bucket_index]    = id;
+            hashes[bucket_index] = hash;
+            pool.strings[id - 1].bucket_index = bucket_index;
         }
 
         memory::free(pool.alloc, pool.ids);
@@ -135,46 +150,53 @@ namespace basecode::intern {
         return status_t::ok;
     }
 
-    u0 init(intern_t& pool, alloc_t* alloc, f32 load_factor) {
-        pool.hashes      = {};
-        pool.ids         = {};
-        pool.alloc       = alloc;
-        pool.load_factor = load_factor;
-        pool.size        = pool.capacity = {};
-        assoc_array::init(pool.buf, pool.alloc);
-    }
-
-    result_t intern(intern_t& pool, const str::slice_t& value) {
+    result_t fold(intern_t& pool, const s8* data, s32 len) {
         if (requires_rehash(pool)) {
             auto status = rehash(pool, pool.size * 2);
             if (!OK(status))
                 return result_t{.status = status, .new_value = false};
         }
 
+        const auto value = slice::make(data, len == -1 ? strlen(data) : len);
         u64 hash         = hash::hash64(value);
-        u32 bucket_index = ((u128) hash * (u128) pool.capacity) >> 64;
+        u32 bucket_index = (u128(hash) * u128(pool.capacity)) >> u128(64);
 
         if (find_key(pool, hash, value, bucket_index)) {
             const auto id = pool.ids[bucket_index];
-            return result_t{hash, pool.buf[id - 1].key, id, status_t::ok, false};
+            return result_t{
+                hash,
+                pool.strings[id - 1].value,
+                id,
+                status_t::ok,
+                false
+            };
         }
 
         if (!find_bucket(pool.ids, pool.capacity, bucket_index))
             return result_t{.status = status_t::no_bucket, .new_value = false};
 
-        assoc_array::append(pool.buf, value, bucket_index);
+        auto& str = array::append(pool.strings);
+        auto buf = buf_pool::retain(value.length + 1);
+        std::memcpy(buf, value.data, value.length);
+        buf[value.length] = '\0';
+        str.value        = slice::make(buf, value.length);
+        str.bucket_index = bucket_index;
 
-        const auto id = pool.buf.size;
+        const auto id = pool.strings.size;
         pool.ids[bucket_index]    = id;
         pool.hashes[bucket_index] = hash;
 
         ++pool.size;
 
-        return result_t{hash, pool.buf[id - 1].key, id, status_t::ok, true};
+        return result_t{hash, str.value, id, status_t::ok, true};
     }
 
-    u0 reserve(intern_t& pool, u32 key_capacity, u32 value_capacity) {
-        assoc_array::reserve_keys(pool.buf, key_capacity);
-        assoc_array::reserve_values(pool.buf, value_capacity);
+    u0 init(intern_t& pool, alloc_t* alloc, f32 load_factor) {
+        pool.hashes      = {};
+        pool.ids         = {};
+        pool.alloc       = alloc;
+        pool.load_factor = load_factor;
+        pool.size        = pool.capacity = {};
+        array::init(pool.strings, pool.alloc);
     }
 }

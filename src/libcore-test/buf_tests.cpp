@@ -39,7 +39,7 @@ TEST_CASE("basecode::buf basics") {
     buf::index(buf);
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("index buf"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("index buf"_ss, 40, time);
 
 //    u32 lineno{};
 //    for (const auto& line : buf.lines) {
@@ -66,7 +66,7 @@ TEST_CASE("basecode::buf extended indexing") {
     buf::index(buf);
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("index buf"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("index buf"_ss, 40, time);
 
 //    u32 lineno{};
 //    for (const auto& line : buf.lines) {

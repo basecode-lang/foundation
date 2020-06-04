@@ -34,7 +34,7 @@ namespace basecode::network {
     };
 
     static s32 recv(socket_t& sock, u0* buf, s32 len, s32 timeout) {
-        struct pollfd fd;
+        struct pollfd fd{};
         fd.fd     = sock.socket;
         fd.events = POLLIN;
         return poll(&fd, 1, timeout) > 0 ? ::recv(sock.socket, (s8*) buf, len, 0) : -1;
@@ -85,7 +85,7 @@ namespace basecode::network {
     }
 
     u0 socket::free(socket_t& sock) {
-        close(sock);
+        socket::close(sock);
         memory::free(sock.alloc, sock.buf);
         sock.buf_cur  = sock.buf      = {};
         sock.buf_size = sock.buf_free = {};
@@ -93,20 +93,16 @@ namespace basecode::network {
 
     b8 socket::has_data(socket_t& sock) {
         if (sock.buf_free > 0) return true;
-        struct pollfd fd;
+        struct pollfd fd{};
         fd.fd     = sock.socket;
         fd.events = POLLIN;
         return poll(&fd, 1, 0) > 0;
     }
 
     status_t socket::close(socket_t& sock) {
-        if (sock.socket == -1) return status_t::socket_already_closed;
-#ifdef _WIN32
-        closesocket(sock.socket);
-#else
+        if (sock.socket == INVALID_SOCKET) return status_t::socket_already_closed;
         ::close(sock.socket);
-#endif
-        sock.socket = -1;
+        sock.socket = INVALID_SOCKET;
         if (sock.close_cb)
             sock.close_cb(sock);
         return status_t::ok;
@@ -118,13 +114,8 @@ namespace basecode::network {
 
     s32 socket::send_buf_size(socket_t& sock) {
         s32 buf_size;
-#if defined _WIN32 || defined __CYGWIN__
-        s32 sz = sizeof(buf_size);
-        getsockopt(sock.socket, SOL_SOCKET, SO_SNDBUF, (char*)&buf_size, &sz);
-#else
         socklen_t sz = sizeof(buf_size);
-        getsockopt(sock.socket, SOL_SOCKET, SO_SNDBUF, &buf_size, &sz);
-#endif
+        getsockopt(sock.socket, SOL_SOCKET, SO_SNDBUF, (s8*) &buf_size, &sz);
         return buf_size;
     }
 
@@ -132,7 +123,7 @@ namespace basecode::network {
         auto buf_ptr   = sock.buf;
         auto buf_start = buf_ptr;
         while (len > 0) {
-            auto write_len = ::send(sock.socket, buf, len, MSG_NOSIGNAL);
+            auto write_len = ::send(sock.socket, (const s8*) buf, len, MSG_NOSIGNAL);
             if (write_len == -1) return -1;
             len -= write_len;
             buf_ptr += write_len;
@@ -152,11 +143,7 @@ namespace basecode::network {
     }
 
     u0 ip_address::set(ip_address_t& ip, const struct sockaddr* addr) {
-#if __MINGW32__
-        auto ai = (struct sockaddr_in*) addr;
-#else
         auto ai = (const struct sockaddr_in*) addr;
-#endif
         inet_ntop(AF_INET, &ai->sin_addr, ip.text, 17);
         ip.number = ai->sin_addr.s_addr;
     }
@@ -170,9 +157,9 @@ namespace basecode::network {
     }
 
     status_t tcp::connect(socket_t& sock, str::slice_t addr, u16 port) {
-        if (sock.socket != -1) return status_t::socket_already_open;
+        if (sock.socket != INVALID_SOCKET) return status_t::socket_already_open;
 
-        struct addrinfo hints;
+        struct addrinfo hints{};
         struct addrinfo* res;
         struct addrinfo* ptr;
 
@@ -188,17 +175,13 @@ namespace basecode::network {
         s32 socket;
         for (ptr = res; ptr; ptr = ptr->ai_next) {
             socket  = ::socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-            if (socket == -1) continue;
+            if (socket == INVALID_SOCKET) continue;
 #ifdef __APPLE__
             s32 val = 1;
             setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &val, sizeof(val));
 #endif
             if (::connect(socket, ptr->ai_addr, ptr->ai_addrlen) == -1) {
-#ifdef _WIN32
-                closesocket(socket);
-#else
                 ::close(socket);
-#endif
                 continue;
             }
             break;
@@ -213,16 +196,16 @@ namespace basecode::network {
     }
 
     b8 tcp::accept(socket_t& listen_sock, socket_t& client_sock, s32 timeout) {
-        struct sockaddr_storage remote;
+        struct sockaddr_storage remote{};
         socklen_t               sz = sizeof(remote);
 
-        struct pollfd fd;
+        struct pollfd fd{};
         fd.fd     = listen_sock.socket;
         fd.events = POLLIN;
 
         if (poll(&fd, 1, timeout) > 0) {
             auto socket = ::accept(listen_sock.socket, (sockaddr*) &remote, &sz);
-            if (socket == -1)
+            if (socket == INVALID_SOCKET)
                 return false;
 #if defined __APPLE__
             s32 val = 1;
@@ -235,64 +218,46 @@ namespace basecode::network {
     }
 
     u8* udp::read(socket_t& sock, ssize& len, ip_address_t& addr, s32 timeout) {
-        struct pollfd fd;
+        struct pollfd fd{};
         fd.fd                  = sock.socket;
         fd.events              = POLLIN;
         if (poll(&fd, 1, timeout) <= 0)
             return nullptr;
-        struct sockaddr sa;
+        struct sockaddr sa{};
         socklen_t       sa_len = sizeof(struct sockaddr);
-        len = recvfrom(sock.socket, sock.buf, sock.buf_size, 0, &sa, &sa_len);
+        len = recvfrom(sock.socket, (s8*) sock.buf, sock.buf_size, 0, &sa, &sa_len);
         ip_address::set(addr, &sa);
         return sock.buf;
     }
 
     status_t udp::listen(socket_t& sock, u16 port) {
-        if (sock.socket != -1) return status_t::socket_already_open;
+        if (sock.socket != INVALID_SOCKET) return status_t::socket_already_open;
 
         auto socket = ::socket(AF_INET, SOCK_DGRAM, 0);
-        if (socket == -1)
+        if (socket == INVALID_SOCKET)
             return status_t::socket_dgram_error;
 
 #if defined __APPLE__
         s32 val = 1;
         setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &val, sizeof(val));
 #endif
-#if defined _WIN32 || defined __CYGWIN__
-        unsigned long reuse = 1;
-        setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
-#else
-        s32 reuse = 1;
-        setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-#endif
         s32 result;
-#if defined _WIN32 || defined __CYGWIN__
-        unsigned long broadcast = 1;
-        result = setsockopt(socket, SOL_SOCKET, SO_BROADCAST, (const char*)&broadcast, sizeof(broadcast));
-#else
+        s32 reuse = 1;
         s32 broadcast = 1;
-        result = setsockopt(socket, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof(broadcast));
-#endif
+        setsockopt(socket, SOL_SOCKET, SO_REUSEADDR, (const s8*) &reuse, sizeof(reuse));
+        result = setsockopt(socket, SOL_SOCKET, SO_BROADCAST, (const s8*) &broadcast, sizeof(broadcast));
         if (result == -1) {
-#ifdef _WIN32
-            closesocket(socket);
-#else
             ::close(socket);
-#endif
             return status_t::socket_option_broadcast_error;
         }
 
-        struct sockaddr_in addr;
+        struct sockaddr_in addr{};
         addr.sin_family      = AF_INET;
         addr.sin_port        = htons(port);
         addr.sin_addr.s_addr = INADDR_ANY;
 
         if (bind(socket, (sockaddr*) &addr, sizeof(addr)) == -1) {
-#ifdef _WIN32
-            closesocket(socket);
-#else
             ::close(socket);
-#endif
             return status_t::bind_failure;
         }
 
@@ -301,10 +266,10 @@ namespace basecode::network {
     }
 
     status_t tcp::listen(socket_t& sock, u16 port, s32 backlog) {
-        if (sock.socket != -1) return status_t::socket_already_open;
+        if (sock.socket != INVALID_SOCKET) return status_t::socket_already_open;
 
         struct addrinfo* res;
-        struct addrinfo hints;
+        struct addrinfo hints{};
 
         memset(&hints, 0, sizeof(hints));
         hints.ai_family   = AF_INET6;
@@ -316,13 +281,8 @@ namespace basecode::network {
             return status_t::invalid_address_and_port;
 
         sock.socket = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-#if defined _WIN32 || defined __CYGWIN__
-        unsigned long val = 0;
-        setsockopt(sock.socket, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&val, sizeof(val));
-#else
         s32 val = 1;
-        setsockopt(sock.socket, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
-#endif
+        setsockopt(sock.socket, SOL_SOCKET, SO_REUSEADDR, (const s8*) &val, sizeof(val));
         if (bind(sock.socket, res->ai_addr, res->ai_addrlen) == -1)
             return status_t::bind_failure;
 
@@ -333,7 +293,7 @@ namespace basecode::network {
     }
 
     s32 udp::send(socket_t& sock, u16 port, const u0* data, u32 len) {
-        struct sockaddr_in addr;
+        struct sockaddr_in addr{};
         addr.sin_family      = AF_INET;
         addr.sin_port        = htons(port);
         addr.sin_addr.s_addr = INADDR_BROADCAST;
@@ -341,7 +301,7 @@ namespace basecode::network {
     }
 
     u0 socket::init(socket_t& sock, u32 buf_size, socket_close_callback_t close_cb, alloc_t* alloc) {
-        sock.socket   = -1;
+        sock.socket   = INVALID_SOCKET;
         sock.user     = {};
         sock.alloc    = alloc;
         sock.close_cb = close_cb;

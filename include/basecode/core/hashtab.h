@@ -96,7 +96,7 @@ namespace basecode {
             if (table.capacity <= 0) return nullptr;
 
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = ((u128) hash * (u128) table.capacity) >> 64;
+            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
             u32 found_index;
             if (find_key(table, bucket_index, hash, key, &found_index)) {
                 if constexpr (IsPtr) {
@@ -117,7 +117,7 @@ namespace basecode {
                 rehash(table, table.capacity << 1);
 
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = ((u128) hash * (u128) table.capacity) >> 64;
+            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
             u32 found_index;
 
             if (find_free_bucket(table.hashes, table.capacity, bucket_index, &found_index)) {
@@ -142,7 +142,7 @@ namespace basecode {
                 rehash(table, table.capacity << 1);
 
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = ((u128) hash * (u128) table.capacity) >> 64;
+            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
             u32 found_index;
 
             if (find_free_bucket(table.hashes, table.capacity, bucket_index, &found_index)) {
@@ -178,7 +178,7 @@ namespace basecode {
         }
 
         inline b8 requires_rehash(u32 capacity, u32 size, f32 load_factor) {
-            return capacity == 0 || size + 1 > (capacity - 1) * load_factor;
+            return capacity == 0 || f32(size) + 1 > f32(capacity - 1) * load_factor;
         }
 
         template<typename K, typename V> hashtab_t<K, V> make(alloc_t* alloc) {
@@ -211,7 +211,7 @@ namespace basecode {
             if (table.capacity == 0)
                 return false;
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = ((u128) hash * (u128) table.capacity) >> 64;
+            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
             u32 found_index;
             if (!find_key(table, bucket_index, hash, key, &found_index))
                 return false;
@@ -240,7 +240,7 @@ namespace basecode {
             for (u32 i = 0; i < table.capacity; ++i) {
                 if (!table.hashes[i]) continue;
 
-                u32 bucket_index = ((u128) table.hashes[i] * (u128) new_capacity) >> 64;
+                u32 bucket_index = u128(table.hashes[i]) * u128(new_capacity) >> 64U;
                 u32 found_index;
                 find_free_bucket(new_hashes, new_capacity, bucket_index, &found_index);
 

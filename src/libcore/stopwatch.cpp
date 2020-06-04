@@ -21,6 +21,10 @@
 #include <basecode/core/stopwatch.h>
 
 namespace basecode::stopwatch {
+    u0 init(stopwatch_t& w) {
+        w.start = w.end = {};
+    }
+
     u0 stop(stopwatch_t& w) {
         w.end = profiler::get_time();
     }
@@ -35,17 +39,19 @@ namespace basecode::stopwatch {
         return delta * profiler::calibration_mult();
     }
 
-    u0 print_elapsed(str::slice_t label, s32 width, s64 elapsed) {
-        format::print("{}", label);
-        format::print("{:.<{}}", ".", width - label.length);
-        if (elapsed < 1000) {
-            format::print("{}ns\n", elapsed);
+    u0 print_elapsed(str::slice_t label, s32 width, stopwatch_t& w) {
+        const auto sv_label = (std::string_view) label;
+        const auto e = elapsed(w);
+        if (e <= 0) {
+            format::print_ellipsis(sv_label, width, "---\n", e);
+        } else if (e < 1000) {
+            format::print_ellipsis(sv_label, width, "{}ns\n", e);
         } else {
-            const auto us = elapsed / 1000;
+            const auto us = e / 1000;
             if (us >= 1000) {
-                format::print("{}ms\n", (f64) us / 1000);
+                format::print_ellipsis(sv_label, width, "{}ms\n", (f64) us / 1000);
             } else {
-                format::print("{}us\n", us);
+                format::print_ellipsis(sv_label, width, "{}us\n", us);
             }
         }
     }

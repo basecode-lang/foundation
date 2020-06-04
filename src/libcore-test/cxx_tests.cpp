@@ -40,10 +40,9 @@ TEST_CASE("basecode::cxx create program_t") {
     REQUIRE(pgm.storage.index.alloc);
     REQUIRE(pgm.storage.index.size == 1);
     REQUIRE(pgm.modules.size == 0);
-    REQUIRE(pgm.intern.alloc);
 
     stopwatch::stop(build_time);
-    stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
+    stopwatch::print_elapsed("total build time"_ss, 40, build_time);
 }
 
 TEST_CASE("basecode::cxx create module_t") {
@@ -80,7 +79,7 @@ TEST_CASE("basecode::cxx create module_t") {
     REQUIRE(root_scope.identifiers.size == 0);
 
     stopwatch::stop(build_time);
-    stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
+    stopwatch::print_elapsed("total build time"_ss, 40, build_time);
 }
 
 TEST_CASE("basecode::cxx create identifier within scope") {
@@ -107,12 +106,12 @@ TEST_CASE("basecode::cxx create identifier within scope") {
     REQUIRE(ident.record_id == id);
     REQUIRE(ident.intern_id != 0);
 
-    auto intern_result = intern::get(pgm.intern, ident.intern_id);
+    auto intern_result = string::interned::get(ident.intern_id);
     REQUIRE(OK(intern_result.status));
     REQUIRE(intern_result.slice == expected_ident);
 
     stopwatch::stop(build_time);
-    stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
+    stopwatch::print_elapsed("total build time"_ss, 40, build_time);
 }
 
 TEST_CASE("basecode::cxx declare s32 type within scope") {
@@ -135,7 +134,7 @@ TEST_CASE("basecode::cxx declare s32 type within scope") {
     REQUIRE(int_type_id != 0);
 
     stopwatch::stop(build_time);
-    stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
+    stopwatch::print_elapsed("total build time"_ss, 40, build_time);
 }
 
 TEST_CASE("basecode::cxx example program") {
@@ -266,7 +265,7 @@ TEST_CASE("basecode::cxx example program") {
     REQUIRE(OK(cxx::program::finalize(pgm)));
 
     stopwatch::stop(build_time);
-    stopwatch::print_elapsed("total build time"_ss, 40, stopwatch::elapsed(build_time));
+    stopwatch::print_elapsed("total build time"_ss, 40, build_time);
 
 //    {
 //        fmt_buf_t buf{};
@@ -282,7 +281,7 @@ TEST_CASE("basecode::cxx example program") {
         status = cxx::serializer::serialize(s);
 
         stopwatch::stop(serialize_time);
-        stopwatch::print_elapsed("total serialize time"_ss, 40, stopwatch::elapsed(serialize_time));
+        stopwatch::print_elapsed("total serialize time"_ss, 40, serialize_time);
 
         assoc_array_t<str_t*> modules{};
         assoc_array::init(modules);

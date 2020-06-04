@@ -18,7 +18,6 @@
 
 #include <basecode/core/str.h>
 #include <basecode/core/intern.h>
-#include <basecode/core/hashtab.h>
 #include <basecode/core/memory/system/trace.h>
 
 namespace basecode::memory::trace {
@@ -57,21 +56,35 @@ namespace basecode::memory::trace {
     };
 
     static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
+        UNUSED(alloc);
+        UNUSED(enforce);
+        *freed_size = 0;
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
+        UNUSED(alloc);
+        UNUSED(config);
     }
 
     static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
+        UNUSED(alloc);
+        UNUSED(mem);
         freed_size = 0;
     }
 
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& allocated_size) {
+        UNUSED(alloc);
+        UNUSED(size);
+        UNUSED(align);
         allocated_size = 0;
         return {};
     }
 
     static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size) {
+        UNUSED(alloc);
+        UNUSED(mem);
+        UNUSED(size);
+        UNUSED(align);
         old_size = {};
         return {};
     }
@@ -90,6 +103,8 @@ namespace basecode::memory::trace {
     }
 
     alloc_t* make(alloc_t* backing, str::slice_t name) {
+        UNUSED(backing);
+        UNUSED(name);
         return nullptr;
     }
 }

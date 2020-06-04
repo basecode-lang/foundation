@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <cerrno>
+#include <climits>
 #include <cstdlib>
 #include <basecode/core/numbers.h>
 

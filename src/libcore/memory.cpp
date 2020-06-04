@@ -16,16 +16,10 @@
 //
 // ----------------------------------------------------------------------------
 
-#ifdef _WIN32
-#   include <windows.h>
-#else
-#   include <unistd.h>
-#endif
-#include <cassert>
+#include <unistd.h>
 #include <sys/mman.h>
 #include <basecode/core/array.h>
 #include <basecode/core/format.h>
-#include <basecode/core/memory.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/core/memory/system/dl.h>
 #include <basecode/core/memory/system/page.h>
@@ -35,7 +29,6 @@
 #include <basecode/core/memory/system/trace.h>
 #include <basecode/core/memory/system/stack.h>
 #include <basecode/core/memory/system/default.h>
-
 
 namespace basecode::memory {
     struct system_t final {
@@ -123,13 +116,7 @@ namespace basecode::memory {
         }
 
         status_t init(alloc_type_t type, u32 heap_size, u0* base) {
-#ifdef _WIN32
-            SYSTEM_INFO system_info;
-            GetSystemInfo(&system_info);
-            t_system.os_page_size = system_info.dwAllocationGranularity;
-#else
             t_system.os_page_size = sysconf(_SC_PAGE_SIZE);
-#endif
             switch (type) {
                 case alloc_type_t::default_: {
                     auto status = memory::init(&t_system.default_alloc, alloc_type_t::default_);

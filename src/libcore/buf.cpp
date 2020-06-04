@@ -17,8 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/buf.h>
-#include <basecode/core/defer.h>
-#include <basecode/core/format.h>
 
 namespace basecode::buf {
     namespace cursor {
@@ -30,7 +28,7 @@ namespace basecode::buf {
 
         u0 init(buf_crsr_t& crsr, buf_t& buf) {
             crsr.buf = &buf;
-            crsr.pos = {};
+            crsr.pos = crsr.line = crsr.column = {};
         }
     }
 
@@ -56,12 +54,12 @@ namespace basecode::buf {
         const __m128i cr = _mm_set1_epi8('\r');
         const __m128i lf = _mm_set1_epi8('\n');
 
-        m128i_bytes_t dqw;
-        buf_line_t* line;
-        u32 start_pos{};
-        u32 end_pos;
-        u32 mask;
-        u32 i{};
+        m128i_bytes_t   dqw         {};
+        buf_line_t*     line;
+        u32             start_pos   {};
+        u32             end_pos;
+        u32             mask;
+        u32             i           {};
 
         array::reset(buf.lines);
         array::reserve(buf.lines, (buf.length / 80) * 3);
@@ -117,18 +115,9 @@ namespace basecode::buf {
             return;
 
         new_capacity = std::max(buf.length, new_capacity);
-        new_capacity = new_capacity + (-new_capacity & 15);
+        new_capacity = new_capacity + (-new_capacity & 15U);
         buf.data = (u8*) memory::realloc(buf.alloc, buf.data, new_capacity, 16);
         buf.capacity = new_capacity;
-    }
-
-    status_t load(buf_t& buf, const str_t& value) {
-        auto file = ::fmemopen(value.data, value.length, "r");
-        if (!file)
-            return status_t::unable_to_open_file;
-        defer(::fclose(file));
-        write(buf, 0, file, value.length);
-        return status_t::ok;
     }
 
     status_t load(buf_t& buf, const path_t& path) {
@@ -171,7 +160,7 @@ namespace basecode::buf {
     }
 
     b8 each_line(const buf_t& buf, const line_callback_t& cb, str::slice_t sep) {
-        s32 i{}, start_pos{};
+        u32 i{}, start_pos{};
         while (i < buf.length) {
             if (std::memcmp(buf.data + i, sep.data, sep.length) == 0) {
                 str::slice_t line;

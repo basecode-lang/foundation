@@ -27,12 +27,12 @@ endfunction()
 # Turn on warnings on the given target
 function(spdlog_enable_warnings target_name)
     target_compile_options(${target_name} PRIVATE
-        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
-            -Wall -Wextra -Wconversion -pedantic -Wfatal-errors>
+        $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:-Wall>
+		$<$<CXX_COMPILER_ID:GNU>:-pedantic>
         $<$<CXX_COMPILER_ID:MSVC>:/W4>)
-		if(MSVC_VERSION GREATER  1900)  #Allow non fatal security wanrnings for msvc 2015
-			target_compile_options(${target_name} PRIVATE /WX)
-		endif()
+#		if(MSVC_VERSION GREATER  1900)  #Allow non fatal security wanrnings for msvc 2015
+#			target_compile_options(${target_name} PRIVATE /WX)
+#		endif()
 endfunction()
 
 

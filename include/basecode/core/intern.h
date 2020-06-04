@@ -22,14 +22,18 @@
 #include <basecode/core/array.h>
 #include <basecode/core/slice.h>
 #include <basecode/core/hashtab.h>
-#include <basecode/core/assoc_array.h>
 
 namespace basecode {
+    struct interned_str_t final {
+        str::slice_t                    value;
+        u32                             bucket_index;
+    };
+
     struct intern_t final {
         alloc_t*                        alloc;
         u32*                            ids;
         u64*                            hashes;
-        assoc_array_t<u32>              buf;
+        array_t<interned_str_t>         strings;
         u32                             size;
         u32                             capacity;
         f32                             load_factor;
@@ -49,21 +53,31 @@ namespace basecode {
             u32                         id;
             status_t                    status;
             b8                          new_value;
+
+            b8 operator==(const result_t& other) const {
+                return id == other.id;
+            }
         };
 
         u0 free(intern_t& pool);
 
         u0 reset(intern_t& pool);
 
+        b8 remove(intern_t& pool, u32 id);
+
         result_t get(intern_t& pool, u32 id);
+
+        u0 reserve(intern_t& pool, u32 capacity);
 
         str::slice_t status_name(status_t status);
 
         intern_t make(alloc_t* alloc = context::top()->alloc);
 
-        result_t intern(intern_t& pool, const str::slice_t& value);
+        result_t fold(intern_t& pool, const s8* data, s32 len = -1);
 
-        u0 reserve(intern_t& pool, u32 key_capacity, u32 value_capacity);
+        result_t fold(intern_t& pool, const String_Concept auto& value) {
+            return fold(pool, (const s8*) value.data, value.length);
+        }
 
         u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc, f32 load_factor = .5f);
     }

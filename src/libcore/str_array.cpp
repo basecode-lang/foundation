@@ -39,17 +39,6 @@ namespace basecode::str_array {
         return array.size == 0;
     }
 
-    u0 append(str_array_t& array, s8* str) {
-        const auto length = strlen(str) + 1;
-        if (array.size + 1 > array.capacity)                grow_index(array);
-        if (array.buf.size + length > array.buf.capacity)   grow_data(array, length);
-        auto& idx = array.index[array.size++];
-        idx.offset = array.buf.size;
-        idx.length = length - 1;
-        std::memcpy(array.buf.data + idx.offset, str, length);
-        array.buf.size += length;
-    }
-
     // XXX: need to implement
     u0 erase(str_array_t& array, u32 index) {
         UNUSED(array);
@@ -72,6 +61,17 @@ namespace basecode::str_array {
     u0 grow_index(str_array_t& array, u32 new_capacity) {
         new_capacity = std::max(new_capacity, array.capacity);
         reserve_index(array, new_capacity * 2 + 8);
+    }
+
+    u0 append(str_array_t& array, const s8* str, s32 len) {
+        const auto length = len == - 1 ? strlen(str) + 1 : len + 1;
+        if (array.size + 1 > array.capacity)                grow_index(array);
+        if (array.buf.size + length > array.buf.capacity)   grow_data(array, length);
+        auto& idx = array.index[array.size++];
+        idx.offset = array.buf.size;
+        idx.length = length - 1;
+        std::memcpy(array.buf.data + idx.offset, str, length);
+        array.buf.size += length;
     }
 
     u0 reserve_data(str_array_t& array, u32 new_capacity) {

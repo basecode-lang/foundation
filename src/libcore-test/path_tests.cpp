@@ -47,7 +47,7 @@ TEST_CASE("basecode::path basics") {
     REQUIRE(filename == "ut.txt"_ss);
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("path basic operations"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("path basic operations"_ss, 40, time);
 }
 
 TEST_CASE("basecode::path only a file name") {
@@ -72,7 +72,7 @@ TEST_CASE("basecode::path only a file name") {
     REQUIRE(path::filename(path) == expected_path);
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("path only a file name"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("path only a file name"_ss, 40, time);
 }
 
 TEST_CASE("basecode::path change extension") {
@@ -101,28 +101,40 @@ TEST_CASE("basecode::path change extension") {
     REQUIRE(path::extension(path) == new_expected_ext);
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("path change extension"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("path change extension"_ss, 40, time);
 }
 
 
 TEST_CASE("basecode::path append") {
     const auto expected_base_path = "/Users/jeff"_ss;
     const auto expected_rel_path = "names/ut.txt"_ss;
+#ifdef _WIN32
+    const auto expected_combined_dir = R"(/Users/jeff\names)"_ss;
+#else
+    const auto expected_combined_dir = "/Users/jeff/names"_ss;
+#endif
 
     stopwatch_t time{};
     stopwatch::start(time);
 
+    path_t rel_path{};
     path_t base_path{};
+    path_t parent_path{};
+    defer(
+        path::free(base_path);
+        path::free(rel_path);
+        path::free(parent_path);
+        );
+
     path::init(base_path, expected_base_path);
     REQUIRE(!base_path.is_root);
 
-    path_t rel_path{};
     path::init(rel_path, expected_rel_path);
     REQUIRE(!rel_path.is_root);
 
     REQUIRE(OK(path::append(base_path, rel_path)));
 
-    REQUIRE(path::directory(base_path) == "/Users/jeff/names"_ss);
+    REQUIRE(path::directory(base_path) == expected_combined_dir);
     REQUIRE(path::length(base_path) == expected_base_path.length + expected_rel_path.length + 1);
 
     REQUIRE(path::extension(base_path) == ".txt"_ss);
@@ -130,19 +142,12 @@ TEST_CASE("basecode::path append") {
 
     format::print("base_path = {}\n", base_path);
 
-    path_t parent_path{};
     path::init(parent_path, slice::make(base_path));
 
     while (OK(path::parent_path(parent_path, parent_path))) {
         format::print("parent_path = {}\n", parent_path);
     }
 
-    defer(
-        path::free(base_path);
-        path::free(rel_path);
-        path::free(parent_path);
-         );
-
     stopwatch::stop(time);
-    stopwatch::print_elapsed("path append operations"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("path append operations"_ss, 40, time);
 }

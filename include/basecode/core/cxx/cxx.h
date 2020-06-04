@@ -22,7 +22,7 @@
 #include <basecode/core/types.h>
 #include <basecode/core/stack.h>
 #include <basecode/core/array.h>
-#include <basecode/core/intern.h>
+#include <basecode/core/string.h>
 #include <basecode/core/format.h>
 #include <basecode/core/symtab.h>
 
@@ -308,14 +308,12 @@ namespace basecode::cxx {
     struct program_t final {
         bass_t                  storage;
         module_array_t          modules;
-        intern_t                intern;
         str_t                   scratch;
         alloc_t*                alloc;
         u32                     id;
     };
 
     struct serializer_t final {
-        intern_t*               intern;
         bass_t*                 store;
         alloc_t*                alloc;
         symtab_t<str_t>         modules;
@@ -645,7 +643,7 @@ namespace basecode::cxx {
 
         status_t serialize(serializer_t& s);
 
-        status_t expand_type(bass_t& storage, intern_t& intern, u32 type_id, type_info_t& type_info);
+        status_t expand_type(bass_t& storage, u32 type_id, type_info_t& type_info);
 
         u0 init(serializer_t& s, program_t& pgm, alloc_t* alloc = context::top()->alloc, u16 margin = 160, u16 tab_width = 4);
     }

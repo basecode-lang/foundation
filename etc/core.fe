@@ -1,0 +1,32 @@
+(= for (mac (item lst . body)
+  (list 'do
+    (list 'let 'for-iter lst)
+    (list 'while 'for-iter
+      (list 'let item '(car for-iter))
+      '(= for-iter (cdr for-iter))
+      (cons 'do body)
+    )
+  )
+))
+
+(= parent-logger (current-logger))
+(= color-logger (log-create-color 'out))
+(= syslog-logger (syslog-create "bc-libcore-tests"
+               (list 'opt-pid 'opt-ndelay 'opt-cons 'opt-perror)
+               'local0))
+(= basic-file-logger (log-create-basic-file "test.log"))
+(= daily-file-logger (log-create-daily-file "daily.log" 23 0))
+(= rotating-file-logger (log-create-rotating-file "rotating.log" (* 256 1024) 256))
+
+(logger-append-child parent-logger color-logger)
+(logger-append-child parent-logger basic-file-logger)
+(logger-append-child parent-logger daily-file-logger)
+(logger-append-child parent-logger rotating-file-logger)
+(logger-append-child parent-logger syslog-logger)
+
+(log-info "example log message!")
+(log-warn "oh, shit!")
+(log-error "this should really stick out")
+
+(for arg (current-command-line)
+    (print arg))

@@ -81,7 +81,7 @@ namespace basecode::cxx::scope {
                 meta_type == meta_type_t::signed_integer ? format::to_radix(scope.pgm->scratch, s64(lit), radix) : format::to_radix(scope.pgm->scratch, u64(lit), radix);
                 break;
         }
-        auto r = intern::intern(scope.pgm->intern, slice::make(scope.pgm->scratch));
+        auto r = string::interned::fold_for_result(scope.pgm->scratch);
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::num_lit, 4);
@@ -330,7 +330,7 @@ namespace basecode::cxx::scope {
         ident_t ident{};
         if (symtab::find(scope.labels, name, ident))
             return ident.record_id;
-        auto     r = intern::intern(scope.pgm->intern, name);
+        auto     r = string::interned::fold_for_result(name);
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::label, 1);
@@ -355,7 +355,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 lit::str(scope_t& scope, str::slice_t lit) {
-        auto r = intern::intern(scope.pgm->intern, lit);
+        auto r = string::interned::fold_for_result(lit);
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::str_lit, 1);
@@ -405,7 +405,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 expr::raw(scope_t& scope, str::slice_t source) {
-        auto r = intern::intern(scope.pgm->intern, source);
+        auto r = string::interned::fold_for_result(source);
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::expression, 3);
@@ -416,7 +416,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::raw(scope_t& scope, str::slice_t source) {
-        auto r = intern::intern(scope.pgm->intern, source);
+        auto r = string::interned::fold_for_result(source);
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::statement, 3);
@@ -435,7 +435,7 @@ namespace basecode::cxx::scope {
         ident_t ident{};
         if (symtab::find(scope.identifiers, name, ident))
             return ident.record_id;
-        auto r = intern::intern(scope.pgm->intern, name);
+        auto r = string::interned::fold_for_result(name);
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::ident, 2);
@@ -484,7 +484,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::pp::pragma(scope_t &scope, str::slice_t expr) {
-        auto r = intern::intern(scope.pgm->intern, expr);
+        auto r = string::interned::fold_for_result(expr);
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::statement, 3);
@@ -547,7 +547,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::comment::line(scope_t& scope, str::slice_t value) {
-        auto r = intern::intern(scope.pgm->intern, value);
+        auto r = string::interned::fold_for_result(value);
         auto id = make_comment(scope, r.id);
         array::append(scope.statements, id);
         return id;
@@ -590,7 +590,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::comment::block(scope_t& scope, str::slice_t value) {
-        auto r = intern::intern(scope.pgm->intern, value);
+        auto r = string::interned::fold_for_result(value);
         auto id = make_comment(scope, r.id, true);
         array::append(scope.statements, id);
         return id;
@@ -697,7 +697,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::pp::include_local(scope_t &scope, str::slice_t path) {
-        auto r = intern::intern(scope.pgm->intern, path);
+        auto r = string::interned::fold_for_result(path);
         auto id = make_include(scope, r.id, true);
         array::append(scope.statements, id);
         return id;
@@ -706,7 +706,7 @@ namespace basecode::cxx::scope {
     u32 lit::float_(scope_t& scope, f64 lit, integral_size_t size) {
         str_buf_t buf(&scope.pgm->scratch);
         format::format_to(buf, "{}", lit);
-        auto r = intern::intern(scope.pgm->intern, slice::make(scope.pgm->scratch));
+        auto r = string::interned::fold_for_result(scope.pgm->scratch);
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::num_lit, 3);
@@ -733,7 +733,7 @@ namespace basecode::cxx::scope {
     }
 
     u32 stmt::pp::include_system(scope_t &scope, str::slice_t path) {
-        auto r = intern::intern(scope.pgm->intern, path);
+        auto r = string::interned::fold_for_result(path);
         auto id = make_include(scope, r.id);
         array::append(scope.statements, id);
         return id;

@@ -18,6 +18,9 @@
 
 #pragma once
 
+#ifndef _WIN32
+#   include <zconf.h>
+#endif
 #include <basecode/core/str.h>
 #include <basecode/core/array.h>
 
@@ -49,6 +52,8 @@ namespace basecode {
         b8 empty(const path_t& path);
 
         u16 length(const path_t& path);
+
+        const s8* c_str(const path_t& path);
 
         str::slice_t stem(const path_t& path);
 

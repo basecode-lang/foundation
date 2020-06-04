@@ -44,7 +44,8 @@ namespace basecode::plot {
 
     u0 scrolled::append_point(scrolled_view_t& view, f32 x, f32 y) {
         if (y > view.max_y) view.max_y = y;
-        if (view.values.size < view.max_size) {
+        const s32 size = view.values.size;
+        if (size < view.max_size) {
             array::append(view.values, data_point_t{x, y});
         } else {
             view.values[view.offset] = data_point_t{x, y};

@@ -1,7 +1,16 @@
 BACKLOG
 ---------
+- rework graphviz api
+- add directed_graph_t
+- locale: localized strings
+- abstract: shared memory buffer between processes
+- ipc: create an ipc module for low-level base
+    ipc_addr_t, ipc_transport_t, ipc_
+- buddy allocator
 - page allocator: implement free list so pages can recycle
-- page allocator/slab allocator: implement reserve function so n numbers of pages can be allocated at a time. this would replace passing num_pages into these up front and makes the interface (perhaps) more consistent with other mechanisms in the library.
+- page allocator/slab allocator: implement reserve function so n numbers of pages can be allocated at a time.
+        this would replace passing num_pages into these up front and makes the interface (perhaps) more consistent
+        with other mechanisms in the library.
 - buf: create a Buffer_Concept and rework buf to be based on it
 - buf: pretty formatting for source errors
 - term: module for ANSI output to terminals
@@ -11,87 +20,43 @@ BACKLOG
             also, need to read applicable env vars once at module init and put them into the
             same symtab_t/hashtab_t.
 - filesys: once meta data is done (previous task), implement the remaining places::* functions
-- rework graphviz api
-- add directed_graph_t
-- locale: localized strings
-- libgfx: create new library holding common graphics related functionality
+- libgfx: pull in nfd or rewrite based on nfd_extended
+- libgfx: font book/font loading from scm file
+- libgfx: bitmap loading from scm file
+- libgfx: native menus support + scm file to define
+- libgfx: pull over zed + implot
+- libgfx: create test bed application within foundation project
 
-20200106
---------
-    DONE
-    ----
-    - path: implement replace_extension function
-    - path: implement stem function, which returns the file name without the extension
-
-20201705
---------
-    DONE
-    ----
-    - add bintree_t
-    - memory: create a public api which returns a tree structure of allocators that tools like a UI can
-            invoke and create a display of allocators in a hierarchy
-20201605
---------
-    DONE
-    ----
-    - add queue_t
-    - audit: stack_t
-    - fix: set_t functionality finalized & tested
-    - fix: symtab_t appears to be increasing the size member more often than it should so the count of
-            a symtab_t is off-by-n (where n is usually <= 5) compared to a hashtab_t.
-
-20201505
---------
-    DONE
-    ----
-    - fix: symtab_t remove needs to be rewritten to recursively visit each prefix
-
-20201405
---------
-    DONE
-    ----
-    - ffi module
-    - path & filesys modules
-    - use new path module to grab the process filename from argv[0] in the default log system
-
-20201305
---------
-    DONE
-    ----
-    - network
-
-20201205
---------
-    DONE
-    ----
-    - logging
-
-20201105
---------
-    DONE
-    ----
-    - add set_t
-    - add linked_list_t
-    - integrate iterator macros
-    - symtab_t: make pairs function a prefix search, defaulting to everything
-    - bit functions
-
-20200705
---------
-    DONE
-    ----
-    - replace intern pool + hashtable in proxy_system
-    - implement symtab::find and symtab::remove
-    - test a few different slab size configs
-    - change slab system to allow config for number of pages allocated for
-        each slab.  default should be 1 page.
-    - change stable_array and symtab to support passing in number of pages
-        default is 1 page.
-
-20200605
---------
-    DONE
-    ----
-    - slab::reset function
-    - symtab::reset should mark all nodes empty, free values
+DONE
+----
+- path: implement replace_extension function
+- path: implement stem function, which returns the file name without the extension
+- add bintree_t
+- memory: create a public api which returns a tree structure of allocators that tools like a UI can
+        invoke and create a display of allocators in a hierarchy
+- add queue_t
+- audit: stack_t
+- fix: set_t functionality finalized & tested
+- fix: symtab_t appears to be increasing the size member more often than it should so the count of
+        a symtab_t is off-by-n (where n is usually <= 5) compared to a hashtab_t.
+- fix: symtab_t remove needs to be rewritten to recursively visit each prefix
+- ffi module
+- path & filesys modules
+- use new path module to grab the process filename from argv[0] in the default log system
+- network
+- logging
+- add set_t
+- add linked_list_t
+- integrate iterator macros
+- symtab_t: make pairs function a prefix search, defaulting to everything
+- bit functions
+- replace intern pool + hashtable in proxy_system
+- implement symtab::find and symtab::remove
+- test a few different slab size configs
+- change slab system to allow config for number of pages allocated for
+    each slab.  default should be 1 page.
+- change stable_array and symtab to support passing in number of pages
+    default is 1 page.
+- slab::reset function
+- symtab::reset should mark all nodes empty, free values
 

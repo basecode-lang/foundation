@@ -16,18 +16,18 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <unistd.h>
 #include <sys/stat.h>
+#include <sys/types.h>
 #include <basecode/core/symtab.h>
 #include <basecode/core/filesys.h>
 
 namespace basecode::filesys {
     struct system_t final {
-        alloc_t*                alloc;
-        symtab_t<str_t>         env;
+        alloc_t*                    alloc;
+        symtab_t<str_t>             env;
     };
 
-    static str::slice_t         s_status_names[] = {
+    static str::slice_t             s_status_names[] = {
         "ok"_ss,
         "not dir"_ss,
         "not file"_ss,
@@ -48,21 +48,29 @@ namespace basecode::filesys {
         "cannot rename to existing file"_ss,
     };
 
-    thread_local system_t       t_file_sys = {};
+    thread_local system_t           t_file_sys = {};
 
     namespace glob {
         u0 free(glob_result_t& r) {
             ::globfree(&r.buf);
+            for (auto& s : r.paths)
+                str::free(s);
             array::free(r.paths);
+        }
+
+        u0 reset(glob_result_t& r) {
+            for (auto& s : r.paths)
+                str::free(s);
+            array::reset(r.paths);
         }
 
         u0 init(glob_result_t& r, alloc_t* alloc) {
             array::init(r.paths, alloc);
-            ZERO_MEM(&r.buf, sizeof(glob_t));
+            ZERO_MEM(&r.buf, glob_t);
         }
 
         status_t find(glob_result_t& r, str::slice_t pattern, u32 flags) {
-            if ((flags & GLOB_APPEND) == 0) array::reset(r.paths);
+            if ((flags & GLOB_APPEND) == 0) reset(r);
             WITH_SLICE_AS_CSTR(pattern, ::glob(pattern, flags, nullptr, &r.buf););
             for (u32 i = r.buf.gl_offs; i < r.buf.gl_pathc; ++i)
                 array::append(r.paths, (str_t) r.buf.gl_pathv[i]);
@@ -102,13 +110,13 @@ namespace basecode::filesys {
 
     status_t exists(const path_t& path) {
         if (path::empty(path)) return status_t::unexpected_empty_path;
-        struct stat sb;
+        struct stat sb{};
         return stat(str::c_str(const_cast<str_t&>(path.str)), &sb) == 0 ? status_t::ok : status_t::not_exists;
     }
 
     status_t is_dir(const path_t& path) {
         if (path::empty(path)) return status_t::unexpected_empty_path;
-        struct stat sb;
+        struct stat sb{};
         if (stat(str::c_str(const_cast<str_t&>(path.str)), &sb))
             return status_t::not_exists;
         return S_ISDIR(sb.st_mode) ? status_t::ok : status_t::not_dir;
@@ -116,7 +124,7 @@ namespace basecode::filesys {
 
     status_t is_file(const path_t& path) {
         if (path::empty(path)) return status_t::unexpected_empty_path;
-        struct stat sb;
+        struct stat sb{};
         if (stat(str::c_str(const_cast<str_t&>(path.str)), &sb))
             return status_t::not_exists;
         return S_ISREG(sb.st_mode) ? status_t::ok : status_t::not_file;
@@ -224,7 +232,13 @@ namespace basecode::filesys {
         if (path::empty(path))      return status_t::unexpected_empty_path;
         if (path.is_root)           return status_t::cannot_modify_root;
         if (!recursive) {
-            return ::mkdir(str::c_str(const_cast<str_t&>(path.str)), S_IRWXU) == 0 ? status_t::ok : status_t::mkdir_failure;
+            s32 rc;
+#if _WIN32
+            rc = ::mkdir(str::c_str(const_cast<str_t&>(path.str)));
+#else
+            rc = ::mkdir(str::c_str(const_cast<str_t&>(path.str)), S_IRWXU);
+#endif
+            return rc == 0 ? status_t::ok : status_t::mkdir_failure;
         }
 
         s8 temp[PATH_MAX];
@@ -234,7 +248,13 @@ namespace basecode::filesys {
         for (auto p = temp + 1; *p; ++p) {
             if (*p == '/') {
                 *p = '\0';
-                if (::mkdir(temp, S_IRWXU) != 0) {
+                s32 rc;
+#if _WIN32
+                rc = ::mkdir(temp);
+#else
+                rc = ::mkdir(temp, S_IRWXU);
+#endif
+                if (rc != 0) {
                     if (errno != EEXIST)
                         return status_t::mkdir_failure;
                 }
@@ -242,7 +262,13 @@ namespace basecode::filesys {
             }
         }
 
-        if (::mkdir(temp, S_IRWXU) != 0) {
+        s32 rc;
+#if _WIN32
+        rc = ::mkdir(temp);
+#else
+        rc = ::mkdir(temp, S_IRWXU);
+#endif
+        if (rc != 0) {
             if (errno != EEXIST)
                 return status_t::mkdir_failure;
         }
@@ -261,15 +287,19 @@ namespace basecode::filesys {
         std::memcpy(temp, name.data, name.length);
         std::memset(temp + name.length, 'X', 6);
         temp[name.length + 6] = '\0';
+#ifndef _WIN32
         auto temp_str = ::mkdtemp(temp);
         if (!temp_str) return status_t::mkdtemp_failure;
         str::append(path.str, temp_str);
+#else
+        // XXX: FIXME
+#endif
         return status_t::ok;
     }
 
     status_t file_size(const path_t& path, usize& size) {
         if (path::empty(path)) return status_t::unexpected_empty_path;
-        struct stat sb;
+        struct stat sb{};
         if (stat(str::c_str(const_cast<str_t&>(path.str)), &sb))
             return status_t::not_exists;
         size = sb.st_size;
@@ -279,8 +309,13 @@ namespace basecode::filesys {
     status_t mkabs(const path_t& path, path_t& new_path) {
         if (path::empty(path)) return status_t::unexpected_empty_path;
         s8 temp[PATH_MAX];
+#if _WIN32
+        if (!_fullpath(temp, str::c_str(const_cast<str_t&>(path.str)), PATH_MAX))
+            return status_t::realpath_failure;
+#else
         if (!realpath(str::c_str(const_cast<str_t&>(path.str)), temp))
             return status_t::realpath_failure;
+#endif
         path::set(new_path, temp);
         return status_t::ok;
     }
@@ -312,8 +347,8 @@ namespace basecode::filesys {
 
     status_t equivalent(const path_t& path1, const path_t& path2) {
         if (path::empty(path1) || path::empty(path2)) return status_t::unexpected_empty_path;
-        struct stat sb1;
-        struct stat sb2;
+        struct stat sb1{};
+        struct stat sb2{};
         if (stat(str::c_str(const_cast<str_t&>(path1.str)), &sb1))
             return status_t::not_exists;
         if (stat(str::c_str(const_cast<str_t&>(path2.str)), &sb2))

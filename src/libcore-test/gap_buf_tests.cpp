@@ -49,7 +49,7 @@ TEST_CASE("basecode::gap_buf basics") {
     gap_buf::caret_delete(buf, 4);
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("gap_buf edit test"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("gap_buf edit test"_ss, 40, time);
 
     gap_buf::print(buf);
     format::print("\n");

@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/ffi.h>
-#include <basecode/core/hashtab.h>
 #include <basecode/core/stable_array.h>
 
 namespace basecode::ffi {
@@ -36,8 +35,8 @@ namespace basecode::ffi {
         stable_array_t<lib_t>                   libs;
         stable_array_t<param_t>                 params;
         stable_array_t<proto_t>                 protos;
-        hashtab_t<str::slice_t, lib_pair_t>     lib_map;
-        hashtab_t<str::slice_t, proto_pair_t>   proto_map;
+        symtab_t<lib_pair_t>                    lib_map;
+        symtab_t<proto_pair_t>                  proto_map;
     };
 
     static str::slice_t                         s_status_names[] = {
@@ -61,8 +60,8 @@ namespace basecode::ffi {
             array::free(param->members);
         for (auto proto : g_ffi_system.protos)
             array::free(proto->params);
-        hashtab::free(g_ffi_system.lib_map);
-        hashtab::free(g_ffi_system.proto_map);
+        symtab::free(g_ffi_system.lib_map);
+        symtab::free(g_ffi_system.proto_map);
         stable_array::free(g_ffi_system.libs);
         stable_array::free(g_ffi_system.protos);
         stable_array::free(g_ffi_system.params);
@@ -78,21 +77,41 @@ namespace basecode::ffi {
         dcReset(ffi.vm);
     }
 
+    u0 proto::free(proto_t* proto) {
+        for (auto param : proto->params)
+            param::free(param);
+        array::free(proto->params);
+    }
+
+    u0 param::free(param_t* param) {
+        if (!param)
+            return;
+        for (auto member_param : param->members)
+            param::free(member_param);
+        array::free(param->members);
+    }
+
     status_t lib::unload(lib_t* lib) {
-        auto pair = hashtab::find(g_ffi_system.lib_map, lib->path);
-        if (!pair) return status_t::lib_not_loaded;
+        if (!lib) return status_t::ok;
         symtab::free(lib->symbols);
         if (lib->handle) dlFreeLibrary(lib->handle);
-        stable_array::erase(g_ffi_system.libs, pair->idx);
-        hashtab::remove(g_ffi_system.lib_map, lib->path);
-        return status_t::ok;
+        lib_pair_t pair{};
+        const auto path_slice = slice::make(lib->path.str);
+        if (symtab::find(g_ffi_system.lib_map, path_slice, pair)) {
+            stable_array::erase(g_ffi_system.libs, pair.idx - 1);
+            symtab::remove(g_ffi_system.lib_map, path_slice);
+            path::free(lib->path);
+            return status_t::ok;
+        }
+        return status_t::lib_not_loaded;
     }
 
     b8 proto::remove(str::slice_t symbol) {
-        auto pair = hashtab::find(g_ffi_system.proto_map, symbol);
-        if (pair) {
-            stable_array::erase(g_ffi_system.protos, pair->idx);
-            hashtab::remove(g_ffi_system.proto_map, symbol);
+        proto_pair_t pair{};
+        if (symtab::find(g_ffi_system.proto_map, symbol, pair)) {
+            proto::free(pair.proto);
+            stable_array::erase(g_ffi_system.protos, pair.idx - 1);
+            symtab::remove(g_ffi_system.proto_map, symbol);
             return true;
         }
         return false;
@@ -103,44 +122,51 @@ namespace basecode::ffi {
     }
 
     proto_t* proto::find(str::slice_t symbol) {
-        auto pair = hashtab::find(g_ffi_system.proto_map, symbol);
-        return pair ? pair->proto : nullptr;
+        proto_pair_t pair{};
+        return symtab::find(g_ffi_system.proto_map, symbol, pair) ? pair.proto : nullptr;
     }
 
     proto_t* proto::make(str::slice_t symbol) {
-        auto pair = hashtab::find(g_ffi_system.proto_map, symbol);
-        if (pair)
-            return pair->proto;
-        auto proto = &stable_array::append(g_ffi_system.protos);
-        pair = hashtab::emplace(g_ffi_system.proto_map, symbol);
-        pair->idx       = g_ffi_system.protos.size;
-        pair->proto     = proto;
-        proto->lib      = {};
-        proto->func     = {};
-        proto->name     = symbol;
-        proto->ret_type = {};
-        proto->mode     = call_mode_t::system;
-        array::init(proto->params, g_ffi_system.alloc);
-        return proto;
+        proto_pair_t pair{};
+        if (symtab::find(g_ffi_system.proto_map, symbol, pair))
+            return pair.proto;
+        proto_pair_t* new_pair{};
+        if (symtab::emplace(g_ffi_system.proto_map, symbol, &new_pair)) {
+            auto proto = &stable_array::append(g_ffi_system.protos);
+            new_pair->idx   = g_ffi_system.protos.size;
+            new_pair->proto = proto;
+            proto->lib      = {};
+            proto->func     = {};
+            proto->ret_type = {};
+            proto->name     = symbol;
+            proto->mode     = call_mode_t::system;
+            array::init(proto->params, g_ffi_system.alloc);
+            return proto;
+        }
+        return nullptr;
     }
 
     status_t lib::load(const path_t& path, lib_t** lib) {
+        lib_pair_t pair{};
         const auto path_slice = slice::make(path);
-        auto       pair       = hashtab::find(g_ffi_system.lib_map, path_slice);
-        if (pair) {
-            *lib = pair->lib;
+        if (symtab::find(g_ffi_system.lib_map, path_slice, pair)) {
+            *lib = pair.lib;
             return status_t::ok;
         }
-        pair = hashtab::emplace(g_ffi_system.lib_map, path_slice);
-        pair->lib         = &stable_array::append(g_ffi_system.libs);
-        pair->idx         = g_ffi_system.libs.size;
-        pair->lib->path   = path_slice;
-        pair->lib->alloc  = g_ffi_system.alloc;
-        pair->lib->handle = dlLoadLibrary(str::c_str(const_cast<str_t&>(path.str)));
-        if (!pair->lib->handle) return status_t::load_library_failure;
-        symtab::init(pair->lib->symbols, pair->lib->alloc);
-        *lib = pair->lib;
-        return status_t::ok;
+        lib_pair_t* new_pair{};
+        if (symtab::emplace(g_ffi_system.lib_map, path_slice, &new_pair)) {
+            new_pair->lib         = &stable_array::append(g_ffi_system.libs);
+            new_pair->idx         = g_ffi_system.libs.size;
+            path::init(new_pair->lib->path, path_slice, g_ffi_system.alloc);
+            new_pair->lib->alloc  = g_ffi_system.alloc;
+            new_pair->lib->handle = dlLoadLibrary(str::c_str(const_cast<str_t&>(path.str)));
+            if (!new_pair->lib->handle)
+                return status_t::load_library_failure;
+            symtab::init(new_pair->lib->symbols, new_pair->lib->alloc);
+            *lib = new_pair->lib;
+            return status_t::ok;
+        }
+        return status_t::load_library_failure;
     }
 
     status_t system::init(alloc_t* alloc, u8 num_pages) {
@@ -148,8 +174,8 @@ namespace basecode::ffi {
         stable_array::init(g_ffi_system.libs, g_ffi_system.alloc, num_pages);
         stable_array::init(g_ffi_system.params, g_ffi_system.alloc, num_pages);
         stable_array::init(g_ffi_system.protos, g_ffi_system.alloc, num_pages);
-        hashtab::init(g_ffi_system.lib_map, g_ffi_system.alloc, .7f);
-        hashtab::init(g_ffi_system.proto_map, g_ffi_system.alloc, .7f);
+        symtab::init(g_ffi_system.lib_map, g_ffi_system.alloc);
+        symtab::init(g_ffi_system.proto_map, g_ffi_system.alloc);
         return status_t::ok;
     }
 

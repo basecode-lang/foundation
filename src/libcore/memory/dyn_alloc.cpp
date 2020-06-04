@@ -20,10 +20,12 @@
 
 using namespace basecode;
 
-extern "C" u0 dyn_free(u0* mem) {
-    memory::free(context::top()->alloc, mem);
-}
+extern "C" {
+    void dyn_free(void* mem) {
+        memory::free(context::top()->alloc, mem);
+    }
 
-extern "C" u0* dyn_alloc(usize size) {
-    return memory::alloc(context::top()->alloc, size);
+    void* dyn_alloc(size_t size) {
+        return memory::alloc(context::top()->alloc, size);
+    }
 }

@@ -59,6 +59,7 @@ namespace basecode::memory::page {
     }
 
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
+        UNUSED(size); UNUSED(align);
         auto sc      = &alloc->subclass.page;
         auto backing = alloc->backing;
         page_header_t* page{};

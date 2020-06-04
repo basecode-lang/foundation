@@ -21,7 +21,6 @@
 
 namespace basecode::cxx::program {
     static b8 format_record(format_type_t type, cursor_t& c, fmt_buf_t& buf, u0* ctx) {
-        auto pgm = (program_t*) ctx;
         if (type == format_type_t::field) {
             auto value = c.field->value;
             format::format_to(
@@ -99,7 +98,7 @@ namespace basecode::cxx::program {
                     break;
                 }
                 case element::field::intern: {
-                    auto rc = intern::get(pgm->intern, value);
+                    auto rc = string::interned::get(value);
                     format::format_to(buf, "\n\t{:<16} = '{}'", " .slice", rc.slice);
                     break;
                 }
@@ -125,7 +124,6 @@ namespace basecode::cxx::program {
         for (auto& module : pgm.modules)
             module::free(module);
         array::free(pgm.modules);
-        intern::free(pgm.intern);
     }
 
     status_t finalize(program_t& pgm) {
@@ -167,7 +165,6 @@ namespace basecode::cxx::program {
     }
 
     u0 init(program_t& pgm, alloc_t* alloc, u32 num_modules) {
-        intern::init(pgm.intern, alloc);
         array::init(pgm.modules, alloc);
         array::reserve(pgm.modules, num_modules);
         str::init(pgm.scratch, alloc);

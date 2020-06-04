@@ -43,7 +43,7 @@ TEST_CASE("basecode::symtab_t remove key") {
         REQUIRE(symbols.size == 3);
 
         stopwatch::stop(time);
-        stopwatch::print_elapsed("add key/values step 1"_ss, 40, stopwatch::elapsed(time));
+        stopwatch::print_elapsed("add key/values step 1"_ss, 40, time);
         symtab::format_pairs(symbols);
     }
 
@@ -57,7 +57,7 @@ TEST_CASE("basecode::symtab_t remove key") {
         REQUIRE(symbols.size == 0);
 
         stopwatch::stop(time);
-        stopwatch::print_elapsed("remove key/values from step 1"_ss, 40, stopwatch::elapsed(time));
+        stopwatch::print_elapsed("remove key/values from step 1"_ss, 40, time);
         symtab::format_pairs(symbols);
     }
 
@@ -72,7 +72,7 @@ TEST_CASE("basecode::symtab_t remove key") {
         REQUIRE(symbols.size == 4);
 
         stopwatch::stop(time);
-        stopwatch::print_elapsed("add key/values step 2"_ss, 40, stopwatch::elapsed(time));
+        stopwatch::print_elapsed("add key/values step 2"_ss, 40, time);
         symtab::format_pairs(symbols);
     }
 }
@@ -129,5 +129,5 @@ TEST_CASE("basecode::symtab_t names") {
     stopwatch::stop(emplace_time);
 
     format::print("table.size = {}, table.nodes.size = {}\n", symbols.size, symbols.nodes.size);
-    stopwatch::print_elapsed("total symtab emplace time"_ss, 40, stopwatch::elapsed(emplace_time));
+    stopwatch::print_elapsed("total symtab emplace time"_ss, 40, emplace_time);
 }

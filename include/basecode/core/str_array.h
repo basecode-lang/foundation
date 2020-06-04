@@ -56,8 +56,6 @@ namespace basecode {
 
         u0 erase(str_array_t& array, u32 index);
 
-        u0 append(str_array_t& array, const s8* str);
-
         u0 reserve_data(str_array_t& array, u32 new_capacity);
 
         u0 reserve_index(str_array_t& array, u32 new_capacity);
@@ -65,6 +63,8 @@ namespace basecode {
         u0 grow_data(str_array_t& array, u32 new_capacity = 0);
 
         u0 grow_index(str_array_t& array, u32 new_capacity = 0);
+
+        u0 append(str_array_t& array, const s8* str, s32 len = -1);
 
         u0 append(str_array_t& array, const String_Concept auto& str) {
             if (array.size + 1 > array.capacity)                        grow_index(array);

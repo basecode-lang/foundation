@@ -19,12 +19,13 @@
 #pragma once
 
 #include <glob.h>
+#include <unistd.h>
 #include <basecode/core/path.h>
 
 namespace basecode {
     struct glob_result_t final {
-        glob_t              buf;
-        array_t<str_t>      paths;
+        glob_t                      buf;
+        array_t<str_t>              paths;
     };
     static_assert(sizeof(glob_result_t) <= 112, "glob_result_t is now bigger than 112 bytes!");
 
@@ -53,6 +54,8 @@ namespace basecode {
 
         namespace glob {
             u0 free(glob_result_t& r);
+
+            u0 reset(glob_result_t& r);
 
             inline u32 size(const glob_result_t& r) {
                 return r.paths.size;

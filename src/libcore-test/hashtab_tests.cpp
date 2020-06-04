@@ -72,8 +72,7 @@ TEST_CASE("basecode::hashtab names") {
 
     stopwatch::stop(emplace_time);
     format::print("table.size = {}, table.capcaity = {}\n", table.size, table.capacity);
-    stopwatch::print_elapsed("total hashtab emplace time"_ss, 40,
-                             stopwatch::elapsed(emplace_time));
+    stopwatch::print_elapsed("total hashtab emplace time"_ss, 40, emplace_time);
 }
 
 TEST_CASE("basecode::hashtab payload with random string keys") {
@@ -110,7 +109,7 @@ TEST_CASE("basecode::hashtab payload with random string keys") {
     }
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("hashtab payload + string key"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("hashtab payload + string key"_ss, 40, time);
 }
 
 TEST_CASE("basecode::hashtab payload with integer keys") {
@@ -128,7 +127,7 @@ TEST_CASE("basecode::hashtab payload with integer keys") {
     }
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("hashtab payload + int key"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("hashtab payload + int key"_ss, 40, time);
 }
 
 TEST_CASE("basecode::hashtab basics") {
@@ -188,5 +187,5 @@ TEST_CASE("basecode::hashtab basics") {
     REQUIRE(*s == four);
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("hashtab insert + find"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("hashtab insert + find"_ss, 40, time);
 }

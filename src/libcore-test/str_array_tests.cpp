@@ -44,7 +44,7 @@ TEST_CASE("basecode::str_array basics") {
     }
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("str_array: append"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("str_array: append"_ss, 40, time);
     //format::print("{}\n", array);
 
     REQUIRE(array.size == 100);

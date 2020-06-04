@@ -35,9 +35,12 @@ namespace basecode::log::syslog {
         openlog(sc->ident, sc->opts, sc->facility);
     }
 
-    static u0 emit(logger_t* logger, log_level_t level, str::slice_t msg) {
+    static u0 emit(logger_t* logger, log_level_t level, fmt_str_t format_str, const fmt_args_t& args) {
         UNUSED(logger);
-        ::syslog((s32) level, "%s", msg.data);
+        fmt_buf_t buf{};
+        fmt::vformat_to(buf, format_str, args);
+        format::format_to(buf, "{}", '\0');
+        ::syslog((s32) level, "%s", buf.data());
     }
 
     logger_system_t               g_syslog_system{

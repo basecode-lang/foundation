@@ -129,6 +129,12 @@ namespace basecode {
             array.data[array.size++] = v;
         }
 
+        template<typename T> u0 truncate(stable_array_t<T>& array, u32 index) {
+            for (u32 i = index; i < array.size; ++i)
+                memory::free(array.slab_alloc, array.data[i]);
+            array.size = index;
+        }
+
         template<typename T> u0 resize(stable_array_t<T>& array, u32 new_size) {
             if (new_size > array.capacity)
                 grow(array, new_size);
@@ -145,9 +151,9 @@ namespace basecode {
             }
             if (idx == -1) return false;
             memory::free(array.slab_alloc, array.data[idx]);
+            --array.size;
             auto dest = array.data + idx;
             std::memcpy(dest, dest + 1, (array.size - idx) * sizeof(T*));
-            --array.size;
             return true;
         }
 

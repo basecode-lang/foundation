@@ -90,6 +90,7 @@ namespace basecode::log {
 
         logger_t* make(logger_type_t type, logger_config_t* config) {
             auto logger = (logger_t*) memory::alloc(&g_log_system.slab_alloc);
+            logger->name = config->name;
             log::init(logger, type, config);
             array::append(g_log_system.loggers, logger);
             return logger;
@@ -141,11 +142,11 @@ namespace basecode::log {
         return array::erase(logger->children, child);
     }
 
-    u0 emit(log_level_t level, str::slice_t msg, logger_t* logger) {
+    u0 emit(log_level_t level, fmt_str_t format_str, const fmt::format_args& args, logger_t* logger) {
         if (!logger->system || !logger->system->emit) return;
-        logger->system->emit(logger, level, msg);
+        logger->system->emit(logger, level, format_str, args);
         for (auto child_logger : logger->children)
-            emit(level, msg, child_logger);
+            emit(level, format_str, args, child_logger);
     }
 
     status_t init(logger_t* logger, logger_type_t type, logger_config_t* config, log_level_t mask, alloc_t* alloc) {

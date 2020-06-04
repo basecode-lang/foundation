@@ -19,6 +19,12 @@
 #include <basecode/core/path.h>
 
 namespace basecode::path {
+#ifdef _WIN32
+    constexpr s8 path_sep = '\\';
+#else
+    constexpr s8 path_sep = '/';
+#endif
+
     static str::slice_t s_status_names[] = {
         "ok"_ss,
         "path too long"_ss,
@@ -34,7 +40,8 @@ namespace basecode::path {
         if (path.str.length == 0) return;
         u16 last_ext_mark{};
         for (u16 i    = 0; i < path.str.length; ++i) {
-            if (path.str[i] == '/') {
+            const auto ch = path.str[i];
+            if (ch == '/' || ch == '\\') {
                 array::append(path.marks, i);
             } else if (path.str[i] == '.') {
                 last_ext_mark = i;
@@ -43,7 +50,8 @@ namespace basecode::path {
         if (array::empty(path.marks) || last_ext_mark > *array::back(path.marks)) {
             path.ext_mark = last_ext_mark;
         }
-        path.is_abs   = path.str[0] == '/';
+        const auto ch = path.str[0];
+        path.is_abs   = ch == '/' || ch == '\\';
         path.is_root  = path.is_abs && path.str.length == 1;
     }
 
@@ -59,6 +67,10 @@ namespace basecode::path {
 
     u16 length(const path_t& path) {
         return path.str.length;
+    }
+
+    const s8* c_str(const path_t& path) {
+        return str::c_str(const_cast<str_t&>(path.str));
     }
 
     str::slice_t stem(const path_t& path) {
@@ -96,8 +108,9 @@ namespace basecode::path {
         if (empty(rhs))                                         return status_t::ok;
         if (rhs.is_abs)                                         return status_t::expected_relative_path;
         if ((lhs.str.length + rhs.str.length + 2) > PATH_MAX)   return status_t::path_too_long;
-        if (lhs.str[lhs.str.length - 1] != '/') {
-            str::append(lhs.str, '/');
+        const auto ch = lhs.str[lhs.str.length - 1];
+        if (ch != '/' && ch != '\\') {
+            str::append(lhs.str, path_sep);
         }
         str::append(lhs.str, rhs.str);
         tokenize(lhs);

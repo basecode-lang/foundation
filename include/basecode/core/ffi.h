@@ -28,7 +28,7 @@ namespace basecode {
         alloc_t*                alloc;
         DLLib*                  handle;
         symtab_t<u0*>           symbols;
-        str::slice_t            path;
+        path_t                  path;
     };
     using symbol_array_t        = assoc_array_t<u0*>;
 
@@ -133,10 +133,14 @@ namespace basecode {
                 return param_type_t{.cls = cls, .size = size};
             }
 
+            u0 free(param_t* param);
+
             param_t* make(str::slice_t name, param_type_t type, b8 rest = {}, param_alias_t* dft_val = {});
         }
 
         namespace proto {
+            u0 free(proto_t* proto);
+
             b8 remove(str::slice_t symbol);
 
             proto_t* find(str::slice_t symbol);
@@ -162,7 +166,7 @@ namespace basecode {
                 arg.type.cls  = param_cls_t::ptr;
                 arg.type.size = param_size_t::qword;
                 arg.alias.p   = value;
-            } else if constexpr (std::is_same_v<T, typeof(bool)>) {
+            } else if constexpr (std::is_same_v<T, bool>) {
                 arg.type.cls  = param_cls_t::int_;
                 arg.type.size = param_size_t::dword;
                 arg.alias.dw  = value;
@@ -203,7 +207,7 @@ namespace basecode {
         template <typename T> u0 push(ffi_t& ffi, T value) {
             if constexpr (std::is_pointer_v<T>) {
                 dcArgPointer(ffi.vm, value);
-            } else if constexpr (std::is_same_v<T, typeof(bool)>) {
+            } else if constexpr (std::is_same_v<T, bool>) {
                 dcArgBool(ffi.vm, value);
             } else if constexpr (std::is_integral_v<T>) {
                 if constexpr (sizeof(T) == 1) {

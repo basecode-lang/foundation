@@ -165,8 +165,8 @@ void dcFreeStruct(DCstruct* s)
 		if (f->type == DC_SIGCHAR_STRUCT)
 			dcFreeStruct(f->pSubStruct);
 	}
-	free(s->pFields);
-	free(s);
+	dcFreeMem(s->pFields);
+	dcFreeMem(s);
 }
 
 

@@ -133,7 +133,6 @@ namespace basecode::cxx::serializer {
     }
 
     static status_t decl_var(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
-        auto&       intern = *s.intern;
         auto&       store  = *s.store;
         cursor_t    init_cursor{};
         cursor_t    rhs_cursor{};
@@ -145,7 +144,7 @@ namespace basecode::cxx::serializer {
         const auto init_id = DICTV(dict, element::field::init);
         const auto type_id = DICTV(dict, element::field::type);
         process_var_flags(s, buf, type_id);
-        expand_type(store, intern, lhs_id, type_info);
+        expand_type(store, lhs_id, type_info);
         at_indent(s, buf, "{} ", *type_info.name);
         if (unlikely(!bass::seek_record(store, rhs_id, rhs_cursor)))
             return status_t::rhs_not_found;
@@ -207,7 +206,6 @@ namespace basecode::cxx::serializer {
 
     static status_t process_expr(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         status_t status{};
-        auto& intern = *s.intern;
         auto& store  = *s.store;
         cursor_t ident_cursor{};
         auto dict = bass::dict::make(cursor);
@@ -218,12 +216,12 @@ namespace basecode::cxx::serializer {
             }
             case element::header::ident:
             case element::header::num_lit: {
-                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
+                auto interned = string::interned::get(DICTV(dict, element::field::intern));
                 at_indent(s, buf, "{}", interned.slice);
                 return status_t::ok;
             }
             case element::header::str_lit: {
-                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
+                auto interned = string::interned::get(DICTV(dict, element::field::intern));
                 at_indent(s, buf, "\"{}\"", interned.slice);
                 return status_t::ok;
             }
@@ -247,7 +245,7 @@ namespace basecode::cxx::serializer {
             return status_t::lhs_not_found;
         switch (type) {
             case expression_type_t::raw: {
-                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
+                auto interned = string::interned::get(DICTV(dict, element::field::intern));
                 if (unlikely(!OK(interned.status)))
                     return status_t::intern_not_found;
                 at_indent(s, buf, "{}", interned.slice);
@@ -386,7 +384,6 @@ namespace basecode::cxx::serializer {
 
     static status_t process_stmt(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         status_t status{};
-        auto& intern = *s.intern;
         auto& store  = *s.store;
         auto dict       = bass::dict::make(cursor);
         auto type_field = DICTV(dict, element::field::type);
@@ -399,20 +396,20 @@ namespace basecode::cxx::serializer {
             u32 intern_id{};
             if (!bass::next_field(label_cursor, intern_id, element::field::intern))
                 return status_t::label_not_found;
-            auto interned = intern::get(intern, intern_id);
+            auto interned = string::interned::get(intern_id);
             at_indent(s, buf, "{}: ", interned.slice);
         }
         switch (type) {
             case statement_type_t::pp: {
                 auto pp_type = (preprocessor_type_t) SUB_TYPE(type_field);
-                auto interned           = intern::get(intern, DICTV(dict, element::field::intern));
+                auto interned           = string::interned::get(DICTV(dict, element::field::intern));
                 const auto pp_template  = s_pp_templates[(u32) pp_type];
                 at_indent(s, buf, pp_template, interned.slice);
                 newline(s, buf);
                 break;
             }
             case statement_type_t::raw: {
-                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
+                auto interned = string::interned::get(DICTV(dict, element::field::intern));
                 if (unlikely(!OK(interned.status)))
                     return status_t::intern_not_found;
                 at_indent(s, buf, "{}", interned.slice);
@@ -715,13 +712,13 @@ namespace basecode::cxx::serializer {
                 break;
             }
             case statement_type_t::line_comment: {
-                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
+                auto interned = string::interned::get(DICTV(dict, element::field::intern));
                 at_indent(s, buf, "//{}", interned.slice);
                 newline(s, buf);
                 break;
             }
             case statement_type_t::block_comment: {
-                auto interned = intern::get(intern, DICTV(dict, element::field::intern));
+                auto interned = string::interned::get(DICTV(dict, element::field::intern));
                 at_indent(s, buf, "/*{}*/", interned.slice);
                 break;
             }
@@ -761,18 +758,22 @@ namespace basecode::cxx::serializer {
     }
 
     static status_t unsupported(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
+        UNUSED(s); UNUSED(buf); UNUSED(cursor);
         return status_t::unsupported_revision;
     }
 
     static status_t c99(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
+        UNUSED(s); UNUSED(buf); UNUSED(cursor);
         return status_t::not_implemented;
     }
 
     static status_t c11(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
+        UNUSED(s); UNUSED(buf); UNUSED(cursor);
         return status_t::not_implemented;
     }
 
     static status_t cpp17(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
+        UNUSED(s); UNUSED(buf); UNUSED(cursor);
         return status_t::not_implemented;
     }
 
@@ -794,6 +795,7 @@ namespace basecode::cxx::serializer {
     static revision_handler_t s_revision_handlers[] = { unsupported, c99, c11, cpp17, cpp20 };
 
     static status_t serialize_module(serializer_t& s, u32 id, alloc_t* alloc) {
+        UNUSED(alloc);
         auto& store = *s.store;
         cursor_t cursor{};
         if (!bass::seek_record(store, id, cursor)) return status_t::element_not_found;
@@ -806,7 +808,7 @@ namespace basecode::cxx::serializer {
             if (!bass::seek_record(store, filename_lit, lit_cursor))
                 return status_t::intern_not_found;
             auto lit_dict = bass::dict::make(lit_cursor);
-            auto interned = intern::get(*s.intern, DICTV(lit_dict, element::field::intern));
+            auto interned = string::interned::get(DICTV(lit_dict, element::field::intern));
             if (unlikely(!OK(interned.status)))
                 return status_t::intern_not_found;
             filename = interned.slice;
@@ -855,7 +857,6 @@ namespace basecode::cxx::serializer {
         s.alloc     = alloc;
         s.margin    = margin;
         s.store     = &pgm.storage;
-        s.intern    = &pgm.intern;
         s.tab_width = tab_width;
         symtab::init(s.modules, s.alloc);
         for (u32 i = 0; i < 2; ++i) {
@@ -869,7 +870,7 @@ namespace basecode::cxx::serializer {
         else if (meta_type == meta_type_t::reference)   suffix[suffix_len++] = '&';
     }
 
-    status_t expand_type(bass_t& storage, intern_t& intern, u32 type_id, type_info_t& type_info) {
+    status_t expand_type(bass_t& storage, u32 type_id, type_info_t& type_info) {
         cursor_t type_cursor{};
         if (!bass::seek_record(storage, type_id, type_cursor))
             return status_t::element_not_found;
@@ -916,7 +917,7 @@ namespace basecode::cxx::serializer {
                     return status_t::element_not_found;
                 if (!bass::next_field(ident_cursor, intern_id, element::field::intern))
                     return status_t::intern_not_found;
-                auto interned = intern::get(intern, intern_id);
+                auto interned = string::interned::get(intern_id);
                 str::append(*type_info.name, interned.slice);
                 if (suffix_len > 0) {
                     str::append(*type_info.name, suffix, suffix_len);

@@ -546,6 +546,7 @@ MAX_RELEASE_CHECK_RATE   default: 4095 unless not HAVE_MMAP
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <tchar.h>
+#include <errno.h>
 #define HAVE_MMAP 1
 #define HAVE_MORECORE 0
 #define LACKS_UNISTD_H
@@ -1665,20 +1666,20 @@ static int dev_zero_fd = -1; /* Cached file descriptor for /dev/zero. */
 #else /* WIN32 */
 
 /* Win32 MMAP via VirtualAlloc */
-static FORCEINLINE void* win32mmap(size_t size) {
+FORCEINLINE void* win32mmap(size_t size) {
   void* ptr = VirtualAlloc(0, size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
   return (ptr != 0)? ptr: MFAIL;
 }
 
 /* For direct MMAP, use MEM_TOP_DOWN to minimize interference */
-static FORCEINLINE void* win32direct_mmap(size_t size) {
+FORCEINLINE void* win32direct_mmap(size_t size) {
   void* ptr = VirtualAlloc(0, size, MEM_RESERVE|MEM_COMMIT|MEM_TOP_DOWN,
                            PAGE_READWRITE);
   return (ptr != 0)? ptr: MFAIL;
 }
 
 /* This function supports releasing coalesed segments */
-static FORCEINLINE int win32munmap(void* ptr, size_t size) {
+FORCEINLINE int win32munmap(void* ptr, size_t size) {
   MEMORY_BASIC_INFORMATION minfo;
   char* cptr = (char*)ptr;
   while (size) {

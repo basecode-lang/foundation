@@ -20,8 +20,16 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <unistd.h>
 #include <sys/types.h>
 #include <x86intrin.h>
+#include <type_traits>
+
+#if defined(WIN32)
+#   define api_export   __declspec(dllexport)
+#else
+#   define api_export
+#endif
 
 #if defined(__GNUC__)
 #   define force_inline inline __attribute__((always_inline, unused))
@@ -55,30 +63,30 @@
 #define ALIGNED16               __attribute__((aligned(16)))
 #define UNIQUE_NAME_1(x, y)     x##y
 #define UNIQUE_NAME_2(x, y)     UNIQUE_NAME_1(x, y)
-#define UNIQUE_NAME(x)    _     UNIQUE_NAME_2(x, __COUNTER__)
+#define UNIQUE_NAME_(x)         UNIQUE_NAME_2(x, __COUNTER__)
 #define UNUSED(x)               ((void) x)
 #define OK(x)                   (0 == (u32) x)
 #define SAFE_SCOPE(x)           do { x } while (false)
-#define ZERO_MEM(x, s)          std::memset((x), 0, sizeof((s)))
+#define ZERO_MEM(x, s)          std::memset((x), 0, sizeof(s))
 #define HAS_ZERO(v)             (((v)-UINT64_C(0x0101010101010101)) & ~(v)&UINT64_C(0x8080808080808080))
 
 namespace basecode {
-    using u0    = void;
-    using u8    = uint8_t;
-    using u16   = uint16_t;
-    using u32   = uint32_t;
-    using u64   = uint64_t;
-    using s8    = char;
-    using s16   = int16_t;
-    using s32   = int32_t;
-    using s64   = int64_t;
-    using b8    = bool;
-    using f32   = float;
-    using f64   = double;
-    using s128  = __int128_t;
-    using u128  = __uint128_t;
-    using usize = std::size_t;
-    using ssize = ssize_t;
+    using u0            = void;
+    using u8            = std::uint8_t;
+    using u16           = std::uint16_t;
+    using u32           = std::uint32_t;
+    using u64           = std::uint64_t;
+    using s8            = char;
+    using s16           = std::int16_t;
+    using s32           = std::int32_t;
+    using s64           = std::int64_t;
+    using b8            = bool;
+    using f32           = float;
+    using f64           = double;
+    using s128          = __int128_t;
+    using u128          = __uint128_t;
+    using usize         = std::size_t;
+    using ssize         = ssize_t;
 
     struct alloc_t;
 
@@ -110,22 +118,19 @@ namespace basecode {
 
     template <typename T, typename U> concept same_as = same_helper<T, U> && same_helper<U, T>;
 
-    template <typename T> concept Slice_Concept = requires(const T& t) {
-        typename        T::is_static;
+    template <typename T> concept Slice_Concept = same_as<typename T::is_static, std::true_type> && requires(const T& t) {
         {t.data}        -> same_as<const u8*>;
         {t.length}      -> same_as<u32>;
     };
 
-    template <typename T> concept Static_Stack_Concept = requires(const T& t) {
-        typename        T::is_static;
+    template <typename T> concept Static_Stack_Concept = same_as<typename T::is_static, std::true_type> && requires(const T& t) {
         typename        T::value_type;
         {t.data}        -> same_as<typename T::value_type*>;
         {t.size}        -> same_as<u32>;
         {t.capacity}    -> same_as<u32>;
     };
 
-    template <typename T> concept Dynamic_Stack_Concept = requires(const T& t) {
-        typename        T::is_static;
+    template <typename T> concept Dynamic_Stack_Concept = same_as<typename T::is_static, std::false_type> && requires(const T& t) {
         typename        T::value_type;
         {t.alloc}       -> same_as<alloc_t*>;
         {t.data}        -> same_as<typename T::value_type*>;
@@ -133,16 +138,14 @@ namespace basecode {
         {t.capacity}    -> same_as<u32>;
     };
 
-    template <typename T> concept Static_Array_Concept = requires(const T& t) {
-        typename        T::is_static;
+    template <typename T> concept Static_Array_Concept = same_as<typename T::is_static, std::true_type> && requires(const T& t) {
         typename        T::value_type;
         {t.data}        -> same_as<typename T::value_type*>;
         {t.size}        -> same_as<u32>;
         {t.capacity}    -> same_as<u32>;
     };
 
-    template <typename T> concept Dynamic_Array_Concept = requires(const T& t) {
-        typename        T::is_static;
+    template <typename T> concept Dynamic_Array_Concept = same_as<typename T::is_static, std::false_type> && requires(const T& t) {
         typename        T::value_type;
         {t.alloc}       -> same_as<alloc_t*>;
         {t.data}        -> same_as<typename T::value_type*>;
@@ -150,15 +153,13 @@ namespace basecode {
         {t.capacity}    -> same_as<u32>;
     };
 
-    template <typename T> concept Static_String_Concept  = requires(const T& t) {
-        typename        T::is_static;
+    template <typename T> concept Static_String_Concept  = same_as<typename T::is_static, std::true_type> && requires(const T& t) {
         {t.data}        -> same_as<u8*>;
         {t.length}      -> same_as<u32>;
         {t.capacity}    -> same_as<u32>;
     };
 
-    template <typename T> concept Dynamic_String_Concept  = requires(const T& t) {
-        typename        T::is_static;
+    template <typename T> concept Dynamic_String_Concept  = same_as<typename T::is_static, std::false_type> && requires(const T& t) {
         {t.alloc}       -> same_as<alloc_t*>;
         {t.data}        -> same_as<u8*>;
         {t.length}      -> same_as<u32>;
@@ -175,5 +176,12 @@ namespace basecode {
 
     template <typename T> concept Radix_Concept     = Integer_Concept<T> && requires(T radix) {
         radix == 2 || radix == 8 || radix == 10 || radix == 16;
+    };
+
+    template <typename T> concept Buffer_Concept = String_Concept<T> || requires(const T& t) {
+        {t.alloc}       -> same_as<alloc_t*>;
+        {t.data}        -> same_as<u8*>;
+        {t.length}      -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
     };
 }

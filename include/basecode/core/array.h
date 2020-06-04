@@ -32,7 +32,7 @@ namespace basecode {
         using size_per_16   = std::integral_constant<u32, 16 / sizeof(T)>;
 
         T                   data[Capacity];
-        u32                 size;
+        u32                 size{};
         u32                 capacity = Capacity;
 
         T* end()                                { return data + size;       }
@@ -61,10 +61,10 @@ namespace basecode {
         T* rend()                               { return data - 1;          }
         T* begin()                              { return data;              }
         T* rbegin()                             { return data + (size - 1); }
-        const T* end() const                    { return data + size;       }
-        const T* rend() const                   { return data - 1;          }
-        const T* begin() const                  { return data;              }
-        const T* rbegin() const                 { return data + (size - 1); }
+        [[nodiscard]] const T* end() const      { return data + size;       }
+        [[nodiscard]] const T* rend() const     { return data - 1;          }
+        [[nodiscard]] const T* begin() const    { return data;              }
+        [[nodiscard]] const T* rbegin() const   { return data + (size - 1); }
         T& operator[](u32 index)                { return data[index];       }
         const T& operator[](u32 index) const    { return data[index];       }
     };
@@ -278,6 +278,23 @@ namespace basecode {
             reserve(array, new_capacity * 2 + 8);
         }
 
+        u0 append(Array_Concept auto& dest, Array_Concept auto& src) {
+            using DT = std::remove_reference_t<decltype(dest)>;
+            using ST = std::remove_reference_t<decltype(src)>;
+            if constexpr (!same_as<typename ST::value_type, typename DT::value_type>) {
+                static_assert("array::append array-to-array only supported between equivalent types");
+            }
+            if constexpr (DT::is_static::value) {
+                assert(dest.size + src.size < dest.capacity);
+            } else {
+                const auto new_size = dest.size + src.size;
+                if (new_size > dest.capacity)
+                    grow(dest, new_size);
+            }
+            std::memcpy(dest.data + dest.size, src.data, src.size * sizeof(typename ST::value_type));
+            dest.size += src.size;
+        }
+
         u0 insert(Array_Concept auto& array, u32 index, auto&& value) {
             using T = std::remove_reference_t<decltype(array)>;
             if constexpr (T::is_static::value) {
@@ -290,6 +307,22 @@ namespace basecode {
                 std::memmove(array.data + index + 1, array.data + index, (array.size - index) * sizeof(typename T::value_type));
             array.data[index] = value;
             ++array.size;
+        }
+
+        u0 copy(Array_Concept auto& dest, const Array_Concept auto& src) {
+            using DT = std::remove_reference_t<decltype(dest)>;
+            using ST = std::remove_reference_t<decltype(src)>;
+            if constexpr (!same_as<typename ST::value_type, typename DT::value_type>) {
+                static_assert("array::copy only supported between equivalent types");
+            }
+            if constexpr (DT::is_static::value) {
+                assert(src.size <= dest.capacity);
+            } else {
+                if (src.size > dest.capacity)
+                    grow(dest);
+            }
+            std::memcpy(dest.data, src.data, src.size * sizeof(typename ST::value_type));
+            dest.size = src.size;
         }
 
         s32 contains(const Array_Concept auto& array, const auto& value) {

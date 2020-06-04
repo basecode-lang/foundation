@@ -17,10 +17,10 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/memory.h>
-#include <basecode/core/memory/std_alloc.h>
 
 namespace basecode::memory::std_alloc {
     u0 free(alloc_t* alloc, u0* mem, u32 size) {
+        UNUSED(size);
         memory::free(alloc, mem);
     }
 

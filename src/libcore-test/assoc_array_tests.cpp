@@ -45,7 +45,7 @@ TEST_CASE("basecode::assoc_array basics") {
     }
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("assoc_array: append"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("assoc_array: append"_ss, 40, time);
 
 //    for (u32 i = 0; i < 100; ++i) {
 //        if (i > 0) format::print(",");
@@ -74,7 +74,7 @@ TEST_CASE("basecode::assoc_array find by key") {
     auto value = assoc_array::find(pairs, "test4"_ss);
 
     stopwatch::stop(time);
-    stopwatch::print_elapsed("assoc_array: find"_ss, 40, stopwatch::elapsed(time));
+    stopwatch::print_elapsed("assoc_array: find"_ss, 40, time);
 
     REQUIRE(value);
     REQUIRE(*value == 40);

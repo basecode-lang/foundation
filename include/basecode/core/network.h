@@ -18,27 +18,18 @@
 
 #pragma once
 
-#ifdef _WIN32
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#  endif
-#  include <winsock2.h>
-#  include <ws2tcpip.h>
-#  ifdef _MSC_VER
-#    pragma warning(disable:4244)
-#    pragma warning(disable:4267)
-#  endif
-#  define poll WSAPoll
-#else
-#  include <poll.h>
-#  include <netdb.h>
-#  include <unistd.h>
-#  include <arpa/inet.h>
-#  include <sys/socket.h>
-#endif
+#include <poll.h>
+#include <netdb.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
 #include <basecode/core/types.h>
 #include <basecode/core/memory.h>
 
+#ifndef INVALID_SOCKET
+#   define INVALID_SOCKET   (-1)
+#   define SOCKET           s32
+#endif
 #ifndef MSG_NOSIGNAL
 #  define MSG_NOSIGNAL 0
 #endif
@@ -60,7 +51,7 @@ namespace basecode {
         u8*                         buf_cur;
         u0*                         user;
         socket_close_callback_t     close_cb;
-        s32                         socket;
+        SOCKET                      socket;
         u32                         buf_free;
         u32                         buf_size;
     };

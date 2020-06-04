@@ -128,6 +128,18 @@ namespace basecode {
             }
         }
 
+        template <typename... Args>
+        inline u0 print_ellipsis(fmt_str_t label_str, u32 width, fmt_str_t format_str, const Args&... args) {
+            vprint(context::top()->alloc, stdout, "{} {:.<{}}", fmt::make_format_args(label_str, ".", width - label_str.size()));
+            vprint(context::top()->alloc, stdout, format_str, fmt::make_format_args(args...));
+        }
+
+        template <typename... Args>
+        inline u0 print_ellipsis(alloc_t* alloc, FILE* file, fmt_str_t label_str, u32 width, fmt_str_t format_str, const Args&... args) {
+            vprint(alloc, file, "{} {:.<{}}", fmt::make_format_args(label_str, ".", width - label_str.size()));
+            vprint(alloc, file, format_str, fmt::make_format_args(args...));
+        }
+
         force_inline str_t to_radix(Integer_Concept auto value, Radix_Concept auto radix = 10, alloc_t* alloc = context::top()->alloc) {
             fmt_alloc_t fmt_alloc(alloc);
             fmt_buf_t buf(fmt_alloc);

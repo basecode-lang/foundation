@@ -76,9 +76,11 @@ namespace basecode::log::spdlog {
         sc->logger->set_level((::spdlog::level::level_enum) s_level_map[(u32) logger->mask]);
     }
 
-    static u0 emit(logger_t* logger, log_level_t level, str::slice_t msg) {
+    static u0 emit(logger_t* logger, log_level_t level, fmt_str_t format_str, const fmt_args_t& args) {
         auto sc  = &logger->subclass.spdlog;
-        sc->logger->log((::spdlog::level::level_enum) s_level_map[(u32) level], "{}", msg.data);
+        fmt_buf_t buf{};
+        fmt::vformat_to(buf, format_str, args);
+        sc->logger->log((::spdlog::level::level_enum) s_level_map[(u32) level], "{}", std::string_view(buf.data(), buf.size()));
     }
 
     logger_system_t               g_spdlog_system{

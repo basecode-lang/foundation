@@ -101,7 +101,7 @@ namespace basecode {
             format::print("symtab: size = {}, nodes.size = {}, values.size = {}\n", symtab.size, symtab.nodes.size, symtab.values.size);
             for (const auto& node : symtab.nodes) {
                 s8 c = (s8) node.sym;
-                format::print("{:04}: sym: {} type: {} next: {:>4} child: {:>4} value: {:>4}\n", n++, isprint(c) ? c : '.', node.type, node.next, node.child, node.value);
+                format::print("{:04}: sym: {} ({:02x}) type: {} next: {:>4} child: {:>4} value: {:>4}\n", n++, isprint(c) ? c : '.', (u32) c, node.type, node.next, node.child, node.value);
             }
         }
 
@@ -120,16 +120,14 @@ namespace basecode {
 
         template <typename V> b8 remove(symtab_t<V>& symtab, str::slice_t prefix) {
             symtab_node_t* node;
-            array_t<u32> prefix_nodes{};
-            array::init(prefix_nodes, symtab.alloc);
-            array::reserve(prefix_nodes, prefix.length * 2);
-            defer(array::free(prefix_nodes));
+            u32 prefix_nodes[symtab.nodes.size];
+            u32 prefix_count{};
             u32 next_node_id = 1;
             for (u32 i = 0; i < prefix.length; ++i) {
                 node = get_node(symtab, next_node_id);
                 while (node) {
                     if (i < prefix.length - 1)
-                        array::append(prefix_nodes, next_node_id);
+                        prefix_nodes[prefix_count++] = next_node_id;
                     if (node->sym == prefix[i]) {
                         next_node_id = node->child;
                         break;
@@ -150,7 +148,7 @@ namespace basecode {
                     node->sym       = {};
                     parent_cleared  = true;
                 }
-                for (s32 i = prefix_nodes.size - 1; i >= 0; --i) {
+                for (s32 i = prefix_count - 1; i >= 0; --i) {
                     const auto prefix_node = get_node(symtab, prefix_nodes[i]);
                     if (!has_children(symtab, prefix_node, node) || parent_cleared) {
                         prefix_node->type   = empty;

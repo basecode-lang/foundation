@@ -73,13 +73,14 @@ namespace basecode {
         u8* rend()                              { return data; }
         u8* begin()                             { return data; }
         u8* rbegin()                            { return data + length; }
-        const u8* end() const                   { return data + length; }
-        const u8* rend() const                  { return data; }
-        const u8* begin() const                 { return data; }
-        const u8* rbegin() const                { return data + length; }
+        [[nodiscard]] const u8* end() const     { return data + length; }
+        [[nodiscard]] const u8* rend() const    { return data; }
+        [[nodiscard]] const u8* begin() const   { return data; }
+        [[nodiscard]] const u8* rbegin() const  { return data + length; }
         u8& operator[](u32 index)               { return data[index]; }
         const u8& operator[](u32 index) const   { return data[index]; }
         operator std::string_view () const      { return std::string_view((const s8*) data, length); }
+        operator str::slice_t() const           { return str::slice_t{.data = data, .length = length};  }
 
         str_t& operator+(const str_t& other) {
             str::append(*this, other);
