@@ -5,11 +5,14 @@
 ;; -------------------------------------------------------------
 
 ;; strings
-(= str:objfmt-config-eval-err  (localized-string 2000 'en_US "unable to read/eval config"))
-(= str:objfmt-read-err         (localized-string 2001 'en_US "container read error"))
-(= str:objfmt-write-err        (localized-string 2002 'en_US "container write error"))
-(= str:objfmt-import-failure   (localized-string 2003 'en_US "section import failure"))
-(= str:objfmt-invalid-section  (localized-string 2004 'en_US "invalid section type"))
+(= str:read-error               (localized-string 2000 'en_US "container read error"))
+(= str:write-error              (localized-string 2001 'en_US "container write error"))
+(= str:import-failure           (localized-string 2002 'en_US "section import failure"))
+(= str:duplicate-symbol         (localized-string 2003 'en_US "duplicate symbol"))
+(= str:symbol-not-found         (localized-string 2004 'en_US "symbol not found"))
+(= str:config-eval-error        (localized-string 2005 'en_US "unable to read/eval config"))
+(= str:invalid-section-type     (localized-string 2006 'en_US "invalid section type"))
+(= str:container-init-error     (localized-string 2007 'en_US "container init error"))
 
 ;; errors
 

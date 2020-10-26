@@ -26,24 +26,25 @@ namespace basecode {
     namespace objfmt::container {
         enum class status_t : u8 {
             ok,
-            init_failure,
-            fini_failure,
             read_error,
             write_error,
+            init_failure,
+            fini_failure,
+            invalid_container_type
         };
 
-        using fini_callback_t   = status_t (*)();
-        using init_callback_t   = status_t (*)(alloc_t*);
-        using read_callback_t   = status_t (*)(obj_file_t&);
-        using write_callback_t  = status_t (*)(obj_file_t&);
-
         enum class type_t : u8 {
-            coff,
             pe,
             elf,
+            coff,
             macho
         };
         constexpr u32 max_type_count = 4;
+
+        using fini_callback_t   = u0 (*)();
+        using init_callback_t   = status_t (*)(alloc_t*);
+        using read_callback_t   = status_t (*)(obj_file_t&);
+        using write_callback_t  = status_t (*)(obj_file_t&);
 
         struct system_t final {
             init_callback_t     init;
@@ -55,7 +56,7 @@ namespace basecode {
 
         u0 fini();
 
-        u0 init(alloc_t* alloc);
+        status_t init(alloc_t* alloc);
 
         status_t read(container::type_t type, obj_file_t& file);
 

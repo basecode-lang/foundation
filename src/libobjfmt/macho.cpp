@@ -19,12 +19,12 @@
 #include <basecode/objfmt/macho.h>
 
 namespace basecode::objfmt::container::macho {
-    static status_t fini() {
-        return status_t::fini_failure;
+    static u0 fini() {
     }
 
     static status_t init(alloc_t* alloc) {
-        return status_t::init_failure;
+        UNUSED(alloc);
+        return status_t::ok;
     }
 
     static status_t read(obj_file_t& file) {

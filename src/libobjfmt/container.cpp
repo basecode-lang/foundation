@@ -30,25 +30,32 @@ namespace basecode::objfmt::container {
             sys->fini();
     }
 
-    u0 init(alloc_t* alloc) {
-        s_systems[u32(type_t::coff)]  = coff::system();
+    status_t init(alloc_t* alloc) {
         s_systems[u32(type_t::pe)]    = pe::system();
         s_systems[u32(type_t::elf)]   = elf::system();
+        s_systems[u32(type_t::coff)]  = coff::system();
         s_systems[u32(type_t::macho)] = macho::system();
 
-        for (auto sys : s_systems)
-            sys->init(alloc);
+        for (auto sys : s_systems) {
+            auto status = sys->init(alloc);
+            if (!OK(status))
+                return status;
+        }
+
+        return status_t::ok;
     }
 
     status_t read(container::type_t type, obj_file_t& file) {
-        UNUSED(type);
-        UNUSED(file);
-        return status_t::read_error;
+        const auto idx = u32(type);
+        if (idx > max_type_count - 1)
+            return status_t::invalid_container_type;
+        return s_systems[idx]->read(file);
     }
 
     status_t write(container::type_t type, obj_file_t& file) {
-        UNUSED(type);
-        UNUSED(file);
-        return status_t::write_error;
+        const auto idx = u32(type);
+        if (idx > max_type_count - 1)
+            return status_t::invalid_container_type;
+        return s_systems[idx]->write(file);
     }
 }

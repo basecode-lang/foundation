@@ -36,89 +36,172 @@ namespace basecode::objfmt {
 
         status_t init(alloc_t* alloc) {
             g_objfmt_sys.alloc = alloc;
-            container::init(g_objfmt_sys.alloc);
-            auto objfmt_config_path = "../etc/objfmt.fe"_path;
+            auto   file_path = "../etc/objfmt.fe"_path;
             path_t config_path{};
-            filesys::bin_rel_path(config_path, objfmt_config_path);
+            filesys::bin_rel_path(config_path, file_path);
             defer({
                 path::free(config_path);
-                path::free(objfmt_config_path);
+                path::free(file_path);
             });
+            {
+                auto status = container::init(g_objfmt_sys.alloc);
+                if (!OK(status))
+                    return status_t::container_init_error;
+            }
             fe_Object* result{};
-            auto status = config::eval(config_path, &result);
-            if (!OK(status)) {
-                return status_t::config_eval_error;
+            {
+                auto status = config::eval(config_path, &result);
+                if (!OK(status))
+                    return status_t::config_eval_error;
             }
             return status_t::ok;
         }
     }
 
+    namespace import {
+        status_t add_symbol(import_t* import, const symbol_t* symbol) {
+            for (auto imported : import->symbols) {
+                if (imported == symbol)
+                    return status_t::duplicate_import;
+            }
+            array::append(import->symbols, const_cast<symbol_t*>(symbol));
+            return status_t::ok;
+        }
+    }
+
     namespace section {
-        u0 free(section_t& section) {
-            hashtab::free(section.symbols);
-            switch (section.type) {
+        u0 free(section_t* section) {
+            switch (section->type) {
                 case section_type_t::import:
-                    hashtab::free(section.subclass.import.table);
+                    for (auto& import : section->subclass.imports)
+                        array::free(import.symbols);
+                    array::free(section->subclass.imports);
                     break;
                 default:
                     break;
             }
+            array::free(section->symbols);
         }
 
-        u0 reserve(section_t& section, u64 size) {
-            section.subclass.uninit.size = size;
+        u0 reserve(section_t* section, u64 size) {
+            section->subclass.size = size;
         }
 
-        u0 data(section_t& section, const u8* data, u32 length) {
-            section.subclass.data.range = slice::make(data, length);
+        u0 data(section_t* section, const u8* data, u32 length) {
+            section->subclass.data = slice::make(data, length);
         }
 
-        status_t import(section_t& section, import_t** result, const s8* name, s32 len) {
-            if (section.type != section_type_t::import)
-                return status_t::invalid_section_type;
-            const auto import_name = string::interned::fold(name, len);
-            *result = hashtab::emplace(section.subclass.import.table, import_name);
-            (*result)->flags = {};
-            return *result ? status_t::ok : status_t::import_failure;
-        }
-
-        status_t init(section_t& section, section_type_t type, const s8* name, s32 len) {
-            section.alloc = g_objfmt_sys.alloc;
-            hashtab::init(section.symbols, section.alloc);
-            section.type             = type;
-            section.name             = string::interned::fold(name, len);
-            section.address.physical = {};
-            section.address.virtual_ = {};
-            section.flags            = {};
-            switch (section.type) {
+        status_t init(section_t* section, section_type_t type, const symbol_t* symbol) {
+            section->alloc = g_objfmt_sys.alloc;
+            array::init(section->symbols, section->alloc);
+            section->type             = type;
+            section->flags            = {};
+            section->symbol           = symbol;
+            section->address.physical = {};
+            section->address.virtual_ = {};
+            switch (section->type) {
                 case section_type_t::uninit:
-                    section.subclass.uninit.size = {};
+                    section->subclass.size = {};
                     break;
                 case section_type_t::import:
-                    hashtab::init(section.subclass.import.table, section.alloc);
+                    array::init(section->subclass.imports, section->alloc);
                     break;
                 default:
-                    section.subclass.data.range = {};
+                    section->subclass.data = {};
                     break;
             }
             return status_t::ok;
+        }
+
+        status_t import_module(section_t* section, import_t** result, const symbol_t* module) {
+            if (section->type != section_type_t::import)
+                return status_t::invalid_section_type;
+            auto import = &array::append(section->subclass.imports);
+            import->module  = module;
+            import->section = section;
+            import->flags   = {};
+            array::init(import->symbols);
+            *result = import;
+            return *result ? status_t::ok : status_t::import_failure;
         }
     }
 
     namespace obj_file {
         u0 free(obj_file_t& file) {
             path::free(file.path);
-            for (auto& section : file.sections)
+            for (auto section : file.sections)
                 section::free(section);
             array::free(file.sections);
-            stable_array::free(file.symbols);
+            hashtab::free(file.symbols);
+            memory::system::free(file.symbol_slab);
+            memory::system::free(file.section_slab);
         }
 
         status_t init(obj_file_t& file) {
             file.alloc = g_objfmt_sys.alloc;
             path::init(file.path, file.alloc);
             array::init(file.sections, file.alloc);
-            stable_array::init(file.symbols, file.alloc);
+            hashtab::init(file.symbols, file.alloc);
+            {
+                slab_config_t slab_config{};
+                slab_config.backing   = file.alloc;
+                slab_config.buf_size  = sizeof(symbol_t);
+                slab_config.buf_align = alignof(symbol_t);
+                slab_config.num_pages = 1;
+                file.symbol_slab = memory::system::make(alloc_type_t::slab, &slab_config);
+            }
+            {
+                slab_config_t slab_config{};
+                slab_config.backing   = file.alloc;
+                slab_config.buf_size  = sizeof(section_t);
+                slab_config.buf_align = alignof(section_t);
+                slab_config.num_pages = 1;
+                file.section_slab = memory::system::make(alloc_type_t::slab, &slab_config);
+            }
+            return status_t::ok;
+        }
+
+        status_t find_symbol(obj_file_t& file, symbol_t** result, const s8* name, s32 len) {
+            const auto key = slice::make(name, len == -1 ? strlen(name) : len);
+            *result = hashtab::find(file.symbols, key);
+            return *result ? status_t::ok : status_t::symbol_not_found;
+        }
+
+        status_t make_symbol(obj_file_t& file, symbol_t** result, const s8* name, s32 len) {
+            if (OK(find_symbol(file, result, name, len)))
+                return status_t::duplicate_symbol;
+            const auto key = string::interned::fold(name, len);
+            auto symbol = (symbol_t*) memory::alloc(file.symbol_slab);
+            symbol->name    = key;
+            symbol->section = {};
+            symbol->type    = {};
+            hashtab::insert(file.symbols, key, symbol);
+            *result = symbol;
+            return status_t::ok;
+        }
+
+        status_t find_section(obj_file_t& file, section_t** result, const symbol_t* symbol) {
+            *result = {};
+            for (auto section : file.sections) {
+                if (section->symbol == symbol) {
+                    *result = section;
+                    return status_t::ok;
+                }
+            }
+            return status_t::symbol_not_found;
+        }
+
+        status_t make_section(obj_file_t& file, section_t** result, section_type_t type, const symbol_t* symbol) {
+            *result = {};
+            if (OK(find_section(file, result, symbol)))
+                return status_t::ok;
+            auto section = (section_t*) memory::alloc(file.section_slab);
+            section->file = &file;
+            auto status = section::init(section, type, symbol);
+            if (!OK(status))
+                return status;
+            array::append(file.sections, section);
+            *result = section;
             return status_t::ok;
         }
     }

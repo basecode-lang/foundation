@@ -42,39 +42,117 @@ static const u8 s_rot13_table[] = {
     247, 248, 249, 250, 251, 252, 253, 254, 255
 };
 
+static const u8 s_rot13_code[] = {
+    0x48,0x89,0x5c,0x24,0x18,                       //0000000000000000: 48 89 5C 24 18          mov         qword ptr [rsp+18h],rbx
+    0x57,                                           //0000000000000005: 57                      push        rdi
+    0x48,0x83,0xec,0x30,                            //0000000000000006: 48 83 EC 30             sub         rsp,30h
+    0xb9,0xf6,0xff,0xff,0xff,                       //000000000000000A: B9 F6 FF FF FF          mov         ecx,0FFFFFFF6h
+    0xff,0x15,0x00,0x00,0x00,0x00,                  //000000000000000F: FF 15 00 00 00 00       call        qword ptr [__imp_GetStdHandle]
+    0xb9,0xf5,0xff,0xff,0xff,                       //0000000000000015: B9 F5 FF FF FF          mov         ecx,0FFFFFFF5h
+    0x48,0x8b,0xd8,                                 //000000000000001A: 48 8B D8                mov         rbx,rax
+    0xff,0x15,0x00,0x00,0x00,0x00,                  //000000000000001D: FF 15 00 00 00 00       call        qword ptr [__imp_GetStdHandle]
+    0x48,0x8b,0xf8,                                 //0000000000000023: 48 8B F8                mov         rdi,rax
+    0xeb,0x4f,                                      //0000000000000026: EB 4F                   jmp         0000000000000077
+    0x83,0x64,0x24,0x48,0x00,                       //0000000000000028: 83 64 24 48 00          and         dword ptr [rsp+48h],0
+    0x85,0xd2,                                      //000000000000002D: 85 D2                   test        edx,edx
+    0x74,0x28,                                      //000000000000002F: 74 28                   je          0000000000000059
+    0x44,0x8b,0xc2,                                 //0000000000000031: 44 8B C2                mov         r8d,edx
+    0x48,0x8d,0x0d,0x00,0x00,0x00,0x00,             //0000000000000034: 48 8D 0D 00 00 00 00    lea         rcx,[buffer]
+    0x44,0x89,0x44,0x24,0x48,                       //000000000000003B: 44 89 44 24 48          mov         dword ptr [rsp+48h],r8d
+    0x0f,0xb6,0x01,                                 //0000000000000040: 0F B6 01                movzx       eax,byte ptr [rcx]
+    0x4c,0x8d,0x0d,0x00,0x00,0x00,0x00,             //0000000000000043: 4C 8D 0D 00 00 00 00    lea         r9,[rot13_table]
+    0x42,0x8a,0x04,0x08,                            //000000000000004A: 42 8A 04 08             mov         al,byte ptr [rax+r9]
+    0x88,0x01,                                      //000000000000004E: 88 01                   mov         byte ptr [rcx],al
+    0x48,0xff,0xc1,                                 //0000000000000050: 48 FF C1                inc         rcx
+    0x49,0x83,0xe8,0x01,                            //0000000000000053: 49 83 E8 01             sub         r8,1
+    0x75,0xe7,                                      //0000000000000057: 75 E7                   jne         0000000000000040
+    0x48,0x83,0x64,0x24,0x20,0x00,                  //0000000000000059: 48 83 64 24 20 00       and         qword ptr [rsp+20h],0
+    0x4c,0x8d,0x4c,0x24,0x48,                       //000000000000005F: 4C 8D 4C 24 48          lea         r9,[rsp+48h]
+    0x44,0x8b,0xc2,                                 //0000000000000064: 44 8B C2                mov         r8d,edx
+    0x48,0x8b,0xcf,                                 //0000000000000067: 48 8B CF                mov         rcx,rdi
+    0x48,0x8d,0x15,0x00,0x00,0x00,0x00,             //000000000000006A: 48 8D 15 00 00 00 00    lea         rdx,[buffer]
+    0xff,0x15,0x00,0x00,0x00,0x00,                  //0000000000000071: FF 15 00 00 00 00       call        qword ptr [__imp_WriteFile]
+    0x48,0x83,0x64,0x24,0x20,0x00,                  //0000000000000077: 48 83 64 24 20 00       and         qword ptr [rsp+20h],0
+    0x4c,0x8d,0x4c,0x24,0x40,                       //000000000000007D: 4C 8D 4C 24 40          lea         r9,[rsp+40h]
+    0x41,0xb8,0x00,0x10,0x00,0x00,                  //0000000000000082: 41 B8 00 10 00 00       mov         r8d,1000h
+    0x48,0x8d,0x15,0x00,0x00,0x00,0x00,             //0000000000000088: 48 8D 15 00 00 00 00    lea         rdx,[buffer]
+    0x48,0x8b,0xcb,                                 //000000000000008F: 48 8B CB                mov         rcx,rbx
+    0xff,0x15,0x00,0x00,0x00,0x00,                  //0000000000000092: FF 15 00 00 00 00       call        qword ptr [__imp_ReadFile]
+    0x8b,0x54,0x24,0x40,                            //0000000000000098: 8B 54 24 40             mov         edx,dword ptr [rsp+40h]
+    0x85,0xd2,                                      //000000000000009C: 85 D2                   test        edx,edx
+    0x75,0x88,                                      //000000000000009E: 75 88                   jne         0000000000000028
+    0x48,0x8b,0x5c,0x24,0x50,                       //00000000000000A0: 48 8B 5C 24 50          mov         rbx,qword ptr [rsp+50h]
+    0x33,0xc0,                                      //00000000000000A5: 33 C0                   xor         eax,eax
+    0x48,0x83,0xc4,0x30,                            //00000000000000A7: 48 83 C4 30             add         rsp,30h
+    0x5f,                                           //00000000000000AB: 5F                      pop         rdi
+    0xc3,                                           //00000000000000AC: C3                      ret
+};
+
 TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
+    stopwatch_t timer{};
+    stopwatch::start(timer);
+
     obj_file_t rot13_pgm{};
     REQUIRE(OK(objfmt::obj_file::init(rot13_pgm)));
     path::set(rot13_pgm.path, "rot13.exe");
     defer(objfmt::obj_file::free(rot13_pgm));
 
-    section_t text{};
-    REQUIRE(OK(objfmt::section::init(text, section_type_t::data, ".text"_ss)));
-    text.flags.code = true;
-    text.flags.read = true;
-    text.flags.exec = true;
+    section_t* text{};
+    symbol_t* text_sym{};
+    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &text_sym, ".text"_ss)));
+    REQUIRE(OK(objfmt::obj_file::make_section(rot13_pgm, &text, section_type_t::data, text_sym)));
+    objfmt::section::data(text, s_rot13_code, sizeof(s_rot13_code));
+    text->flags.code = true;
+    text->flags.read = true;
+    text->flags.exec = true;
 
-    section_t rdata{};
-    REQUIRE(OK(objfmt::section::init(rdata, section_type_t::data, ".rdata"_ss)));
+    section_t *rdata{};
+    symbol_t* rdata_sym{};
+    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &rdata_sym, ".rdata"_ss)));
+    REQUIRE(OK(objfmt::obj_file::make_section(rot13_pgm, &rdata, section_type_t::data, rdata_sym)));
     objfmt::section::data(rdata, s_rot13_table, sizeof(s_rot13_table));
-    rdata.flags.data = true;
-    rdata.flags.read = true;
+    rdata->flags.data = true;
+    rdata->flags.read = true;
 
-    section_t idata{};
-    REQUIRE(OK(objfmt::section::init(idata, section_type_t::import, ".idata"_ss)));
-    idata.flags.data  = true;
-    idata.flags.read  = true;
-    idata.flags.write = true;
+    section_t* idata{};
     import_t* kernel32{};
-    REQUIRE(OK(objfmt::section::import(idata, &kernel32, "kernel32.dll"_ss)));
-    REQUIRE(kernel32);
+    symbol_t* idata_sym{};
+    symbol_t* kernel32_sym{};
+    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &kernel32_sym, "kernel32.dll"_ss)));
+    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &idata_sym, ".idata"_ss)));
+    REQUIRE(OK(objfmt::obj_file::make_section(rot13_pgm, &idata, section_type_t::import, idata_sym)));
+    idata->flags.data  = true;
+    idata->flags.read  = true;
+    idata->flags.write = true;
 
-    section_t bss{};
-    REQUIRE(OK(objfmt::section::init(bss, section_type_t::uninit, ".bss"_ss)));
+    REQUIRE(OK(objfmt::section::import_module(idata, &kernel32, kernel32_sym)));
+    REQUIRE(kernel32);
+    REQUIRE(kernel32->module == kernel32_sym);
+
+    symbol_t* read_file_sym{};
+    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &read_file_sym, "ReadFile"_ss)));
+
+    symbol_t* write_file_sym{};
+    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &write_file_sym, "WriteFile"_ss)));
+
+    symbol_t* get_std_handle_sym{};
+    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &get_std_handle_sym, "GetStdHandle"_ss)));
+
+    objfmt::import::add_symbol(kernel32, get_std_handle_sym);
+    objfmt::import::add_symbol(kernel32, read_file_sym);
+    objfmt::import::add_symbol(kernel32, write_file_sym);
+
+    section_t* bss{};
+    symbol_t* bss_sym{};
+    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &bss_sym, ".bss"_ss)));
+    REQUIRE(OK(objfmt::obj_file::make_section(rot13_pgm, &bss, section_type_t::uninit, bss_sym)));
     objfmt::section::reserve(bss, 4096);
-    bss.flags.data   = true;
-    bss.flags.read   = true;
-    bss.flags.write  = true;
+    bss->flags.data   = true;
+    bss->flags.read   = true;
+    bss->flags.write  = true;
 
     REQUIRE(OK(objfmt::container::write(objfmt::container::type_t::pe, rot13_pgm)));
+
+    stopwatch::stop(timer);
+    stopwatch::print_elapsed("objfmt write PE executable time"_ss, 40, timer);
 }
