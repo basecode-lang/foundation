@@ -44,27 +44,27 @@ namespace basecode::cxx {
     using module_array_t    = array_t<module_t>;
 
     enum class status_t : u8 {
-        ok,
-        error,
-        lhs_not_found,
-        rhs_not_found,
-        pgm_not_found,
-        list_not_found,
-        scope_not_found,
-        label_not_found,
-        child_not_found,
-        invalid_pp_type,
-        intern_not_found,
-        invalid_revision,
-        invalid_pos_type,
-        element_not_found,
-        invalid_meta_type,
-        invalid_list_entry,
-        invalid_def_element,
-        invalid_decl_element,
-        invalid_expr_element,
-        unsupported_revision,
-        not_implemented,
+        ok                      = 0,
+        error                   = 180,
+        lhs_not_found           = 181,
+        rhs_not_found           = 182,
+        pgm_not_found           = 183,
+        list_not_found          = 184,
+        scope_not_found         = 185,
+        label_not_found         = 186,
+        child_not_found         = 187,
+        invalid_pp_type         = 188,
+        intern_not_found        = 189,
+        invalid_revision        = 190,
+        invalid_pos_type        = 191,
+        element_not_found       = 192,
+        invalid_meta_type       = 193,
+        invalid_list_entry      = 194,
+        invalid_def_element     = 195,
+        invalid_decl_element    = 196,
+        invalid_expr_element    = 197,
+        unsupported_revision    = 198,
+        not_implemented         = 199,
     };
 
     enum class revision_t : u8 {
@@ -620,8 +620,6 @@ namespace basecode::cxx {
         u0 free(program_t& pgm);
 
         status_t finalize(program_t& pgm);
-
-        str::slice_t status_name(status_t status);
 
         str::slice_t revision_name(revision_t rev);
 

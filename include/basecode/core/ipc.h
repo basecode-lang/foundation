@@ -24,7 +24,7 @@ namespace basecode {
 
     namespace ipc {
         enum class status_t : u8 {
-            ok,
+            ok                  = 0,
             error,
         };
 

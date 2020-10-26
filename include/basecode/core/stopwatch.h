@@ -23,8 +23,8 @@
 
 namespace basecode {
     struct stopwatch_t final {
-        s64                     end;
-        s64                     start;
+        u64                     end;
+        u64                     start;
     };
 
     namespace stopwatch {
@@ -34,7 +34,7 @@ namespace basecode {
 
         u0 start(stopwatch_t& w);
 
-        s64 elapsed(stopwatch_t& w);
+        u64 elapsed(stopwatch_t& w);
 
         u0 print_elapsed(str::slice_t label, s32 width, stopwatch_t& w);
     }

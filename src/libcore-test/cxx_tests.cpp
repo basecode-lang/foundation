@@ -289,7 +289,7 @@ TEST_CASE("basecode::cxx example program") {
         symtab::find_prefix(s.modules, modules);
         for (u32 i = 0; i < modules.size; ++i) {
             auto module = modules[i];
-            format::print("{:<40} {} bytes\n", module.key, module.value->length);
+            format::print("{:<40}  {} bytes\n", module.key, module.value->length);
             format::print("{}\n", *module.value);
         }
     }
@@ -299,7 +299,7 @@ TEST_CASE("basecode::cxx example program") {
     defer(array::free(proxies));
     memory::proxy::active(proxies);
     for (auto proxy : proxies) {
-        format::print("{:<32} {:>10}\n", memory::proxy::name(proxy->alloc), proxy->alloc->total_allocated);
+        format::print("{:<40} {:>10}\n", memory::proxy::name(proxy->alloc), proxy->alloc->total_allocated);
     }
 
     REQUIRE(OK(status));

@@ -23,12 +23,7 @@
 
 using namespace basecode;
 
+// XXX: change this to format to a string and compare
 TEST_CASE("string::slice_t formatting") {
     format::print("{:<20}", "test with alignment\n"_ss);
-
-    buf_t buf{};
-    buf::init(buf);
-    buf::free(buf);
-
-    error::print(stdout, buf, 1, 1, "test: {}", 10);
 }

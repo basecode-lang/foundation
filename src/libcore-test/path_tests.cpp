@@ -24,6 +24,33 @@
 
 using namespace basecode;
 
+#ifdef _WIN32
+TEST_CASE("basecode::path win32 parsing") {
+    const auto expected_abs_path = R"(C:\temp\test.txt)"_ss;
+
+    stopwatch_t time{};
+    stopwatch::start(time);
+
+    path_t path{};
+    path::init(path, expected_abs_path);
+    defer(path::free(path));
+
+    REQUIRE(!path::empty(path));
+    REQUIRE(path::length(path) == expected_abs_path.length);
+    REQUIRE(path::absolute(path));
+    REQUIRE(path::has_extension(path));
+
+    auto ext = path::extension(path);
+    REQUIRE(ext == ".txt"_ss);
+
+    auto filename = path::filename(path);
+    REQUIRE(filename == "test.txt"_ss);
+
+    stopwatch::stop(time);
+    stopwatch::print_elapsed("win32 path parsing"_ss, 40, time);
+}
+#endif
+
 TEST_CASE("basecode::path basics") {
     const auto expected_path = "/Users/jeff/ut.txt"_ss;
 
@@ -34,11 +61,10 @@ TEST_CASE("basecode::path basics") {
     path::init(path, expected_path);
     defer(path::free(path));
 
-    REQUIRE(path::length(path) == expected_path.length);
-    REQUIRE(path.is_abs);
-    REQUIRE(path.ext_mark);
-    REQUIRE(!path.is_root);
     REQUIRE(!path::empty(path));
+    REQUIRE(path::length(path) == expected_path.length);
+    REQUIRE(path::absolute(path));
+    REQUIRE(path::has_extension(path));
 
     auto ext = path::extension(path);
     REQUIRE(ext == ".txt"_ss);
@@ -62,11 +88,10 @@ TEST_CASE("basecode::path only a file name") {
     path::init(path, expected_path);
     defer(path::free(path));
 
-    REQUIRE(path::length(path) == expected_path.length);
-    REQUIRE(!path.is_abs);
-    REQUIRE(path.ext_mark);
-    REQUIRE(!path.is_root);
     REQUIRE(!path::empty(path));
+    REQUIRE(path::length(path) == expected_path.length);
+    REQUIRE(!path::absolute(path));
+    REQUIRE(path::has_extension(path));
     REQUIRE(path::stem(path) == expected_stem);
     REQUIRE(path::extension(path) == expected_ext);
     REQUIRE(path::filename(path) == expected_path);
@@ -88,11 +113,10 @@ TEST_CASE("basecode::path change extension") {
     path::init(path, expected_path);
     defer(path::free(path));
 
-    REQUIRE(path::length(path) == expected_path.length);
-    REQUIRE(!path.is_abs);
-    REQUIRE(path.ext_mark);
-    REQUIRE(!path.is_root);
     REQUIRE(!path::empty(path));
+    REQUIRE(path::length(path) == expected_path.length);
+    REQUIRE(!path::absolute(path));
+    REQUIRE(path::has_extension(path));
     REQUIRE(path::stem(path) == expected_stem);
     REQUIRE(path::extension(path) == expected_ext);
     REQUIRE(path::filename(path) == expected_path);
@@ -106,12 +130,13 @@ TEST_CASE("basecode::path change extension") {
 
 
 TEST_CASE("basecode::path append") {
-    const auto expected_base_path = "/Users/jeff"_ss;
     const auto expected_rel_path = "names/ut.txt"_ss;
 #ifdef _WIN32
-    const auto expected_combined_dir = R"(/Users/jeff\names)"_ss;
+    const auto expected_combined_dir = R"(C:\Users\jeff\names)"_ss;
+    const auto expected_base_path = R"(C:\Users\jeff)"_ss;
 #else
     const auto expected_combined_dir = "/Users/jeff/names"_ss;
+    const auto expected_base_path = "/Users/jeff"_ss;
 #endif
 
     stopwatch_t time{};
@@ -127,10 +152,10 @@ TEST_CASE("basecode::path append") {
         );
 
     path::init(base_path, expected_base_path);
-    REQUIRE(!base_path.is_root);
+    REQUIRE(path::absolute(base_path));
 
     path::init(rel_path, expected_rel_path);
-    REQUIRE(!rel_path.is_root);
+    REQUIRE(!path::absolute(rel_path));
 
     REQUIRE(OK(path::append(base_path, rel_path)));
 

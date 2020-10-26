@@ -19,33 +19,13 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <basecode/core/symtab.h>
+#include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 
 namespace basecode::filesys {
     struct system_t final {
         alloc_t*                    alloc;
         symtab_t<str_t>             env;
-    };
-
-    static str::slice_t             s_status_names[] = {
-        "ok"_ss,
-        "not dir"_ss,
-        "not file"_ss,
-        "not exists"_ss,
-        "invalid dir"_ss,
-        "chdir failure"_ss,
-        "file writable"_ss,
-        "mkdir failure"_ss,
-        "rename failure"_ss,
-        "remove failure"_ss,
-        "not equivalent"_ss,
-        "mkdtemp failure"_ss,
-        "not implemented"_ss,
-        "unexpected path"_ss,
-        "realpath failure"_ss,
-        "cannot modify root"_ss,
-        "unexpected empty path"_ss,
-        "cannot rename to existing file"_ss,
     };
 
     thread_local system_t           t_file_sys = {};
@@ -105,19 +85,21 @@ namespace basecode::filesys {
     }
 
     status_t cwd(const path_t& path) {
-        return ::chdir(str::c_str(const_cast<str_t&>(path.str))) == 0 ? status_t::ok : status_t::chdir_failure;
+        return ::chdir(path::c_str(path)) == 0 ? status_t::ok : status_t::chdir_failure;
     }
 
     status_t exists(const path_t& path) {
         if (path::empty(path)) return status_t::unexpected_empty_path;
         struct stat sb{};
-        return stat(str::c_str(const_cast<str_t&>(path.str)), &sb) == 0 ? status_t::ok : status_t::not_exists;
+        const auto path_str = path::c_str(path);
+        auto rc = stat(path_str, &sb);
+        return rc == 0 ? status_t::ok : status_t::not_exists;
     }
 
     status_t is_dir(const path_t& path) {
         if (path::empty(path)) return status_t::unexpected_empty_path;
         struct stat sb{};
-        if (stat(str::c_str(const_cast<str_t&>(path.str)), &sb))
+        if (stat(path::c_str(path), &sb))
             return status_t::not_exists;
         return S_ISDIR(sb.st_mode) ? status_t::ok : status_t::not_dir;
     }
@@ -125,7 +107,7 @@ namespace basecode::filesys {
     status_t is_file(const path_t& path) {
         if (path::empty(path)) return status_t::unexpected_empty_path;
         struct stat sb{};
-        if (stat(str::c_str(const_cast<str_t&>(path.str)), &sb))
+        if (stat(path::c_str(path), &sb))
             return status_t::not_exists;
         return S_ISREG(sb.st_mode) ? status_t::ok : status_t::not_file;
     }
@@ -141,11 +123,7 @@ namespace basecode::filesys {
     }
 
     status_t is_read_only(const path_t& path) {
-        return ::access(str::c_str(const_cast<str_t&>(path.str)), W_OK) == 0 ? status_t::ok : status_t::file_writable;
-    }
-
-    str::slice_t status_name(status_t status) {
-        return s_status_names[(u32) status];
+        return ::access(path::c_str(path), W_OK) == 0 ? status_t::ok : status_t::file_writable;
     }
 
     status_t places::user::temp(path_t& path) {
@@ -194,12 +172,12 @@ namespace basecode::filesys {
     }
 
     status_t rm(const path_t& path, b8 recursive) {
-        if (path::empty(path))    return status_t::unexpected_empty_path;
-        if (path.is_root)   return status_t::cannot_modify_root;
+        if (path::empty(path))          return status_t::unexpected_empty_path;
+        if (path::is_only_root(path))   return status_t::cannot_modify_root;
         if (recursive) {
             return status_t::not_implemented;
         } else {
-            return std::remove(str::c_str(const_cast<str_t&>(path.str))) == 0 ? status_t::ok : status_t::remove_failure;
+            return std::remove(path::c_str(path)) == 0 ? status_t::ok : status_t::remove_failure;
         }
     }
 
@@ -229,14 +207,14 @@ namespace basecode::filesys {
     }
 
     status_t mkdir(const path_t& path, b8 recursive) {
-        if (path::empty(path))      return status_t::unexpected_empty_path;
-        if (path.is_root)           return status_t::cannot_modify_root;
+        if (path::empty(path))                  return status_t::unexpected_empty_path;
+        if (path::is_only_root(path))           return status_t::cannot_modify_root;
         if (!recursive) {
             s32 rc;
 #if _WIN32
-            rc = ::mkdir(str::c_str(const_cast<str_t&>(path.str)));
+            rc = ::mkdir(path::c_str(path));
 #else
-            rc = ::mkdir(str::c_str(const_cast<str_t&>(path.str)), S_IRWXU);
+            rc = ::mkdir(path::c_str(path), S_IRWXU);
 #endif
             return rc == 0 ? status_t::ok : status_t::mkdir_failure;
         }
@@ -300,7 +278,7 @@ namespace basecode::filesys {
     status_t file_size(const path_t& path, usize& size) {
         if (path::empty(path)) return status_t::unexpected_empty_path;
         struct stat sb{};
-        if (stat(str::c_str(const_cast<str_t&>(path.str)), &sb))
+        if (stat(path::c_str(path), &sb))
             return status_t::not_exists;
         size = sb.st_size;
         return status_t::ok;
@@ -310,10 +288,10 @@ namespace basecode::filesys {
         if (path::empty(path)) return status_t::unexpected_empty_path;
         s8 temp[PATH_MAX];
 #if _WIN32
-        if (!_fullpath(temp, str::c_str(const_cast<str_t&>(path.str)), PATH_MAX))
+        if (!_fullpath(temp, path::c_str(path), PATH_MAX))
             return status_t::realpath_failure;
 #else
-        if (!realpath(str::c_str(const_cast<str_t&>(path.str)), temp))
+        if (!realpath(path::c_str(path), temp))
             return status_t::realpath_failure;
 #endif
         path::set(new_path, temp);
@@ -349,9 +327,9 @@ namespace basecode::filesys {
         if (path::empty(path1) || path::empty(path2)) return status_t::unexpected_empty_path;
         struct stat sb1{};
         struct stat sb2{};
-        if (stat(str::c_str(const_cast<str_t&>(path1.str)), &sb1))
+        if (stat(path::c_str(path1), &sb1))
             return status_t::not_exists;
-        if (stat(str::c_str(const_cast<str_t&>(path2.str)), &sb2))
+        if (stat(path::c_str(path2), &sb2))
             return status_t::not_exists;
         return sb1.st_dev == sb2.st_dev && sb1.st_ino == sb2.st_ino ? status_t::ok : status_t::not_equivalent;
     }
@@ -361,15 +339,23 @@ namespace basecode::filesys {
         return OK(status) ? status_t::ok : status_t::invalid_dir;
     }
 
+    status_t bin_rel_path(path_t& abs_path, const path_t& rel_path) {
+        path::init(abs_path, slice::make(context::top()->argv[0]));
+        path::parent_path(abs_path, abs_path);
+        path::append(abs_path, rel_path);
+        return filesys::mkabs(abs_path, abs_path);
+    }
+
     status_t mv(const path_t& old_filename, const path_t& new_filename) {
         if (path::empty(old_filename) || path::empty(new_filename))
             return status_t::unexpected_empty_path;
-        if (old_filename.is_root)
+        if (path::is_only_root(old_filename))
             return status_t::cannot_modify_root;
         if (!OK(exists(old_filename)))
             return status_t::not_exists;
         if (OK(exists(new_filename)))
             return status_t::cannot_rename_to_existing_file;
-        return std::rename(str::c_str(const_cast<str_t&>(old_filename.str)), str::c_str(const_cast<str_t&>(new_filename.str))) == 0 ? status_t::ok : status_t::rename_failure;
+        return std::rename(path::c_str(old_filename),
+                           path::c_str(new_filename)) == 0 ? status_t::ok : status_t::rename_failure;
     }
 }

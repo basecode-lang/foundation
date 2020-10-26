@@ -110,15 +110,6 @@ namespace basecode {
         ;
 
     namespace eav {
-        static str::slice_t s_status_names[] = {
-            [u32(status_t::ok)]                 = "ok"_ss,
-            [u32(status_t::error)]              = "error"_ss,
-            [u32(status_t::not_found)]          = "not found"_ss,
-            [u32(status_t::sql_error)]          = "sql error"_ss,
-            [u32(status_t::invalid_rowid)]      = "invalid row id"_ss,
-            [u32(status_t::invalid_entity)]     = "invalid entity"_ss,
-        };
-
         namespace txn {
             status_t begin(db_t& db, txn_t& txn) {
                 auto is_first = stable_array::empty(db.txns);
@@ -581,10 +572,6 @@ namespace basecode {
             }
         }
 
-        str::slice_t status_name(status_t status) {
-            return s_status_names[u32(status)];
-        }
-
         str::slice_t intern_label(db_t& db, u32 id) {
             str::reset(db.buf);
             {
@@ -596,7 +583,8 @@ namespace basecode {
 
         status_t init(db_t& db, const path_t& path, alloc_t* alloc) {
             db.alloc = alloc;
-            db.path  = path;
+            path::init(db.path, db.alloc);
+            path::set(db.path, path.str);
             str::init(db.buf, db.alloc);
             str::reserve(db.buf, 64);
             stable_array::init(db.txns, db.alloc);

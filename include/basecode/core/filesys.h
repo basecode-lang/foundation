@@ -31,25 +31,25 @@ namespace basecode {
 
     namespace filesys {
         enum class status_t : u8 {
-            ok,
-            not_dir,
-            not_file,
-            not_exists,
-            invalid_dir,
-            chdir_failure,
-            file_writable,
-            mkdir_failure,
-            getcwd_failure,
-            rename_failure,
-            remove_failure,
-            not_equivalent,
-            mkdtemp_failure,
-            not_implemented,
-            unexpected_path,
-            realpath_failure,
-            cannot_modify_root,
-            unexpected_empty_path,
-            cannot_rename_to_existing_file,
+            ok                              = 0,
+            not_dir                         = 116,
+            not_file                        = 117,
+            not_exists                      = 118,
+            invalid_dir                     = 119,
+            chdir_failure                   = 120,
+            file_writable                   = 121,
+            mkdir_failure                   = 122,
+            getcwd_failure                  = 123,
+            rename_failure                  = 124,
+            remove_failure                  = 125,
+            not_equivalent                  = 126,
+            mkdtemp_failure                 = 127,
+            not_implemented                 = 128,
+            unexpected_path                 = 129,
+            realpath_failure                = 130,
+            cannot_modify_root              = 131,
+            unexpected_empty_path           = 132,
+            cannot_rename_to_existing_file  = 133,
         };
 
         namespace glob {
@@ -132,8 +132,6 @@ namespace basecode {
 
         status_t is_read_only(const path_t& path);
 
-        str::slice_t status_name(status_t status);
-
         status_t mktmpdir(str::slice_t name, path_t& path);
 
         status_t rm(const path_t& path, b8 recursive = {});
@@ -147,6 +145,8 @@ namespace basecode {
         status_t init(alloc_t* alloc = context::top()->alloc);
 
         status_t equivalent(const path_t& path1, const path_t& path2);
+
+        status_t bin_rel_path(path_t& abs_path, const path_t& rel_path);
 
         status_t mv(const path_t& old_filename, const path_t& new_filename);
     }

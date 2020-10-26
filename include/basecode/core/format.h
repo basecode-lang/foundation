@@ -28,7 +28,7 @@ namespace basecode {
         "PB"_ss,    "EB"_ss, "ZB"_ss, "YB"_ss
     };
 
-    class str_buf_t : public fmt::internal::buffer<s8> {
+    class str_buf_t : public fmt::detail::buffer<s8> {
         str_t*      _str;
     public: explicit str_buf_t(str_t* str) : _str(str) {
             set((s8*) _str->data, str->capacity);
@@ -130,7 +130,7 @@ namespace basecode {
 
         template <typename... Args>
         inline u0 print_ellipsis(fmt_str_t label_str, u32 width, fmt_str_t format_str, const Args&... args) {
-            vprint(context::top()->alloc, stdout, "{} {:.<{}}", fmt::make_format_args(label_str, ".", width - label_str.size()));
+            vprint(context::top()->alloc, stdout, "{} {:.<{}} ", fmt::make_format_args(label_str, ".", width - label_str.size()));
             vprint(context::top()->alloc, stdout, format_str, fmt::make_format_args(args...));
         }
 

@@ -26,10 +26,57 @@ extern "C" {
 #include <basecode/core/context.h>
 
 namespace basecode {
+    enum class cvar_type_t : u8 {
+        none,
+        flag,
+        real,
+        integer,
+        string,
+        pointer,
+    };
+
+    struct config_settings_t final {
+        str::slice_t            build_type      {};
+        str::slice_t            product_name    {};
+        struct {
+            u32                 major           {};
+            u32                 minor           {};
+            u32                 revision        {};
+        }                       version         {};
+        u32                     heap_size       {64 * 1024};
+        b8                      test_runner     {};
+    };
+
+    struct cvar_t final {
+        str::slice_t            name;
+        u32                     id;
+        cvar_type_t             type;
+        union {
+            const u8*           ptr;
+            f64                 real;
+            u64                 integer;
+            b8                  flag;
+        }                       value;
+    };
+    static_assert(sizeof(cvar_t) <= 32, "cvar_t is now larger than 32 bytes!");
+
     namespace config {
+        enum var_t : u8 {
+            platform            = 10,
+            build_type,
+            test_runner,
+            product_name,
+            version_major,
+            version_minor,
+            version_revision,
+        };
+
         enum class status_t : u8 {
-            ok          = 0,
-            bad_input   = 22
+            ok                  = 0,
+            bad_input,
+            duplicate_cvar,
+            cvar_not_found,
+            cvar_id_out_of_range,
         };
 
         namespace system {
@@ -37,7 +84,21 @@ namespace basecode {
 
             fe_Context* context();
 
-            status_t init(u32 heap_size = 64 * 1024, alloc_t* alloc = context::top()->alloc);
+            status_t init(const config_settings_t& settings, alloc_t* alloc = context::top()->alloc);
+        }
+
+        namespace cvar {
+            u0 clear();
+
+            status_t remove(u32 id);
+
+            status_t get(u32 id, cvar_t** var);
+
+            status_t add(u32 id, const s8* name, cvar_type_t type, s32 len = -1);
+
+            status_t add(u32 id, const String_Concept auto& name, cvar_type_t type) {
+                return add(id, (const s8*) name.data, type, name.length);
+            }
         }
 
         status_t eval(const path_t& path, fe_Object** obj);

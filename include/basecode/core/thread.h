@@ -90,19 +90,19 @@ namespace basecode {
 
     namespace thread {
         enum class status_t : u8 {
-            ok,
-            error,
-            deadlock,
-            not_joinable,
-            invalid_state,
-            name_too_long,
-            invalid_thread,
-            already_joined,
-            not_cancelable,
-            already_canceled,
-            already_detached,
-            create_thread_failure,
-            insufficient_privilege,
+            ok                      = 0,
+            error                   = 167,
+            deadlock                = 168,
+            not_joinable            = 169,
+            invalid_state           = 170,
+            name_too_long           = 171,
+            invalid_thread          = 172,
+            already_joined          = 173,
+            not_cancelable          = 174,
+            already_canceled        = 175,
+            already_detached        = 176,
+            create_thread_failure   = 177,
+            insufficient_privilege  = 178,
         };
 
         namespace system {

@@ -19,13 +19,14 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/ffi.h>
 #include <basecode/core/defer.h>
+#include <basecode/core/string.h>
 #include <basecode/core/format.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
-TEST_CASE("basecode::ffi basics", "[hide]") {
+TEST_CASE("basecode::ffi basics") {
 #ifdef _MSC_VER
     auto lib_filename = "ffi-test-kernel.dll"_path;
 #elif _WIN32
@@ -36,7 +37,7 @@ TEST_CASE("basecode::ffi basics", "[hide]") {
 
     path_t proc_path{};
     path::init(proc_path, slice::make(context::top()->argv[0]));
-    if (!proc_path.is_abs)
+    if (!path::absolute(proc_path))
         filesys::mkabs(proc_path, proc_path);
 
     path::parent_path(proc_path, proc_path);
@@ -81,4 +82,16 @@ TEST_CASE("basecode::ffi basics", "[hide]") {
 
     stopwatch::stop(time);
     stopwatch::print_elapsed("ffi call simple function"_ss, 40, time);
+}
+
+TEST_CASE("basecode::ffi status names") {
+    REQUIRE(string::localized::status_name(ffi::status_t::ok) == "ok"_ss);
+    REQUIRE(string::localized::status_name(ffi::status_t::address_null) == "ffi: address null"_ss);
+    REQUIRE(string::localized::status_name(ffi::status_t::prototype_null) == "ffi: prototype null"_ss);
+    REQUIRE(string::localized::status_name(ffi::status_t::lib_not_loaded) == "ffi: lib not loaded"_ss);
+    REQUIRE(string::localized::status_name(ffi::status_t::symbol_not_found) == "ffi: symbol not found"_ss);
+    REQUIRE(string::localized::status_name(ffi::status_t::invalid_int_size) == "ffi: invalid int size"_ss);
+    REQUIRE(string::localized::status_name(ffi::status_t::invalid_float_size) == "ffi: invalid float size"_ss);
+    REQUIRE(string::localized::status_name(ffi::status_t::load_library_failure) == "ffi: load library failure"_ss);
+    REQUIRE(string::localized::status_name(ffi::status_t::struct_by_value_not_implemented) == "ffi: struct by value not implemented"_ss);
 }

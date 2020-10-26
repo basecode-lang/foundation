@@ -19,6 +19,7 @@
 #pragma once
 
 #include <basecode/core/array.h>
+#include <basecode/core/src_loc.h>
 #include <basecode/core/hashable.h>
 #include <basecode/core/hash/murmur.h>
 
@@ -54,22 +55,6 @@ namespace basecode {
     private:
         u32                     cls:    16;
         u32                     type:   16;
-    };
-
-    struct source_loc_t final {
-        u32                     line    {};
-        u32                     column  {};
-    };
-
-    struct source_pos_t final {
-        u32                     end     {};
-        u32                     start   {};
-    };
-
-    struct source_info_t final {
-        source_pos_t            pos;
-        source_loc_t            start;
-        source_loc_t            end;
     };
 
     struct token_t final {
@@ -131,5 +116,3 @@ namespace basecode {
         }
     }
 }
-
-FORMAT_TYPE(basecode::source_info_t, format_to(ctx.out(), "[S: {:>06}, E: {:>06}, [SL: {:>04}, SC: {:>03}, EL: {:>04}, EC: {:>04}]]", data.pos.start, data.pos.end, data.start.line, data.start.column, data.end.line, data.end.column));

@@ -21,8 +21,11 @@
 #include <basecode/core/log.h>
 #include <basecode/core/ffi.h>
 #include <basecode/core/job.h>
+#include <basecode/core/term.h>
 #include <basecode/core/event.h>
 #include <basecode/core/defer.h>
+#include <basecode/core/error.h>
+#include <basecode/core/locale.h>
 #include <basecode/core/config.h>
 #include <basecode/core/thread.h>
 #include <basecode/core/memory.h>
@@ -31,6 +34,7 @@
 #include <basecode/core/network.h>
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
+#include <basecode/core/configure.h>
 #include <basecode/core/log/system/spdlog.h>
 #include <basecode/core/log/system/syslog.h>
 #include <basecode/core/log/system/default.h>
@@ -42,7 +46,8 @@ s32 main(s32 argc, const s8** argv) {
     {
         auto status = memory::system::init(alloc_type_t::dlmalloc);
         if (!OK(status)) {
-            format::print(stderr, "memory::system::init error: {}\n", memory::status_name(status));
+            format::print(stderr, "memory::system::init error: {}\n",
+                          memory::status_name(status));
             return (s32) status;
         }
     }
@@ -50,26 +55,58 @@ s32 main(s32 argc, const s8** argv) {
         default_config_t dft_config{};
         dft_config.file = stderr;
         dft_config.process_arg = argv[0];
-        auto status = log::system::init(logger_type_t::default_, &dft_config, log_level_t::debug, memory::system::default_alloc());
+        auto status = log::system::init(logger_type_t::default_,
+                                        &dft_config,
+                                        log_level_t::debug,
+                                        memory::system::default_alloc());
         if (!OK(status)) {
-            format::print(stderr, "log::system::init error: {}\n", log::status_name(status));
+            format::print(stderr, "log::system::init error: {}\n",
+                          log::status_name(status));
         }
     }
 
-    auto ctx = context::make(argc, argv, memory::system::default_alloc(), log::system::default_logger());
+    auto ctx = context::make(argc,
+                             argv,
+                             memory::system::default_alloc(),
+                             log::system::default_logger());
     context::push(&ctx);
 
+    if (!OK(term::system::init(true)))  return 1;
+    if (!OK(locale::system::init()))    return 1;
     if (!OK(buf_pool::system::init()))  return 1;
     if (!OK(string::system::init()))    return 1;
-    if (!OK(config::system::init()))    return 1;
+    if (!OK(error::system::init()))     return 1;
+
+    {
+        config_settings_t settings{};
+        settings.product_name  = string::interned::fold(PRODUCT_NAME);
+        settings.build_type    = string::interned::fold(BUILD_TYPE);
+        settings.version.major = VERSION_MAJOR;
+        settings.version.minor = VERSION_MINOR;
+        settings.test_runner   = true;
+        auto status = config::system::init(settings);
+        if (!OK(status)) {
+            format::print(stderr, "config::system::init error\n");
+            return 1;
+        }
+    }
+
+    cvar_t* cvar{};
+    config::cvar::add(1, "enable-console-color", cvar_type_t::flag);
+    config::cvar::get(1, &cvar);
+    cvar->value.flag = true;
+
+    config::cvar::add(2, "log-path", cvar_type_t::string);
+    config::cvar::get(2, &cvar);
+    cvar->value.ptr = (u8*) string::interned::fold("/var/log"_ss).data;
+
+    config::cvar::add(3, "magick-weight", cvar_type_t::real);
+    config::cvar::get(3, &cvar);
+    cvar->value.real = 47.314f;
 
     auto core_config_path = "../etc/core.fe"_path;
     path_t config_path{};
-    path::init(config_path, slice::make(context::top()->argv[0]));
-    path::parent_path(config_path, config_path);
-    path::append(config_path, core_config_path);
-    if (!config_path.is_abs)
-        filesys::mkabs(config_path, config_path);
+    filesys::bin_rel_path(config_path, core_config_path);
     fe_Object* result{};
     if (!OK(config::eval(config_path, &result))) return 1;
 
@@ -97,9 +134,12 @@ s32 main(s32 argc, const s8** argv) {
     event::system::fini();
     thread::system::fini();
     config::system::fini();
-    log::system::fini();
     string::system::fini();
+    error::system::fini();
     buf_pool::system::fini();
+    locale::system::fini();
+    log::system::fini();
+    term::system::fini();
     memory::proxy::fini();
     memory::system::fini();
     context::pop();

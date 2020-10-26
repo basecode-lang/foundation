@@ -1,7 +1,5 @@
 import lldb
 import lldb.formatters
-import re
-import os
 
 
 def log(fmt, *args, **kwargs):
@@ -9,31 +7,31 @@ def log(fmt, *args, **kwargs):
     logger >> fmt.format(*args, **kwargs)
 
 
-def extract_template_arg(val, i):
-    data_type = val.GetType().GetUnqualifiedType()
-    if data_type.IsReferenceType():
-        data_type = data_type.GetDereferenedType()
-    if data_type.GetNumberOfTemplateArguments() > i:
-        data_type = data_type.GetTemplateArgumentType(i)
+def extract_template_arg(valobj, i):
+    base_type = valobj.GetType().GetUnqualifiedType()
+    if base_type.IsReferenceType():
+        base_type = base_type.GetDereferencedType()
+    if base_type.GetNumberOfTemplateArguments() > i:
+        data_type = base_type.GetTemplateArgumentType(i)
     else:
         data_type = None
     return data_type
 
 
 class Stack_Provider(lldb.SBSyntheticValueProvider):
-    def __init__(self, valobj, internal_dict):
+    def __init__(self, valobj, dict):
         self.val = valobj
         self.data = None
         self.size = None
         self.data_type = None
 
     def update(self):
-        try:
-            self.data_type = extract_template_arg(self.val, 0)
-            self.data = self.val.GetChildMemberWithName('data')
-            self.size = self.val.GetChildMemberWithName('size').GetValueAsUnsigned()
-        except:
-            pass
+        self.data = self.val.GetChildMemberWithName('data')
+        self.size = self.val.GetChildMemberWithName('size').GetValueAsUnsigned()
+        self.data_type = extract_template_arg(self.val, 0)
+        if self.data_type is None:
+            self.data_type = self.data.GetType().GetPointeeType()
+        pass
 
     def num_children(self):
         return self.size
@@ -45,9 +43,11 @@ class Stack_Provider(lldb.SBSyntheticValueProvider):
         try:
             return int(name.lstrip('[').rstrip(']'))
         except:
-            return -1
+            return None
 
     def get_child_at_index(self, index):
+        if self.data_type is None:
+            return None
         index_name = '[{}]'.format(index)
         offset = (self.size - index - 1) * self.data_type.GetByteSize()
         return self.data.CreateChildAtOffset(index_name, offset, self.data_type)
@@ -61,13 +61,12 @@ class Array_Provider(lldb.SBSyntheticValueProvider):
         self.data_type = None
 
     def update(self):
-        self.size = None
-        try:
-            self.data_type = extract_template_arg(self.val, 0)
-            self.data = self.val.GetChildMemberWithName('data')
-            self.size = self.val.GetChildMemberWithName('size').GetValueAsUnsigned()
-        except:
-            pass
+        self.data = self.val.GetChildMemberWithName('data')
+        self.size = self.val.GetChildMemberWithName('size').GetValueAsUnsigned()
+        self.data_type = extract_template_arg(self.val, 0)
+        if self.data_type is None:
+            self.data_type = self.data.GetType().GetPointeeType()
+        pass
 
     def num_children(self):
         return self.size
@@ -79,9 +78,11 @@ class Array_Provider(lldb.SBSyntheticValueProvider):
         try:
             return int(name.lstrip('[').rstrip(']'))
         except:
-            return -1
+            return None
 
     def get_child_at_index(self, index):
+        if self.data_type is None:
+            return None
         index_name = '[{}]'.format(index)
         offset = index * self.data_type.GetByteSize()
         return self.data.CreateChildAtOffset(index_name, offset, self.data_type)

@@ -29,7 +29,7 @@ namespace basecode {
 
     namespace buf_pool {
         enum class status_t : u8 {
-            ok,
+            ok                  = 0,
         };
 
         namespace system {

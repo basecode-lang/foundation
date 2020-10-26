@@ -27,9 +27,9 @@ namespace basecode {
 
     namespace event {
         enum class status_t : u8 {
-            ok,
-            error,
-            timeout,
+            ok                  = 0,
+            error               = 106,
+            timeout             = 107,
         };
 
         namespace system {

@@ -201,7 +201,7 @@ namespace basecode {
         }
 
         status_t reset(event_t event) {
-            scoped_lock_t lock(event->mutex);
+            scoped_lock_t lock(&event->mutex);
             event->state = false;
             return status_t::ok;
         }

@@ -27,14 +27,14 @@ namespace basecode {
 
     namespace mutex {
         enum class status_t : u8 {
-            ok,
-            busy,
-            error,
-            invalid_mutex,
-            out_of_memory,
-            create_mutex_failure,
-            insufficient_privilege,
-            thread_already_owns_lock,
+            ok                          = 0,
+            busy                        = 143,
+            error                       = 144,
+            invalid_mutex               = 145,
+            out_of_memory               = 146,
+            create_mutex_failure        = 147,
+            insufficient_privilege      = 148,
+            thread_already_owns_lock    = 149,
         };
 
         status_t free(mutex_t& mutex);
@@ -46,8 +46,6 @@ namespace basecode {
         status_t unlock(mutex_t& mutex);
 
         status_t try_lock(mutex_t& mutex);
-
-        str::slice_t status_name(status_t status);
     }
 
     struct mutex_t final {
@@ -56,9 +54,9 @@ namespace basecode {
     };
 
     struct scoped_lock_t final {
-        mutex_t&                    mutex;
+        mutex_t*                    mutex;
 
-        explicit scoped_lock_t(mutex_t& m) : mutex(m) { mutex::lock(mutex);   }
-        ~scoped_lock_t()                              { mutex::unlock(mutex); }
+        explicit scoped_lock_t(mutex_t* m) : mutex(m)   { mutex::lock(*mutex);   }
+        ~scoped_lock_t()                                { mutex::unlock(*mutex); }
     };
 }

@@ -201,8 +201,10 @@ namespace basecode {
             s32 idx = -1;
             u32 i{};
 #if defined(__SSE4_2__) || defined(__SSE4_1__)
-            if constexpr (std::is_integral_v<typename T::value_type> || std::is_floating_point_v<typename T::value_type> || std::is_pointer_v<typename T::value_type>) {
-                __m128i n;
+            if constexpr (std::is_integral_v<typename T::value_type>
+                        || std::is_floating_point_v<typename T::value_type>
+                        || std::is_pointer_v<typename T::value_type>) {
+                __m128i n{};
                 if constexpr (T::size_per_16::value == 4) {
                     n = _mm_set1_epi32((s32) value);
                 } else if constexpr (T::size_per_16::value == 2) {
@@ -211,7 +213,7 @@ namespace basecode {
                 m128i_bytes_t dqw{};
                 while (i + T::size_per_16::value < array.capacity) {
                     dqw.value = _mm_loadu_si128((const __m128i*) (array.data + i));
-                    __m128i cmp;
+                    __m128i cmp{};
                     if constexpr (T::size_per_16::value == 4) {
                         cmp = _mm_cmpeq_epi32(dqw.value, n);
                     } else if constexpr (T::size_per_16::value == 2) {
@@ -228,7 +230,7 @@ namespace basecode {
                             case 0xf00: i += 2;     break;
                             case 0xf000:i += 3;     break;
 
-                                // 64-bit values matching
+                            // 64-bit values matching
                             case 0xff:              break;
                             case 0xff00:++i;        break;
 

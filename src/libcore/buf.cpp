@@ -103,6 +103,13 @@ namespace basecode::buf {
         array::init(buf.tokens, buf.alloc);
     }
 
+    str::slice_t line(buf_t& buf, u32 idx) {
+        if (buf.lines.size == 0 || idx > buf.lines.size - 1)
+            return {};
+        const auto& line = buf.lines[idx];
+        return slice::make(buf.data + line.pos, line.len);
+    }
+
     u0 reserve(buf_t& buf, u32 new_capacity) {
         if (new_capacity == 0) {
             memory::free(buf.alloc, buf.data);

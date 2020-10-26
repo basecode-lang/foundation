@@ -22,21 +22,21 @@
 
 namespace basecode {
 
-    struct  timer_t;
-    using   timer_callback_t = b8 (*)(timer_t*, u0*);
+    struct timer_t;
+    using timer_callback_t      = b8 (*)(timer_t*, u0*);
 
     struct timer_t final {
-        u0*                 context;
-        timer_callback_t    callback;
-        s64                 expiry;
-        s64                 duration;
-        b8                  active;
+        u0*                     context;
+        timer_callback_t        callback;
+        s64                     expiry;
+        s64                     duration;
+        b8                      active;
     };
 
     namespace timer {
         enum class status_t : u8 {
-            ok,
-            error
+            ok                  = 0,
+            error               = 179
         };
 
         u0 fini();

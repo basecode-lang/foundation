@@ -21,14 +21,15 @@
 #include <basecode/core/array.h>
 #include <basecode/core/event.h>
 #include <basecode/core/stopwatch.h>
+#include <basecode/core/stable_array.h>
 
 namespace basecode {
     struct job_t;
-    using job_id                    = u32;
-    using job_array_t               = array_t<job_id>;
+    using job_id                = u32;
+    using job_id_list_t         = array_t<job_id>;
 
     enum class job_state_t : u8 {
-        queued,
+        queued                  = 250,
         created,
         running,
         finished,
@@ -48,14 +49,14 @@ namespace basecode {
     struct job_task_t : job_task_base_t {
         static constexpr b8 is_void = std::is_void_v<std::invoke_result_t<Proc, Args...>>;
 
-        using proc_t                = Proc;
-        using args_t                = std::tuple<Args...>;
-        using return_t              = typename std::conditional<is_void, s32, std::invoke_result_t<Proc, Args...>>::type;
+        using proc_t            = Proc;
+        using args_t            = std::tuple<Args...>;
+        using return_t          = typename std::conditional<is_void, s32, std::invoke_result_t<Proc, Args...>>::type;
 
-        job_t*                      job;
-        proc_t                      proc;
-        args_t                      args;
-        return_t                    ret_val;
+        job_t*                  job;
+        proc_t                  proc;
+        args_t                  args;
+        return_t                ret_val;
 
         job_task_t(proc_t proc, args_t args) : job(), proc(proc), args(std::move(args)), ret_val() {
         }
@@ -73,28 +74,39 @@ namespace basecode {
         u0 set_job(job_t* value) override   { job = value;       }
     };
 
+    // N.B. job subsystem uses a slab allocator to store instances
+    //      of job_task_t.  because job_task_t's size varies based on
+    //      the types passed at compile time, we don't know the exact
+    //      memory footprint.
+    //
+    //      assume there's 32 bytes of free memory per job_task_t to store
+    //      the parameters passed.
+    constexpr u32 job_task_buffer_size = 64;
+
     struct job_t final {
-        job_task_base_t*            task;
-        event_t                     finished;
-        stopwatch_t                 time;
-        job_array_t                 children;
-        job_id                      parent;
-        job_id                      id;
-        u32                         label_id;
-        job_state_t                 state;
+        job_task_base_t*        task;
+        event_t                 finished;
+        stopwatch_t             time;
+        job_id_list_t           children;
+        job_id                  parent;
+        job_id                  id;
+        u32                     label_id;
+        job_state_t             state;
 
         b8 operator==(const job_t& other) const { return id == other.id; };
     };
     static_assert(sizeof(job_t) <= 72, "sizeof(job_t) is now greater than 72 bytes!");
 
+    using job_list_t            = stable_array_t<job_t>;
+
     namespace job {
         enum class status_t : u8 {
-            ok,
-            busy,
-            error,
-            invalid_job_id,
-            invalid_job_state,
-            label_intern_failure,
+            ok                      = 0,
+            busy                    = 138,
+            error                   = 139,
+            invalid_job_id          = 140,
+            invalid_job_state       = 141,
+            label_intern_failure    = 142,
         };
 
         namespace system {
@@ -122,8 +134,6 @@ namespace basecode {
         u0 all(array_t<const job_t*>& list);
 
         status_t get(job_id id, job_t** job);
-
-        str::slice_t status_name(status_t status);
 
         str::slice_t state_name(job_state_t state);
 
@@ -156,8 +166,8 @@ namespace basecode {
         }
 
         template <typename Proc, typename... Args> status_t start(job_id id, Proc proc, Args&&... args) {
-            auto mem  = system::alloc_task();
-            auto task = new(mem) job_task_t(proc, std::forward_as_tuple(args...));
+            auto mem    = system::alloc_task();
+            auto task   = new(mem) job_task_t(proc, std::forward_as_tuple(args...));
             auto status = system::start(id, task);
             if (!OK(status))
                 system::free_task(task);

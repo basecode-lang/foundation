@@ -57,8 +57,8 @@ namespace basecode {
 
     namespace buf {
         enum class status_t : u8 {
-            ok,
-            unable_to_open_file,
+            ok                  = 0,
+            unable_to_open_file = 100,
         };
 
         namespace cursor {
@@ -72,6 +72,8 @@ namespace basecode {
         u0 reset(buf_t& buf);
 
         u0 index(buf_t& buf);
+
+        str::slice_t line(buf_t& buf, u32 idx);
 
         u0 reserve(buf_t& buf, u32 new_capacity);
 

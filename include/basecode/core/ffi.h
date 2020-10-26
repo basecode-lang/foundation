@@ -101,15 +101,15 @@ namespace basecode {
 
     namespace ffi {
         enum class status_t : u8 {
-            ok,
-            address_null,
-            prototype_null,
-            lib_not_loaded,
-            symbol_not_found,
-            invalid_int_size,
-            invalid_float_size,
-            load_library_failure,
-            struct_by_value_not_implemented,
+            ok                                  = 0,
+            address_null                        = 108,
+            prototype_null                      = 109,
+            lib_not_loaded                      = 110,
+            symbol_not_found                    = 111,
+            invalid_int_size                    = 112,
+            invalid_float_size                  = 113,
+            load_library_failure                = 114,
+            struct_by_value_not_implemented     = 115,
         };
 
         namespace lib {
@@ -157,8 +157,6 @@ namespace basecode {
         u0 free(ffi_t& ffi);
 
         u0 reset(ffi_t& ffi);
-
-        str::slice_t status_name(status_t status);
 
         template <typename T> param_value_t arg(T value) {
             param_value_t arg{};

@@ -42,6 +42,8 @@ configure_file(
 set(
     CORE_SOURCES
 
+    ${CORE_INC_DIR}/src_loc.h
+
     ast.cpp ${CORE_INC_DIR}/ast.h
 
     ${CORE_INC_DIR}/assoc_array.h
@@ -83,15 +85,13 @@ set(
 
     event.cpp ${CORE_INC_DIR}/event.h
 
-    ${PROJECT_DIR_BASE}/ext/fe-master/src/fe.c ${PROJECT_DIR_BASE}/ext/fe-master/src/fe.h
+    fe/src/fe.c fe/src/fe.h
 
     filesys.cpp ${CORE_INC_DIR}/filesys.h
 
     ffi.cpp ${CORE_INC_DIR}/ffi.h
 
     format.cpp ${CORE_INC_DIR}/format.h ${CORE_INC_DIR}/format_types.h
-
-    forth.cpp ${CORE_INC_DIR}/forth.h
 
     gap_buf.cpp ${CORE_INC_DIR}/gap_buf.h
 
@@ -114,6 +114,8 @@ set(
     job.cpp ${CORE_INC_DIR}/job.h
 
     ${CORE_INC_DIR}/list.h
+
+    locale.cpp ${CORE_INC_DIR}/locale.h
 
     log.cpp ${CORE_INC_DIR}/log.h
 
@@ -198,7 +200,8 @@ if (WIN32)
         ${PLATFORM_SRC_DIR}/unistd.cpp ${PLATFORM_INC_DIR}/unistd.h
         ${PLATFORM_SRC_DIR}/dirent.cpp ${PLATFORM_INC_DIR}/dirent.h
         ${PLATFORM_SRC_DIR}/syslog.cpp ${PLATFORM_INC_DIR}/syslog.h
-#        ${PLATFORM_SRC_DIR}/pthread.cpp ${PLATFORM_INC_DIR}/pthread.h
+        ${PLATFORM_SRC_DIR}/win32_locale.cpp ${PLATFORM_INC_DIR}/win32_locale.h
+        #        ${PLATFORM_SRC_DIR}/pthread.cpp ${PLATFORM_INC_DIR}/pthread.h
     )
     if (MSVC)
         set (
@@ -220,7 +223,7 @@ target_include_directories(
 target_include_directories(
     ${LIBRARY_TARGET} PRIVATE
 
-    ${PROJECT_DIR_BASE}/ext/fe-master/src)
+    fe/src)
 target_compile_options(${LIBRARY_TARGET} PUBLIC -march=native PRIVATE -Wno-array-bounds)
 set_target_properties(${LIBRARY_TARGET} PROPERTIES LIBRARY_OUTPUT_NAME ${LIBRARY_NAME})
 if (LINUX)
@@ -256,7 +259,7 @@ add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(
     ${PROJECT_NAME} INTERFACE
 
-    ${PROJECT_DIR_BASE}/ext/fe-master/src
+    fe/src
     ${INC_DIR_BASE}
     ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(

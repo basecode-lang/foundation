@@ -17,22 +17,10 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/format.h>
+#include <basecode/core/string.h>
 #include <basecode/core/network.h>
 
 namespace basecode::network {
-    static str::slice_t s_status_names[] = {
-        "ok"_ss,
-        "bind failure"_ss,
-        "listen failure"_ss,
-        "connect failure"_ss,
-        "socket dgram error"_ss,
-        "socket already open"_ss,
-        "winsock init failure"_ss,
-        "socket already closed"_ss,
-        "invalid address and port"_ss,
-        "socket option broadcast error"_ss,
-    };
-
     static s32 recv(socket_t& sock, u0* buf, s32 len, s32 timeout) {
         struct pollfd fd{};
         fd.fd     = sock.socket;
@@ -106,10 +94,6 @@ namespace basecode::network {
         if (sock.close_cb)
             sock.close_cb(sock);
         return status_t::ok;
-    }
-
-    str::slice_t status_name(status_t status) {
-        return s_status_names[(u32) status];
     }
 
     s32 socket::send_buf_size(socket_t& sock) {

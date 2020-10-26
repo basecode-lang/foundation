@@ -17,15 +17,10 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/intern.h>
+#include <basecode/core/string.h>
 #include <basecode/core/buf_pool.h>
 
 namespace basecode::intern {
-    static str::slice_t s_status_names[] = {
-        "ok"_ss,
-        "no bucket"_ss,
-        "not found"_ss,
-    };
-
     static b8 requires_rehash(const intern_t& pool) {
         return pool.capacity == 0 || pool.size + 1 > u32(f32(pool.capacity - 1) * pool.load_factor);
     }
@@ -108,10 +103,6 @@ namespace basecode::intern {
 
     u0 reserve(intern_t& pool, u32 capacity) {
         array::reserve(pool.strings, capacity);
-    }
-
-    str::slice_t status_name(status_t status) {
-        return s_status_names[(u32) status];
     }
 
     static status_t rehash(intern_t& pool, u32 new_capacity) {

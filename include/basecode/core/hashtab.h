@@ -16,6 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
+#pragma once
+
 #include <cassert>
 #include <algorithm>
 #include <basecode/core/str.h>
@@ -23,10 +25,9 @@
 #include <basecode/core/array.h>
 #include <basecode/core/memory.h>
 #include <basecode/core/format.h>
+#include <basecode/core/locale.h>
 #include <basecode/core/context.h>
 #include <basecode/core/hashable.h>
-
-#pragma once
 
 namespace basecode {
     template <typename K, typename V> requires hash::Hashable<K>

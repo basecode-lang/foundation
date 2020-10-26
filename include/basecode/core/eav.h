@@ -176,12 +176,12 @@ namespace basecode {
 
     namespace eav {
         enum class status_t : u8 {
-            ok,
-            error,
-            not_found,
-            sql_error,
-            invalid_rowid,
-            invalid_entity,
+            ok                  = 0,
+            error               = 101,
+            not_found           = 102,
+            sql_error           = 103,
+            invalid_rowid       = 104,
+            invalid_entity      = 105,
         };
 
         namespace txn {
@@ -284,8 +284,6 @@ namespace basecode {
         }
 
         u0 free(db_t& db);
-
-        str::slice_t status_name(status_t status);
 
         str::slice_t intern_label(db_t& db, u32 id);
 

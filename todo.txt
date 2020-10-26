@@ -1,30 +1,37 @@
-BACKLOG
+HIGH
 ---------
-- rework graphviz api
-- add directed_graph_t
 - locale: localized strings
+
+- buf: create a Buffer_Concept and rework buf to be based on it
+- buf: pretty formatting for source errors
+- term: module for ANSI output to terminals
+
+MEDIUM
+---------
+- add directed_graph_t
+- rework graphviz api
+
+LOW
+---------
 - abstract: shared memory buffer between processes
 - ipc: create an ipc module for low-level base
     ipc_addr_t, ipc_transport_t, ipc_
+
 - buddy allocator
+
 - page allocator: implement free list so pages can recycle
 - page allocator/slab allocator: implement reserve function so n numbers of pages can be allocated at a time.
         this would replace passing num_pages into these up front and makes the interface (perhaps) more consistent
         with other mechanisms in the library.
-- buf: create a Buffer_Concept and rework buf to be based on it
-- buf: pretty formatting for source errors
-- term: module for ANSI output to terminals
+
 - filesys: implement glob function, which will also touch the init and fini functions for the
             filesys module.
 - filesys: need to open and read the xdg config file (if found) and put into a symtab_t or hashtab_t.
             also, need to read applicable env vars once at module init and put them into the
             same symtab_t/hashtab_t.
 - filesys: once meta data is done (previous task), implement the remaining places::* functions
+
 - libgfx: pull in nfd or rewrite based on nfd_extended
-- libgfx: font book/font loading from scm file
-- libgfx: bitmap loading from scm file
-- libgfx: native menus support + scm file to define
-- libgfx: pull over zed + implot
 - libgfx: create test bed application within foundation project
 
 DONE

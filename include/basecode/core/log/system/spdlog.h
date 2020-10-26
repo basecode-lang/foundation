@@ -64,6 +64,8 @@ namespace basecode {
     };
 
     namespace log::spdlog {
+        u0 fini();
+
         logger_system_t* system();
     }
 }

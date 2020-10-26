@@ -18,12 +18,11 @@
 
 #include <thread>
 #include <cpuid.h>
-#include <cassert>
 #include <basecode/core/profiler.h>
 
 namespace basecode::profiler {
-    static s64      s_resolution = 0;
-    static f64      s_timer_multiplier = 1.0;
+    static s64  s_resolution        = 0;
+    static f64  s_timer_multiplier  = 1.0;
 
     static f64 calibrate() {
 #ifdef HW_TIMER
@@ -32,15 +31,11 @@ namespace basecode::profiler {
 #   else
         using namespace std::chrono;
 
-        std::atomic_signal_fence(std::memory_order_acq_rel);
         const auto t0 = high_resolution_clock::now();
         const auto r0 = get_time();
-        std::atomic_signal_fence(std::memory_order_acq_rel);
         std::this_thread::sleep_for(milliseconds(200));
-        std::atomic_signal_fence(std::memory_order_acq_rel);
         const auto t1 = high_resolution_clock::now();
         const auto r1 = get_time();
-        std::atomic_signal_fence(std::memory_order_acq_rel);
 
         const auto dt = duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
         const auto dr = r1 - r0;
@@ -87,7 +82,7 @@ namespace basecode::profiler {
         return status_t::ok;
     }
 
-    s64 timer_resolution() {
+    u64 timer_resolution() {
         return s_resolution;
     }
 

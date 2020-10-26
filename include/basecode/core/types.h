@@ -20,6 +20,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <cstring>
 #include <unistd.h>
 #include <sys/types.h>
 #include <x86intrin.h>
@@ -71,43 +72,43 @@
 #define HAS_ZERO(v)             (((v)-UINT64_C(0x0101010101010101)) & ~(v)&UINT64_C(0x8080808080808080))
 
 namespace basecode {
-    using u0            = void;
-    using u8            = std::uint8_t;
-    using u16           = std::uint16_t;
-    using u32           = std::uint32_t;
-    using u64           = std::uint64_t;
-    using s8            = char;
-    using s16           = std::int16_t;
-    using s32           = std::int32_t;
-    using s64           = std::int64_t;
-    using b8            = bool;
-    using f32           = float;
-    using f64           = double;
-    using s128          = __int128_t;
-    using u128          = __uint128_t;
-    using usize         = std::size_t;
-    using ssize         = ssize_t;
+    using u0                    = void;
+    using u8                    = std::uint8_t;
+    using u16                   = std::uint16_t;
+    using u32                   = std::uint32_t;
+    using u64                   = std::uint64_t;
+    using s8                    = char;
+    using s16                   = std::int16_t;
+    using s32                   = std::int32_t;
+    using s64                   = std::int64_t;
+    using b8                    = bool;
+    using f32                   = float;
+    using f64                   = double;
+    using s128                  = __int128_t;
+    using u128                  = __uint128_t;
+    using usize                 = std::size_t;
+    using ssize                 = ssize_t;
 
     struct alloc_t;
 
     union u16_bytes_t final {
-        u16             value;
-        u8              bytes[2];
+        u16                     value;
+        u8                      bytes[2];
     };
 
     union u32_bytes_t final {
-        u32             value;
-        u8              bytes[4];
+        u32                     value;
+        u8                      bytes[4];
     };
 
     union u64_bytes_t final {
-        u64             value;
-        u8              bytes[8];
+        u64                     value;
+        u8                      bytes[8];
     };
 
     union m128i_bytes_t final {
-        __m128i         value;
-        u8              bytes[16];
+        __m128i                 value;
+        u8                      bytes[16];
     };
 
     template <typename From, typename To> concept convertible_to = std::is_convertible_v<From, To> && requires(std::add_rvalue_reference_t<From> (&f)()) {
@@ -183,5 +184,9 @@ namespace basecode {
         {t.data}        -> same_as<u8*>;
         {t.length}      -> same_as<u32>;
         {t.capacity}    -> same_as<u32>;
+    };
+
+    template <typename T> concept Status_Concept = std::is_enum_v<T> || requires(const T& t) {
+        typename T::ok;
     };
 }

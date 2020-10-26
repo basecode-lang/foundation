@@ -17,19 +17,9 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/mutex.h>
+#include <basecode/core/string.h>
 
 namespace basecode::mutex {
-    static str::slice_t         s_status_names[] = {
-        "ok"_ss,
-        "busy"_ss,
-        "error"_ss,
-        "invalid mutex"_ss,
-        "out of memory"_ss,
-        "create mutex failure"_ss,
-        "insufficient privilege"_ss,
-        "thread already owns lock"_ss,
-    };
-
     static status_t status_from_errno(s32 err) {
         switch (err) {
             case 0:             return status_t::ok;
@@ -74,9 +64,5 @@ namespace basecode::mutex {
         auto r = pthread_mutex_trylock(&mutex.handle);
         mutex.locked = r == 0;
         return status_from_errno(r);
-    }
-
-    str::slice_t status_name(status_t status) {
-        return s_status_names[(u32) status];
     }
 }

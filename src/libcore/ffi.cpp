@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/ffi.h>
+#include <basecode/core/string.h>
 #include <basecode/core/stable_array.h>
 
 namespace basecode::ffi {
@@ -37,18 +38,6 @@ namespace basecode::ffi {
         stable_array_t<proto_t>                 protos;
         symtab_t<lib_pair_t>                    lib_map;
         symtab_t<proto_pair_t>                  proto_map;
-    };
-
-    static str::slice_t                         s_status_names[] = {
-        "ok"_ss,
-        "address null"_ss,
-        "prototype null"_ss,
-        "lib not loaded"_ss,
-        "symbol not found"_ss,
-        "invalid int size"_ss,
-        "invalid float size"_ss,
-        "load library failure"_ss,
-        "struct by value not implemented"_ss,
     };
 
     system_t                                    g_ffi_system;
@@ -115,10 +104,6 @@ namespace basecode::ffi {
             return true;
         }
         return false;
-    }
-
-    str::slice_t status_name(status_t status) {
-        return s_status_names[(u32) status];
     }
 
     proto_t* proto::find(str::slice_t symbol) {

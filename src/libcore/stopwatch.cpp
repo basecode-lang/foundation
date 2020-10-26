@@ -34,22 +34,23 @@ namespace basecode::stopwatch {
         w.start = profiler::get_time();
     }
 
-    s64 elapsed(stopwatch_t& w) {
-        auto delta = w.end - w.start;
+    u64 elapsed(stopwatch_t& w) {
+        if (w.start > w.end) return 0;
+        f64 delta = w.end - w.start;
         return delta * profiler::calibration_mult();
     }
 
     u0 print_elapsed(str::slice_t label, s32 width, stopwatch_t& w) {
         const auto sv_label = (std::string_view) label;
         const auto e = elapsed(w);
-        if (e <= 0) {
-            format::print_ellipsis(sv_label, width, "---\n", e);
+        if (e == 0) {
+            format::print_ellipsis(sv_label, width, "---\n");
         } else if (e < 1000) {
             format::print_ellipsis(sv_label, width, "{}ns\n", e);
         } else {
             const auto us = e / 1000;
             if (us >= 1000) {
-                format::print_ellipsis(sv_label, width, "{}ms\n", (f64) us / 1000);
+                format::print_ellipsis(sv_label, width, "{}ms\n", us / 1000);
             } else {
                 format::print_ellipsis(sv_label, width, "{}us\n", us);
             }

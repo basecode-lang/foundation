@@ -22,30 +22,6 @@ namespace basecode::cxx {
     static u32 s_integral_size_in_bytes[]   = {0, 0, 1, 2, 4, 8};
     static u32 s_integral_size_in_bits[]    = {0, 0, 8, 16, 32, 64};
 
-    static str::slice_t s_statuses[] = {
-        "ok"_ss,
-        "general error"_ss,
-        "field not found: lhs"_ss,
-        "field not found: rhs"_ss,
-        "program not found"_ss,
-        "field not found: list"_ss,
-        "field not found: scope"_ss,
-        "field not found: label"_ss,
-        "field not found: child"_ss,
-        "invalid pre-processor type"_ss,
-        "field not found: intern"_ss,
-        "invalid module revision"_ss,
-        "invalid unary position type"_ss,
-        "element not found"_ss,
-        "invalid meta type"_ss,
-        "invalid list entry"_ss,
-        "invalid def element"_ss,
-        "invalid decl element"_ss,
-        "invalid expr element"_ss,
-        "unsupported revision"_ss,
-        "not implemented"_ss,
-    };
-
     static str::slice_t s_revisions[] = {
         "none"_ss,
         "c99"_ss,
@@ -248,10 +224,6 @@ namespace basecode::cxx {
         return s_element_headers[value];
     }
 
-    str::slice_t program::status_name(status_t status) {
-        return s_statuses[(u32) status];
-    }
-
     str::slice_t program::revision_name(revision_t rev) {
         return s_revisions[(u32) rev];
     }
@@ -260,16 +232,16 @@ namespace basecode::cxx {
         return s_meta_types[(u32) type];
     }
 
-    u32 program::integral_size_in_bits(integral_size_t size) {
-        return s_integral_size_in_bits[(u32) size];
-    }
-
     str::slice_t scope::stmt::name(statement_type_t type) {
         return s_statement_types[(u32) type];
     }
 
     str::slice_t scope::expr::name(expression_type_t type) {
         return s_expression_types[(u32) type];
+    }
+
+    u32 program::integral_size_in_bits(integral_size_t size) {
+        return s_integral_size_in_bits[(u32) size];
     }
 
     u32 program::integral_size_in_bytes(integral_size_t size) {

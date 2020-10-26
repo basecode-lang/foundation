@@ -58,16 +58,16 @@ namespace basecode {
 
     namespace network {
         enum class status_t : u8 {
-            ok,
-            bind_failure,
-            listen_failure,
-            connect_failure,
-            socket_dgram_error,
-            socket_already_open,
-            winsock_init_failure,
-            socket_already_closed,
-            invalid_address_and_port,
-            socket_option_broadcast_error,
+            ok                              = 0,
+            bind_failure                    = 150,
+            listen_failure                  = 151,
+            connect_failure                 = 152,
+            socket_dgram_error              = 153,
+            socket_already_open             = 154,
+            winsock_init_failure            = 155,
+            socket_already_closed           = 156,
+            invalid_address_and_port        = 157,
+            socket_option_broadcast_error   = 158,
         };
 
         namespace udp {
@@ -115,7 +115,5 @@ namespace basecode {
 
             u0 init(ip_address_t& ip, const struct sockaddr* addr = {});
         }
-
-        str::slice_t status_name(status_t status);
     }
 }

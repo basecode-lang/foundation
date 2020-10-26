@@ -53,9 +53,9 @@ namespace basecode {
 
     namespace rpn {
         enum class status_t : u8 {
-            ok,
-            error,
-            invalid_operator_precedence_array
+            ok                                  = 0,
+            error                               = 200,
+            invalid_operator_precedence_array   = 201
         };
 
         namespace expr {

@@ -42,17 +42,17 @@ namespace basecode {
 
     namespace intern {
         enum class status_t : u8 {
-            ok,
-            no_bucket,
-            not_found,
+            ok                  = 0,
+            no_bucket           = 135,
+            not_found           = 136,
         };
 
         struct result_t final {
-            u64                         hash;
-            str::slice_t                slice;
-            u32                         id;
-            status_t                    status;
-            b8                          new_value;
+            u64                         hash        {};
+            str::slice_t                slice       {};
+            u32                         id          {};
+            status_t                    status      {};
+            b8                          new_value   {};
 
             b8 operator==(const result_t& other) const {
                 return id == other.id;
@@ -68,8 +68,6 @@ namespace basecode {
         result_t get(intern_t& pool, u32 id);
 
         u0 reserve(intern_t& pool, u32 capacity);
-
-        str::slice_t status_name(status_t status);
 
         intern_t make(alloc_t* alloc = context::top()->alloc);
 

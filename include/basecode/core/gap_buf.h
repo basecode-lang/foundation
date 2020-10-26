@@ -38,7 +38,7 @@ namespace basecode {
 
     namespace gap_buf {
         enum class status_t : u8 {
-            ok,
+            ok                  = 0,
         };
 
         u0 free(gap_buf_t& buf);
