@@ -53,11 +53,73 @@ namespace basecode::objfmt {
         }
     }
 
-    status_t read(container::type_t type, obj_file_t& file) {
-        return status_t::read_error;
+    namespace section {
+        u0 free(section_t& section) {
+            hashtab::free(section.symbols);
+            switch (section.type) {
+                case section_type_t::import:
+                    hashtab::free(section.subclass.import.table);
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        u0 reserve(section_t& section, u64 size) {
+            section.subclass.uninit.size = size;
+        }
+
+        u0 data(section_t& section, const u8* data, u32 length) {
+            section.subclass.data.range = slice::make(data, length);
+        }
+
+        status_t import(section_t& section, import_t** result, const s8* name, s32 len) {
+            if (section.type != section_type_t::import)
+                return status_t::invalid_section_type;
+            const auto import_name = string::interned::fold(name, len);
+            *result = hashtab::emplace(section.subclass.import.table, import_name);
+            (*result)->flags = {};
+            return *result ? status_t::ok : status_t::import_failure;
+        }
+
+        status_t init(section_t& section, section_type_t type, const s8* name, s32 len) {
+            section.alloc = g_objfmt_sys.alloc;
+            hashtab::init(section.symbols, section.alloc);
+            section.type             = type;
+            section.name             = string::interned::fold(name, len);
+            section.address.physical = {};
+            section.address.virtual_ = {};
+            section.flags            = {};
+            switch (section.type) {
+                case section_type_t::uninit:
+                    section.subclass.uninit.size = {};
+                    break;
+                case section_type_t::import:
+                    hashtab::init(section.subclass.import.table, section.alloc);
+                    break;
+                default:
+                    section.subclass.data.range = {};
+                    break;
+            }
+            return status_t::ok;
+        }
     }
 
-    status_t write(container::type_t type, obj_file_t& file) {
-        return status_t::write_error;
+    namespace obj_file {
+        u0 free(obj_file_t& file) {
+            path::free(file.path);
+            for (auto& section : file.sections)
+                section::free(section);
+            array::free(file.sections);
+            stable_array::free(file.symbols);
+        }
+
+        status_t init(obj_file_t& file) {
+            file.alloc = g_objfmt_sys.alloc;
+            path::init(file.path, file.alloc);
+            array::init(file.sections, file.alloc);
+            stable_array::init(file.symbols, file.alloc);
+            return status_t::ok;
+        }
     }
 }

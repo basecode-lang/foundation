@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/objfmt/container.h>
+#include <basecode/objfmt/types.h>
 #include <basecode/objfmt/pe.h>
 #include <basecode/objfmt/coff.h>
 #include <basecode/objfmt/elf.h>
@@ -40,7 +40,15 @@ namespace basecode::objfmt::container {
             sys->init(alloc);
     }
 
-    system_t* system(type_t type) {
-        return s_systems[u32(type)];
+    status_t read(container::type_t type, obj_file_t& file) {
+        UNUSED(type);
+        UNUSED(file);
+        return status_t::read_error;
+    }
+
+    status_t write(container::type_t type, obj_file_t& file) {
+        UNUSED(type);
+        UNUSED(file);
+        return status_t::write_error;
     }
 }

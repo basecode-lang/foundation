@@ -22,18 +22,22 @@
 #include <basecode/core/hashtab.h>
 #include <basecode/objfmt/configure.h>
 #include <basecode/objfmt/container.h>
+#include <basecode/core/stable_array.h>
 
 #define SYMBOL_DERIVED_TYPE(type)   (u32((type)) >> 16U & 0xffffU)
 #define SYMBOL_TYPE(derived, type)  (u32((derived)) << 16U | u32((type)))
 
 namespace basecode {
     struct symbol_t;
+    struct import_t;
     struct section_t;
     struct version_t;
     struct obj_file_t;
 
-    using symbol_table_t        = hashtab_t<u32, symbol_t>;
+    using symbol_list_t         = stable_array_t<symbol_t>;
     using section_list_t        = array_t<section_t>;
+    using import_map_t          = hashtab_t<str::slice_t, import_t>;
+    using symbol_ref_map_t      = hashtab_t<str::slice_t, symbol_t*>;
 
     struct symbol_type_t final {
         constexpr symbol_type_t()         : derived(0), base_type(0)
@@ -48,7 +52,13 @@ namespace basecode {
         u32                     base_type:  16;
     };
 
+    enum class machine_type_t : u16 {
+    };
+
     enum class section_type_t : u8 {
+        data,
+        uninit,
+        import
     };
 
     enum class relocation_type_t : u8 {
@@ -79,15 +89,39 @@ namespace basecode {
     };
 
     union section_subclass_t {
+        struct {
+            str::slice_t        range;
+        }                       data;
+        struct {
+            u64                 size;
+        }                       uninit;
+        struct {
+            import_map_t        table;
+        }                       import;
+    };
+
+    struct import_t final {
+        symbol_t*               symbol;
+        struct {
+            u32                 load:   1;
+            u32                 pad:    31;
+        }                       flags;
     };
 
     struct section_t final {
         alloc_t*                alloc;
         str::slice_t            name;
         address_t               address;
-        u64                     size;
-        symbol_table_t          symbols;
+        symbol_ref_map_t        symbols;
         section_subclass_t      subclass;
+        struct {
+            u32                 code:   1;
+            u32                 data:   1;
+            u32                 read:   1;
+            u32                 write:  1;
+            u32                 exec:   1;
+            u32                 pad:    26;
+        }                       flags;
         section_type_t          type;
     };
 
@@ -99,8 +133,10 @@ namespace basecode {
     struct obj_file_t final {
         alloc_t*                alloc       {};
         path_t                  path;
+        symbol_list_t           symbols     {};
         section_list_t          sections    {};
         version_t               version     {};
+        machine_type_t          machine     {};
     };
 
     namespace objfmt {
@@ -108,7 +144,9 @@ namespace basecode {
             ok                  = 0,
             read_error          = 2001,
             write_error         = 2002,
-            config_eval_error   = 2000
+            import_failure      = 2003,
+            config_eval_error   = 2000,
+            invalid_section_type= 2004,
         };
 
         namespace system {
@@ -117,8 +155,30 @@ namespace basecode {
             status_t init(alloc_t* alloc = context::top()->alloc);
         }
 
-        status_t read(container::type_t type, obj_file_t& file);
+        namespace section {
+            u0 free(section_t& section);
 
-        status_t write(container::type_t type, obj_file_t& file);
+            u0 reserve(section_t& section, u64 size);
+
+            u0 data(section_t& section, const u8* data, u32 length);
+
+            status_t import(section_t& section, import_t** result, const s8* name, s32 len = -1);
+
+            status_t import(section_t& section, import_t** result, const String_Concept auto& name) {
+                return import(section, result, (const s8*) name.data, name.length);
+            }
+
+            status_t init(section_t& section, section_type_t type, const s8* name, s32 len = -1);
+
+            status_t init(section_t& section, section_type_t type, const String_Concept auto& name) {
+                return init(section, type, (const s8*) name.data, name.length);
+            }
+        }
+
+        namespace obj_file {
+            u0 free(obj_file_t& file);
+
+            status_t init(obj_file_t& file);
+        }
     }
 }

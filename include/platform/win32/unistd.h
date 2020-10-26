@@ -50,12 +50,9 @@ FILE* fmemopen(void* buf, size_t len, const char* type);
 #define PATH_MAX            260
 
 #define strdup              _strdup
-//#define vsnprintf           _vsnprintf
-#define write               _write
 #define unlink              _unlink
 #define mkdir               _mkdir
 #define rmdir               _rmdir
-#define read                _read
 #define lstat               stat
 #define lseek               _lseek
 #define isatty              _isatty
@@ -82,7 +79,15 @@ FILE* fmemopen(void* buf, size_t len, const char* type);
 
 typedef unsigned long long useconds_t;
 
-inline int usleep(useconds_t usec) {
+__forceinline int read(int const fd, void * const buffer, unsigned const buffer_size) {
+    return _read(fd, buffer, buffer_size);
+}
+
+__forceinline int write(int fd, const void* buffer, unsigned int buffer_size) {
+    return _write(fd, buffer, buffer_size);
+}
+
+__forceinline int usleep(useconds_t usec) {
     LARGE_INTEGER time1;
     LARGE_INTEGER time2;
     LARGE_INTEGER freq;

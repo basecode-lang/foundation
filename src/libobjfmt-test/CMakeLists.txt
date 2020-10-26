@@ -6,6 +6,7 @@ add_executable(
 
     test.h
     main.cpp
+    pe_tests.cpp
 )
 target_link_libraries(${PROJECT_NAME} basecode-core basecode-objfmt)
 if (NOT MSVC)
