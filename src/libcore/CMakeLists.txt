@@ -224,7 +224,12 @@ target_include_directories(
     ${LIBRARY_TARGET} PRIVATE
 
     fe/src)
-target_compile_options(${LIBRARY_TARGET} PUBLIC -march=native PRIVATE -Wno-array-bounds)
+target_compile_options(
+    ${LIBRARY_TARGET}
+
+    PUBLIC  "$<$<COMPILE_LANGUAGE:C,CXX>:-march=native>"
+    PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:-Wno-array-bounds>"
+)
 set_target_properties(${LIBRARY_TARGET} PROPERTIES LIBRARY_OUTPUT_NAME ${LIBRARY_NAME})
 if (LINUX)
     set_target_properties(${LIBRARY_TARGET} PROPERTIES POSITION_INDEPENDENT_CODE True)
@@ -233,7 +238,6 @@ endif()
 target_link_libraries(
     ${LIBRARY_TARGET} PRIVATE
 
-    asmjit
     utf8proc
     blake3
     fmt
@@ -265,7 +269,6 @@ target_include_directories(
 target_link_libraries(
     ${PROJECT_NAME} INTERFACE
 
-    asmjit
     utf8proc
     blake3
     fmt

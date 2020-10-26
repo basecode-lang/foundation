@@ -117,10 +117,6 @@ else ()
 endif ()
 
 
-# asmjit
-set(ASMJIT_STATIC 1)
-add_subdirectory(ext/asmjit-master EXCLUDE_FROM_ALL)
-
 # libpng
 option(PNG_STATIC "" ON)
 option(PNG_SHARED "" OFF)
@@ -191,18 +187,26 @@ target_include_directories(dyncall_s INTERFACE ext/dyncall-1.1.0)
 target_include_directories(dynload_s INTERFACE ext/dyncall-1.1.0)
 set (DYN_ALLOC_HEADER "${PROJECT_SOURCE_DIR}/include/basecode/core/memory/dyn_alloc.h")
 if (MSVC)
-    target_compile_options(dyncall_s PRIVATE "/FI${DYN_ALLOC_HEADER}")
-    target_compile_options(dynload_s PRIVATE "/FI${DYN_ALLOC_HEADER}")
-else ()
     target_compile_options(
         dyncall_s PRIVATE
-        "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:--include=${DYN_ALLOC_HEADER}>"
-        "$<$<COMPILE_LANG_AND_ID:CXX,Clang>:--include=${DYN_ALLOC_HEADER}>"
+
+        "$<$<COMPILE_LANGUAGE:C,CXX>:/FI${DYN_ALLOC_HEADER}>"
     )
     target_compile_options(
         dynload_s PRIVATE
-        "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:--include=${DYN_ALLOC_HEADER}>"
-        "$<$<COMPILE_LANG_AND_ID:CXX,Clang>:--include=${DYN_ALLOC_HEADER}>"
+
+        "$<$<COMPILE_LANGUAGE:C,CXX>:/FI${DYN_ALLOC_HEADER}>"
+    )
+else ()
+    target_compile_options(
+        dyncall_s PRIVATE
+
+        "$<$<COMPILE_LANGUAGE:C,CXX>:--include=${DYN_ALLOC_HEADER}>"
+    )
+    target_compile_options(
+        dynload_s PRIVATE
+
+        "$<$<COMPILE_LANGUAGE:C,CXX>:--include=${DYN_ALLOC_HEADER}>"
     )
 endif ()
 
