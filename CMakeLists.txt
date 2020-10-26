@@ -201,12 +201,12 @@ else ()
     target_compile_options(
         dyncall_s PRIVATE
 
-        "$<$<COMPILE_LANGUAGE:C,CXX>:--include=${DYN_ALLOC_HEADER}>"
+        "$<$<COMPILE_LANGUAGE:CXX>:--include=${DYN_ALLOC_HEADER}>"
     )
     target_compile_options(
         dynload_s PRIVATE
 
-        "$<$<COMPILE_LANGUAGE:C,CXX>:--include=${DYN_ALLOC_HEADER}>"
+        "$<$<COMPILE_LANGUAGE:CXX>:--include=${DYN_ALLOC_HEADER}>"
     )
 endif ()
 

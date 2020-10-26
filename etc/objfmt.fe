@@ -1,0 +1,13 @@
+;; -------------------------------------------------------------
+;;
+;; localization
+;;
+;; -------------------------------------------------------------
+
+;; strings
+(= str:objfmt-config-eval-err  (localized-string 2000 'en_US "unable to read/eval config"))
+(= str:objfmt-read-err         (localized-string 2001 'en_US "container read error"))
+(= str:objfmt-write-err        (localized-string 2002 'en_US "container write error"))
+
+;; errors
+

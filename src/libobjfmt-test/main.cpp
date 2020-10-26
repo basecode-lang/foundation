@@ -32,9 +32,9 @@
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/network.h>
+#include <basecode/objfmt/types.h>
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
-#include <basecode/objfmt/configure.h>
 #include <basecode/core/log/system/spdlog.h>
 #include <basecode/core/log/system/syslog.h>
 #include <basecode/core/log/system/default.h>
@@ -91,19 +91,6 @@ s32 main(s32 argc, const s8** argv) {
         }
     }
 
-    cvar_t* cvar{};
-    config::cvar::add(1, "enable-console-color", cvar_type_t::flag);
-    config::cvar::get(1, &cvar);
-    cvar->value.flag = true;
-
-    config::cvar::add(2, "log-path", cvar_type_t::string);
-    config::cvar::get(2, &cvar);
-    cvar->value.ptr = (u8*) string::interned::fold("/var/log"_ss).data;
-
-    config::cvar::add(3, "magick-weight", cvar_type_t::real);
-    config::cvar::get(3, &cvar);
-    cvar->value.real = 47.314f;
-
     auto core_config_path = "../etc/core.fe"_path;
     path_t config_path{};
     filesys::bin_rel_path(config_path, core_config_path);
@@ -119,11 +106,21 @@ s32 main(s32 argc, const s8** argv) {
     if (!OK(filesys::init()))           return 1;
     if (!OK(network::system::init()))   return 1;
 
+    {
+        auto status = objfmt::system::init();
+        if (!OK(status)) {
+            format::print(stderr, "objfmt::system::init error: {}\n",
+                          string::localized::status_name(status));
+            return (s32) status;
+        }
+    }
+
     auto rc = Catch::Session().run(argc, argv);
 
     path::free(config_path);
     path::free(core_config_path);
 
+    objfmt::system::fini();
     network::system::fini();
     filesys::fini();
     ffi::system::fini();

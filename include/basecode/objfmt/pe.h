@@ -16,8 +16,10 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/objfmt/types.h>
+#pragma once
 
-namespace basecode {
-    u32 g_garbage{};
+#include <basecode/objfmt/container.h>
+
+namespace basecode::objfmt::container::pe {
+    system_t* system();
 }

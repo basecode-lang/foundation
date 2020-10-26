@@ -24,10 +24,10 @@ configure_file(
     configure.in.h
     "${CMAKE_BINARY_DIR}/include/basecode/objfmt/configure.h"
 )
-#configure_file(
-#    ${PROJECT_DIR_BASE}/etc/core.fe
-#    ${CMAKE_BINARY_DIR}/etc/core.fe COPYONLY
-#)
+configure_file(
+    ${PROJECT_DIR_BASE}/etc/objfmt.fe
+    ${CMAKE_BINARY_DIR}/etc/objfmt.fe COPYONLY
+)
 
 # -----------------------------------------------------------------------------
 #
@@ -38,7 +38,19 @@ configure_file(
 set(
     OBJFMT_SOURCES
 
-    ${INC_DIR}/types.h types.cpp
+    ${INC_DIR}/types.h
+
+    coff.cpp ${INC_DIR}/coff.h
+
+    container.cpp ${INC_DIR}/container.h
+
+    elf.cpp ${INC_DIR}/elf.h
+
+    macho.cpp ${INC_DIR}/macho.h
+
+    pe.cpp ${INC_DIR}/pe.h
+
+    system.cpp
 )
 add_library(${LIBRARY_TARGET} ${OBJFMT_SOURCES})
 target_include_directories(
