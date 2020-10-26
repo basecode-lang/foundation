@@ -160,7 +160,10 @@
 ;; test runner support
 ;;
 ;; -------------------------------------------------------------
-(if (cvar-ref cvar:test-runner)
+(= objfmt-tests (fn ()
+    nil))
+
+(= core-tests (fn ()
     (do
         (localized-string 5000 'en_US "US: test localized string: 0={} 1={} 2={}")
         (localized-string 5001 'en_US "duplicate cvar")
@@ -217,5 +220,10 @@
 
             (log-info "example log message!")
             (log-warn "oh, shit!")
-            (log-error "this should really stick out"))))
-
+            (log-error "this should really stick out")))))
+(if (cvar-ref cvar:test-runner)
+    (do
+        (let product-name (cvar-ref cvar:product-name))
+        (if (is product-name "Basecode Foundation Object Format Library") (objfmt-tests)
+            (is product-name "Basecode Foundation Core Library")          (core-tests)
+            nil)))
