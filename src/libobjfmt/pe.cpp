@@ -38,11 +38,11 @@ namespace basecode::objfmt::container::pe {
     [[maybe_unused]] constexpr u32 optional_header_size         = 0xf0;
     [[maybe_unused]] constexpr u32 pe_header_size               = pe_sig_size + coff_header_size + optional_header_size;
     [[maybe_unused]] constexpr u32 section_header_size          = 0x28;
-    [[maybe_unused]] constexpr u32 imp_addr_entry_size          = 0x04;
-    [[maybe_unused]] constexpr u32 imp_dir_entry_size           = sizeof(u64) * 5; //0x14;
+    [[maybe_unused]] constexpr u32 imp_addr_entry_size          = 0x08;
+    [[maybe_unused]] constexpr u32 imp_dir_entry_size           = 0x14;
     [[maybe_unused]] constexpr u32 imp_lookup_entry_size        = imp_addr_entry_size;
     [[maybe_unused]] constexpr u32 name_table_entry_size        = 0x12;
-    [[maybe_unused]] constexpr u32 image_base_addr              = 0x00400000;   // XXX: check this
+    [[maybe_unused]] constexpr u64 image_base_addr              = 0x140000000;    //0x00400000;   // XXX: check this
     [[maybe_unused]] constexpr u32 section_align                = 0x1000;       // XXX: this seems massive!
     [[maybe_unused]] constexpr u32 file_align                   = 0x200;
 
@@ -96,9 +96,20 @@ namespace basecode::objfmt::container::pe {
     [[maybe_unused]] constexpr u16 subsys_win_boot_app          = 16;
     [[maybe_unused]] constexpr u16 subsys_xbox_code_catalog     = 17;
 
+    static u0 write_pad(buf_crsr_t& crsr) {
+        if ((crsr.pos % 2) == 0) return;
+        buf::cursor::write_u8(crsr, 0);
+    }
+
     static u0 write_pad8(buf_crsr_t& crsr, str::slice_t slice) {
         for (u32 i = 0; i < 8; ++i)
             buf::cursor::write_u8(crsr, i < slice.length ? slice[i] : 0);
+    }
+
+    static u0 write_cstr(buf_crsr_t& crsr, str::slice_t slice) {
+        for (u32 i = 0; i < slice.length; ++i)
+            buf::cursor::write_u8(crsr, slice[i]);
+        buf::cursor::write_u8(crsr, 0);
     }
 
     static u0 write_pad16(buf_crsr_t& crsr, str::slice_t slice) {
@@ -122,8 +133,8 @@ namespace basecode::objfmt::container::pe {
         buf_crsr_t crsr{};
         buf::cursor::init(crsr, buf);
 
-        const auto dos_stub_size    = dos_header_size + sizeof(s_dos_stub);
-        const auto pe_offset        = align(dos_stub_size, 8);
+        const auto dos_stub_size = dos_header_size + sizeof(s_dos_stub);
+        const auto pe_offset     = align(dos_stub_size, 8);
 
         buf::cursor::write_u8(crsr, 'M');
         buf::cursor::write_u8(crsr, 'Z');
@@ -163,7 +174,7 @@ namespace basecode::objfmt::container::pe {
         buf::cursor::write_u32(crsr, 0);
         buf::cursor::write_u32(crsr, 0);
         buf::cursor::write_u16(crsr, optional_header_size);
-        buf::cursor::write_u16(crsr, relocations_stripped | executable_image);
+        buf::cursor::write_u16(crsr, 0x022F /*relocations_stripped | executable_image*/);
 
         const auto headers_size = pe_offset + pe_header_size + (file.sections.size * section_header_size);
 
@@ -179,10 +190,10 @@ namespace basecode::objfmt::container::pe {
         u32 iat_rva             = {};
         u32 iat_size            = {};
         u32 name_tbl_rva        = {};
+        u32 name_tbl_size       = {};
         u32 imp_dir_tbl_rva     = {};
         u32 imp_dir_tbl_size    = {};
         u32 imp_lookup_tbl_rva  = {};
-        u32 imp_lookup_tbl_size = {};
 
         for (auto& section : file.sections) {
             offset = section.offset           = align(offset + size, file_align);
@@ -207,20 +218,24 @@ namespace basecode::objfmt::container::pe {
                 case section::type_t::import: {
                     const auto& imports = section.subclass.imports;
                     iat_rva  = rva;
-                    u32 imported_count = imports.size;
-                    for (const auto& import : imports) {
+                    u32 imported_count{};
+                    for (const auto& import : imports)
                         imported_count += import.symbols.size;
-                    }
-                    iat_size = imported_count * imp_addr_entry_size;
+                    iat_size = (imported_count + 1) * imp_addr_entry_size;
+                    rva += iat_size;
 
-                    imp_dir_tbl_rva = iat_rva + iat_size;
+                    imp_dir_tbl_rva = rva;
                     imp_dir_tbl_size = imp_dir_entry_size * 2;
+                    rva += imp_dir_tbl_size;
 
-                    imp_lookup_tbl_rva = imp_dir_tbl_rva + imp_dir_tbl_size;
+                    imp_lookup_tbl_rva = rva;
+                    rva += iat_size;
 
-                    name_tbl_rva = imp_lookup_tbl_rva + iat_size;
-                    const auto name_tbl_size = imported_count * name_table_entry_size + 16;
-                    size = section.size = name_tbl_rva + name_tbl_size - rva;
+                    name_tbl_rva = rva;
+                    name_tbl_size = (imported_count + 1) * name_table_entry_size;
+                    rva += name_tbl_size;
+
+                    size = section.size = rva - iat_rva;
                     size_of_init_data += size;
                     break;
                 }
@@ -229,7 +244,7 @@ namespace basecode::objfmt::container::pe {
         }
 
         buf::cursor::write_u16(crsr, pe64);
-        buf::cursor::write_u8(crsr, 0);     // XXX: linker major
+        buf::cursor::write_u8(crsr, 6);     // XXX: linker major
         buf::cursor::write_u8(crsr, 0);     // XXX: linker minor
         buf::cursor::write_u32(crsr, size_of_code);
         buf::cursor::write_u32(crsr, size_of_init_data);
@@ -239,12 +254,12 @@ namespace basecode::objfmt::container::pe {
         buf::cursor::write_u64(crsr, image_base_addr);
         buf::cursor::write_u32(crsr, section_align);
         buf::cursor::write_u32(crsr, file_align);
-        buf::cursor::write_u16(crsr, 3);            // XXX: OS ver major
-        buf::cursor::write_u16(crsr, 10);           // XXX: OS ver minor
+        buf::cursor::write_u16(crsr, 4);            // XXX: OS ver major
+        buf::cursor::write_u16(crsr, 0);            // XXX: OS ver minor
         buf::cursor::write_u16(crsr, 0);            // XXX: image ver major
         buf::cursor::write_u16(crsr, 0);            // XXX: image ver minor
-        buf::cursor::write_u16(crsr, 3);            // XXX: subsystem ver major
-        buf::cursor::write_u16(crsr, 10);           // XXX: subsystem ver minor
+        buf::cursor::write_u16(crsr, 4);            // XXX: subsystem ver major
+        buf::cursor::write_u16(crsr, 0);            // XXX: subsystem ver minor
         buf::cursor::write_u32(crsr, 0);
         buf::cursor::write_u32(crsr, align(rva + size, section_align));
         buf::cursor::write_u32(crsr, align(headers_size, file_align));
@@ -314,8 +329,13 @@ namespace basecode::objfmt::container::pe {
             write_pad8(crsr, intern_rc.slice);
             buf::cursor::write_u32(crsr, section.size);
             buf::cursor::write_u32(crsr, section.address.virtual_);
-            buf::cursor::write_u32(crsr, align(section.size, file_align));
-            buf::cursor::write_u32(crsr, section.offset);
+            if (section.type == section::type_t::uninit) {
+                buf::cursor::write_u32(crsr, 0);
+                buf::cursor::write_u32(crsr, 0);
+            } else {
+                buf::cursor::write_u32(crsr, align(section.size, file_align));
+                buf::cursor::write_u32(crsr, section.offset);
+            }
             buf::cursor::write_u32(crsr, 0);         // XXX: pointer to relocs
             buf::cursor::write_u32(crsr, 0);         // XXX: pointer to line numbers
             buf::cursor::write_u16(crsr, 0);         // XXX: number of relocs
@@ -335,12 +355,13 @@ namespace basecode::objfmt::container::pe {
             if (section.flags.write)    flags |= memory_write;
             if (section.flags.exec)     flags |= memory_execute;
 
-//            format::print("flags = 0x{:08X}\n", flags);
             buf::cursor::write_u32(crsr, flags);
         }
 
         // section data
         for (const auto& section : file.sections) {
+            if (section.type == section::type_t::uninit)
+                continue;
             buf::cursor::seek(crsr, section.offset);
             switch (section.type) {
                 case section::type_t::code:
@@ -354,42 +375,42 @@ namespace basecode::objfmt::container::pe {
                         const auto module_intern = string::interned::get(module_symbol->name);
 
                         // import address table
-                        u32 name_table_ptr = name_tbl_rva;
-                        buf::cursor::write_u32(crsr, name_table_ptr);
-                        name_table_ptr += name_table_entry_size;
-                        for (auto symbol_id : import.symbols) {
-                            buf::cursor::write_u32(crsr, name_table_ptr);
+                        format::print("name_tbl_rva = 0x{:08x}\n", name_tbl_rva);
+                        u32 name_table_ptr = name_tbl_rva + name_table_entry_size;
+                        for (u32 i = 0; i < import.symbols.size; ++i) {
+                            format::print("name_table_ptr = 0x{:08x}\n", name_table_ptr);
+                            buf::cursor::write_u64(crsr, name_table_ptr);
                             name_table_ptr += name_table_entry_size;
                         }
-                        buf::cursor::write_u32(crsr, 0);
+                        buf::cursor::write_u64(crsr, 0);
 
                         // import directory table
-                        buf::cursor::write_u64(crsr, imp_lookup_tbl_rva);
-                        buf::cursor::write_u64(crsr, 0);
-                        buf::cursor::write_u64(crsr, 0);
-                        buf::cursor::write_u64(crsr, name_tbl_rva);
-                        buf::cursor::write_u64(crsr, iat_rva);
+                        buf::cursor::write_u32(crsr, imp_lookup_tbl_rva);
+                        buf::cursor::write_u32(crsr, 0);
+                        buf::cursor::write_u32(crsr, 0);
+                        buf::cursor::write_u32(crsr, name_tbl_rva);
+                        buf::cursor::write_u32(crsr, iat_rva);
 
                         // null node
-                        buf::cursor::write_u64(crsr, 0);
-                        buf::cursor::write_u64(crsr, 0);
-                        buf::cursor::write_u64(crsr, 0);
-                        buf::cursor::write_u64(crsr, 0);
-                        buf::cursor::write_u64(crsr, 0);
-
-                        // import lookup table
-                        name_table_ptr = name_tbl_rva;
-                        buf::cursor::write_u32(crsr, name_table_ptr);
-                        name_table_ptr += name_table_entry_size;
-                        for (auto symbol_id : import.symbols) {
-                            buf::cursor::write_u32(crsr, name_table_ptr);
-                            name_table_ptr += name_table_entry_size;
-                        }
+                        buf::cursor::write_u32(crsr, 0);
+                        buf::cursor::write_u32(crsr, 0);
+                        buf::cursor::write_u32(crsr, 0);
+                        buf::cursor::write_u32(crsr, 0);
                         buf::cursor::write_u32(crsr, 0);
 
+                        // import lookup table
+                        name_table_ptr = name_tbl_rva + name_table_entry_size;
+                        for (u32 i = 0; i < import.symbols.size; ++i) {
+                            format::print("name_table_ptr = 0x{:08x}\n", name_table_ptr);
+                            buf::cursor::write_u64(crsr, name_table_ptr);
+                            name_table_ptr += name_table_entry_size;
+                        }
+                        buf::cursor::write_u64(crsr, 0);
+
                         // name table
-                        buf::cursor::write_u16(crsr, 0);        // XXX: hint
                         write_pad16(crsr, module_intern.slice);
+                        buf::cursor::write_u8(crsr, 0);
+                        buf::cursor::write_u8(crsr, 0);
                         for (auto symbol_id : import.symbols) {
                             const auto symbol = file::get_symbol(file, symbol_id);
                             const auto symbol_intern = string::interned::get(symbol->name);
