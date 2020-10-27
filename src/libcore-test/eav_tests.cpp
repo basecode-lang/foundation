@@ -27,7 +27,7 @@ TEST_CASE("basecode::eav") {
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    auto data_file = "test.data"_path;
+    auto data_file = ":memory:"_path;
     db_t db{};
     defer({
         eav::free(db);

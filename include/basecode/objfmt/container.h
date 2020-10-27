@@ -18,48 +18,35 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/objfmt/types.h>
 
-namespace basecode {
-    struct obj_file_t;
+namespace basecode::objfmt::container {
+    enum class type_t : u8 {
+        pe,
+        elf,
+        coff,
+        macho
+    };
+    constexpr u32 max_type_count = 4;
 
-    namespace objfmt::container {
-        enum class status_t : u8 {
-            ok,
-            read_error,
-            write_error,
-            init_failure,
-            fini_failure,
-            invalid_container_type
-        };
+    using fini_callback_t       = u0 (*)();
+    using read_callback_t       = status_t (*)(file_t&);
+    using write_callback_t      = status_t (*)(file_t&);
+    using init_callback_t       = status_t (*)(alloc_t*);
 
-        enum class type_t : u8 {
-            pe,
-            elf,
-            coff,
-            macho
-        };
-        constexpr u32 max_type_count = 4;
+    struct system_t final {
+        init_callback_t         init;
+        fini_callback_t         fini;
+        read_callback_t         read;
+        write_callback_t        write;
+        type_t                  type;
+    };
 
-        using fini_callback_t   = u0 (*)();
-        using init_callback_t   = status_t (*)(alloc_t*);
-        using read_callback_t   = status_t (*)(obj_file_t&);
-        using write_callback_t  = status_t (*)(obj_file_t&);
+    u0 fini();
 
-        struct system_t final {
-            init_callback_t     init;
-            fini_callback_t     fini;
-            read_callback_t     read;
-            write_callback_t    write;
-            type_t              type;
-        };
+    status_t init(alloc_t* alloc);
 
-        u0 fini();
+    status_t read(type_t type, file_t& file);
 
-        status_t init(alloc_t* alloc);
-
-        status_t read(container::type_t type, obj_file_t& file);
-
-        status_t write(container::type_t type, obj_file_t& file);
-    }
+    status_t write(type_t type, file_t& file);
 }

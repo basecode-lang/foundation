@@ -18,8 +18,9 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
-#include <basecode/objfmt/types.h>
+#include <basecode/objfmt/objfmt.h>
 #include <basecode/core/stopwatch.h>
+#include <basecode/objfmt/container.h>
 
 using namespace basecode;
 
@@ -92,35 +93,35 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    obj_file_t rot13_pgm{};
-    REQUIRE(OK(objfmt::obj_file::init(rot13_pgm)));
+    objfmt::file_t rot13_pgm{};
+    REQUIRE(OK(objfmt::file::init(rot13_pgm)));
     path::set(rot13_pgm.path, "rot13.exe");
-    defer(objfmt::obj_file::free(rot13_pgm));
+    defer(objfmt::file::free(rot13_pgm));
 
-    section_t* text{};
-    symbol_t* text_sym{};
-    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &text_sym, ".text"_ss)));
-    REQUIRE(OK(objfmt::obj_file::make_section(rot13_pgm, &text, section_type_t::data, text_sym)));
+    objfmt::section_t* text{};
+    objfmt::symbol_t* text_sym{};
+    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &text_sym, ".text"_ss)));
+    REQUIRE(OK(objfmt::file::make_section(rot13_pgm, &text, objfmt::section_type_t::data, text_sym)));
     objfmt::section::data(text, s_rot13_code, sizeof(s_rot13_code));
     text->flags.code = true;
     text->flags.read = true;
     text->flags.exec = true;
 
-    section_t *rdata{};
-    symbol_t* rdata_sym{};
-    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &rdata_sym, ".rdata"_ss)));
-    REQUIRE(OK(objfmt::obj_file::make_section(rot13_pgm, &rdata, section_type_t::data, rdata_sym)));
+    objfmt::section_t *rdata{};
+    objfmt::symbol_t* rdata_sym{};
+    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &rdata_sym, ".rdata"_ss)));
+    REQUIRE(OK(objfmt::file::make_section(rot13_pgm, &rdata, objfmt::section_type_t::data, rdata_sym)));
     objfmt::section::data(rdata, s_rot13_table, sizeof(s_rot13_table));
     rdata->flags.data = true;
     rdata->flags.read = true;
 
-    section_t* idata{};
-    import_t* kernel32{};
-    symbol_t* idata_sym{};
-    symbol_t* kernel32_sym{};
-    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &kernel32_sym, "kernel32.dll"_ss)));
-    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &idata_sym, ".idata"_ss)));
-    REQUIRE(OK(objfmt::obj_file::make_section(rot13_pgm, &idata, section_type_t::import, idata_sym)));
+    objfmt::section_t* idata{};
+    objfmt::import_t* kernel32{};
+    objfmt::symbol_t* idata_sym{};
+    objfmt::symbol_t* kernel32_sym{};
+    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &kernel32_sym, "kernel32.dll"_ss)));
+    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &idata_sym, ".idata"_ss)));
+    REQUIRE(OK(objfmt::file::make_section(rot13_pgm, &idata, objfmt::section_type_t::import, idata_sym)));
     idata->flags.data  = true;
     idata->flags.read  = true;
     idata->flags.write = true;
@@ -129,23 +130,23 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
     REQUIRE(kernel32);
     REQUIRE(kernel32->module == kernel32_sym);
 
-    symbol_t* read_file_sym{};
-    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &read_file_sym, "ReadFile"_ss)));
+    objfmt::symbol_t* read_file_sym{};
+    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &read_file_sym, "ReadFile"_ss)));
 
-    symbol_t* write_file_sym{};
-    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &write_file_sym, "WriteFile"_ss)));
+    objfmt::symbol_t* write_file_sym{};
+    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &write_file_sym, "WriteFile"_ss)));
 
-    symbol_t* get_std_handle_sym{};
-    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &get_std_handle_sym, "GetStdHandle"_ss)));
+    objfmt::symbol_t* get_std_handle_sym{};
+    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &get_std_handle_sym, "GetStdHandle"_ss)));
 
     objfmt::import::add_symbol(kernel32, get_std_handle_sym);
     objfmt::import::add_symbol(kernel32, read_file_sym);
     objfmt::import::add_symbol(kernel32, write_file_sym);
 
-    section_t* bss{};
-    symbol_t* bss_sym{};
-    REQUIRE(OK(objfmt::obj_file::make_symbol(rot13_pgm, &bss_sym, ".bss"_ss)));
-    REQUIRE(OK(objfmt::obj_file::make_section(rot13_pgm, &bss, section_type_t::uninit, bss_sym)));
+    objfmt::section_t* bss{};
+    objfmt::symbol_t* bss_sym{};
+    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &bss_sym, ".bss"_ss)));
+    REQUIRE(OK(objfmt::file::make_section(rot13_pgm, &bss, objfmt::section_type_t::uninit, bss_sym)));
     objfmt::section::reserve(bss, 4096);
     bss->flags.data   = true;
     bss->flags.read   = true;

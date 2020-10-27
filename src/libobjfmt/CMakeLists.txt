@@ -38,8 +38,6 @@ configure_file(
 set(
     OBJFMT_SOURCES
 
-    ${INC_DIR}/types.h
-
     coff.cpp ${INC_DIR}/coff.h
 
     container.cpp ${INC_DIR}/container.h
@@ -50,7 +48,9 @@ set(
 
     pe.cpp ${INC_DIR}/pe.h
 
-    system.cpp
+    objfmt.cpp ${INC_DIR}/objfmt.h
+
+    ${INC_DIR}/types.h
 )
 add_library(${LIBRARY_TARGET} ${OBJFMT_SOURCES})
 target_include_directories(

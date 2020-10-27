@@ -32,7 +32,7 @@
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/network.h>
-#include <basecode/objfmt/types.h>
+#include <basecode/objfmt/objfmt.h>
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
 #include <basecode/core/log/system/spdlog.h>

@@ -19,8 +19,8 @@
 #include <basecode/core/error.h>
 #include <basecode/core/string.h>
 #include <basecode/core/config.h>
-#include <basecode/objfmt/types.h>
 #include <basecode/core/filesys.h>
+#include <basecode/objfmt/container.h>
 
 namespace basecode::objfmt {
     struct system_t final {
@@ -46,7 +46,7 @@ namespace basecode::objfmt {
             {
                 auto status = container::init(g_objfmt_sys.alloc);
                 if (!OK(status))
-                    return status_t::container_init_error;
+                    return status;
             }
             fe_Object* result{};
             {
@@ -126,8 +126,8 @@ namespace basecode::objfmt {
         }
     }
 
-    namespace obj_file {
-        u0 free(obj_file_t& file) {
+    namespace file {
+        u0 free(file_t& file) {
             path::free(file.path);
             for (auto section : file.sections)
                 section::free(section);
@@ -137,7 +137,7 @@ namespace basecode::objfmt {
             memory::system::free(file.section_slab);
         }
 
-        status_t init(obj_file_t& file) {
+        status_t init(file_t& file) {
             file.alloc = g_objfmt_sys.alloc;
             path::init(file.path, file.alloc);
             array::init(file.sections, file.alloc);
@@ -161,13 +161,13 @@ namespace basecode::objfmt {
             return status_t::ok;
         }
 
-        status_t find_symbol(obj_file_t& file, symbol_t** result, const s8* name, s32 len) {
+        status_t find_symbol(file_t& file, symbol_t** result, const s8* name, s32 len) {
             const auto key = slice::make(name, len == -1 ? strlen(name) : len);
             *result = hashtab::find(file.symbols, key);
             return *result ? status_t::ok : status_t::symbol_not_found;
         }
 
-        status_t make_symbol(obj_file_t& file, symbol_t** result, const s8* name, s32 len) {
+        status_t make_symbol(file_t& file, symbol_t** result, const s8* name, s32 len) {
             if (OK(find_symbol(file, result, name, len)))
                 return status_t::duplicate_symbol;
             const auto key = string::interned::fold(name, len);
@@ -180,7 +180,7 @@ namespace basecode::objfmt {
             return status_t::ok;
         }
 
-        status_t find_section(obj_file_t& file, section_t** result, const symbol_t* symbol) {
+        status_t find_section(file_t& file, section_t** result, const symbol_t* symbol) {
             *result = {};
             for (auto section : file.sections) {
                 if (section->symbol == symbol) {
@@ -191,7 +191,7 @@ namespace basecode::objfmt {
             return status_t::symbol_not_found;
         }
 
-        status_t make_section(obj_file_t& file, section_t** result, section_type_t type, const symbol_t* symbol) {
+        status_t make_section(file_t& file, section_t** result, section_type_t type, const symbol_t* symbol) {
             *result = {};
             if (OK(find_section(file, result, symbol)))
                 return status_t::ok;

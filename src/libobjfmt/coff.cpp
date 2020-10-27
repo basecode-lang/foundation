@@ -22,17 +22,17 @@ namespace basecode::objfmt::container::coff {
     static u0 fini() {
     }
 
-    static status_t init(alloc_t* alloc) {
-        UNUSED(alloc);
-        return status_t::ok;
-    }
-
-    static status_t read(obj_file_t& file) {
+    static status_t read(file_t& file) {
         return status_t::read_error;
     }
 
-    static status_t write(obj_file_t& file) {
+    static status_t write(file_t& file) {
         return status_t::write_error;
+    }
+
+    static status_t init(alloc_t* alloc) {
+        UNUSED(alloc);
+        return status_t::ok;
     }
 
     system_t                    g_coff_sys {

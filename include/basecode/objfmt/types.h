@@ -21,18 +21,17 @@
 #include <basecode/core/path.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/objfmt/configure.h>
-#include <basecode/objfmt/container.h>
 #include <basecode/core/memory/system/slab.h>
 
 #define SYMBOL_DERIVED_TYPE(type)   (u32((type)) >> 16U & 0xffffU)
 #define SYMBOL_TYPE(derived, type)  (u32((derived)) << 16U | u32((type)))
 
-namespace basecode {
+namespace basecode::objfmt {
+    struct file_t;
     struct symbol_t;
     struct import_t;
     struct section_t;
     struct version_t;
-    struct obj_file_t;
 
     using import_list_t         = array_t<import_t>;
     using symbol_list_t         = array_t<symbol_t*>;
@@ -50,6 +49,20 @@ namespace basecode {
     private:
         u32                     derived:    16;
         u32                     base_type:  16;
+    };
+
+    enum class status_t : u32 {
+        ok                              = 0,
+        read_error                      = 2000,
+        write_error                     = 2001,
+        import_failure                  = 2002,
+        duplicate_import                = 2008,
+        duplicate_symbol                = 2003,
+        symbol_not_found                = 2004,
+        config_eval_error               = 2005,
+        invalid_section_type            = 2006,
+        container_init_error            = 2007,
+        invalid_container_type          = 2009,
     };
 
     enum class machine_type_t : u16 {
@@ -109,8 +122,8 @@ namespace basecode {
 
     struct section_t final {
         alloc_t*                alloc;
+        const file_t*           file;
         const symbol_t*         symbol;
-        const obj_file_t*       file;
         address_t               address;
         symbol_list_t           symbols;
         section_subclass_t      subclass;
@@ -130,7 +143,7 @@ namespace basecode {
         u16                     minor;
     };
 
-    struct obj_file_t final {
+    struct file_t final {
         alloc_t*                alloc       {};
         alloc_t*                symbol_slab {};
         alloc_t*                section_slab{};
@@ -140,63 +153,4 @@ namespace basecode {
         version_t               version     {};
         machine_type_t          machine     {};
     };
-
-    namespace objfmt {
-        enum class status_t : u32 {
-            ok                              = 0,
-            read_error                      = 2000,
-            write_error                     = 2001,
-            import_failure                  = 2002,
-            duplicate_import                = 2008,
-            duplicate_symbol                = 2003,
-            symbol_not_found                = 2004,
-            config_eval_error               = 2005,
-            invalid_section_type            = 2006,
-            container_init_error            = 2007,
-        };
-
-        namespace system {
-            u0 fini();
-
-            status_t init(alloc_t* alloc = context::top()->alloc);
-        }
-
-        namespace import {
-            status_t add_symbol(import_t* import, const symbol_t* symbol);
-        }
-
-        namespace section {
-            u0 free(section_t* section);
-
-            u0 reserve(section_t* section, u64 size);
-
-            u0 data(section_t* section, const u8* data, u32 length);
-
-            status_t init(section_t* section, section_type_t type, const symbol_t* symbol);
-
-            status_t import_module(section_t* section, import_t** result, const symbol_t* module);
-        }
-
-        namespace obj_file {
-            u0 free(obj_file_t& file);
-
-            status_t init(obj_file_t& file);
-
-            status_t find_section(obj_file_t& file, section_t** result, const symbol_t* symbol);
-
-            status_t find_symbol(obj_file_t& file, symbol_t** result, const s8* name, s32 len = -1);
-
-            status_t make_symbol(obj_file_t& file, symbol_t** result, const s8* name, s32 len = -1);
-
-            status_t find_symbol(obj_file_t& file, symbol_t** result, const String_Concept auto& name) {
-                return find_symbol(file, result, (const s8*) name.data, name.length);
-            }
-
-            status_t make_symbol(obj_file_t& file, symbol_t** result, const String_Concept auto& name) {
-                return make_symbol(file, result, (const s8*) name.data, name.length);
-            }
-
-            status_t make_section(obj_file_t& file, section_t** result, section_type_t type, const symbol_t* symbol);
-        }
-    }
 }
