@@ -26,9 +26,33 @@ namespace basecode::buf {
             return crsr;
         }
 
+        u0 seek(buf_crsr_t& crsr, u32 offset) {
+            crsr.pos = offset;
+        }
+
         u0 init(buf_crsr_t& crsr, buf_t& buf) {
             crsr.buf = &buf;
             crsr.pos = crsr.line = crsr.column = {};
+        }
+
+        u0 write_u8(buf_crsr_t& crsr, u8 value) {
+            write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u8));
+            crsr.pos += sizeof(u8);
+        }
+
+        u0 write_u16(buf_crsr_t& crsr, u16 value) {
+            write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u16));
+            crsr.pos += sizeof(u16);
+        }
+
+        u0 write_u32(buf_crsr_t& crsr, u32 value) {
+            write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u32));
+            crsr.pos += sizeof(u32);
+        }
+
+        u0 write_u64(buf_crsr_t& crsr, u64 value) {
+            write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u64));
+            crsr.pos += sizeof(u64);
         }
     }
 
@@ -144,7 +168,7 @@ namespace basecode::buf {
             grow(buf, offset + length + 1);
         fread(buf.data + offset, 1, length, file);
         buf.length += offset + length > buf.length ? offset + length : length;
-        buf.data[buf.length] = 255;
+//        buf.data[buf.length] = 255;
     }
 
     u0 write(buf_t& buf, u32 offset, const u8* data, u32 length) {
@@ -152,7 +176,7 @@ namespace basecode::buf {
             grow(buf, offset + length + 1);
         std::memcpy(buf.data + offset, data, length);
         buf.length += offset + length > buf.length ? offset + length : length;
-        buf.data[buf.length] = 255;
+//        buf.data[buf.length] = 255;
     }
 
     status_t save(buf_t& buf, const path_t& path, u32 offset, u32 length) {

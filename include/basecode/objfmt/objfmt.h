@@ -56,18 +56,18 @@ namespace basecode::objfmt {
 
         section_t* find_section(file_t& file, symbol_id symbol);
 
-        result_t make_symbol(file_t& file, const s8* name, s32 len = -1);
-
         symbol_t* find_symbol(file_t& file, const s8* name, s32 len = -1);
-
-        result_t make_symbol(file_t& file, const String_Concept auto& name) {
-            return make_symbol(file, (const s8*) name.data, name.length);
-        }
 
         symbol_t* find_symbol(file_t& file, const String_Concept auto& name) {
             return find_symbol(file, (const s8*) name.data, name.length);
         }
 
         result_t make_section(file_t& file, section::type_t type, symbol_id symbol);
+
+        result_t make_symbol(file_t& file, symbol::type_t type, const s8* name, s32 len = -1);
+
+        result_t make_symbol(file_t& file, const String_Concept auto& name, symbol::type_t type = {}) {
+            return make_symbol(file, type, (const s8*) name.data, name.length);
+        }
     }
 }

@@ -95,13 +95,14 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
 
     objfmt::file_t rot13_pgm{};
     REQUIRE(OK(objfmt::file::init(rot13_pgm)));
-    path::set(rot13_pgm.path, "rot13.exe");
     defer(objfmt::file::free(rot13_pgm));
+    path::set(rot13_pgm.path, "rot13.exe");
+    rot13_pgm.machine = objfmt::machine::type_t::amd64;
 
     /* .text section */ {
         auto text_sym_rc = objfmt::file::make_symbol(rot13_pgm, ".text"_ss);
         auto text_rc = objfmt::file::make_section(rot13_pgm,
-                                                  objfmt::section::type_t::data,
+                                                  objfmt::section::type_t::code,
                                                   text_sym_rc.id);
         auto text = objfmt::file::get_section(rot13_pgm, text_rc.id);
         objfmt::section::data(text, s_rot13_code, sizeof(s_rot13_code));

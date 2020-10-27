@@ -44,19 +44,6 @@ namespace basecode::objfmt {
     using section_list_t        = array_t<section_t>;
     using symbol_table_t        = hashtab_t<intern_id, symbol_t>;
 
-    struct symbol_type_t final {
-        constexpr symbol_type_t()         : derived(0), base_type(0)
-        {}
-        constexpr symbol_type_t(u32 type) : derived(type >> 16U & 0xffffU), base_type(type & 0xffffU)
-        {}
-        constexpr operator u32() const              { return SYMBOL_TYPE(derived, base_type);   }
-        [[nodiscard]] constexpr b8 empty() const    { return base_type == 0 && derived == 0;    }
-        static constexpr symbol_type_t none()       { return 0;                                 }
-    private:
-        u32                     derived:    16;
-        u32                     base_type:  16;
-    };
-
     enum class status_t : u32 {
         ok                              = 0,
         read_error                      = 2000,
@@ -71,16 +58,94 @@ namespace basecode::objfmt {
         invalid_container_type          = 2009,
     };
 
+    namespace symbol {
+        struct type_t final {
+            constexpr type_t()         : derived(0), base_type(0)
+            {}
+            constexpr type_t(u32 type) : derived(type >> 16U & 0xffffU), base_type(type & 0xffffU)
+            {}
+            constexpr operator u32() const              { return SYMBOL_TYPE(derived, base_type);   }
+            [[nodiscard]] constexpr b8 empty() const    { return base_type == 0 && derived == 0;    }
+            static constexpr type_t none()              { return 0;                                 }
+        private:
+            u32                     derived:    16;
+            u32                     base_type:  16;
+        };
+
+        namespace type::base {
+            [[maybe_unused]] constexpr u16 null_            = 0b0000;
+            [[maybe_unused]] constexpr u16 void_            = 0b0001;
+            [[maybe_unused]] constexpr u16 char_            = 0b0010;
+            [[maybe_unused]] constexpr u16 short_           = 0b0011;
+            [[maybe_unused]] constexpr u16 int_             = 0b0100;
+            [[maybe_unused]] constexpr u16 long_            = 0b0101;
+            [[maybe_unused]] constexpr u16 float_           = 0b0110;
+            [[maybe_unused]] constexpr u16 double_          = 0b0111;
+            [[maybe_unused]] constexpr u16 struct_          = 0b1000;
+            [[maybe_unused]] constexpr u16 union_           = 0b1001;
+            [[maybe_unused]] constexpr u16 enum_            = 0b1010;
+            [[maybe_unused]] constexpr u16 member_of_enum   = 0b1011;
+            [[maybe_unused]] constexpr u16 uchar            = 0b1100;
+            [[maybe_unused]] constexpr u16 uint             = 0b1101;
+            [[maybe_unused]] constexpr u16 ulong            = 0b1110;
+            [[maybe_unused]] constexpr u16 long_double      = 0b1111;
+        }
+
+        namespace type::derived {
+            [[maybe_unused]] constexpr u16 none             = 0b0000;
+            [[maybe_unused]] constexpr u16 pointer          = 0b0001;
+            [[maybe_unused]] constexpr u16 function         = 0b0010;
+            [[maybe_unused]] constexpr u16 array            = 0b0011;
+        }
+    }
+
     namespace machine {
         enum class type_t : u32 {
+            amd64               = 0x8664,
+            arm64               = 0xaa64
         };
     }
 
     namespace section {
         enum class type_t : u8 {
+            code,
             data,
             uninit,
             import
+        };
+    }
+
+    namespace storage {
+        enum class class_t : u8 {
+            null_,
+            auto_,
+            external_,
+            static_,
+            register_,
+            extern_def,
+            label,
+            undef_label,
+            member_of_struct,
+            argument,
+            struct_tag,
+            member_of_union,
+            union_tag,
+            type_def,
+            undef_static,
+            enum_tag,
+            member_of_enum,
+            register_param,
+            bit_field,
+            auto_argument,
+            dummy_entry,
+            block,
+            function,
+            end_of_struct,
+            file_name,
+            line_number,
+            alias,
+            hidden,
+            end_of_function,
         };
     }
 
@@ -92,7 +157,7 @@ namespace basecode::objfmt {
     struct symbol_t final {
         intern_id               name        {};
         section_id              section     {};
-        symbol_type_t           type        {};
+        symbol::type_t          type        {};
 
         b8 operator==(const symbol_t& other) const {
             return name == other.name;
@@ -136,6 +201,8 @@ namespace basecode::objfmt {
     struct section_t final {
         alloc_t*                alloc;
         const file_t*           file;
+        u64                     size;
+        u64                     offset;
         address_t               address;
         symbol_list_t           symbols;
         section_subclass_t      subclass;

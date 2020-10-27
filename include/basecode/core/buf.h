@@ -61,10 +61,29 @@ namespace basecode {
             unable_to_open_file = 100,
         };
 
+        u0 write(buf_t& buf, u32 offset, FILE* file, u32 length);
+
+        u0 write(buf_t& buf, u32 offset, const u8* data, u32 length);
+
         namespace cursor {
             buf_crsr_t make(buf_t& buf);
 
+            u0 seek(buf_crsr_t& crsr, u32 offset);
+
             u0 init(buf_crsr_t& crsr, buf_t& buf);
+
+            u0 write_u8(buf_crsr_t& crsr, u8 value);
+
+            u0 write_u16(buf_crsr_t& crsr, u16 value);
+
+            u0 write_u32(buf_crsr_t& crsr, u32 value);
+
+            u0 write_u64(buf_crsr_t& crsr, u64 value);
+
+            u0 write_str(buf_crsr_t& crsr, const String_Concept auto& str) {
+                write(*crsr.buf, crsr.pos, str.data, str.length);
+                crsr.pos += str.length;
+            }
         }
 
         u0 free(buf_t& buf);
@@ -81,11 +100,7 @@ namespace basecode {
 
         buf_t make(alloc_t* alloc = context::top()->alloc);
 
-        u0 write(buf_t& buf, u32 offset, FILE* file, u32 length);
-
         u0 init(buf_t& buf, alloc_t* alloc = context::top()->alloc);
-
-        u0 write(buf_t& buf, u32 offset, const u8* data, u32 length);
 
         status_t load(buf_t& buf, const String_Concept auto& value) {
             auto file = ::fmemopen((u0*) value.data, value.length, "r");

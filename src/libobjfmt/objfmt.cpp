@@ -165,18 +165,6 @@ namespace basecode::objfmt {
             return nullptr;
         }
 
-        result_t make_symbol(file_t& file, const s8* name, s32 len) {
-            auto symbol = find_symbol(file, name, len);
-            if (symbol)
-                return {0, status_t::duplicate_symbol};
-            const auto rc = string::interned::fold_for_result(name, len);
-            symbol = hashtab::emplace(file.symbols, rc.id);
-            symbol->name    = rc.id;
-            symbol->section = {};
-            symbol->type    = {};
-            return {symbol->name, status_t::ok};
-        }
-
         symbol_t* find_symbol(file_t& file, const s8* name, s32 len) {
             const auto rc = string::interned::fold_for_result(name, len);
             return hashtab::find(file.symbols, rc.id);
@@ -193,6 +181,18 @@ namespace basecode::objfmt {
             if (!OK(status))
                 return {0, status};
             return {section->id, status_t::ok};
+        }
+
+        result_t make_symbol(file_t& file, symbol::type_t type, const s8* name, s32 len) {
+            auto symbol = find_symbol(file, name, len);
+            if (symbol)
+                return {0, status_t::duplicate_symbol};
+            const auto rc = string::interned::fold_for_result(name, len);
+            symbol = hashtab::emplace(file.symbols, rc.id);
+            symbol->name    = rc.id;
+            symbol->section = {};
+            symbol->type    = type;
+            return {symbol->name, status_t::ok};
         }
     }
 }
