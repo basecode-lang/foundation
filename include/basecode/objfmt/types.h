@@ -19,6 +19,7 @@
 #pragma once
 
 #include <basecode/core/path.h>
+#include <basecode/core/intern.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/objfmt/configure.h>
 #include <basecode/core/memory/system/slab.h>
@@ -33,10 +34,15 @@ namespace basecode::objfmt {
     struct section_t;
     struct version_t;
 
+    using import_id             = u32;
+    using symbol_id             = u32;
+    using section_id            = u32;
+
+    using id_list_t             = array_t<u32>;
     using import_list_t         = array_t<import_t>;
-    using symbol_list_t         = array_t<symbol_t*>;
-    using section_list_t        = array_t<section_t*>;
-    using symbol_table_t        = hashtab_t<str::slice_t, symbol_t*>;
+    using symbol_list_t         = array_t<symbol_t>;
+    using section_list_t        = array_t<section_t>;
+    using symbol_table_t        = hashtab_t<intern_id, symbol_t>;
 
     struct symbol_type_t final {
         constexpr symbol_type_t()         : derived(0), base_type(0)
@@ -65,21 +71,27 @@ namespace basecode::objfmt {
         invalid_container_type          = 2009,
     };
 
-    enum class machine_type_t : u16 {
-    };
+    namespace machine {
+        enum class type_t : u32 {
+        };
+    }
 
-    enum class section_type_t : u8 {
-        data,
-        uninit,
-        import
-    };
+    namespace section {
+        enum class type_t : u8 {
+            data,
+            uninit,
+            import
+        };
+    }
 
-    enum class relocation_type_t : u8 {
-    };
+    namespace relocation {
+        enum class type_t : u8 {
+        };
+    }
 
     struct symbol_t final {
-        str::slice_t            name        {};
-        section_t*              section     {};
+        intern_id               name        {};
+        section_id              section     {};
         symbol_type_t           type        {};
 
         b8 operator==(const symbol_t& other) const {
@@ -88,9 +100,10 @@ namespace basecode::objfmt {
     };
 
     struct import_t final {
-        const symbol_t*         module;
-        const section_t*        section;
-        symbol_list_t           symbols;
+        id_list_t               symbols;
+        symbol_id               module;
+        section_id              section;
+        import_id               id;
         struct {
             u32                 load:   1;
             u32                 pad:    31;
@@ -104,13 +117,13 @@ namespace basecode::objfmt {
 
     struct relo_entry_t final {
         address_t               address;
-        symbol_t*               symbol;
-        relocation_type_t       type;
+        symbol_id               symbol;
+        relocation::type_t      type;
     };
 
-    struct line_number_entry_t final {
+    struct lineno_entry_t final {
         address_t               address;
-        symbol_t*               symbol;
+        symbol_id               symbol;
         u16                     line_number;
     };
 
@@ -123,10 +136,11 @@ namespace basecode::objfmt {
     struct section_t final {
         alloc_t*                alloc;
         const file_t*           file;
-        const symbol_t*         symbol;
         address_t               address;
         symbol_list_t           symbols;
         section_subclass_t      subclass;
+        symbol_id               symbol;
+        section_id              id;
         struct {
             u32                 code:   1;
             u32                 data:   1;
@@ -135,7 +149,7 @@ namespace basecode::objfmt {
             u32                 write:  1;
             u32                 pad:    26;
         }                       flags;
-        section_type_t          type;
+        section::type_t         type;
     };
 
     struct version_t final {
@@ -145,12 +159,15 @@ namespace basecode::objfmt {
 
     struct file_t final {
         alloc_t*                alloc       {};
-        alloc_t*                symbol_slab {};
-        alloc_t*                section_slab{};
         path_t                  path        {};
         symbol_table_t          symbols     {};
         section_list_t          sections    {};
         version_t               version     {};
-        machine_type_t          machine     {};
+        machine::type_t         machine     {};
+    };
+
+    struct result_t final {
+        u32                     id;
+        status_t                status;
     };
 }

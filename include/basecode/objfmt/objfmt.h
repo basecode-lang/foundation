@@ -28,19 +28,21 @@ namespace basecode::objfmt {
     }
 
     namespace import {
-        status_t add_symbol(import_t* import, const symbol_t* symbol);
+        status_t add_symbol(import_t* import, symbol_id symbol);
     }
 
     namespace section {
-        u0 free(section_t* section);
+        u0 free(section_t& section);
 
         u0 reserve(section_t* section, u64 size);
 
+        import_t* get_import(section_t* section, import_id id);
+
         u0 data(section_t* section, const u8* data, u32 length);
 
-        status_t init(section_t* section, section_type_t type, const symbol_t* symbol);
+        result_t import_module(section_t* section, symbol_id symbol);
 
-        status_t import_module(section_t* section, import_t** result, const symbol_t* module);
+        status_t init(section_t& section, section::type_t type, symbol_id symbol);
     }
 
     namespace file {
@@ -48,20 +50,24 @@ namespace basecode::objfmt {
 
         status_t init(file_t& file);
 
-        status_t find_section(file_t& file, section_t** result, const symbol_t* symbol);
+        symbol_t* get_symbol(file_t& file, symbol_id id);
 
-        status_t find_symbol(file_t& file, symbol_t** result, const s8* name, s32 len = -1);
+        section_t* get_section(file_t& file, section_id id);
 
-        status_t make_symbol(file_t& file, symbol_t** result, const s8* name, s32 len = -1);
+        section_t* find_section(file_t& file, symbol_id symbol);
 
-        status_t find_symbol(file_t& file, symbol_t** result, const String_Concept auto& name) {
-            return find_symbol(file, result, (const s8*) name.data, name.length);
+        result_t make_symbol(file_t& file, const s8* name, s32 len = -1);
+
+        symbol_t* find_symbol(file_t& file, const s8* name, s32 len = -1);
+
+        result_t make_symbol(file_t& file, const String_Concept auto& name) {
+            return make_symbol(file, (const s8*) name.data, name.length);
         }
 
-        status_t make_symbol(file_t& file, symbol_t** result, const String_Concept auto& name) {
-            return make_symbol(file, result, (const s8*) name.data, name.length);
+        symbol_t* find_symbol(file_t& file, const String_Concept auto& name) {
+            return find_symbol(file, (const s8*) name.data, name.length);
         }
 
-        status_t make_section(file_t& file, section_t** result, section_type_t type, const symbol_t* symbol);
+        result_t make_section(file_t& file, section::type_t type, symbol_id symbol);
     }
 }

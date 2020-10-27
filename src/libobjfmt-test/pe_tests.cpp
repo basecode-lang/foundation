@@ -98,59 +98,89 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
     path::set(rot13_pgm.path, "rot13.exe");
     defer(objfmt::file::free(rot13_pgm));
 
-    objfmt::section_t* text{};
-    objfmt::symbol_t* text_sym{};
-    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &text_sym, ".text"_ss)));
-    REQUIRE(OK(objfmt::file::make_section(rot13_pgm, &text, objfmt::section_type_t::data, text_sym)));
-    objfmt::section::data(text, s_rot13_code, sizeof(s_rot13_code));
-    text->flags.code = true;
-    text->flags.read = true;
-    text->flags.exec = true;
+    /* .text section */ {
+        auto text_sym_rc = objfmt::file::make_symbol(rot13_pgm, ".text"_ss);
+        auto text_rc = objfmt::file::make_section(rot13_pgm,
+                                                  objfmt::section::type_t::data,
+                                                  text_sym_rc.id);
+        auto text = objfmt::file::get_section(rot13_pgm, text_rc.id);
+        objfmt::section::data(text, s_rot13_code, sizeof(s_rot13_code));
+        text->flags.code = true;
+        text->flags.read = true;
+        text->flags.exec = true;
 
-    objfmt::section_t *rdata{};
-    objfmt::symbol_t* rdata_sym{};
-    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &rdata_sym, ".rdata"_ss)));
-    REQUIRE(OK(objfmt::file::make_section(rot13_pgm, &rdata, objfmt::section_type_t::data, rdata_sym)));
-    objfmt::section::data(rdata, s_rot13_table, sizeof(s_rot13_table));
-    rdata->flags.data = true;
-    rdata->flags.read = true;
+        REQUIRE(OK(text_sym_rc.status));
+        REQUIRE(OK(text_rc.status));
+        REQUIRE(text);
+    }
 
-    objfmt::section_t* idata{};
-    objfmt::import_t* kernel32{};
-    objfmt::symbol_t* idata_sym{};
-    objfmt::symbol_t* kernel32_sym{};
-    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &kernel32_sym, "kernel32.dll"_ss)));
-    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &idata_sym, ".idata"_ss)));
-    REQUIRE(OK(objfmt::file::make_section(rot13_pgm, &idata, objfmt::section_type_t::import, idata_sym)));
-    idata->flags.data  = true;
-    idata->flags.read  = true;
-    idata->flags.write = true;
+    /* .rdata section */ {
+        auto rdata_sym_rc = objfmt::file::make_symbol(rot13_pgm, ".rdata"_ss);
+        auto rdata_rc = objfmt::file::make_section(rot13_pgm,
+                                                   objfmt::section::type_t::data,
+                                                   rdata_sym_rc.id);
+        auto rdata = objfmt::file::get_section(rot13_pgm, rdata_rc.id);
+        objfmt::section::data(rdata, s_rot13_table, sizeof(s_rot13_table));
+        rdata->flags.data = true;
+        rdata->flags.read = true;
 
-    REQUIRE(OK(objfmt::section::import_module(idata, &kernel32, kernel32_sym)));
-    REQUIRE(kernel32);
-    REQUIRE(kernel32->module == kernel32_sym);
+        REQUIRE(OK(rdata_sym_rc.status));
+        REQUIRE(OK(rdata_rc.status));
+        REQUIRE(rdata);
+    }
 
-    objfmt::symbol_t* read_file_sym{};
-    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &read_file_sym, "ReadFile"_ss)));
+    /* .idata section */ {
+        auto idata_sym_rc = objfmt::file::make_symbol(rot13_pgm, ".idata"_ss);
+        auto kernel32_sym_rc = objfmt::file::make_symbol(rot13_pgm, "kernel32.dll"_ss);
+        auto read_file_sym_rc = objfmt::file::make_symbol(rot13_pgm, "ReadFile"_ss);
+        auto write_file_sym_rc = objfmt::file::make_symbol(rot13_pgm, "WriteFile"_ss);
+        auto get_std_handle_sym_rc = objfmt::file::make_symbol(rot13_pgm, "GetStdHandle"_ss);
+        auto idata_rc = objfmt::file::make_section(rot13_pgm,
+                                                   objfmt::section::type_t::import,
+                                                   idata_sym_rc.id);
 
-    objfmt::symbol_t* write_file_sym{};
-    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &write_file_sym, "WriteFile"_ss)));
+        auto idata = objfmt::file::get_section(rot13_pgm, idata_rc.id);
+        idata->flags.data  = true;
+        idata->flags.read  = true;
+        idata->flags.write = true;
 
-    objfmt::symbol_t* get_std_handle_sym{};
-    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &get_std_handle_sym, "GetStdHandle"_ss)));
+        auto kernel32_imp_rc = objfmt::section::import_module(idata, kernel32_sym_rc.id);
+        auto kernel32_imp    = objfmt::section::get_import(idata, kernel32_imp_rc.id);
+        objfmt::import::add_symbol(kernel32_imp, get_std_handle_sym_rc.id);
+        objfmt::import::add_symbol(kernel32_imp, read_file_sym_rc.id);
+        objfmt::import::add_symbol(kernel32_imp, write_file_sym_rc.id);
 
-    objfmt::import::add_symbol(kernel32, get_std_handle_sym);
-    objfmt::import::add_symbol(kernel32, read_file_sym);
-    objfmt::import::add_symbol(kernel32, write_file_sym);
+        REQUIRE(OK(idata_sym_rc.status));
+        REQUIRE(OK(kernel32_sym_rc.status));
+        REQUIRE(OK(read_file_sym_rc.status));
+        REQUIRE(OK(write_file_sym_rc.status));
+        REQUIRE(OK(get_std_handle_sym_rc.status));
+        REQUIRE(OK(idata_rc.status));
+        REQUIRE(idata);
+        REQUIRE(OK(kernel32_imp_rc.status));
+        REQUIRE(kernel32_imp);
+        REQUIRE(kernel32_imp->symbols.size == 3);
+        REQUIRE(kernel32_imp->symbols[0] == get_std_handle_sym_rc.id);
+        REQUIRE(kernel32_imp->symbols[1] == read_file_sym_rc.id);
+        REQUIRE(kernel32_imp->symbols[2] == write_file_sym_rc.id);
+    }
 
-    objfmt::section_t* bss{};
-    objfmt::symbol_t* bss_sym{};
-    REQUIRE(OK(objfmt::file::make_symbol(rot13_pgm, &bss_sym, ".bss"_ss)));
-    REQUIRE(OK(objfmt::file::make_section(rot13_pgm, &bss, objfmt::section_type_t::uninit, bss_sym)));
-    objfmt::section::reserve(bss, 4096);
-    bss->flags.data   = true;
-    bss->flags.read   = true;
-    bss->flags.write  = true;
+    /* .bss section */ {
+        auto bss_sym_rc = objfmt::file::make_symbol(rot13_pgm, ".bss"_ss);
+        auto bss_rc = objfmt::file::make_section(rot13_pgm,
+                                                 objfmt::section::type_t::uninit,
+                                                 bss_sym_rc.id);
+        auto bss = objfmt::file::get_section(rot13_pgm, bss_rc.id);
+        objfmt::section::reserve(bss, 4096);
+        bss->flags.data   = true;
+        bss->flags.read   = true;
+        bss->flags.write  = true;
+
+        REQUIRE(OK(bss_sym_rc.status));
+        REQUIRE(OK(bss_rc.status));
+        REQUIRE(bss);
+        REQUIRE(bss->subclass.size == 4096);
+    }
 
     REQUIRE(OK(objfmt::container::write(objfmt::container::type_t::pe, rot13_pgm)));
 

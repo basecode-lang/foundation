@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/intern.h>
-#include <basecode/core/string.h>
 #include <basecode/core/buf_pool.h>
 
 namespace basecode::intern {
@@ -25,7 +24,7 @@ namespace basecode::intern {
         return pool.capacity == 0 || pool.size + 1 > u32(f32(pool.capacity - 1) * pool.load_factor);
     }
 
-    static b8 find_bucket(const u32* ids, u32 capacity, u32& bucket_index) {
+    static b8 find_bucket(const intern_id* ids, u32 capacity, u32& bucket_index) {
         for(u32 i = bucket_index; i < capacity; ++i) {
             if (ids[i] == 0) {
                 bucket_index = i;
@@ -83,7 +82,7 @@ namespace basecode::intern {
         return pool;
     }
 
-    b8 remove(intern_t& pool, u32 id) {
+    b8 remove(intern_t& pool, intern_id id) {
         if (id == 0 || id > pool.strings.size)
             return false;
         const auto& str = pool.strings[id - 1];
@@ -94,29 +93,29 @@ namespace basecode::intern {
         return true;
     }
 
-    result_t get(intern_t& pool, u32 id) {
+    u0 reserve(intern_t& pool, u32 capacity) {
+        array::reserve(pool.strings, capacity);
+    }
+
+    result_t get(intern_t& pool, intern_id id) {
         if (id == 0 || id > pool.strings.size)
             return result_t{.status = status_t::not_found};
         const auto& str = pool.strings[id - 1];
         return result_t{pool.hashes[str.bucket_index], str.value, id, status_t::ok, false};
     }
 
-    u0 reserve(intern_t& pool, u32 capacity) {
-        array::reserve(pool.strings, capacity);
-    }
-
     static status_t rehash(intern_t& pool, u32 new_capacity) {
         new_capacity = std::max<u32>(new_capacity, std::ceil(std::max<u32>(16, new_capacity) / pool.load_factor));
 
-        const auto ids_size    = new_capacity * sizeof(u32);
+        const auto ids_size    = new_capacity * sizeof(intern_id);
         const auto hashes_size = new_capacity * sizeof(u64);
         const auto buf_size    = ids_size + alignof(u64) + hashes_size;
 
-        auto buf    = (u8*) memory::alloc(pool.alloc, buf_size, alignof(u32));
+        auto buf    = (u8*) memory::alloc(pool.alloc, buf_size, alignof(intern_id));
         std::memset(buf, 0, ids_size);
 
         u32  hashes_align{};
-        auto ids    = (u32*) buf;
+        auto ids    = (intern_id*) buf;
         auto hashes = (u64*) memory::system::align_forward(buf + ids_size, alignof(u64), hashes_align);
 
         for (u32 i = 0; i < pool.capacity; ++i) {
