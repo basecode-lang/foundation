@@ -115,8 +115,6 @@ namespace basecode::objfmt {
             section->type             = type;
             section->flags            = {};
             section->symbol           = symbol;
-            section->address.physical = {};
-            section->address.virtual_ = {};
             switch (section->type) {
                 case section::type_t::uninit:
                     section->subclass.size = {};
@@ -149,32 +147,23 @@ namespace basecode::objfmt {
             return status_t::ok;
         }
 
-        symbol_t* get_symbol(file_t& file, symbol_id id) {
-            return hashtab::find(file.symbols, id);
+        symbol_t* get_symbol(const file_t& file, symbol_id id) {
+            return hashtab::find(const_cast<symbol_table_t&>(file.symbols), id);
         }
 
-        section_t* get_section(file_t& file, section_id id) {
-            return &file.sections[id - 1];
+        section_t* get_section(const file_t& file, section_id id) {
+            return (section_t*) &file.sections[id - 1];
         }
 
-        section_t* find_section(file_t& file, symbol_id symbol) {
-            for (auto& section : file.sections) {
-                if (section.symbol == symbol)
-                    return &section;
-            }
-            return nullptr;
-        }
-
-        symbol_t* find_symbol(file_t& file, const s8* name, s32 len) {
+        symbol_t* find_symbol(const file_t& file, const s8* name, s32 len) {
             const auto rc = string::interned::fold_for_result(name, len);
-            return hashtab::find(file.symbols, rc.id);
+            return hashtab::find(const_cast<symbol_table_t&>(file.symbols), rc.id);
         }
 
         result_t make_section(file_t& file, section::type_t type, symbol_id symbol) {
-            auto section = find_section(file, symbol);
-            if (section)
-                return {0, status_t::duplicate_symbol};
-            section = &array::append(file.sections);
+            if (type != section::type_t::custom && symbol != 0)
+                return {0, status_t::spec_section_custom_name};
+            auto section = &array::append(file.sections);
             section->id   = file.sections.size;
             section->file = &file;
             auto status = section::init(section, type, symbol);
@@ -184,15 +173,25 @@ namespace basecode::objfmt {
         }
 
         result_t make_symbol(file_t& file, symbol::type_t type, const s8* name, s32 len) {
-            auto symbol = find_symbol(file, name, len);
-            if (symbol)
-                return {0, status_t::duplicate_symbol};
-            const auto rc = string::interned::fold_for_result(name, len);
-            symbol = hashtab::emplace(file.symbols, rc.id);
+            {
+                auto symbol = find_symbol(file, name, len);
+                if (symbol)
+                    return {0, status_t::duplicate_symbol};
+            }
+            const auto rc     = string::interned::fold_for_result(name, len);
+            auto       symbol = hashtab::emplace(file.symbols, rc.id);
             symbol->name    = rc.id;
             symbol->section = {};
             symbol->type    = type;
             return {symbol->name, status_t::ok};
+        }
+
+        u0 find_sections(const file_t& file, symbol_id symbol, section_ptr_list_t& list) {
+            array::reset(list);
+            for (auto& section : file.sections) {
+                if (section.symbol == symbol)
+                    array::append(list, (section_t*) &section);
+            }
         }
     }
 }

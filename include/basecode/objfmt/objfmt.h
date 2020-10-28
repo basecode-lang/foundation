@@ -50,19 +50,19 @@ namespace basecode::objfmt {
 
         status_t init(file_t& file);
 
-        symbol_t* get_symbol(file_t& file, symbol_id id);
+        symbol_t* get_symbol(const file_t& file, symbol_id id);
 
-        section_t* get_section(file_t& file, section_id id);
+        section_t* get_section(const file_t& file, section_id id);
 
-        section_t* find_section(file_t& file, symbol_id symbol);
+        symbol_t* find_symbol(const file_t& file, const s8* name, s32 len = -1);
 
-        symbol_t* find_symbol(file_t& file, const s8* name, s32 len = -1);
+        result_t make_section(file_t& file, section::type_t type, symbol_id symbol = {});
 
-        symbol_t* find_symbol(file_t& file, const String_Concept auto& name) {
+        u0 find_sections(const file_t& file, symbol_id symbol, section_ptr_list_t& list);
+
+        const symbol_t* find_symbol(const file_t& file, const String_Concept auto& name) {
             return find_symbol(file, (const s8*) name.data, name.length);
         }
-
-        result_t make_section(file_t& file, section::type_t type, symbol_id symbol);
 
         result_t make_symbol(file_t& file, symbol::type_t type, const s8* name, s32 len = -1);
 

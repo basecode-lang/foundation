@@ -16,7 +16,6 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/buf.h>
 #include <basecode/core/bits.h>
 #include <basecode/objfmt/pe.h>
 #include <basecode/core/string.h>
@@ -32,6 +31,16 @@ namespace basecode::objfmt::container::pe {
         0x00, 0x00, 0x00, 0x00
     };
 
+    static str::slice_t s_section_names[] = {
+        [u32(section::type_t::code)]        = ".text"_ss,
+        [u32(section::type_t::data)]        = ".rdata"_ss,
+        [u32(section::type_t::debug)]       = ".debug"_ss,
+        [u32(section::type_t::uninit)]      = ".bss"_ss,
+        [u32(section::type_t::import)]      = ".idata"_ss,
+        [u32(section::type_t::export_)]     = ".edata"_ss,
+        [u32(section::type_t::resource)]    = ".rsrc"_ss,
+    };
+
     [[maybe_unused]] constexpr u32 dos_header_size              = 0x40;
     [[maybe_unused]] constexpr u32 pe_sig_size                  = 0x04;
     [[maybe_unused]] constexpr u32 coff_header_size             = 0x14;
@@ -42,12 +51,6 @@ namespace basecode::objfmt::container::pe {
     [[maybe_unused]] constexpr u32 imp_dir_entry_size           = 0x14;
     [[maybe_unused]] constexpr u32 imp_lookup_entry_size        = imp_addr_entry_size;
     [[maybe_unused]] constexpr u32 name_table_entry_size        = 0x12;
-    [[maybe_unused]] constexpr u64 image_base_addr              = 0x140000000;    //0x00400000;   // XXX: check this
-    [[maybe_unused]] constexpr u32 section_align                = 0x1000;       // XXX: this seems massive!
-    [[maybe_unused]] constexpr u32 file_align                   = 0x200;
-
-    [[maybe_unused]] constexpr u32 relocations_stripped         = 0x0001;
-    [[maybe_unused]] constexpr u32 executable_image             = 0x0002;
 
     [[maybe_unused]] constexpr u16 pe32                         = 0x10b;
     [[maybe_unused]] constexpr u16 pe64                         = 0x20b;
@@ -96,344 +99,406 @@ namespace basecode::objfmt::container::pe {
     [[maybe_unused]] constexpr u16 subsys_win_boot_app          = 16;
     [[maybe_unused]] constexpr u16 subsys_xbox_code_catalog     = 17;
 
-    static u0 write_pad(buf_crsr_t& crsr) {
-        if ((crsr.pos % 2) == 0) return;
-        buf::cursor::write_u8(crsr, 0);
+    namespace image {
+        namespace flags {
+            [[maybe_unused]] constexpr u32 relocs_stripped              = 0x0001;
+            [[maybe_unused]] constexpr u32 executable_type              = 0x0002;
+            [[maybe_unused]] constexpr u32 line_nums_stripped           = 0x0004;
+            [[maybe_unused]] constexpr u32 local_syms_stripped          = 0x0008;
+            [[maybe_unused]] constexpr u32 aggressive_ws_trim           = 0x0010;
+            [[maybe_unused]] constexpr u32 large_address_aware          = 0x0020;
+            [[maybe_unused]] constexpr u32 reserved                     = 0x0040;
+            [[maybe_unused]] constexpr u32 bytes_reversed_lo            = 0x0080;
+            [[maybe_unused]] constexpr u32 machine_32bit                = 0x0100;
+            [[maybe_unused]] constexpr u32 debug_stripped               = 0x0200;
+            [[maybe_unused]] constexpr u32 removable_run_from_swap      = 0x0400;
+            [[maybe_unused]] constexpr u32 net_run_from_swap            = 0x0800;
+            [[maybe_unused]] constexpr u32 system_type                  = 0x1000;
+            [[maybe_unused]] constexpr u32 dll_type                     = 0x2000;
+            [[maybe_unused]] constexpr u32 up_system_only               = 0x4000;
+            [[maybe_unused]] constexpr u32 bytes_reversed_hi            = 0x8000;
+        }
     }
 
-    static u0 write_pad8(buf_crsr_t& crsr, str::slice_t slice) {
-        for (u32 i = 0; i < 8; ++i)
-            buf::cursor::write_u8(crsr, i < slice.length ? slice[i] : 0);
-    }
+    namespace pe {
+        u0 free(pe_t& pe) {
+            buf::free(pe.buf);
+        }
 
-    static u0 write_cstr(buf_crsr_t& crsr, str::slice_t slice) {
-        for (u32 i = 0; i < slice.length; ++i)
-            buf::cursor::write_u8(crsr, slice[i]);
-        buf::cursor::write_u8(crsr, 0);
-    }
+        u0 write_pad(pe_t& pe) {
+            if ((pe.crsr.pos % 2) == 0) return;
+            buf::cursor::write_u8(pe.crsr, 0);
+        }
 
-    static u0 write_pad16(buf_crsr_t& crsr, str::slice_t slice) {
-        for (u32 i = 0; i < 16; ++i)
-            buf::cursor::write_u8(crsr, i < slice.length ? slice[i] : 0);
+        u0 seek(pe_t& pe, u32 offset) {
+            buf::cursor::seek(pe.crsr, offset);
+        }
+
+        u0 write_dos_header(pe_t& pe) {
+            const auto dos_stub_size = dos_header_size + sizeof(s_dos_stub);
+            pe.offset = align(dos_stub_size, 8);
+
+            pe::write_u8(pe, 'M');
+            pe::write_u8(pe, 'Z');
+            pe::write_u16(pe, dos_stub_size % 512);
+            pe::write_u16(pe, align(dos_stub_size, 512) / 512);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, dos_header_size / 16);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 1);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, dos_header_size);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 0);
+            pe::write_u16(pe, 0);
+            for (u32 i = 0; i < 10; ++i)
+                pe::write_u16(pe, 0);
+            pe::write_u32(pe, pe.offset);
+            for (u8 code_byte : s_dos_stub)
+                pe::write_u8(pe, code_byte);
+        }
+
+        u0 write_u8(pe_t& pe, u8 value) {
+            buf::cursor::write_u8(pe.crsr, value);
+        }
+
+        u0 write_u16(pe_t& pe, u16 value) {
+            buf::cursor::write_u16(pe.crsr, value);
+        }
+
+        u0 write_u32(pe_t& pe, u32 value) {
+            buf::cursor::write_u32(pe.crsr, value);
+        }
+
+        u0 write_u64(pe_t& pe, u64 value) {
+            buf::cursor::write_u64(pe.crsr, value);
+        }
+
+        status_t save(pe_t& pe, const path_t& path) {
+            auto status = buf::save(pe.buf, path);
+            if (!OK(status))
+                return status_t::write_error;
+            return status_t::ok;
+        }
+
+        u0 write_pad8(pe_t& pe, str::slice_t slice) {
+            for (u32 i = 0; i < 8; ++i)
+                buf::cursor::write_u8(pe.crsr, i < slice.length ? slice[i] : 0);
+        }
+
+        u0 write_cstr(pe_t& pe, str::slice_t slice) {
+            for (u32 i = 0; i < slice.length; ++i)
+                buf::cursor::write_u8(pe.crsr, slice[i]);
+            buf::cursor::write_u8(pe.crsr, 0);
+        }
+
+        u0 write_pad16(pe_t& pe, str::slice_t slice) {
+            for (u32 i = 0; i < 16; ++i)
+                buf::cursor::write_u8(pe.crsr, i < slice.length ? slice[i] : 0);
+        }
+
+        u0 write_optional_header(pe_t& pe, const context_t& ctx) {
+            pe::write_u16(pe, pe64);
+            pe::write_u8(pe, ctx.versions.linker.major);
+            pe::write_u8(pe, ctx.versions.linker.minor);
+            pe::write_u32(pe, pe.code.size);
+            pe::write_u32(pe, pe.init_data.size);
+            pe::write_u32(pe, pe.uninit_data.size);
+            pe::write_u32(pe, pe.code.base);
+            pe::write_u32(pe, pe.code.base);
+            pe::write_u64(pe, pe.base_addr);
+            pe::write_u32(pe, pe.align.section);
+            pe::write_u32(pe, pe.align.file);
+            pe::write_u16(pe, ctx.versions.min_os.major);
+            pe::write_u16(pe, ctx.versions.min_os.minor);
+            pe::write_u16(pe, 0);            // XXX: image ver major
+            pe::write_u16(pe, 0);            // XXX: image ver minor
+            pe::write_u16(pe, ctx.versions.min_os.major);
+            pe::write_u16(pe, ctx.versions.min_os.minor);
+            pe::write_u32(pe, 0);
+            pe::write_u32(pe, align(pe.rva + pe.size.image, pe.align.section));
+            pe::write_u32(pe, align(pe.size.headers, pe.align.file));
+            pe::write_u32(pe, 0);
+            if (ctx.flags.console) {
+                pe::write_u16(pe, subsys_win_cui);
+            } else {
+                pe::write_u16(pe, subsys_win_gui);
+            }
+            pe::write_u16(pe, 0);            // XXX: dll flags
+            pe::write_u64(pe, 0x100000);     // XXX: size of stack reserve
+            pe::write_u64(pe, 0x1000);       // XXX: size of stack commit
+            pe::write_u64(pe, 0x100000);     // XXX: size of heap reserve
+            pe::write_u64(pe, 0x1000);       // XXX: size of heap commit
+            pe::write_u32(pe, 0);            // XXX: load flags
+            pe::write_u32(pe, 16);           // XXX: number of rva and sizes
+
+            for (const auto& dir : pe.dirs) {
+                pe::write_u32(pe, dir.rva);
+                pe::write_u32(pe, dir.size);
+            }
+        }
+
+        u0 write_section_headers(pe_t& pe, const context_t& ctx) {
+            const auto num_sections = ctx.file->sections.size;
+            for (u32 i = 0; i < num_sections; ++i) {
+                const auto& hdr = pe.hdrs[i];
+                const auto type = hdr.section->type;
+                const auto& flags = hdr.section->flags;
+
+                if (type == section::type_t::custom) {
+                    const auto symbol = objfmt::file::get_symbol(*ctx.file, hdr.section->symbol);
+                    const auto intern_rc = string::interned::get(symbol->name);
+                    pe::write_pad8(pe, intern_rc.slice);
+                } else {
+                    pe::write_pad8(pe, s_section_names[u32(type)]);
+                }
+                pe::write_u32(pe, hdr.size);
+                pe::write_u32(pe, hdr.rva);
+                if (type == section::type_t::uninit) {
+                    pe::write_u32(pe, 0);
+                    pe::write_u32(pe, 0);
+                } else {
+                    pe::write_u32(pe, align(hdr.size, pe.align.file));
+                    pe::write_u32(pe, hdr.offset);
+                }
+                pe::write_u32(pe, 0);         // XXX: pointer to relocs
+                pe::write_u32(pe, 0);         // N.B. always null
+                pe::write_u16(pe, 0);         // XXX: number of relocs
+                pe::write_u16(pe, 0);         // N.B. always zero
+
+                u32 bitmask{};
+                if (flags.code)     bitmask |= section_code;
+                if (flags.data) {
+                    if (type == section::type_t::data
+                        ||  type == section::type_t::import) {
+                        bitmask |= section_init_data;
+                    } else if (type == section::type_t::uninit) {
+                        bitmask |= section_uninit_data;
+                    }
+                }
+                if (flags.read)     bitmask |= memory_read;
+                if (flags.write)    bitmask |= memory_write;
+                if (flags.exec)     bitmask |= memory_execute;
+
+                pe::write_u32(pe, bitmask);
+            }
+        }
+
+        status_t prepare_sections(pe_t& pe, const context_t& ctx) {
+            pe.size.headers = pe.offset
+                              + pe_header_size
+                              + (ctx.file->sections.size * section_header_size);
+            pe.offset = pe.size.headers;
+            pe.rva    = pe.size.headers;
+
+            const auto num_sections = ctx.file->sections.size;
+            for (u32 i = 0; i < num_sections; ++i) {
+                auto& hdr = pe.hdrs[i];
+                pe.offset = hdr.offset = align(pe.offset + pe.size.image, pe.align.file);
+                pe.rva    = hdr.rva    = align(pe.rva + pe.size.image, pe.align.section);
+                switch (hdr.section->type) {
+                    case section::type_t::code:
+                        if (!pe.code.base)
+                            pe.code.base = hdr.rva;
+                        pe.size.image = hdr.size = hdr.section->subclass.data.length;
+                        pe.code.size += pe.size.image;
+                        break;
+                    case section::type_t::data:
+                    case section::type_t::custom:
+                        if (!pe.init_data.base)
+                            pe.init_data.base = hdr.rva;
+                        pe.size.image = hdr.size = hdr.section->subclass.data.length;
+                        pe.init_data.size += pe.size.image;
+                        break;
+                    case section::type_t::uninit:
+                        pe.size.image = hdr.size = hdr.section->subclass.size;
+                        pe.uninit_data.size += pe.size.image;
+                        break;
+                    case section::type_t::import: {
+                        auto& import_table = pe.dirs[dir_type_t::import_table];
+                        auto& import_address_table = pe.dirs[dir_type_t::import_address_table];
+                        const auto& imports = hdr.section->subclass.imports;
+                        import_address_table.rva = pe.rva;
+                        u32 imported_count{};
+                        for (const auto& import : imports)
+                            imported_count += import.symbols.size;
+                        import_address_table.size = (imported_count + 1) * imp_addr_entry_size;
+                        pe.rva += import_address_table.size;
+
+                        import_table.rva = pe.rva;
+                        import_table.size = imp_dir_entry_size * 2;
+                        pe.rva += import_table.size;
+
+                        pe.import_lookup_table.rva = pe.rva;
+                        pe.rva += import_address_table.size;
+
+                        pe.name_table.rva = pe.rva;
+                        pe.name_table.size = (imported_count + 1) * name_table_entry_size;
+                        pe.rva += pe.name_table.size;
+
+                        pe.size.image = hdr.size = pe.rva - import_address_table.rva;
+                        pe.init_data.size += pe.size.image;
+                        break;
+                    }
+                    case section::type_t::debug:
+                    case section::type_t::export_:
+                    case section::type_t::resource:
+                        return status_t::not_implemented;
+                }
+            }
+
+            return status_t::ok;
+        }
+
+        u0 write_section_data(pe_t& pe, const context_t& ctx) {
+            const auto num_sections = ctx.file->sections.size;
+            for (u32 i = 0; i < num_sections; ++i) {
+                const auto& hdr = pe.hdrs[i];
+                const auto type = hdr.section->type;
+                const auto& sc = hdr.section->subclass;
+                if (type == section::type_t::uninit)
+                    continue;
+                pe::seek(pe, hdr.offset);
+                switch (type) {
+                    case section::type_t::code:
+                    case section::type_t::data:
+                        pe::write_str(pe, sc.data);
+                        break;
+                    case section::type_t::import: {
+                        const auto& imports = sc.imports;
+                        for (const auto& import : imports) {
+                            const auto module_symbol = file::get_symbol(*ctx.file, import.module);
+                            const auto module_intern = string::interned::get(module_symbol->name);
+
+                            // import address table
+                            u32 name_table_ptr = pe.name_table.rva + name_table_entry_size;
+                            for (u32 i = 0; i < import.symbols.size; ++i) {
+                                pe::write_u64(pe, name_table_ptr);
+                                name_table_ptr += name_table_entry_size;
+                            }
+                            pe::write_u64(pe, 0);
+
+                            // import directory table
+                            pe::write_u32(pe, pe.import_lookup_table.rva);
+                            pe::write_u32(pe, 0);
+                            pe::write_u32(pe, 0);
+                            pe::write_u32(pe, pe.name_table.rva);
+                            pe::write_u32(pe, pe.dirs[dir_type_t::import_address_table].rva);
+
+                            // null node
+                            pe::write_u32(pe, 0);
+                            pe::write_u32(pe, 0);
+                            pe::write_u32(pe, 0);
+                            pe::write_u32(pe, 0);
+                            pe::write_u32(pe, 0);
+
+                            // import lookup table
+                            name_table_ptr = pe.name_table.rva + name_table_entry_size;
+                            for (u32 i = 0; i < import.symbols.size; ++i) {
+                                pe::write_u64(pe, name_table_ptr);
+                                name_table_ptr += name_table_entry_size;
+                            }
+                            pe::write_u64(pe, 0);
+
+                            // name table
+                            pe::write_pad16(pe, module_intern.slice);
+                            pe::write_u8(pe, 0);
+                            pe::write_u8(pe, 0);
+                            for (auto symbol_id : import.symbols) {
+                                const auto symbol = file::get_symbol(*ctx.file, symbol_id);
+                                const auto symbol_intern = string::interned::get(symbol->name);
+                                pe::write_u16(pe, 0);    // XXX: hint
+                                pe::write_pad16(pe, symbol_intern.slice);
+                            }
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+        }
+
+        u0 write_pe_and_coff_header(pe_t& pe, const context_t& ctx) {
+            pe::seek(pe, pe.offset);
+            pe::write_u8(pe, 'P');
+            pe::write_u8(pe, 'E');
+            pe::write_u8(pe, 0);
+            pe::write_u8(pe, 0);
+            pe::write_u16(pe, u16(ctx.file->machine));
+            pe::write_u16(pe, ctx.file->sections.size);
+            pe::write_u32(pe, 0);
+            pe::write_u32(pe, 0);
+            pe::write_u32(pe, 0);
+            pe::write_u16(pe, optional_header_size);
+            pe::write_u16(pe,
+                          image::flags::relocs_stripped
+                          | image::flags::executable_type
+                          | image::flags::large_address_aware);
+        }
+
+        status_t init(pe_t& pe, coff::section_hdr_t* hdrs, alloc_t* alloc) {
+            pe.hdrs          = hdrs;
+            pe.rva           = pe.offset    = {};
+            pe.size          = {};
+            pe.base_addr     = 0x140000000;
+            pe.align.file    = 0x200;
+            pe.align.section = 0x1000;
+            pe.code          = pe.init_data = pe.uninit_data = {};
+            ZERO_MEM(pe.dirs, pe.dirs);
+            buf::init(pe.buf, alloc);
+            // XXX: revisit
+            buf::reserve(pe.buf, 64 * 1024);
+            buf::cursor::init(pe.crsr, pe.buf);
+            return status_t::ok;
+        }
     }
 
     static u0 fini() {
     }
 
-    static status_t read(file_t& file) {
-        UNUSED(file);
+    static status_t init(alloc_t* alloc) {
+        UNUSED(alloc);
         return status_t::ok;
     }
 
-    static status_t write(file_t& file) {
-        buf_t buf{};
-        buf::init(buf, file.alloc);
-        defer(buf::free(buf));
+    static status_t read(const context_t& ctx) {
+        UNUSED(ctx);
+        return status_t::ok;
+    }
 
-        buf_crsr_t crsr{};
-        buf::cursor::init(crsr, buf);
-
-        const auto dos_stub_size = dos_header_size + sizeof(s_dos_stub);
-        const auto pe_offset     = align(dos_stub_size, 8);
-
-        buf::cursor::write_u8(crsr, 'M');
-        buf::cursor::write_u8(crsr, 'Z');
-        buf::cursor::write_u16(crsr, dos_stub_size % 512);
-        buf::cursor::write_u16(crsr, align(dos_stub_size, 512) / 512);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, dos_header_size / 16);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 1);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, dos_header_size);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u16(crsr, 0);
-        for (u32 i = 0; i < 10; ++i)
-            buf::cursor::write_u16(crsr, 0);
-        buf::cursor::write_u32(crsr, pe_offset);
-        for (u8 code_byte : s_dos_stub)
-            buf::cursor::write_u8(crsr, code_byte);
-
-        buf::cursor::seek(crsr, pe_offset);
-        buf::cursor::write_u8(crsr, 'P');
-        buf::cursor::write_u8(crsr, 'E');
-        buf::cursor::write_u8(crsr, 0);
-        buf::cursor::write_u8(crsr, 0);
-        buf::cursor::write_u16(crsr, u16(file.machine));
-        buf::cursor::write_u16(crsr, u16(file.sections.size));
-        buf::cursor::write_u32(crsr, 0);
-        buf::cursor::write_u32(crsr, 0);
-        buf::cursor::write_u32(crsr, 0);
-        buf::cursor::write_u16(crsr, optional_header_size);
-        buf::cursor::write_u16(crsr, 0x022F /*relocations_stripped | executable_image*/);
-
-        const auto headers_size = pe_offset + pe_header_size + (file.sections.size * section_header_size);
-
-        u32 section_num         = 1;
-        u64 offset              = headers_size;
-        u64 rva                 = headers_size;
-        u64 size                = {};
-        u32 base_of_code        = {};
-        u32 base_of_data        = {};
-        u32 size_of_code        = {};
-        u32 size_of_init_data   = {};
-        u32 size_of_uninit_data = {};
-        u32 iat_rva             = {};
-        u32 iat_size            = {};
-        u32 name_tbl_rva        = {};
-        u32 name_tbl_size       = {};
-        u32 imp_dir_tbl_rva     = {};
-        u32 imp_dir_tbl_size    = {};
-        u32 imp_lookup_tbl_rva  = {};
-
-        for (auto& section : file.sections) {
-            offset = section.offset           = align(offset + size, file_align);
-            rva    = section.address.virtual_ = align(rva + size, section_align);
-            switch (section.type) {
-                case section::type_t::code:
-                    if (!base_of_code)
-                        base_of_code = section.address.virtual_;
-                    size = section.size = section.subclass.data.length;
-                    size_of_code += size;
-                    break;
-                case section::type_t::data:
-                    if (!base_of_data)
-                        base_of_data = section.address.virtual_;
-                    size = section.size = section.subclass.data.length;
-                    size_of_init_data += size;
-                    break;
-                case section::type_t::uninit:
-                    size = section.size = section.subclass.size;
-                    size_of_uninit_data += size;
-                    break;
-                case section::type_t::import: {
-                    const auto& imports = section.subclass.imports;
-                    iat_rva  = rva;
-                    u32 imported_count{};
-                    for (const auto& import : imports)
-                        imported_count += import.symbols.size;
-                    iat_size = (imported_count + 1) * imp_addr_entry_size;
-                    rva += iat_size;
-
-                    imp_dir_tbl_rva = rva;
-                    imp_dir_tbl_size = imp_dir_entry_size * 2;
-                    rva += imp_dir_tbl_size;
-
-                    imp_lookup_tbl_rva = rva;
-                    rva += iat_size;
-
-                    name_tbl_rva = rva;
-                    name_tbl_size = (imported_count + 1) * name_table_entry_size;
-                    rva += name_tbl_size;
-
-                    size = section.size = rva - iat_rva;
-                    size_of_init_data += size;
-                    break;
-                }
-            }
-            ++section_num;
+    static status_t write(const context_t& ctx) {
+        coff::section_hdr_t hdrs[ctx.file->sections.size];
+        for (u32 i = 0; i < ctx.file->sections.size; ++i) {
+            auto& hdr = hdrs[i];
+            hdr.section = &ctx.file->sections[i];
+            hdr.rva     = hdr.offset = hdr.size = {};
+            hdr.number  = i + 1;
         }
 
-        buf::cursor::write_u16(crsr, pe64);
-        buf::cursor::write_u8(crsr, 6);     // XXX: linker major
-        buf::cursor::write_u8(crsr, 0);     // XXX: linker minor
-        buf::cursor::write_u32(crsr, size_of_code);
-        buf::cursor::write_u32(crsr, size_of_init_data);
-        buf::cursor::write_u32(crsr, size_of_uninit_data);
-        buf::cursor::write_u32(crsr, base_of_code);
-        buf::cursor::write_u32(crsr, base_of_code);
-        buf::cursor::write_u64(crsr, image_base_addr);
-        buf::cursor::write_u32(crsr, section_align);
-        buf::cursor::write_u32(crsr, file_align);
-        buf::cursor::write_u16(crsr, 4);            // XXX: OS ver major
-        buf::cursor::write_u16(crsr, 0);            // XXX: OS ver minor
-        buf::cursor::write_u16(crsr, 0);            // XXX: image ver major
-        buf::cursor::write_u16(crsr, 0);            // XXX: image ver minor
-        buf::cursor::write_u16(crsr, 4);            // XXX: subsystem ver major
-        buf::cursor::write_u16(crsr, 0);            // XXX: subsystem ver minor
-        buf::cursor::write_u32(crsr, 0);
-        buf::cursor::write_u32(crsr, align(rva + size, section_align));
-        buf::cursor::write_u32(crsr, align(headers_size, file_align));
-        buf::cursor::write_u32(crsr, 0);
-        buf::cursor::write_u16(crsr, subsys_win_cui);     // XXX: subsystem / console
-        buf::cursor::write_u16(crsr, 0);            // XXX: dll flags
-        buf::cursor::write_u64(crsr, 0x100000);     // XXX: size of stack reserve
-        buf::cursor::write_u64(crsr, 0x1000);       // XXX: size of stack commit
-        buf::cursor::write_u64(crsr, 0x100000);     // XXX: size of heap reserve
-        buf::cursor::write_u64(crsr, 0x1000);       // XXX: size of heap commit
-        buf::cursor::write_u32(crsr, 0);            // XXX: load flags
-        buf::cursor::write_u32(crsr, 16);           // XXX: number of rva and sizes
+        pe_t pe{};
+        pe::init(pe, hdrs, ctx.file->alloc);
+        defer(pe::free(pe));
 
-        // windows data directories
-        buf::cursor::write_u32(crsr, 0);            // XXX: export table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: export table size
+        pe::write_dos_header(pe);
+        pe::write_pe_and_coff_header(pe, ctx);
+        pe::prepare_sections(pe, ctx);
+        pe::write_optional_header(pe, ctx);
+        pe::write_section_headers(pe, ctx);
+        pe::write_section_data(pe, ctx);
 
-        buf::cursor::write_u32(crsr, imp_dir_tbl_rva);    // XXX: import table pointer
-        buf::cursor::write_u32(crsr, imp_dir_tbl_size);   // XXX: import table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: resource table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: resource table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: exception table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: exception table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: certificate table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: certificate table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: base relocation table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: base relocation table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: debug table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: debug table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: architecture table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: architecture table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: global table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: global table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: tls table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: tls table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: load config table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: load config table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: bound import table pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: bound import table size
-
-        buf::cursor::write_u32(crsr, iat_rva);            // XXX: import address table pointer
-        buf::cursor::write_u32(crsr, iat_size);           // XXX: import address table size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: delay import descriptor pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: delay import descriptor size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: clr runtime header pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: clr runtime header size
-
-        buf::cursor::write_u32(crsr, 0);            // XXX: reserved pointer
-        buf::cursor::write_u32(crsr, 0);            // XXX: reserved size
-
-        // section headers
-        for (const auto& section : file.sections) {
-            const auto symbol = objfmt::file::get_symbol(file, section.symbol);
-            const auto intern_rc = string::interned::get(symbol->name);
-            write_pad8(crsr, intern_rc.slice);
-            buf::cursor::write_u32(crsr, section.size);
-            buf::cursor::write_u32(crsr, section.address.virtual_);
-            if (section.type == section::type_t::uninit) {
-                buf::cursor::write_u32(crsr, 0);
-                buf::cursor::write_u32(crsr, 0);
-            } else {
-                buf::cursor::write_u32(crsr, align(section.size, file_align));
-                buf::cursor::write_u32(crsr, section.offset);
-            }
-            buf::cursor::write_u32(crsr, 0);         // XXX: pointer to relocs
-            buf::cursor::write_u32(crsr, 0);         // XXX: pointer to line numbers
-            buf::cursor::write_u16(crsr, 0);         // XXX: number of relocs
-            buf::cursor::write_u16(crsr, 0);         // XXX: number of line numbers
-
-            u32 flags{};
-            if (section.flags.code)     flags |= section_code;
-            if (section.flags.data) {
-                if (section.type == section::type_t::data
-                ||  section.type == section::type_t::import) {
-                    flags |= section_init_data;
-                } else if (section.type == section::type_t::uninit) {
-                    flags |= section_uninit_data;
-                }
-            }
-            if (section.flags.read)     flags |= memory_read;
-            if (section.flags.write)    flags |= memory_write;
-            if (section.flags.exec)     flags |= memory_execute;
-
-            buf::cursor::write_u32(crsr, flags);
-        }
-
-        // section data
-        for (const auto& section : file.sections) {
-            if (section.type == section::type_t::uninit)
-                continue;
-            buf::cursor::seek(crsr, section.offset);
-            switch (section.type) {
-                case section::type_t::code:
-                case section::type_t::data:
-                    buf::cursor::write_str(crsr, section.subclass.data);
-                    break;
-                case section::type_t::import: {
-                    const auto& imports = section.subclass.imports;
-                    for (const auto& import : imports) {
-                        const auto module_symbol = file::get_symbol(file, import.module);
-                        const auto module_intern = string::interned::get(module_symbol->name);
-
-                        // import address table
-                        format::print("name_tbl_rva = 0x{:08x}\n", name_tbl_rva);
-                        u32 name_table_ptr = name_tbl_rva + name_table_entry_size;
-                        for (u32 i = 0; i < import.symbols.size; ++i) {
-                            format::print("name_table_ptr = 0x{:08x}\n", name_table_ptr);
-                            buf::cursor::write_u64(crsr, name_table_ptr);
-                            name_table_ptr += name_table_entry_size;
-                        }
-                        buf::cursor::write_u64(crsr, 0);
-
-                        // import directory table
-                        buf::cursor::write_u32(crsr, imp_lookup_tbl_rva);
-                        buf::cursor::write_u32(crsr, 0);
-                        buf::cursor::write_u32(crsr, 0);
-                        buf::cursor::write_u32(crsr, name_tbl_rva);
-                        buf::cursor::write_u32(crsr, iat_rva);
-
-                        // null node
-                        buf::cursor::write_u32(crsr, 0);
-                        buf::cursor::write_u32(crsr, 0);
-                        buf::cursor::write_u32(crsr, 0);
-                        buf::cursor::write_u32(crsr, 0);
-                        buf::cursor::write_u32(crsr, 0);
-
-                        // import lookup table
-                        name_table_ptr = name_tbl_rva + name_table_entry_size;
-                        for (u32 i = 0; i < import.symbols.size; ++i) {
-                            format::print("name_table_ptr = 0x{:08x}\n", name_table_ptr);
-                            buf::cursor::write_u64(crsr, name_table_ptr);
-                            name_table_ptr += name_table_entry_size;
-                        }
-                        buf::cursor::write_u64(crsr, 0);
-
-                        // name table
-                        write_pad16(crsr, module_intern.slice);
-                        buf::cursor::write_u8(crsr, 0);
-                        buf::cursor::write_u8(crsr, 0);
-                        for (auto symbol_id : import.symbols) {
-                            const auto symbol = file::get_symbol(file, symbol_id);
-                            const auto symbol_intern = string::interned::get(symbol->name);
-                            buf::cursor::write_u16(crsr, 0);    // XXX: hint
-                            write_pad16(crsr, symbol_intern.slice);
-                        }
-                    }
-                    break;
-                }
-                default:
-                    break;
-            }
-        }
-
-        auto status = buf::save(buf, file.path);
+        auto status = pe::save(pe, ctx.file->path);
         if (!OK(status))
             return status_t::write_error;
 
-        return status_t::ok;
-    }
-
-    static status_t init(alloc_t* alloc) {
-        UNUSED(alloc);
         return status_t::ok;
     }
 

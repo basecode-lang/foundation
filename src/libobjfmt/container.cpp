@@ -45,17 +45,17 @@ namespace basecode::objfmt::container {
         return status_t::ok;
     }
 
-    status_t read(type_t type, file_t& file) {
-        const auto idx = u32(type);
+    status_t read(const context_t& ctx) {
+        const auto idx = u32(ctx.type);
         if (idx > max_type_count - 1)
             return status_t::invalid_container_type;
-        return s_systems[idx]->read(file);
+        return s_systems[idx]->read(ctx);
     }
 
-    status_t write(type_t type, file_t& file) {
-        const auto idx = u32(type);
+    status_t write(const context_t& ctx) {
+        const auto idx = u32(ctx.type);
         if (idx > max_type_count - 1)
             return status_t::invalid_container_type;
-        return s_systems[idx]->write(file);
+        return s_systems[idx]->write(ctx);
     }
 }

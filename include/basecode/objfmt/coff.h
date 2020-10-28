@@ -21,5 +21,13 @@
 #include <basecode/objfmt/container.h>
 
 namespace basecode::objfmt::container::coff {
+    struct section_hdr_t final {
+        const section_t*        section;
+        u32                     rva;
+        u32                     size;
+        u32                     number;
+        u32                     offset;
+    };
+
     system_t* system();
 }

@@ -42,6 +42,7 @@ namespace basecode::objfmt {
     using import_list_t         = array_t<import_t>;
     using symbol_list_t         = array_t<symbol_t>;
     using section_list_t        = array_t<section_t>;
+    using section_ptr_list_t    = array_t<section_t*>;
     using symbol_table_t        = hashtab_t<intern_id, symbol_t>;
 
     enum class status_t : u32 {
@@ -49,13 +50,15 @@ namespace basecode::objfmt {
         read_error                      = 2000,
         write_error                     = 2001,
         import_failure                  = 2002,
-        duplicate_import                = 2008,
-        duplicate_symbol                = 2003,
-        symbol_not_found                = 2004,
-        config_eval_error               = 2005,
-        invalid_section_type            = 2006,
-        container_init_error            = 2007,
+        duplicate_import                = 2003,
+        duplicate_symbol                = 2004,
+        symbol_not_found                = 2005,
+        config_eval_error               = 2006,
+        invalid_section_type            = 2007,
+        container_init_error            = 2008,
         invalid_container_type          = 2009,
+        spec_section_custom_name        = 2010,
+        not_implemented                 = 2011,
     };
 
     namespace symbol {
@@ -110,8 +113,12 @@ namespace basecode::objfmt {
         enum class type_t : u8 {
             code,
             data,
+            debug,
             uninit,
-            import
+            import,
+            export_,
+            resource,
+            custom
         };
     }
 
@@ -175,22 +182,22 @@ namespace basecode::objfmt {
         }                       flags;
     };
 
-    struct address_t final {
-        u64                     physical;
-        u64                     virtual_;
-    };
+//    struct address_t final {
+//        u64                     physical;
+//        u64                     virtual_;
+//    };
 
-    struct relo_entry_t final {
-        address_t               address;
-        symbol_id               symbol;
-        relocation::type_t      type;
-    };
+//    struct relo_entry_t final {
+//        address_t               address;
+//        symbol_id               symbol;
+//        relocation::type_t      type;
+//    };
 
-    struct lineno_entry_t final {
-        address_t               address;
-        symbol_id               symbol;
-        u16                     line_number;
-    };
+//    struct lineno_entry_t final {
+//        address_t               address;
+//        symbol_id               symbol;
+//        u16                     line_number;
+//    };
 
     union section_subclass_t {
         u64                     size;
@@ -201,9 +208,6 @@ namespace basecode::objfmt {
     struct section_t final {
         alloc_t*                alloc;
         const file_t*           file;
-        u64                     size;
-        u64                     offset;
-        address_t               address;
         symbol_list_t           symbols;
         section_subclass_t      subclass;
         symbol_id               symbol;

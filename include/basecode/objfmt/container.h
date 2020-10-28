@@ -29,10 +29,32 @@ namespace basecode::objfmt::container {
     };
     constexpr u32 max_type_count = 4;
 
+    enum class output_type_t : u8 {
+        obj,
+        lib,
+        exe,
+        dll
+    };
+
+    struct context_t final {
+        const file_t*           file;
+        struct {
+            u32                 gui:        1;
+            u32                 console:    1;
+            u32                 pad:        30;
+        }                       flags;
+        struct {
+            version_t           linker;
+            version_t           min_os;
+        }                       versions;
+        type_t                  type;
+        output_type_t           output_type;
+    };
+
     using fini_callback_t       = u0 (*)();
-    using read_callback_t       = status_t (*)(file_t&);
-    using write_callback_t      = status_t (*)(file_t&);
     using init_callback_t       = status_t (*)(alloc_t*);
+    using read_callback_t       = status_t (*)(const context_t&);
+    using write_callback_t      = status_t (*)(const context_t&);
 
     struct system_t final {
         init_callback_t         init;
@@ -46,7 +68,7 @@ namespace basecode::objfmt::container {
 
     status_t init(alloc_t* alloc);
 
-    status_t read(type_t type, file_t& file);
+    status_t read(const context_t& ctx);
 
-    status_t write(type_t type, file_t& file);
+    status_t write(const context_t& ctx);
 }
