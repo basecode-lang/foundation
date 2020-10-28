@@ -172,7 +172,15 @@ namespace basecode::objfmt {
             return {section->id, status_t::ok};
         }
 
-        result_t make_symbol(file_t& file, symbol::type_t type, const s8* name, s32 len) {
+        u0 find_sections(const file_t& file, symbol_id symbol, section_ptr_list_t& list) {
+            array::reset(list);
+            for (auto& section : file.sections) {
+                if (section.symbol == symbol)
+                    array::append(list, (section_t*) &section);
+            }
+        }
+
+        result_t make_symbol(file_t& file, const symbol_opts_t& opts, const s8* name, s32 len) {
             {
                 auto symbol = find_symbol(file, name, len);
                 if (symbol)
@@ -181,17 +189,11 @@ namespace basecode::objfmt {
             const auto rc     = string::interned::fold_for_result(name, len);
             auto       symbol = hashtab::emplace(file.symbols, rc.id);
             symbol->name    = rc.id;
-            symbol->section = {};
-            symbol->type    = type;
+            symbol->type    = opts.type;
+            symbol->value   = opts.value;
+            symbol->section = opts.section;
+            symbol->length  = rc.slice.length;
             return {symbol->name, status_t::ok};
-        }
-
-        u0 find_sections(const file_t& file, symbol_id symbol, section_ptr_list_t& list) {
-            array::reset(list);
-            for (auto& section : file.sections) {
-                if (section.symbol == symbol)
-                    array::append(list, (section_t*) &section);
-            }
         }
     }
 }

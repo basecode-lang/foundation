@@ -35,11 +35,6 @@ namespace basecode::objfmt::container {
         static u0 fini() {
         }
 
-        static status_t init(alloc_t* alloc) {
-            UNUSED(alloc);
-            return status_t::ok;
-        }
-
         static status_t read(session_t& s) {
             UNUSED(s);
             return status_t::ok;
@@ -50,7 +45,9 @@ namespace basecode::objfmt::container {
             for (u32 i = 0; i < s.file->sections.size; ++i) {
                 auto& hdr = hdrs[i];
                 hdr.section = &s.file->sections[i];
-                hdr.rva     = hdr.offset = hdr.size = {};
+                hdr.name    = coff::get_section_name(hdr.section->type);
+                hdr.rva     = hdr.offset    = hdr.size = {};
+                hdr.relocs  = hdr.line_nums = {};
                 hdr.number  = i + 1;
             }
 
@@ -58,6 +55,9 @@ namespace basecode::objfmt::container {
             pe::init(pe, hdrs, s.file->sections.size, s.file->alloc);
             defer(pe::free(pe));
             auto& coff = pe.coff;
+
+            coff.symbol_table.size = (s.file->symbols.size + (s.file->sections.size * 2))
+                * coff::symbol_table::entry_size;
 
             // XXX: shouldn't be hard coded
             coff.size.opt_hdr = 0xf0;
@@ -67,16 +67,22 @@ namespace basecode::objfmt::container {
 
             pe::write_dos_header(s, pe);
             pe::write_pe_header(s, pe);
-            coff::write_header(s, coff);
             pe::prepare_sections(s, pe);
+            coff::write_header(s, coff);
             pe::write_optional_header(s, pe);
             coff::write_section_headers(s, coff);
             pe::write_section_data(s, pe);
+            coff::write_symbol_table(s, coff);
 
             auto status = session::save(s);
             if (!OK(status))
                 return status_t::write_error;
 
+            return status_t::ok;
+        }
+
+        static status_t init(alloc_t* alloc) {
+            UNUSED(alloc);
             return status_t::ok;
         }
 
@@ -91,14 +97,26 @@ namespace basecode::objfmt::container {
 
     [[maybe_unused]] constexpr u32 dos_header_size              = 0x40;
     [[maybe_unused]] constexpr u32 pe_sig_size                  = 0x04;
-    [[maybe_unused]] constexpr u32 imp_addr_entry_size          = 0x08;
-    [[maybe_unused]] constexpr u32 imp_dir_entry_size           = 0x14;
-    [[maybe_unused]] constexpr u32 imp_lookup_entry_size        = imp_addr_entry_size;
-    [[maybe_unused]] constexpr u32 name_table_entry_size        = 0x12;
 
     [[maybe_unused]] constexpr u16 pe32                         = 0x10b;
     [[maybe_unused]] constexpr u16 pe64                         = 0x20b;
     [[maybe_unused]] constexpr u16 rom                          = 0x107;
+
+    namespace name_table {
+        [[maybe_unused]] constexpr u32 entry_size               = 0x12;
+    }
+
+    namespace import_dir_table {
+        [[maybe_unused]] constexpr u32 entry_size               = 0x14;
+    }
+
+    namespace import_addr_table {
+        [[maybe_unused]] constexpr u32 entry_size               = 0x08;
+    }
+
+    namespace import_lookup_table {
+        [[maybe_unused]] constexpr u32 entry_size               = 0x08;
+    }
 
     namespace subsystem {
         [[maybe_unused]] constexpr u16 unknown                  = 0;
@@ -214,30 +232,37 @@ namespace basecode::objfmt::container {
             pe.size.headers = coff.offset
                               + (pe_sig_size + coff::header_size + coff.size.opt_hdr)
                               + (coff.num_hdrs * coff::section::header_size);
-            coff.offset = pe.size.headers;
-            coff.rva    = pe.size.headers;
-
+            coff.offset = align(pe.size.headers, coff.align.file);
+            coff.rva    = align(pe.size.headers, coff.align.section);
             for (u32 i = 0; i < pe.coff.num_hdrs; ++i) {
                 auto& hdr = pe.coff.hdrs[i];
-                coff.offset = hdr.offset = align(coff.offset + pe.size.image, coff.align.file);
-                coff.rva    = hdr.rva    = align(coff.rva + pe.size.image, coff.align.section);
+                hdr.offset = coff.offset;
+                hdr.rva    = coff.rva;
                 switch (hdr.section->type) {
                     case section::type_t::code:
                         if (!pe.code.base)
                             pe.code.base = hdr.rva;
-                        pe.size.image = hdr.size = hdr.section->subclass.data.length;
-                        pe.code.size += pe.size.image;
+                        hdr.size      = hdr.section->subclass.data.length;
+                        pe.code.size += hdr.size;
+                        pe.size.image = align(pe.size.image + hdr.size, coff.align.section);
+                        coff.offset   = align(coff.offset + hdr.size, coff.align.file);
+                        coff.rva      = align(coff.rva + hdr.size, coff.align.section);
                         break;
                     case section::type_t::data:
                     case section::type_t::custom:
                         if (!pe.init_data.base)
                             pe.init_data.base = hdr.rva;
-                        pe.size.image = hdr.size = hdr.section->subclass.data.length;
-                        pe.init_data.size += pe.size.image;
+                        hdr.size      = hdr.section->subclass.data.length;
+                        pe.init_data.size += hdr.size;
+                        pe.size.image = align(pe.size.image + hdr.size, coff.align.section);
+                        coff.offset   = align(coff.offset + hdr.size, coff.align.file);
+                        coff.rva      = align(coff.rva + hdr.size, coff.align.section);
                         break;
                     case section::type_t::uninit:
-                        pe.size.image = hdr.size = hdr.section->subclass.size;
-                        pe.uninit_data.size += pe.size.image;
+                        hdr.size = hdr.section->subclass.size;
+                        pe.uninit_data.size += hdr.size;
+                        pe.size.image = align(pe.size.image + hdr.size, coff.align.section);
+                        coff.rva      = align(coff.rva + hdr.size, coff.align.section);
                         break;
                     case section::type_t::import: {
                         auto& import_table = pe.dirs[dir_type_t::import_table];
@@ -247,22 +272,26 @@ namespace basecode::objfmt::container {
                         u32 imported_count{};
                         for (const auto& import : imports)
                             imported_count += import.symbols.size;
-                        import_address_table.size = (imported_count + 1) * imp_addr_entry_size;
+                        import_address_table.size = (imported_count + 1) * import_addr_table::entry_size;
                         coff.rva += import_address_table.size;
 
                         import_table.base = coff.rva;
-                        import_table.size = imp_dir_entry_size * 2;
+                        import_table.size = import_dir_table::entry_size * 2;
                         coff.rva += import_table.size;
 
                         pe.import_lookup_table.base = coff.rva;
                         coff.rva += import_address_table.size;
 
                         pe.name_table.base = coff.rva;
-                        pe.name_table.size = (imported_count + 1) * name_table_entry_size;
+                        pe.name_table.size = (imported_count + 1) * name_table::entry_size;
                         coff.rva += pe.name_table.size;
 
-                        pe.size.image = hdr.size = coff.rva - import_address_table.base;
-                        pe.init_data.size += pe.size.image;
+                        hdr.size = coff.rva - import_address_table.base;
+
+                        pe.init_data.size += hdr.size;
+                        pe.size.image = align(pe.size.image + hdr.size, coff.align.section);
+                        coff.offset   = align(coff.offset + hdr.size, coff.align.file);
+                        coff.rva      = align(coff.rva, coff.align.section);
                         break;
                     }
                     case section::type_t::debug:
@@ -271,6 +300,8 @@ namespace basecode::objfmt::container {
                         return status_t::not_implemented;
                 }
             }
+
+            coff.symbol_table.offset = coff.offset;
 
             return status_t::ok;
         }
@@ -295,10 +326,10 @@ namespace basecode::objfmt::container {
                             const auto module_intern = string::interned::get(module_symbol->name);
 
                             // import address table
-                            u32 name_table_ptr = pe.name_table.base + name_table_entry_size;
-                            for (u32 i = 0; i < import.symbols.size; ++i) {
+                            u32 name_table_ptr = pe.name_table.base + name_table::entry_size;
+                            for (u32 j = 0; j < import.symbols.size; ++j) {
                                 session::write_u64(s, name_table_ptr);
-                                name_table_ptr += name_table_entry_size;
+                                name_table_ptr += name_table::entry_size;
                             }
                             session::write_u64(s, 0);
 
@@ -317,10 +348,10 @@ namespace basecode::objfmt::container {
                             session::write_u32(s, 0);
 
                             // import lookup table
-                            name_table_ptr = pe.name_table.base + name_table_entry_size;
-                            for (u32 i = 0; i < import.symbols.size; ++i) {
+                            name_table_ptr = pe.name_table.base + name_table::entry_size;
+                            for (u32 j = 0; j < import.symbols.size; ++j) {
                                 session::write_u64(s, name_table_ptr);
-                                name_table_ptr += name_table_entry_size;
+                                name_table_ptr += name_table::entry_size;
                             }
                             session::write_u64(s, 0);
 

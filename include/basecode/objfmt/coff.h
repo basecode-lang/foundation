@@ -33,10 +33,13 @@ namespace basecode::objfmt::container {
 
     struct section_hdr_t final {
         const section_t*        section;
+        str::slice_t            name;
         u32                     rva;
         u32                     size;
         u32                     number;
         u32                     offset;
+        raw_t                   relocs;
+        raw_t                   line_nums;
     };
 
     struct coff_t final {
@@ -111,11 +114,17 @@ namespace basecode::objfmt::container {
             [[maybe_unused]] constexpr u32 bytes_reversed_hi            = 0x8000;
         }
 
+        namespace symbol_table {
+            [[maybe_unused]] constexpr u32 entry_size                   = 0x12;
+        }
+
         system_t* system();
 
         u0 free(coff_t& coff);
 
         u0 write_header(session_t& s, coff_t& coff);
+
+        u0 write_symbol_table(session_t& s, coff_t& coff);
 
         u0 write_section_headers(session_t& s, coff_t& coff);
 

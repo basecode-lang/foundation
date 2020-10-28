@@ -94,20 +94,22 @@ static const u8 s_rot13_code[] = {
 };
 
 TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
+    using namespace objfmt;
+
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    objfmt::file_t rot13_pgm{};
-    REQUIRE(OK(objfmt::file::init(rot13_pgm)));
-    defer(objfmt::file::free(rot13_pgm));
+    file_t rot13_pgm{};
+    REQUIRE(OK(file::init(rot13_pgm)));
+    defer(file::free(rot13_pgm));
     path::set(rot13_pgm.path, "rot13.exe");
-    rot13_pgm.machine = objfmt::machine::type_t::amd64;
+    rot13_pgm.machine = machine::type_t::amd64;
 
     /* .text section */ {
-        auto text_rc = objfmt::file::make_section(rot13_pgm,
-                                                  objfmt::section::type_t::code);
-        auto text = objfmt::file::get_section(rot13_pgm, text_rc.id);
-        objfmt::section::data(text, s_rot13_code, sizeof(s_rot13_code));
+        auto text_rc = file::make_section(rot13_pgm,
+                                          section::type_t::code);
+        auto text = file::get_section(rot13_pgm, text_rc.id);
+        section::data(text, s_rot13_code, sizeof(s_rot13_code));
         text->flags.code = true;
         text->flags.read = true;
         text->flags.exec = true;
@@ -117,34 +119,41 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
     }
 
     /* .rdata section */ {
-        auto rdata_rc = objfmt::file::make_section(rot13_pgm,
-                                                   objfmt::section::type_t::data);
-        auto rdata = objfmt::file::get_section(rot13_pgm, rdata_rc.id);
-        objfmt::section::data(rdata, s_rot13_table, sizeof(s_rot13_table));
+        auto rdata_rc = file::make_section(rot13_pgm,
+                                           section::type_t::data);
+        auto rdata = file::get_section(rot13_pgm, rdata_rc.id);
+        section::data(rdata, s_rot13_table, sizeof(s_rot13_table));
         rdata->flags.data = true;
         rdata->flags.read = true;
-
         REQUIRE(OK(rdata_rc.status));
         REQUIRE(rdata);
     }
 
     /* .idata section */ {
-        auto kernel32_sym_rc = objfmt::file::make_symbol(rot13_pgm, "kernel32.dll"_ss);
-        auto read_file_sym_rc = objfmt::file::make_symbol(rot13_pgm, "ReadFile"_ss);
-        auto write_file_sym_rc = objfmt::file::make_symbol(rot13_pgm, "WriteFile"_ss);
-        auto get_std_handle_sym_rc = objfmt::file::make_symbol(rot13_pgm, "GetStdHandle"_ss);
-        auto idata_rc = objfmt::file::make_section(rot13_pgm,
-                                                   objfmt::section::type_t::import);
-
-        auto idata = objfmt::file::get_section(rot13_pgm, idata_rc.id);
+        auto idata_rc = file::make_section(rot13_pgm,
+                                           section::type_t::import);
+        auto idata = file::get_section(rot13_pgm, idata_rc.id);
         idata->flags.data  = true;
         idata->flags.read  = true;
 
-        auto kernel32_imp_rc = objfmt::section::import_module(idata, kernel32_sym_rc.id);
-        auto kernel32_imp    = objfmt::section::get_import(idata, kernel32_imp_rc.id);
-        objfmt::import::add_symbol(kernel32_imp, get_std_handle_sym_rc.id);
-        objfmt::import::add_symbol(kernel32_imp, read_file_sym_rc.id);
-        objfmt::import::add_symbol(kernel32_imp, write_file_sym_rc.id);
+        const auto func_type = SYMBOL_TYPE(symbol::type::derived::function, symbol::type::base::null_);
+        auto kernel32_sym_rc = file::make_symbol(rot13_pgm,
+                                                 "kernel32.dll"_ss,
+                                                 {.section = idata->id, .value = 1});
+        auto read_file_sym_rc = file::make_symbol(rot13_pgm,
+                                                  "ReadFile"_ss,
+                                                  {.section = idata->id, .type = func_type, .value = 2});
+        auto write_file_sym_rc = file::make_symbol(rot13_pgm,
+                                                   "WriteFile"_ss,
+                                                   {.section = idata->id, .type = func_type, .value = 3});
+        auto get_std_handle_sym_rc = file::make_symbol(rot13_pgm,
+                                                       "GetStdHandle"_ss,
+                                                       {.section = idata->id, .type = func_type, .value = 4});
+        auto kernel32_imp_rc = section::import_module(idata, kernel32_sym_rc.id);
+        auto kernel32_imp    = section::get_import(idata, kernel32_imp_rc.id);
+        import::add_symbol(kernel32_imp, get_std_handle_sym_rc.id);
+        import::add_symbol(kernel32_imp, read_file_sym_rc.id);
+        import::add_symbol(kernel32_imp, write_file_sym_rc.id);
 
         REQUIRE(OK(kernel32_sym_rc.status));
         REQUIRE(OK(read_file_sym_rc.status));
@@ -161,10 +170,10 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
     }
 
     /* .bss section */ {
-        auto bss_rc = objfmt::file::make_section(rot13_pgm,
-                                                 objfmt::section::type_t::uninit);
-        auto bss = objfmt::file::get_section(rot13_pgm, bss_rc.id);
-        objfmt::section::reserve(bss, 4096);
+        auto bss_rc = file::make_section(rot13_pgm,
+                                         section::type_t::uninit);
+        auto bss = file::get_section(rot13_pgm, bss_rc.id);
+        section::reserve(bss, 4096);
         bss->flags.data   = true;
         bss->flags.read   = true;
         bss->flags.write  = true;
@@ -174,18 +183,18 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
         REQUIRE(bss->subclass.size == 4096);
     }
 
-    objfmt::container::session_t s{};
-    objfmt::container::session::init(s);
-    defer(objfmt::container::session::free(s));
+    container::session_t s{};
+    container::session::init(s);
+    defer(container::session::free(s));
     s.file                  = &rot13_pgm;
-    s.type                  = objfmt::container::type_t::pe;
-    s.output_type           = objfmt::container::output_type_t::exe;
+    s.type                  = container::type_t::pe;
+    s.output_type           = container::output_type_t::exe;
     s.versions.linker.major = 6;
     s.versions.linker.minor = 0;
     s.versions.min_os.major = 4;
     s.versions.min_os.minor = 0;
     s.flags.console         = true;
-    REQUIRE(OK(objfmt::container::write(s)));
+    REQUIRE(OK(container::write(s)));
 
     stopwatch::stop(timer);
     stopwatch::print_elapsed("objfmt write PE executable time"_ss, 40, timer);

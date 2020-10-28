@@ -45,6 +45,11 @@ namespace basecode::buf {
             crsr.pos += sizeof(u16);
         }
 
+        u0 write_s16(buf_crsr_t& crsr, s16 value) {
+            write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(s16));
+            crsr.pos += sizeof(s16);
+        }
+
         u0 write_u32(buf_crsr_t& crsr, u32 value) {
             write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u32));
             crsr.pos += sizeof(u32);
@@ -161,6 +166,10 @@ namespace basecode::buf {
         fseek(file, 0, SEEK_SET);
         write(buf, 0, file, length);
         return status_t::ok;
+    }
+
+    u0 zero_fill(buf_t& buf, u32 offset, u32 length) {
+        std::memset(buf.data + offset, 0, length);
     }
 
     u0 write(buf_t& buf, u32 offset, FILE* file, u32 length) {

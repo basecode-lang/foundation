@@ -64,10 +64,10 @@ namespace basecode::objfmt {
             return find_symbol(file, (const s8*) name.data, name.length);
         }
 
-        result_t make_symbol(file_t& file, symbol::type_t type, const s8* name, s32 len = -1);
+        result_t make_symbol(file_t& file, const symbol_opts_t& opts, const s8* name, s32 len = -1);
 
-        result_t make_symbol(file_t& file, const String_Concept auto& name, symbol::type_t type = {}) {
-            return make_symbol(file, type, (const s8*) name.data, name.length);
+        result_t make_symbol(file_t& file, const String_Concept auto& name, const symbol_opts_t& opts = {}) {
+            return make_symbol(file, opts, (const s8*) name.data, name.length);
         }
     }
 }

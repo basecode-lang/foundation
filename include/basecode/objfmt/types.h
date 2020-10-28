@@ -68,6 +68,7 @@ namespace basecode::objfmt {
             constexpr type_t(u32 type) : derived(type >> 16U & 0xffffU), base_type(type & 0xffffU)
             {}
             constexpr operator u32() const              { return SYMBOL_TYPE(derived, base_type);   }
+            explicit constexpr operator u16() const     { return u8(derived) << 8U | u8(base_type); }
             [[nodiscard]] constexpr b8 empty() const    { return base_type == 0 && derived == 0;    }
             static constexpr type_t none()              { return 0;                                 }
         private:
@@ -120,6 +121,8 @@ namespace basecode::objfmt {
             resource,
             custom
         };
+
+        constexpr u32 max_spec_type_count = 7;
     }
 
     namespace storage {
@@ -165,10 +168,18 @@ namespace basecode::objfmt {
         intern_id               name        {};
         section_id              section     {};
         symbol::type_t          type        {};
+        u32                     length      {};
+        u32                     value       {};
 
         b8 operator==(const symbol_t& other) const {
             return name == other.name;
         }
+    };
+
+    struct symbol_opts_t final {
+        section_id              section     {};
+        symbol::type_t          type        {};
+        u32                     value       {};
     };
 
     struct import_t final {
@@ -181,23 +192,6 @@ namespace basecode::objfmt {
             u32                 pad:    31;
         }                       flags;
     };
-
-//    struct address_t final {
-//        u64                     physical;
-//        u64                     virtual_;
-//    };
-
-//    struct relo_entry_t final {
-//        address_t               address;
-//        symbol_id               symbol;
-//        relocation::type_t      type;
-//    };
-
-//    struct lineno_entry_t final {
-//        address_t               address;
-//        symbol_id               symbol;
-//        u16                     line_number;
-//    };
 
     union section_subclass_t {
         u64                     size;

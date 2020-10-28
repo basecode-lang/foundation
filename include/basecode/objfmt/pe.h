@@ -39,7 +39,6 @@ namespace basecode::objfmt::container {
         com_header,
         reserved
     };
-
     constexpr u32 max_dir_entry_count = 16;
 
     struct pe_t final {

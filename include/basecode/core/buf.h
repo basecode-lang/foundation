@@ -61,6 +61,8 @@ namespace basecode {
             unable_to_open_file = 100,
         };
 
+        u0 zero_fill(buf_t& buf, u32 offset, u32 length);
+
         u0 write(buf_t& buf, u32 offset, FILE* file, u32 length);
 
         u0 write(buf_t& buf, u32 offset, const u8* data, u32 length);
@@ -75,6 +77,8 @@ namespace basecode {
             u0 write_u8(buf_crsr_t& crsr, u8 value);
 
             u0 write_u16(buf_crsr_t& crsr, u16 value);
+
+            u0 write_s16(buf_crsr_t& crsr, s16 value);
 
             u0 write_u32(buf_crsr_t& crsr, u32 value);
 

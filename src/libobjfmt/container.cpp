@@ -20,6 +20,8 @@
 #include <basecode/objfmt/pe.h>
 #include <basecode/objfmt/elf.h>
 #include <basecode/objfmt/macho.h>
+#include <basecode/objfmt/container.h>
+
 
 namespace basecode::objfmt::container {
     static alloc_t*             s_alloc{};
@@ -68,7 +70,7 @@ namespace basecode::objfmt::container {
 
         u0 write_pad(session_t& s) {
             if ((s.crsr.pos % 2) == 0) return;
-            buf::cursor::write_u8(s.crsr, 0);
+            s.buf.data[s.crsr.pos++] = 0;
         }
 
         status_t save(session_t& s) {
@@ -86,39 +88,55 @@ namespace basecode::objfmt::container {
         }
 
         u0 seek(session_t& s, u32 offset) {
-            buf::cursor::seek(s.crsr, offset);
+            s.crsr.pos = offset;
         }
 
         u0 write_u8(session_t& s, u8 value) {
-            buf::cursor::write_u8(s.crsr, value);
+            buf::write(s.buf, s.crsr.pos, (const u8*) &value, sizeof(u8));
+            s.crsr.pos += sizeof(u8);
         }
 
         u0 write_u16(session_t& s, u16 value) {
-            buf::cursor::write_u16(s.crsr, value);
+            buf::write(s.buf, s.crsr.pos, (const u8*) &value, sizeof(u16));
+            s.crsr.pos += sizeof(u16);
+        }
+
+        u0 write_s16(session_t& s, s16 value) {
+            buf::write(s.buf, s.crsr.pos, (const u8*) &value, sizeof(s16));
+            s.crsr.pos += sizeof(s16);
         }
 
         u0 write_u32(session_t& s, u32 value) {
-            buf::cursor::write_u32(s.crsr, value);
+            buf::write(s.buf, s.crsr.pos, (const u8*) &value, sizeof(u32));
+            s.crsr.pos += sizeof(u32);
         }
 
         u0 write_u64(session_t& s, u64 value) {
-            buf::cursor::write_u64(s.crsr, value);
+            buf::write(s.buf, s.crsr.pos, (const u8*) &value, sizeof(u64));
+            s.crsr.pos += sizeof(u64);
         }
 
         u0 write_pad8(session_t& s, str::slice_t slice) {
-            for (u32 i = 0; i < 8; ++i)
-                buf::cursor::write_u8(s.crsr, i < slice.length ? slice[i] : 0);
+            buf::zero_fill(s.buf, s.crsr.pos, 8);
+            buf::write(s.buf,
+                       s.crsr.pos,
+                       slice.data,
+                       std::min<u32>(slice.length, 8));
+            s.crsr.pos += 8;
         }
 
         u0 write_cstr(session_t& s, str::slice_t slice) {
-            for (u32 i = 0; i < slice.length; ++i)
-                buf::cursor::write_u8(s.crsr, slice[i]);
-            buf::cursor::write_u8(s.crsr, 0);
+            buf::write(s.buf, s.crsr.pos, slice.data, slice.length + 1);
+            s.crsr.pos += slice.length + 1;
         }
 
         u0 write_pad16(session_t& s, str::slice_t slice) {
-            for (u32 i = 0; i < 16; ++i)
-                buf::cursor::write_u8(s.crsr, i < slice.length ? slice[i] : 0);
+            buf::zero_fill(s.buf, s.crsr.pos, 16);
+            buf::write(s.buf,
+                       s.crsr.pos,
+                       slice.data,
+                       std::min<u32>(slice.length, 16));
+            s.crsr.pos += 16;
         }
     }
 }

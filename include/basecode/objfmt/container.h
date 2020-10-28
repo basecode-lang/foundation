@@ -69,6 +69,8 @@ namespace basecode::objfmt::container {
 
         u0 write_u16(session_t& s, u16 value);
 
+        u0 write_s16(session_t& s, s16 value);
+
         u0 write_u32(session_t& s, u32 value);
 
         u0 write_u64(session_t& s, u64 value);
