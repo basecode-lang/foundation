@@ -18,34 +18,38 @@
 
 #include <basecode/objfmt/macho.h>
 
-namespace basecode::objfmt::container::macho {
-    static u0 fini() {
+namespace basecode::objfmt::container {
+    namespace internal {
+        static u0 fini() {
+        }
+
+        static status_t read(session_t& s) {
+            UNUSED(s);
+            return status_t::read_error;
+        }
+
+        static status_t write(session_t& s) {
+            UNUSED(s);
+            return status_t::write_error;
+        }
+
+        static status_t init(alloc_t* alloc) {
+            UNUSED(alloc);
+            return status_t::ok;
+        }
+
+        system_t                    g_macho_sys {
+            .init   = init,
+            .fini   = fini,
+            .read   = read,
+            .write  = write,
+            .type   = type_t::macho
+        };
     }
 
-    static status_t init(alloc_t* alloc) {
-        UNUSED(alloc);
-        return status_t::ok;
-    }
-
-    static status_t read(const context_t& ctx) {
-        UNUSED(ctx);
-        return status_t::read_error;
-    }
-
-    static status_t write(const context_t& ctx) {
-        UNUSED(ctx);
-        return status_t::write_error;
-    }
-
-    system_t                    g_macho_sys {
-        .init   = init,
-        .fini   = fini,
-        .read   = read,
-        .write  = write,
-        .type   = type_t::macho
-    };
-
-    system_t* system() {
-        return &g_macho_sys;
+    namespace macho {
+        system_t* system() {
+            return &internal::g_macho_sys;
+        }
     }
 }

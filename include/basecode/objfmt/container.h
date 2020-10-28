@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <basecode/core/buf.h>
 #include <basecode/objfmt/types.h>
 
 namespace basecode::objfmt::container {
@@ -36,8 +37,10 @@ namespace basecode::objfmt::container {
         dll
     };
 
-    struct context_t final {
+    struct session_t final {
         const file_t*           file;
+        buf_t                   buf;
+        buf_crsr_t              crsr;
         struct {
             u32                 gui:        1;
             u32                 console:    1;
@@ -51,10 +54,40 @@ namespace basecode::objfmt::container {
         output_type_t           output_type;
     };
 
+    namespace session {
+        u0 free(session_t& s);
+
+        u0 write_pad(session_t& s);
+
+        status_t init(session_t& s);
+
+        status_t save(session_t& s);
+
+        u0 seek(session_t& s, u32 offset);
+
+        u0 write_u8(session_t& s, u8 value);
+
+        u0 write_u16(session_t& s, u16 value);
+
+        u0 write_u32(session_t& s, u32 value);
+
+        u0 write_u64(session_t& s, u64 value);
+
+        u0 write_pad8(session_t& s, str::slice_t slice);
+
+        u0 write_cstr(session_t& s, str::slice_t slice);
+
+        u0 write_pad16(session_t& s, str::slice_t slice);
+
+        u0 write_str(session_t& s, const String_Concept auto& str) {
+            buf::cursor::write_str(s.crsr, str);
+        }
+    }
+
     using fini_callback_t       = u0 (*)();
     using init_callback_t       = status_t (*)(alloc_t*);
-    using read_callback_t       = status_t (*)(const context_t&);
-    using write_callback_t      = status_t (*)(const context_t&);
+    using read_callback_t       = status_t (*)(session_t&);
+    using write_callback_t      = status_t (*)(session_t&);
 
     struct system_t final {
         init_callback_t         init;
@@ -66,9 +99,9 @@ namespace basecode::objfmt::container {
 
     u0 fini();
 
+    status_t read(session_t& s);
+
+    status_t write(session_t& s);
+
     status_t init(alloc_t* alloc);
-
-    status_t read(const context_t& ctx);
-
-    status_t write(const context_t& ctx);
 }

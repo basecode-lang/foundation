@@ -18,34 +18,38 @@
 
 #include <basecode/objfmt/elf.h>
 
-namespace basecode::objfmt::container::elf {
-    static u0 fini() {
+namespace basecode::objfmt::container {
+    namespace internal {
+        static u0 fini() {
+        }
+
+        static status_t read(session_t& s) {
+            UNUSED(s);
+            return status_t::read_error;
+        }
+
+        static status_t write(session_t& s) {
+            UNUSED(s);
+            return status_t::write_error;
+        }
+
+        static status_t init(alloc_t* alloc) {
+            UNUSED(alloc);
+            return status_t::ok;
+        }
+
+        system_t                    g_elf_sys {
+            .init   = init,
+            .fini   = fini,
+            .read   = read,
+            .write  = write,
+            .type   = type_t::elf
+        };
     }
 
-    static status_t init(alloc_t* alloc) {
-        UNUSED(alloc);
-        return status_t::ok;
-    }
-
-    static status_t read(const context_t& ctx) {
-        UNUSED(ctx);
-        return status_t::read_error;
-    }
-
-    static status_t write(const context_t& ctx) {
-        UNUSED(ctx);
-        return status_t::write_error;
-    }
-
-    system_t                    g_elf_sys {
-        .init   = init,
-        .fini   = fini,
-        .read   = read,
-        .write  = write,
-        .type   = type_t::elf
-    };
-
-    system_t* system() {
-        return &g_elf_sys;
+    namespace elf {
+        system_t* system() {
+            return &internal::g_elf_sys;
+        }
     }
 }

@@ -174,16 +174,18 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
         REQUIRE(bss->subclass.size == 4096);
     }
 
-    objfmt::container::context_t ctx{};
-    ctx.file                  = &rot13_pgm;
-    ctx.type                  = objfmt::container::type_t::pe;
-    ctx.output_type           = objfmt::container::output_type_t::exe;
-    ctx.versions.linker.major = 6;
-    ctx.versions.linker.minor = 0;
-    ctx.versions.min_os.major = 4;
-    ctx.versions.min_os.minor = 0;
-    ctx.flags.console         = true;
-    REQUIRE(OK(objfmt::container::write(ctx)));
+    objfmt::container::session_t s{};
+    objfmt::container::session::init(s);
+    defer(objfmt::container::session::free(s));
+    s.file                  = &rot13_pgm;
+    s.type                  = objfmt::container::type_t::pe;
+    s.output_type           = objfmt::container::output_type_t::exe;
+    s.versions.linker.major = 6;
+    s.versions.linker.minor = 0;
+    s.versions.min_os.major = 4;
+    s.versions.min_os.minor = 0;
+    s.flags.console         = true;
+    REQUIRE(OK(objfmt::container::write(s)));
 
     stopwatch::stop(timer);
     stopwatch::print_elapsed("objfmt write PE executable time"_ss, 40, timer);
