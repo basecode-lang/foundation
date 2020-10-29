@@ -145,14 +145,24 @@ namespace basecode::objfmt::container {
 
         status_t write_sections_data(session_t& s, coff_t& coff);
 
+        u0 write_aux_file_record(session_t& s, str::slice_t name);
+
         str::slice_t get_section_name(objfmt::section::type_t type);
 
         u0 write_header(session_t& s, coff_t& coff, u16 opt_hdr_size = {});
+
+        u0 write_aux_xf_record(session_t& s, u16 line_num, u32 ptr_next_func);
+
+        u0 write_aux_weak_extern_record(session_t& s, u32 tag_idx, u32 flags);
 
         status_t build_section(session_t& s, coff_t& coff, section_hdr_t& hdr);
 
         u0 write_section_header(session_t& s, coff_t& coff, section_hdr_t& hdr);
 
         status_t write_section_data(session_t& s, coff_t& coff, section_hdr_t& hdr);
+
+        u0 write_aux_funcdef_record(session_t& s, u32 tag_idx, u32 total_size, u32 ptr_line_num, u32 ptr_next_func);
+
+        u0 write_aux_section_record(session_t& s, u32 len, u16 num_relocs, u16 num_lines, u32 check_sum, u16 sect_num, u8 comdat_sel);
     }
 }

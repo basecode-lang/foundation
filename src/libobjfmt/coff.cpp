@@ -40,13 +40,15 @@ namespace basecode::objfmt::container {
 
         static status_t init(alloc_t* alloc) {
             UNUSED(alloc);
-            s_section_names[u32(section::type_t::code)]     = string::interned::fold(".text"_ss);
-            s_section_names[u32(section::type_t::data)]     = string::interned::fold(".rdata"_ss);
-            s_section_names[u32(section::type_t::debug)]    = string::interned::fold(".debug"_ss);
-            s_section_names[u32(section::type_t::uninit)]   = string::interned::fold(".bss"_ss);
-            s_section_names[u32(section::type_t::import)]   = string::interned::fold(".idata"_ss);
-            s_section_names[u32(section::type_t::export_)]  = string::interned::fold(".edata"_ss);
-            s_section_names[u32(section::type_t::resource)] = string::interned::fold(".rsrc"_ss);
+            s_section_names[u32(section::type_t::tls)]          = string::interned::fold(".tls"_ss);
+            s_section_names[u32(section::type_t::code)]         = string::interned::fold(".text"_ss);
+            s_section_names[u32(section::type_t::data)]         = string::interned::fold(".rdata"_ss);
+            s_section_names[u32(section::type_t::debug)]        = string::interned::fold(".debug"_ss);
+            s_section_names[u32(section::type_t::uninit)]       = string::interned::fold(".bss"_ss);
+            s_section_names[u32(section::type_t::import)]       = string::interned::fold(".idata"_ss);
+            s_section_names[u32(section::type_t::export_)]      = string::interned::fold(".edata"_ss);
+            s_section_names[u32(section::type_t::resource)]     = string::interned::fold(".rsrc"_ss);
+            s_section_names[u32(section::type_t::exception)]    = string::interned::fold(".pdata"_ss);
             return status_t::ok;
         }
 
@@ -97,6 +99,24 @@ namespace basecode::objfmt::container {
             return status_t::ok;
         }
 
+        u0 write_aux_section_record(session_t& s,
+                                    u32 len,
+                                    u16 num_relocs,
+                                    u16 num_lines,
+                                    u32 check_sum,
+                                    u16 sect_num,
+                                    u8 comdat_sel) {
+            session::write_u32(s, len);
+            session::write_u16(s, num_relocs);
+            session::write_u16(s, num_lines);
+            session::write_u32(s, check_sum);
+            session::write_u16(s, sect_num);
+            session::write_u8(s, comdat_sel);
+            session::write_u8(s, 0);    // XXX: unused
+            session::write_u8(s, 0);    //      "
+            session::write_u8(s, 0);    //      "
+        }
+
         u0 write_symbol_table(session_t& s, coff_t& coff) {
             using type_t = objfmt::section::type_t;
 
@@ -143,15 +163,7 @@ namespace basecode::objfmt::container {
                 session::write_u8(s, u8(storage::class_t::static_));
                 session::write_u8(s, 1);
 
-                session::write_u32(s, hdr.size);
-                session::write_u16(s, hdr.relocs.size);
-                session::write_u16(s, hdr.line_nums.size);
-                session::write_u32(s, 0);
-                session::write_u16(s, 0);
-                session::write_u8(s, 0);
-                session::write_u8(s, 0);    // XXX: unused
-                session::write_u8(s, 0);    //      "
-                session::write_u8(s, 0);    //      "
+                write_aux_section_record(s, hdr.size, hdr.relocs.size, hdr.line_nums.size, 0, hdr.number, 0);
             }
             for (auto symbol : symbols) {
                 const auto intern_rc = string::interned::get(symbol->name);
@@ -204,6 +216,14 @@ namespace basecode::objfmt::container {
             return status_t::ok;
         }
 
+        u0 write_aux_file_record(session_t& s, str::slice_t name) {
+            const s32 pad_len = std::max<s32>(symbol_table::entry_size - name.length, 0);
+            for (u32 i = 0; i < std::min<u32>(name.length, 18); ++i)
+                session::write_u8(s, name[i]);
+            for (u32 i = 0; i < pad_len; ++i)
+                session::write_u8(s, 0);
+        }
+
         str::slice_t get_section_name(objfmt::section::type_t type) {
             return s_section_names[u32(type)];
         }
@@ -250,11 +270,14 @@ namespace basecode::objfmt::container {
                     coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
                     coff.rva        = align(coff.rva + hdr.size, coff.align.section);
                     break;
+                case type_t::reloc:
                 case type_t::import:
                 case type_t::export_:
                     return status_t::invalid_section_type;
+                case type_t::tls:
                 case type_t::debug:
                 case type_t::resource:
+                case type_t::exception:
                     return status_t::not_implemented;
             }
 
@@ -308,6 +331,22 @@ namespace basecode::objfmt::container {
             session::write_u32(s, bitmask);
         }
 
+        u0 write_aux_xf_record(session_t& s, u16 line_num, u32 ptr_next_func) {
+            session::write_u32(s, 0);
+            session::write_u16(s, line_num);
+            session::write_u32(s, 0);
+            session::write_u16(s, 0);
+            session::write_u32(s, ptr_next_func);
+            session::write_u16(s, 0);
+        }
+
+        u0 write_aux_weak_extern_record(session_t& s, u32 tag_idx, u32 flags) {
+            session::write_u32(s, tag_idx);
+            session::write_u32(s, flags);
+            session::write_u64(s, 0);
+            session::write_u16(s, 0);
+        }
+
         status_t write_section_data(session_t& s, coff_t& coff, section_hdr_t& hdr) {
             using type_t = objfmt::section::type_t;
 
@@ -328,14 +367,24 @@ namespace basecode::objfmt::container {
                 case type_t::import:
                 case type_t::export_:
                     return status_t::invalid_section_type;
+                case type_t::tls:
                 case type_t::debug:
                 case type_t::resource:
+                case type_t::exception:
                     return status_t::not_implemented;
                 default:
                     break;
             }
 
             return status_t::ok;
+        }
+
+        u0 write_aux_funcdef_record(session_t& s, u32 tag_idx, u32 total_size, u32 ptr_line_num, u32 ptr_next_func) {
+            session::write_u32(s, tag_idx);
+            session::write_u32(s, total_size);
+            session::write_u32(s, ptr_line_num);
+            session::write_u32(s, ptr_next_func);
+            session::write_u16(s, 0);
         }
     }
 }

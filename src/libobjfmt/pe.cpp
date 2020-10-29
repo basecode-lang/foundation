@@ -325,6 +325,9 @@ namespace basecode::objfmt::container {
             hdr.rva    = coff.rva;
 
             switch (hdr.section->type) {
+                case section::type_t::reloc: {
+                    return status_t::not_implemented;
+                }
                 case section::type_t::export_: {
                     return status_t::not_implemented;
                 }
@@ -377,6 +380,9 @@ namespace basecode::objfmt::container {
             session::seek(s, hdr.offset);
 
             switch (type) {
+                case section::type_t::reloc: {
+                    return status_t::not_implemented;
+                }
                 case section::type_t::export_: {
                     return status_t::not_implemented;
                 }

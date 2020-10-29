@@ -29,6 +29,7 @@
 
 namespace basecode::objfmt {
     struct file_t;
+    struct reloc_t;
     struct symbol_t;
     struct import_t;
     struct section_t;
@@ -39,6 +40,7 @@ namespace basecode::objfmt {
     using section_id            = u32;
 
     using id_list_t             = array_t<u32>;
+    using reloc_list_t          = array_t<reloc_t>;
     using import_list_t         = array_t<import_t>;
     using symbol_list_t         = array_t<symbol_t>;
     using section_list_t        = array_t<section_t>;
@@ -111,21 +113,53 @@ namespace basecode::objfmt {
             x86_64,
             aarch64,
         };
+
+        namespace x86_64::reloc {
+            enum class type_t : u8 {
+                absolute,
+                addr64,
+                addr32,
+                addr32nb,
+                rel32,
+                section,
+                section_rel,
+                pair
+            };
+        }
+
+        namespace aarch64::reloc {
+            enum class type_t : u8 {
+                absolute,
+                addr32,
+                addr32nb,
+                branch24,
+                branch11,
+                rel32,
+                section,
+                section_rel,
+                mov32,
+                pair,
+            };
+        }
     }
 
     namespace section {
+        // XXX: ELF symbol table: SHT_HASH, SHT_SYMTAB, SHT_STRTAB
         enum class type_t : u8 {
-            code,
-            data,
-            debug,
-            uninit,
-            import,
+            tls,                    // XXX: win only?
+            code,                   // XXX: SHT_PROGBITS
+            data,                   // XXX: SHT_PROGBITS
+            debug,                  // XXX: SHT_PROGBITS
+            reloc,                  // XXX: SHT_RELA, SHT_REL
+            uninit,                 // XXX: SHT_NOBITS
+            import,                 // XXX: SHT_DYNAMIC, SHT_DYNSYM
             export_,
-            resource,
+            resource,               // XXX: win only?
+            exception,              // XXX: win only?
             custom
         };
 
-        constexpr u32 max_spec_type_count = 7;
+        constexpr u32 max_spec_type_count = 10;
     }
 
     namespace storage {
@@ -162,11 +196,6 @@ namespace basecode::objfmt {
         };
     }
 
-    namespace relocation {
-        enum class type_t : u8 {
-        };
-    }
-
     struct symbol_t final {
         intern_id               name        {};
         section_id              section     {};
@@ -198,6 +227,12 @@ namespace basecode::objfmt {
         }                       flags;
     };
 
+    struct reloc_t final {
+        u64                     virtual_addr;
+        symbol_id               symbol;
+        u8                      type;
+    };
+
     union section_subclass_t {
         u64                     size;
         str::slice_t            data;
@@ -220,6 +255,7 @@ namespace basecode::objfmt {
             u32                 pad:    26;
         }                       flags;
         section::type_t         type;
+        u8                      align;
     };
 
     struct version_t final {
