@@ -45,11 +45,33 @@ namespace basecode::objfmt::container {
         coff_t                  coff;
         u64                     base_addr;
         struct {
+            u64                 heap;
+            u64                 stack;
+        }                       reserve;
+        struct {
             u32                 opt_hdr;
         }                       size;
+        struct {
+            u32                 dll;
+            u32                 load;
+        }                       flags;
+        struct {
+            u32                 include_symbol_table:   1;
+            u32                 pad:                    31;
+        }                       opts;
         rva_t                   name_table;
         rva_t                   import_lookup_table;
         rva_t                   dirs[max_dir_entry_count];
+    };
+
+    struct pe_opts_t final {
+        alloc_t*                alloc;
+        section_hdr_t*          hdrs;
+        u64                     base_addr;
+        u64                     heap_reserve;
+        u64                     stack_reserve;
+        u32                     num_hdrs;
+        machine::type_t         machine;
     };
 
     namespace pe {
@@ -57,15 +79,11 @@ namespace basecode::objfmt::container {
 
         system_t* system();
 
-        status_t init(pe_t& pe,
-                      section_hdr_t* hdrs,
-                      u32 num_hdrs,
-                      machine::type_t machine,
-                      alloc_t* alloc);
-
         u0 write_pe_header(session_t& s, pe_t& pe);
 
         u0 write_dos_header(session_t& s, pe_t& pe);
+
+        status_t init(pe_t& pe, const pe_opts_t& opts);
 
         status_t build_sections(session_t& s, pe_t& pe);
 

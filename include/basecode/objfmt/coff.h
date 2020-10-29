@@ -52,7 +52,6 @@ namespace basecode::objfmt::container {
             u32                 headers;
         }                       size;
         struct {
-            u32                 dll;
             u32                 image;
         }                       flags;
         struct {

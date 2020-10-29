@@ -74,12 +74,16 @@ namespace basecode::objfmt::container {
                       objfmt::machine::type_t machine,
                       alloc_t* alloc) {
             UNUSED(alloc);
-            coff.hdrs         = hdrs;
-            coff.num_hdrs     = num_hdrs;
-            coff.symbol_table = {};
-            coff.string_table = {};
-            coff.size = {};
-            coff.code = coff.init_data = coff.uninit_data = {};
+            coff.hdrs          = hdrs;
+            coff.num_hdrs      = num_hdrs;
+            coff.symbol_table  = {};
+            coff.string_table  = {};
+            coff.flags         = {};
+            coff.size          = {};
+            coff.code          = coff.init_data = coff.uninit_data = {};
+            coff.rva           = coff.offset    = {};
+            coff.align.file    = 0x200;
+            coff.align.section = 0x1000;
             switch (machine) {
                 case objfmt::machine::type_t::unknown:
                     return status_t::invalid_machine_type;

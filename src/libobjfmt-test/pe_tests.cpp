@@ -194,6 +194,7 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
     s.versions.min_os.major = 4;
     s.versions.min_os.minor = 0;
     s.flags.console         = true;
+//    s.opts.base_addr        = 0x140000000;
     REQUIRE(OK(container::write(s)));
 
     stopwatch::stop(timer);

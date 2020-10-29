@@ -50,6 +50,11 @@ namespace basecode::objfmt::container {
             version_t           linker;
             version_t           min_os;
         }                       versions;
+        struct {
+            u64                 base_addr;
+            u64                 heap_reserve;
+            u64                 stack_reserve;
+        }                       opts;
         type_t                  type;
         output_type_t           output_type;
     };

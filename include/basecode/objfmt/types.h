@@ -60,6 +60,7 @@ namespace basecode::objfmt {
         spec_section_custom_name        = 2010,
         not_implemented                 = 2011,
         invalid_machine_type            = 2012,
+        invalid_output_type             = 2013,
     };
 
     namespace symbol {

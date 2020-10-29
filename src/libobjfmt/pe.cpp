@@ -53,35 +53,60 @@ namespace basecode::objfmt::container {
                 hdr.number  = i + 1;
             }
 
+            pe_opts_t opts{};
+            opts.alloc         = file->alloc;
+            opts.hdrs          = hdrs;
+            opts.num_hdrs      = file->sections.size;
+            opts.machine       = file->machine;
+            opts.base_addr     = s.opts.base_addr;
+            opts.heap_reserve  = s.opts.heap_reserve;
+            opts.stack_reserve = s.opts.stack_reserve;
+
             pe_t pe{};
-            pe::init(pe, hdrs, file->sections.size, file->machine, s.file->alloc);
+            pe::init(pe, opts);
             defer(pe::free(pe));
 
-            // XXX: shouldn't be hard coded
-            pe.size.opt_hdr  = 0xf0;
+            pe.opts.include_symbol_table = true;    // XXX: temporary for testing
 
             auto& coff = pe.coff;
-            coff.symbol_table.size = (file->symbols.size + (file->sections.size * 2))
-                * coff::symbol_table::entry_size;
-            // XXX: shouldn't be hard coded
-            coff.flags.image = coff::flags::relocs_stripped
-                               | coff::flags::executable_type
-                               | coff::flags::large_address_aware;
 
-            status_t status{};
+            switch (s.output_type) {
+                case output_type_t::obj:
+                case output_type_t::lib:
+                    return status_t::invalid_output_type;
+                case output_type_t::exe:
+                    // XXX: relocs_stripped can be determined from file once we have field in the struct
+                    // XXX: large_address_aware is (probably?) a fixed requirement for x64
+                    coff.flags.image = coff::flags::relocs_stripped
+                                       | coff::flags::executable_type
+                                       | coff::flags::large_address_aware;
+                    break;
+                case output_type_t::dll:
+                    pe.flags.dll = 0; // XXX: FIXME!
+                    coff.flags.image |= coff::flags::dll_type;
+                    break;
+            }
+
+            status_t status;
 
             pe::write_dos_header(s, pe);
             pe::write_pe_header(s, pe);
             status = pe::build_sections(s, pe);
             if (!OK(status))
                 return status;
+            if (pe.opts.include_symbol_table) {
+                coff.symbol_table.size = (file->symbols.size + (file->sections.size * 2))
+                                         * coff::symbol_table::entry_size;
+            }
             coff::write_header(s, coff, pe.size.opt_hdr);
             pe::write_optional_header(s, pe);
             coff::write_section_headers(s, coff);
             status = pe::write_sections_data(s, pe);
             if (!OK(status))
                 return status;
-            coff::write_symbol_table(s, coff);
+            if (pe.opts.include_symbol_table) {
+                coff::write_symbol_table(s, coff);
+            }
 
             status = session::save(s);
             if (!OK(status))
@@ -154,20 +179,26 @@ namespace basecode::objfmt::container {
             return &internal::g_pe_sys;
         }
 
-        status_t init(pe_t& pe,
-                      section_hdr_t* hdrs,
-                      u32 num_hdrs,
-                      machine::type_t machine,
-                      alloc_t* alloc) {
-            auto status = coff::init(pe.coff, hdrs, num_hdrs, machine, alloc);
+        status_t init(pe_t& pe, const pe_opts_t& opts) {
+            auto status = coff::init(pe.coff,
+                                     opts.hdrs,
+                                     opts.num_hdrs,
+                                     opts.machine,
+                                     opts.alloc);
             if (!OK(status))
                 return status;
-            auto& coff = pe.coff;
-            coff.rva              = coff.offset  = {};
-            pe.base_addr          = 0x140000000;
-            coff.align.file       = 0x200;
-            coff.align.section    = 0x1000;
+
+            pe.opts          = {};
+            pe.flags         = {};
+            pe.base_addr     = opts.base_addr == 0 ? 0x140000000 : opts.base_addr;
+            pe.reserve.heap  = opts.heap_reserve == 0 ? 0x100000 : opts.heap_reserve;
+            pe.reserve.stack = opts.stack_reserve == 0 ? 0x100000 : opts.stack_reserve;
+
+            // XXX: is this size constant for x64 images?
+            pe.size.opt_hdr  = 0xf0;
+
             ZERO_MEM(pe.dirs, pe.dirs);
+
             return status_t::ok;
         }
 
@@ -226,8 +257,8 @@ namespace basecode::objfmt::container {
             session::write_u32(s, coff.align.file);
             session::write_u16(s, s.versions.min_os.major);
             session::write_u16(s, s.versions.min_os.minor);
-            session::write_u16(s, 0);            // XXX: image ver major
-            session::write_u16(s, 0);            // XXX: image ver minor
+            session::write_u16(s, 0);
+            session::write_u16(s, 0);
             session::write_u16(s, s.versions.min_os.major);
             session::write_u16(s, s.versions.min_os.minor);
             session::write_u32(s, 0);
@@ -239,12 +270,12 @@ namespace basecode::objfmt::container {
             } else {
                 session::write_u16(s, subsystem::win_gui);
             }
-            session::write_u16(s, 0);            // XXX: dll flags
-            session::write_u64(s, 0x100000);     // XXX: size of stack reserve
-            session::write_u64(s, 0x1000);       // XXX: size of stack commit
-            session::write_u64(s, 0x100000);     // XXX: size of heap reserve
-            session::write_u64(s, 0x1000);       // XXX: size of heap commit
-            session::write_u32(s, 0);            // XXX: load flags
+            session::write_u16(s, pe.flags.dll);
+            session::write_u64(s, pe.reserve.stack);
+            session::write_u64(s, 0x1000);
+            session::write_u64(s, pe.reserve.heap);
+            session::write_u64(s, 0x1000);
+            session::write_u32(s, pe.flags.load);
             session::write_u32(s, max_dir_entry_count);
 
             for (const auto& dir : pe.dirs) {
@@ -268,8 +299,9 @@ namespace basecode::objfmt::container {
                     return status;
             }
 
-            // XXX: temporary!
-            coff.symbol_table.offset = coff.offset;
+            if (pe.opts.include_symbol_table) {
+                coff.symbol_table.offset = coff.offset;
+            }
 
             return status_t::ok;
         }
