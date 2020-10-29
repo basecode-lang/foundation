@@ -173,6 +173,7 @@ namespace basecode::objfmt {
         symbol::type_t          type        {};
         u32                     length      {};
         u32                     value       {};
+        storage::class_t        sclass      {};
 
         b8 operator==(const symbol_t& other) const {
             return name == other.name;
@@ -183,6 +184,7 @@ namespace basecode::objfmt {
         section_id              section     {};
         symbol::type_t          type        {};
         u32                     value       {};
+        storage::class_t        sclass      {};
     };
 
     struct import_t final {

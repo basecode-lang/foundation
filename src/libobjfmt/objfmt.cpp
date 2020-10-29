@@ -191,6 +191,7 @@ namespace basecode::objfmt {
             symbol->name    = rc.id;
             symbol->type    = opts.type;
             symbol->value   = opts.value;
+            symbol->sclass  = opts.sclass;
             symbol->section = opts.section;
             symbol->length  = rc.slice.length;
             return {symbol->name, status_t::ok};

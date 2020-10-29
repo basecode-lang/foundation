@@ -98,6 +98,8 @@ namespace basecode::objfmt::container {
         }
 
         u0 write_symbol_table(session_t& s, coff_t& coff) {
+            using type_t = objfmt::section::type_t;
+
             session::seek(s, coff.symbol_table.offset);
             auto symbols = hashtab::values(const_cast<symbol_table_t&>(s.file->symbols));
             defer(array::free(symbols));
@@ -109,7 +111,8 @@ namespace basecode::objfmt::container {
                 });
             u32 num_long_strs{};
             for (u32 i = 0; i < coff.num_hdrs; ++i) {
-                if (coff.hdrs[i].name.length > 8)
+                const auto& hdr = coff.hdrs[i];
+                if (hdr.section->type != type_t::custom && hdr.name.length > 8)
                     num_long_strs++;
             }
             for (auto symbol : symbols) {
@@ -122,6 +125,8 @@ namespace basecode::objfmt::container {
             coff.string_table.size   = sizeof(u32);
             for (u32 i = 0; i < coff.num_hdrs; ++i) {
                 const auto& hdr   = coff.hdrs[i];
+                if (hdr.section->type == type_t::custom)
+                    continue;
                 const auto& slice = hdr.name;
                 if (slice.length > 8) {
                     strs[idx++] = slice;
@@ -135,7 +140,7 @@ namespace basecode::objfmt::container {
                 session::write_u32(s, 0);
                 session::write_s16(s, hdr.number);
                 session::write_u16(s, 0);
-                session::write_u8(s, 3);
+                session::write_u8(s, u8(storage::class_t::static_));
                 session::write_u8(s, 1);
 
                 session::write_u32(s, hdr.size);
@@ -162,7 +167,7 @@ namespace basecode::objfmt::container {
                 session::write_u32(s, symbol->value);
                 session::write_s16(s, symbol->section);
                 session::write_u16(s, u16(symbol->type));
-                session::write_u8(s, 2);
+                session::write_u8(s, u8(symbol->sclass));
                 session::write_u8(s, 0);
             }
             session::write_u32(s, coff.string_table.size);

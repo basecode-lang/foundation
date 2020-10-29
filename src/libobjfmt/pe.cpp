@@ -31,6 +31,47 @@ namespace basecode::objfmt::container {
         0x00, 0x00, 0x00, 0x00
     };
 
+    [[maybe_unused]] constexpr u32 dos_header_size              = 0x40;
+    [[maybe_unused]] constexpr u32 pe_sig_size                  = 0x04;
+
+    [[maybe_unused]] constexpr u16 pe32                         = 0x10b;
+    [[maybe_unused]] constexpr u16 pe64                         = 0x20b;
+    [[maybe_unused]] constexpr u16 rom                          = 0x107;
+
+    namespace name_table {
+        [[maybe_unused]] constexpr u32 entry_size               = 0x12;
+    }
+
+    namespace import_dir_table {
+        [[maybe_unused]] constexpr u32 entry_size               = 0x14;
+    }
+
+    namespace import_addr_table {
+        [[maybe_unused]] constexpr u32 entry_size               = 0x08;
+    }
+
+    namespace import_lookup_table {
+        [[maybe_unused]] constexpr u32 entry_size               = 0x08;
+    }
+
+    namespace subsystem {
+        [[maybe_unused]] constexpr u16 unknown                  = 0;
+        [[maybe_unused]] constexpr u16 native                   = 1;
+        [[maybe_unused]] constexpr u16 win_gui                  = 2;
+        [[maybe_unused]] constexpr u16 win_cui                  = 3;
+        [[maybe_unused]] constexpr u16 os2_cui                  = 5;
+        [[maybe_unused]] constexpr u16 posix_cui                = 7;
+        [[maybe_unused]] constexpr u16 win_native               = 8;
+        [[maybe_unused]] constexpr u16 win_ce_gui               = 9;
+        [[maybe_unused]] constexpr u16 efi_app                  = 10;
+        [[maybe_unused]] constexpr u16 efi_boot_svc_driver      = 11;
+        [[maybe_unused]] constexpr u16 efi_runtime_driver       = 12;
+        [[maybe_unused]] constexpr u16 efi_rom                  = 13;
+        [[maybe_unused]] constexpr u16 xbox                     = 14;
+        [[maybe_unused]] constexpr u16 win_boot_app             = 16;
+        [[maybe_unused]] constexpr u16 xbox_code_catalog        = 17;
+    }
+
     namespace internal {
         static u0 fini() {
         }
@@ -127,47 +168,6 @@ namespace basecode::objfmt::container {
             .write  = write,
             .type   = type_t::pe
         };
-    }
-
-    [[maybe_unused]] constexpr u32 dos_header_size              = 0x40;
-    [[maybe_unused]] constexpr u32 pe_sig_size                  = 0x04;
-
-    [[maybe_unused]] constexpr u16 pe32                         = 0x10b;
-    [[maybe_unused]] constexpr u16 pe64                         = 0x20b;
-    [[maybe_unused]] constexpr u16 rom                          = 0x107;
-
-    namespace name_table {
-        [[maybe_unused]] constexpr u32 entry_size               = 0x12;
-    }
-
-    namespace import_dir_table {
-        [[maybe_unused]] constexpr u32 entry_size               = 0x14;
-    }
-
-    namespace import_addr_table {
-        [[maybe_unused]] constexpr u32 entry_size               = 0x08;
-    }
-
-    namespace import_lookup_table {
-        [[maybe_unused]] constexpr u32 entry_size               = 0x08;
-    }
-
-    namespace subsystem {
-        [[maybe_unused]] constexpr u16 unknown                  = 0;
-        [[maybe_unused]] constexpr u16 native                   = 1;
-        [[maybe_unused]] constexpr u16 win_gui                  = 2;
-        [[maybe_unused]] constexpr u16 win_cui                  = 3;
-        [[maybe_unused]] constexpr u16 os2_cui                  = 5;
-        [[maybe_unused]] constexpr u16 posix_cui                = 7;
-        [[maybe_unused]] constexpr u16 win_native               = 8;
-        [[maybe_unused]] constexpr u16 win_ce_gui               = 9;
-        [[maybe_unused]] constexpr u16 efi_app                  = 10;
-        [[maybe_unused]] constexpr u16 efi_boot_svc_driver      = 11;
-        [[maybe_unused]] constexpr u16 efi_runtime_driver       = 12;
-        [[maybe_unused]] constexpr u16 efi_rom                  = 13;
-        [[maybe_unused]] constexpr u16 xbox                     = 14;
-        [[maybe_unused]] constexpr u16 win_boot_app             = 16;
-        [[maybe_unused]] constexpr u16 xbox_code_catalog        = 17;
     }
 
     namespace pe {
