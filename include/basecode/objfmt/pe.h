@@ -45,13 +45,9 @@ namespace basecode::objfmt::container {
         coff_t                  coff;
         u64                     base_addr;
         struct {
-            u64                 image;
-            u64                 headers;
+            u32                 opt_hdr;
         }                       size;
-        rva_t                   code;
-        rva_t                   init_data;
         rva_t                   name_table;
-        rva_t                   uninit_data;
         rva_t                   import_lookup_table;
         rva_t                   dirs[max_dir_entry_count];
     };
@@ -61,16 +57,24 @@ namespace basecode::objfmt::container {
 
         system_t* system();
 
+        status_t init(pe_t& pe,
+                      section_hdr_t* hdrs,
+                      u32 num_hdrs,
+                      machine::type_t machine,
+                      alloc_t* alloc);
+
         u0 write_pe_header(session_t& s, pe_t& pe);
 
         u0 write_dos_header(session_t& s, pe_t& pe);
 
-        u0 write_section_data(session_t& s, pe_t& pe);
+        status_t build_sections(session_t& s, pe_t& pe);
 
         u0 write_optional_header(session_t& s, pe_t& pe);
 
-        status_t prepare_sections(session_t& s, pe_t& pe);
+        status_t write_sections_data(session_t& s, pe_t& pe);
 
-        status_t init(pe_t& pe, section_hdr_t* hdrs, u32 num_hdrs, alloc_t* alloc);
+        status_t build_section(session_t& s, pe_t& pe, section_hdr_t& hdr);
+
+        status_t write_section_data(session_t& s, pe_t& pe, section_hdr_t& hdr);
     }
 }

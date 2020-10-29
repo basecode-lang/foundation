@@ -48,7 +48,8 @@ namespace basecode::objfmt::container {
         u32                     rva;
         u32                     offset;
         struct {
-            u32                 opt_hdr;
+            u32                 image;
+            u32                 headers;
         }                       size;
         struct {
             u32                 dll;
@@ -58,13 +59,22 @@ namespace basecode::objfmt::container {
             u32                 file;
             u32                 section;
         }                       align;
+        rva_t                   code;
         rva_t                   relocs;
+        rva_t                   init_data;
+        rva_t                   uninit_data;
         raw_t                   symbol_table;
         raw_t                   string_table;
+        u16                     machine;
     };
 
     namespace coff {
         [[maybe_unused]] constexpr u32 header_size                      = 0x14;
+
+        namespace machine {
+            [[maybe_unused]] constexpr u16 amd64                        = 0x8664;
+            [[maybe_unused]] constexpr u16 arm64                        = 0xaa64;
+        }
 
         namespace section {
             [[maybe_unused]] constexpr u32 header_size                  = 0x28;
@@ -122,14 +132,28 @@ namespace basecode::objfmt::container {
 
         u0 free(coff_t& coff);
 
-        u0 write_header(session_t& s, coff_t& coff);
+        status_t init(coff_t& coff,
+                      section_hdr_t* hdrs,
+                      u32 num_hdrs,
+                      objfmt::machine::type_t machine,
+                      alloc_t* alloc);
 
         u0 write_symbol_table(session_t& s, coff_t& coff);
 
+        status_t build_sections(session_t& s, coff_t& coff);
+
         u0 write_section_headers(session_t& s, coff_t& coff);
+
+        status_t write_sections_data(session_t& s, coff_t& coff);
 
         str::slice_t get_section_name(objfmt::section::type_t type);
 
-        status_t init(coff_t& coff, section_hdr_t* hdrs, u32 num_hdrs, alloc_t* alloc);
+        u0 write_header(session_t& s, coff_t& coff, u16 opt_hdr_size = {});
+
+        status_t build_section(session_t& s, coff_t& coff, section_hdr_t& hdr);
+
+        u0 write_section_header(session_t& s, coff_t& coff, section_hdr_t& hdr);
+
+        status_t write_section_data(session_t& s, coff_t& coff, section_hdr_t& hdr);
     }
 }

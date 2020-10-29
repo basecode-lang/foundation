@@ -103,7 +103,7 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
     REQUIRE(OK(file::init(rot13_pgm)));
     defer(file::free(rot13_pgm));
     path::set(rot13_pgm.path, "rot13.exe");
-    rot13_pgm.machine = machine::type_t::amd64;
+    rot13_pgm.machine = machine::type_t::x86_64;
 
     /* .text section */ {
         auto text_rc = file::make_section(rot13_pgm,

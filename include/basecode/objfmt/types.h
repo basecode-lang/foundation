@@ -59,6 +59,7 @@ namespace basecode::objfmt {
         invalid_container_type          = 2009,
         spec_section_custom_name        = 2010,
         not_implemented                 = 2011,
+        invalid_machine_type            = 2012,
     };
 
     namespace symbol {
@@ -105,8 +106,9 @@ namespace basecode::objfmt {
 
     namespace machine {
         enum class type_t : u32 {
-            amd64               = 0x8664,
-            arm64               = 0xaa64
+            unknown,
+            x86_64,
+            aarch64,
         };
     }
 
