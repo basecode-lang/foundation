@@ -158,6 +158,11 @@ namespace basecode::objfmt::container {
             s.crsr.pos += sizeof(u64);
         }
 
+        u0 write_s64(session_t& s, s64 value) {
+            buf::write(s.buf, s.crsr.pos, (const u8*) &value, sizeof(s64));
+            s.crsr.pos += sizeof(s64);
+        }
+
         u0 write_pad8(session_t& s, str::slice_t slice) {
             buf::zero_fill(s.buf, s.crsr.pos, 8);
             buf::write(s.buf,

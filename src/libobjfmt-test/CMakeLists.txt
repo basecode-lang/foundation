@@ -6,6 +6,7 @@ add_executable(
 
     test.h
     main.cpp
+    elf_tests.cpp
     pe_tests.cpp
 )
 target_link_libraries(${PROJECT_NAME} basecode-core basecode-objfmt)
@@ -18,10 +19,3 @@ target_include_directories(
     PRIVATE ${PROJECT_SOURCE_DIR}
             ${PROJECT_DIR_BASE}/ext/catch2-2.8.0/single_include
 )
-#add_custom_command(
-#    TARGET ${PROJECT_NAME} POST_BUILD
-#
-#    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/etc
-#    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_DIR_BASE}/etc/ut.txt ${CMAKE_BINARY_DIR}/etc
-#    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_DIR_BASE}/etc/instructions.ig ${CMAKE_BINARY_DIR}/etc
-#)

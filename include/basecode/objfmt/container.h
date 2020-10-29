@@ -98,6 +98,8 @@ namespace basecode::objfmt::container {
 
         u0 write_u64(session_t& s, u64 value);
 
+        u0 write_s64(session_t& s, s64 value);
+
         u0 write_pad8(session_t& s, str::slice_t slice);
 
         u0 write_cstr(session_t& s, str::slice_t slice);
