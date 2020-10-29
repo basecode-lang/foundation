@@ -63,6 +63,7 @@ namespace basecode::objfmt {
         not_implemented                 = 2011,
         invalid_machine_type            = 2012,
         invalid_output_type             = 2013,
+        cannot_map_section_name         = 2014
     };
 
     namespace symbol {
@@ -148,10 +149,9 @@ namespace basecode::objfmt {
         enum class type_t : u8 {
             tls,                    // XXX: win only?
             code,                   // XXX: SHT_PROGBITS
-            data,                   // XXX: SHT_PROGBITS
+            data,                   // XXX: SHT_PROGBITS or SHT_NOBITS
             debug,                  // XXX: SHT_PROGBITS
             reloc,                  // XXX: SHT_RELA, SHT_REL
-            uninit,                 // XXX: SHT_NOBITS
             import,                 // XXX: SHT_DYNAMIC, SHT_DYNSYM
             export_,
             resource,               // XXX: win only?
@@ -159,7 +159,17 @@ namespace basecode::objfmt {
             custom
         };
 
-        constexpr u32 max_spec_type_count = 10;
+        struct flags_t final {
+            u32                     code:       1;
+            u32                     data:       1;
+            u32                     init:       1;
+            u32                     read:       1;
+            u32                     exec:       1;
+            u32                     write:      1;
+            u32                     alloc:      1;
+            u32                     can_free:   1;
+            u32                     pad:        24;
+        };
     }
 
     namespace storage {
@@ -246,14 +256,7 @@ namespace basecode::objfmt {
         section_subclass_t      subclass;
         symbol_id               symbol;
         section_id              id;
-        struct {
-            u32                 code:   1;
-            u32                 data:   1;
-            u32                 read:   1;
-            u32                 exec:   1;
-            u32                 write:  1;
-            u32                 pad:    26;
-        }                       flags;
+        section::flags_t        flags;
         section::type_t         type;
         u8                      align;
     };

@@ -22,10 +22,16 @@
 #include <basecode/objfmt/objfmt.h>
 
 namespace basecode::objfmt::container {
-    static str::slice_t s_section_names[section::max_spec_type_count];
-
     namespace internal {
+        struct coff_system_t final {
+            alloc_t*                alloc;
+            name_list_t             section_names;
+        };
+
+        coff_system_t               g_coff_sys{};
+
         static u0 fini() {
+            name_map::free(g_coff_sys.section_names);
         }
 
         static status_t read(session_t& s) {
@@ -39,20 +45,153 @@ namespace basecode::objfmt::container {
         }
 
         static status_t init(alloc_t* alloc) {
-            UNUSED(alloc);
-            s_section_names[u32(section::type_t::tls)]          = string::interned::fold(".tls"_ss);
-            s_section_names[u32(section::type_t::code)]         = string::interned::fold(".text"_ss);
-            s_section_names[u32(section::type_t::data)]         = string::interned::fold(".rdata"_ss);
-            s_section_names[u32(section::type_t::debug)]        = string::interned::fold(".debug"_ss);
-            s_section_names[u32(section::type_t::uninit)]       = string::interned::fold(".bss"_ss);
-            s_section_names[u32(section::type_t::import)]       = string::interned::fold(".idata"_ss);
-            s_section_names[u32(section::type_t::export_)]      = string::interned::fold(".edata"_ss);
-            s_section_names[u32(section::type_t::resource)]     = string::interned::fold(".rsrc"_ss);
-            s_section_names[u32(section::type_t::exception)]    = string::interned::fold(".pdata"_ss);
+            g_coff_sys.alloc = alloc;
+
+            name_map::init(g_coff_sys.section_names, g_coff_sys.alloc);
+
+            name_map::add(g_coff_sys.section_names,
+                          section::type_t::tls,
+                          {
+                              .code = false,
+                              .data = true,
+                              .init = true,
+                              .read = true,
+                              .exec = false,
+                              .write = true,
+                              .alloc = false,
+                              .can_free = false
+                          },
+                          ".tls"_ss);
+
+            name_map::add(g_coff_sys.section_names,
+                          section::type_t::code,
+                          {
+                              .code = true,
+                              .data = false,
+                              .read = true,
+                              .exec = true,
+                              .write = false,
+                              .alloc = false,
+                              .can_free = false
+                          },
+                          ".text"_ss);
+
+            name_map::add(g_coff_sys.section_names,
+                          section::type_t::data,
+                          {
+                              .code = false,
+                              .data = true,
+                              .init = true,
+                              .read = true,
+                              .exec = false,
+                              .write = true,
+                              .alloc = false,
+                              .can_free = false
+                          },
+                          ".data"_ss);
+
+            name_map::add(g_coff_sys.section_names,
+                          section::type_t::data,
+                          {
+                              .code = false,
+                              .data = true,
+                              .init = true,
+                              .read = true,
+                              .exec = false,
+                              .write = false,
+                              .alloc = false,
+                              .can_free = false
+                          },
+                          ".rdata"_ss);
+
+            name_map::add(g_coff_sys.section_names,
+                          section::type_t::debug,
+                          {
+                              .code = false,
+                              .data = true,
+                              .init = true,
+                              .read = true,
+                              .exec = false,
+                              .write = false,
+                              .alloc = false,
+                              .can_free = true
+                          },
+                          ".debug"_ss);
+
+            name_map::add(g_coff_sys.section_names,
+                          section::type_t::data,
+                          {
+                              .code = false,
+                              .data = true,
+                              .init = false,
+                              .read = true,
+                              .exec = false,
+                              .write = true,
+                              .alloc = false,
+                              .can_free = false
+                          },
+                          ".bss"_ss);
+
+            name_map::add(g_coff_sys.section_names,
+                          section::type_t::import,
+                          {
+                              .code = false,
+                              .data = true,
+                              .init = true,
+                              .read = true,
+                              .exec = false,
+                              .write = true,
+                              .alloc = false,
+                              .can_free = false
+                          },
+                          ".idata"_ss);
+
+            name_map::add(g_coff_sys.section_names,
+                          section::type_t::export_,
+                          {
+                              .code = false,
+                              .data = true,
+                              .init = true,
+                              .read = true,
+                              .exec = false,
+                              .write = false,
+                              .alloc = false,
+                              .can_free = false
+                          },
+                          ".edata"_ss);
+
+            name_map::add(g_coff_sys.section_names,
+                          section::type_t::resource,
+                          {
+                              .code = false,
+                              .data = true,
+                              .init = true,
+                              .read = true,
+                              .exec = false,
+                              .write = false,
+                              .alloc = false,
+                              .can_free = false
+                          },
+                          ".rsrc"_ss);
+
+            name_map::add(g_coff_sys.section_names,
+                          section::type_t::exception,
+                          {
+                              .code = false,
+                              .data = true,
+                              .init = true,
+                              .read = true,
+                              .exec = false,
+                              .write = false,
+                              .alloc = false,
+                              .can_free = false
+                          },
+                          ".pdata"_ss);
+
             return status_t::ok;
         }
 
-        system_t                    g_coff_sys {
+        system_t                    g_coff_backend {
             .init   = init,
             .fini   = fini,
             .read   = read,
@@ -63,7 +202,7 @@ namespace basecode::objfmt::container {
 
     namespace coff {
         system_t* system() {
-            return &internal::g_coff_sys;
+            return &internal::g_coff_backend;
         }
 
         u0 free(coff_t& coff) {
@@ -224,10 +363,6 @@ namespace basecode::objfmt::container {
                 session::write_u8(s, 0);
         }
 
-        str::slice_t get_section_name(objfmt::section::type_t type) {
-            return s_section_names[u32(type)];
-        }
-
         u0 write_header(session_t& s, coff_t& coff, u16 opt_hdr_size) {
             session::write_u16(s, coff.machine);
             session::write_u16(s, coff.num_hdrs);
@@ -256,19 +391,20 @@ namespace basecode::objfmt::container {
                     break;
                 case type_t::data:
                 case type_t::custom:
-                    if (!coff.init_data.base)
-                        coff.init_data.base = hdr.rva;
-                    hdr.size        = sc.data.length;
-                    coff.init_data.size += hdr.size;
-                    coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
-                    coff.offset     = align(coff.offset + hdr.size, coff.align.file);
-                    coff.rva        = align(coff.rva + hdr.size, coff.align.section);
-                    break;
-                case type_t::uninit:
-                    hdr.size = sc.size;
-                    coff.uninit_data.size += hdr.size;
-                    coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
-                    coff.rva        = align(coff.rva + hdr.size, coff.align.section);
+                    if (hdr.section->flags.init) {
+                        if (!coff.init_data.base)
+                            coff.init_data.base = hdr.rva;
+                        hdr.size        = sc.data.length;
+                        coff.init_data.size += hdr.size;
+                        coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
+                        coff.offset     = align(coff.offset + hdr.size, coff.align.file);
+                        coff.rva        = align(coff.rva + hdr.size, coff.align.section);
+                    } else {
+                        hdr.size = sc.size;
+                        coff.uninit_data.size += hdr.size;
+                        coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
+                        coff.rva        = align(coff.rva + hdr.size, coff.align.section);
+                    }
                     break;
                 case type_t::reloc:
                 case type_t::import:
@@ -301,7 +437,7 @@ namespace basecode::objfmt::container {
             session::write_u32(s, hdr.size);
             session::write_u32(s, hdr.rva);
 
-            if (type == type_t::uninit) {
+            if (type == type_t::data && !hdr.section->flags.init) {
                 session::write_u32(s, 0);
                 session::write_u32(s, 0);
             } else {
@@ -317,12 +453,10 @@ namespace basecode::objfmt::container {
             u32 bitmask{};
             if (flags.code)     bitmask |= section::code;
             if (flags.data) {
-                if (type == type_t::data
-                ||  type == type_t::import) {
+                if (flags.init)
                     bitmask |= section::init_data;
-                } else if (type == type_t::uninit) {
+                else
                     bitmask |= section::uninit_data;
-                }
             }
             if (flags.read)     bitmask |= section::memory_read;
             if (flags.write)    bitmask |= section::memory_write;
@@ -352,7 +486,7 @@ namespace basecode::objfmt::container {
 
             const auto type = hdr.section->type;
 
-            if (type == type_t::uninit)
+            if (type == type_t::data && !hdr.section->flags.init)
                 return status_t::ok;
 
             const auto& sc = hdr.section->subclass;
@@ -376,6 +510,14 @@ namespace basecode::objfmt::container {
                     break;
             }
 
+            return status_t::ok;
+        }
+
+        status_t get_section_name(const objfmt::section_t* section, str::slice_t& name) {
+            const auto entry = name_map::find(internal::g_coff_sys.section_names, section->type, section->flags);
+            if (!entry)
+                return status_t::cannot_map_section_name;
+            name = entry->name;
             return status_t::ok;
         }
 

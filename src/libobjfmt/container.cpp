@@ -16,16 +16,30 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/string.h>
 #include <basecode/objfmt/types.h>
-#include <basecode/objfmt/pe.h>
-#include <basecode/objfmt/elf.h>
-#include <basecode/objfmt/macho.h>
 #include <basecode/objfmt/container.h>
-
 
 namespace basecode::objfmt::container {
     static alloc_t*             s_alloc{};
     static system_t*            s_systems[max_type_count];
+
+    // N.B. forward declare back-end accessor functions
+    namespace pe {
+        system_t* system();
+    }
+
+    namespace elf {
+        system_t* system();
+    }
+
+    namespace coff {
+        system_t* system();
+    }
+
+    namespace macho {
+        system_t* system();
+    }
 
     u0 fini() {
         for (auto sys : s_systems)
@@ -61,6 +75,34 @@ namespace basecode::objfmt::container {
         if (idx > max_type_count - 1)
             return status_t::invalid_container_type;
         return s_systems[idx]->write(s);
+    }
+
+    namespace name_map {
+        u0 free(name_list_t& names) {
+            array::free(names);
+        }
+
+        u0 init(name_list_t& names, alloc_t* alloc) {
+            array::init(names, alloc);
+        }
+
+        u0 add(name_list_t& names, section::type_t type, section::flags_t flags, str::slice_t name) {
+            auto entry = &array::append(names);
+            entry->type = type;
+            entry->flags = flags;
+            entry->flags.pad = {};
+            entry->name = string::interned::fold(name);
+        }
+
+        const name_map_t* find(const name_list_t& names, section::type_t type, section::flags_t flags) {
+            for (const auto& entry : names) {
+                if (entry.type == type
+                &&  std::memcmp(&entry.flags, &flags, sizeof(section::flags_t)) == 0) {
+                    return &entry;
+                }
+            }
+            return nullptr;
+        }
     }
 
     namespace session {

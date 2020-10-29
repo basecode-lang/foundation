@@ -116,14 +116,15 @@ namespace basecode::objfmt {
             section->flags            = {};
             section->symbol           = symbol;
             switch (section->type) {
-                case section::type_t::uninit:
-                    section->subclass.size = {};
+                case section::type_t::data:
+                case section::type_t::code:
+                case section::type_t::custom:
+                    section->subclass.data = {};
                     break;
                 case section::type_t::import:
                     array::init(section->subclass.imports, section->alloc);
                     break;
                 default:
-                    section->subclass.data = {};
                     break;
             }
             return status_t::ok;

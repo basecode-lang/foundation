@@ -88,7 +88,10 @@ namespace basecode::objfmt::container {
             for (u32 i = 0; i < file->sections.size; ++i) {
                 auto& hdr = hdrs[i];
                 hdr.section = &file->sections[i];
-                hdr.name    = coff::get_section_name(hdr.section->type);
+                hdr.name = {};
+                auto status = coff::get_section_name(hdr.section, hdr.name);
+                if (!OK(status))
+                    return status;
                 hdr.rva     = hdr.offset    = hdr.size = {};
                 hdr.relocs  = hdr.line_nums = {};
                 hdr.number  = i + 1;
@@ -373,7 +376,7 @@ namespace basecode::objfmt::container {
 
         status_t write_section_data(session_t& s, pe_t& pe, section_hdr_t& hdr) {
             const auto type = hdr.section->type;
-            if (type == section::type_t::uninit)
+            if (type == section::type_t::data && !hdr.section->flags.init)
                 return status_t::ok;
 
             const auto& sc = hdr.section->subclass;

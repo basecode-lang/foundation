@@ -37,6 +37,14 @@ namespace basecode::objfmt::container {
         dll
     };
 
+    struct name_map_t final {
+        str::slice_t            name;
+        section::flags_t        flags;
+        section::type_t         type;
+    };
+
+    using name_list_t   = array_t<name_map_t>;
+
     struct session_t final {
         const file_t*           file;
         buf_t                   buf;
@@ -58,6 +66,16 @@ namespace basecode::objfmt::container {
         type_t                  type;
         output_type_t           output_type;
     };
+
+    namespace name_map {
+        u0 free(name_list_t& names);
+
+        u0 init(name_list_t& names, alloc_t* alloc);
+
+        u0 add(name_list_t& names, section::type_t type, section::flags_t flags, str::slice_t name);
+
+        const name_map_t* find(const name_list_t& names, section::type_t type, section::flags_t flags);
+    }
 
     namespace session {
         u0 free(session_t& s);

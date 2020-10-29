@@ -108,6 +108,7 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
         section::data(rdata, s_rot13_table, sizeof(s_rot13_table));
         rdata->flags.data = true;
         rdata->flags.read = true;
+        rdata->flags.init = true;
         REQUIRE(OK(rdata_rc.status));
         REQUIRE(rdata);
     }
@@ -118,6 +119,8 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
         auto idata = file::get_section(rot13_pgm, idata_rc.id);
         idata->flags.data  = true;
         idata->flags.read  = true;
+        idata->flags.init  = true;
+        idata->flags.write = true;
 
         const auto func_type = SYMBOL_TYPE(symbol::type::derived::function, symbol::type::base::null_);
         auto kernel32_sym_rc = file::make_symbol(rot13_pgm,
@@ -154,11 +157,12 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
 
     /* .bss section */ {
         auto bss_rc = file::make_section(rot13_pgm,
-                                         section::type_t::uninit);
+                                         section::type_t::data);
         auto bss = file::get_section(rot13_pgm, bss_rc.id);
         section::reserve(bss, 4096);
         bss->flags.data   = true;
         bss->flags.read   = true;
+        bss->flags.init   = false;
         bss->flags.write  = true;
 
         REQUIRE(OK(bss_rc.status));
