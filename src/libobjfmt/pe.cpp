@@ -84,24 +84,9 @@ namespace basecode::objfmt::container {
         static status_t write(session_t& s) {
             const auto file = s.file;
 
-            section_hdr_t hdrs[file->sections.size];
-            for (u32 i = 0; i < file->sections.size; ++i) {
-                auto& hdr = hdrs[i];
-                hdr.section = &file->sections[i];
-                hdr.name = {};
-                auto status = coff::get_section_name(hdr.section, hdr.name);
-                if (!OK(status))
-                    return status;
-                hdr.rva     = hdr.offset    = hdr.size = {};
-                hdr.relocs  = hdr.line_nums = {};
-                hdr.number  = i + 1;
-            }
-
             pe_opts_t opts{};
+            opts.file          = file;
             opts.alloc         = file->alloc;
-            opts.hdrs          = hdrs;
-            opts.num_hdrs      = file->sections.size;
-            opts.machine       = file->machine;
             opts.base_addr     = s.opts.base_addr;
             opts.heap_reserve  = s.opts.heap_reserve;
             opts.stack_reserve = s.opts.stack_reserve;
@@ -110,8 +95,7 @@ namespace basecode::objfmt::container {
             pe::init(pe, opts);
             defer(pe::free(pe));
 
-            pe.opts.include_symbol_table = true;    // XXX: temporary for testing
-
+            status_t status;
             auto& coff = pe.coff;
 
             switch (s.output_type) {
@@ -131,17 +115,14 @@ namespace basecode::objfmt::container {
                     break;
             }
 
-            status_t status;
+            pe.opts.include_symbol_table = true;    // XXX: temporary for testing
 
-            pe::write_dos_header(s, pe);
-            pe::write_pe_header(s, pe);
             status = pe::build_sections(s, pe);
             if (!OK(status))
                 return status;
-            if (pe.opts.include_symbol_table) {
-                coff.symbol_table.size = (file->symbols.size + (file->sections.size * 2))
-                                         * coff::symbol_table::entry_size;
-            }
+
+            pe::write_dos_header(s, pe);
+            pe::write_pe_header(s, pe);
             coff::write_header(s, coff, pe.size.opt_hdr);
             pe::write_optional_header(s, pe);
             coff::write_section_headers(s, coff);
@@ -183,11 +164,7 @@ namespace basecode::objfmt::container {
         }
 
         status_t init(pe_t& pe, const pe_opts_t& opts) {
-            auto status = coff::init(pe.coff,
-                                     opts.hdrs,
-                                     opts.num_hdrs,
-                                     opts.machine,
-                                     opts.alloc);
+            auto status = coff::init(pe.coff, opts.file, opts.alloc);
             if (!OK(status))
                 return status;
 
@@ -196,6 +173,8 @@ namespace basecode::objfmt::container {
             pe.base_addr     = opts.base_addr == 0 ? 0x140000000 : opts.base_addr;
             pe.reserve.heap  = opts.heap_reserve == 0 ? 0x100000 : opts.heap_reserve;
             pe.reserve.stack = opts.stack_reserve == 0 ? 0x100000 : opts.stack_reserve;
+            pe.size.dos_stub = dos_header_size + sizeof(s_dos_stub);
+            pe.coff.offset   = pe.start_offset = align(pe.size.dos_stub, 8);
 
             // XXX: is this size constant for x64 images?
             pe.size.opt_hdr  = 0xf0;
@@ -206,7 +185,7 @@ namespace basecode::objfmt::container {
         }
 
         u0 write_pe_header(session_t& s, pe_t& pe) {
-            session::seek(s, pe.coff.offset);
+            session::seek(s, pe.start_offset);
             session::write_u8(s, 'P');
             session::write_u8(s, 'E');
             session::write_u8(s, 0);
@@ -214,13 +193,10 @@ namespace basecode::objfmt::container {
         }
 
         u0 write_dos_header(session_t& s, pe_t& pe) {
-            const auto dos_stub_size = dos_header_size + sizeof(s_dos_stub);
-            pe.coff.offset = align(dos_stub_size, 8);
-
             session::write_u8(s, 'M');
             session::write_u8(s, 'Z');
-            session::write_u16(s, dos_stub_size % 512);
-            session::write_u16(s, align(dos_stub_size, 512) / 512);
+            session::write_u16(s, pe.size.dos_stub % 512);
+            session::write_u16(s, align(pe.size.dos_stub, 512) / 512);
             session::write_u16(s, 0);
             session::write_u16(s, dos_header_size / 16);
             session::write_u16(s, 0);
@@ -240,7 +216,7 @@ namespace basecode::objfmt::container {
             session::write_u16(s, 0);
             for (u32 i = 0; i < 10; ++i)
                 session::write_u16(s, 0);
-            session::write_u32(s, pe.coff.offset);
+            session::write_u32(s, pe.start_offset);
             for (u8 code_byte : s_dos_stub)
                 session::write_u8(s, code_byte);
         }
@@ -292,28 +268,26 @@ namespace basecode::objfmt::container {
 
             coff.size.headers = coff.offset
                                 + (pe_sig_size + coff::header_size + pe.size.opt_hdr)
-                                + (coff.num_hdrs * coff::section::header_size);
+                                + (coff.headers.size * coff::section::header_size);
             coff.offset = align(coff.size.headers, coff.align.file);
             coff.rva    = align(coff.size.headers, coff.align.section);
 
-            for (u32 i = 0; i < coff.num_hdrs; ++i) {
-                auto status = build_section(s, pe, coff.hdrs[i]);
+            for (auto& hdr : coff.headers) {
+                auto status = build_section(s, pe, hdr);
                 if (!OK(status))
                     return status;
             }
 
-            if (pe.opts.include_symbol_table) {
-                coff.symbol_table.offset = coff.offset;
-            }
+            coff::update_symbol_table(coff);
 
             return status_t::ok;
         }
 
         status_t write_sections_data(session_t& s, pe_t& pe) {
-            const auto& coff = pe.coff;
+            auto& coff = pe.coff;
 
-            for (u32 i = 0; i < coff.num_hdrs; ++i) {
-                auto status = write_section_data(s, pe, coff.hdrs[i]);
+            for (auto& hdr : coff.headers) {
+                auto status = write_section_data(s, pe, hdr);
                 if (!OK(status))
                     return status;
             }
@@ -321,7 +295,7 @@ namespace basecode::objfmt::container {
             return status_t::ok;
         }
 
-        status_t build_section(session_t& s, pe_t& pe, section_hdr_t& hdr) {
+        status_t build_section(session_t& s, pe_t& pe, coff_section_hdr_t& hdr) {
             auto& coff = pe.coff;
 
             hdr.offset = coff.offset;
@@ -362,6 +336,11 @@ namespace basecode::objfmt::container {
                     coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
                     coff.offset     = align(coff.offset + hdr.size, coff.align.file);
                     coff.rva        = align(coff.rva, coff.align.section);
+
+                    // XXX: FIXME
+                    auto& section_rec = hdr.symbol->aux_records[0];
+                    section_rec.section.len = hdr.size;
+
                     break;
                 }
                 default: {
@@ -374,7 +353,7 @@ namespace basecode::objfmt::container {
             return status_t::ok;
         }
 
-        status_t write_section_data(session_t& s, pe_t& pe, section_hdr_t& hdr) {
+        status_t write_section_data(session_t& s, pe_t& pe, coff_section_hdr_t& hdr) {
             const auto type = hdr.section->type;
             if (type == section::type_t::data && !hdr.section->flags.init)
                 return status_t::ok;

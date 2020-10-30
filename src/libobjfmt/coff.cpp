@@ -201,31 +201,85 @@ namespace basecode::objfmt::container {
     }
 
     namespace coff {
+        namespace string_table {
+            u0 free(coff_t& coff) {
+                array::free(coff.string_table.list);
+            }
+
+            u0 init(coff_t& coff, alloc_t* alloc) {
+                coff.string_table.file.offset = 0;
+                coff.string_table.file.size   = sizeof(u32);
+                array::init(coff.string_table.list, alloc);
+            }
+
+            u32 add(coff_t& coff, str::slice_t str) {
+                auto offset = coff.string_table.file.size;
+                array::append(coff.string_table.list, str);
+                coff.string_table.file.size += str.length + 1;
+                return offset;
+            }
+        }
+
+        namespace symbol_table {
+            u0 free(coff_t& coff) {
+                for (auto& sym : coff.symbol_table.list)
+                    array::free(sym.aux_records);
+                array::free(coff.symbol_table.list);
+            }
+
+            u0 init(coff_t& coff, alloc_t* alloc) {
+                array::init(coff.symbol_table.list, alloc);
+            }
+
+            coff_symbol_t* make_symbol(coff_t& coff, str::slice_t name) {
+                auto sym = &array::append(coff.symbol_table.list);
+                array::init(sym->aux_records, coff.alloc);
+                if (name.length > 8) {
+                    sym->name.offset = string_table::add(coff, name);
+                    sym->name.offset <<= u32(32);
+                    sym->inlined     = false;
+                } else {
+                    sym->name.slice = name;
+                    sym->inlined    = true;
+                }
+                coff.symbol_table.file.size += entry_size;
+                return sym;
+            }
+
+            coff_aux_record_t* make_aux_record(coff_t& coff, coff_symbol_t* sym, coff_aux_record_type_t type) {
+                auto aux = &array::append(sym->aux_records);
+                aux->type    = type;
+                aux->section = {};
+                coff.symbol_table.file.size += entry_size;
+                return aux;
+            }
+        }
+
         system_t* system() {
             return &internal::g_coff_backend;
         }
 
         u0 free(coff_t& coff) {
-            UNUSED(coff);
+            array::free(coff.headers);
+            string_table::free(coff);
+            symbol_table::free(coff);
         }
 
         status_t init(coff_t& coff,
-                      section_hdr_t* hdrs,
-                      u32 num_hdrs,
-                      objfmt::machine::type_t machine,
+                      const file_t* file,
                       alloc_t* alloc) {
-            UNUSED(alloc);
-            coff.hdrs          = hdrs;
-            coff.num_hdrs      = num_hdrs;
-            coff.symbol_table  = {};
-            coff.string_table  = {};
-            coff.flags         = {};
-            coff.size          = {};
-            coff.code          = coff.init_data = coff.uninit_data = {};
-            coff.rva           = coff.offset    = {};
+            using type_t = objfmt::section::type_t;
+
+            coff.alloc = alloc;
+
+            array::init(coff.headers, coff.alloc);
+            string_table::init(coff, coff.alloc);
+            symbol_table::init(coff, coff.alloc);
+
             coff.align.file    = 0x200;
             coff.align.section = 0x1000;
-            switch (machine) {
+
+            switch (file->machine) {
                 case objfmt::machine::type_t::unknown:
                     return status_t::invalid_machine_type;
                 case objfmt::machine::type_t::x86_64:
@@ -235,145 +289,193 @@ namespace basecode::objfmt::container {
                     coff.machine = machine::arm64;
                     break;
             }
-            return status_t::ok;
+
+            status_t status{};
+
+            for (u32 i = 0; i < file->sections.size; ++i) {
+                auto& hdr = array::append(coff.headers);
+                hdr = {};
+                hdr.number  = i + 1;
+                hdr.section = &file->sections[i];
+
+                str::slice_t name{};
+                if (hdr.section->type == type_t::custom) {
+                    auto intern_rc = string::interned::get(hdr.section->symbol);
+                    if (!OK(intern_rc.status))
+                        return status_t::symbol_not_found;
+                    name = intern_rc.slice;
+                } else {
+                    status = coff::get_section_name(hdr.section, name);
+                    if (!OK(status))
+                        return status;
+                }
+
+                hdr.symbol = coff::symbol_table::make_symbol(coff, name);
+                hdr.symbol->section = hdr.number;
+                hdr.symbol->value   = {};
+                hdr.symbol->type    = SYMBOL_TYPE(symbol::type::derived::none,
+                                                  symbol::type::base::null_);
+                hdr.symbol->sclass  = storage::class_t::static_;
+
+                auto aux = coff::symbol_table::make_aux_record(coff,
+                                                               hdr.symbol,
+                                                               coff_aux_record_type_t::section);
+                aux->section.len        = hdr.size;
+                aux->section.sect_num   = hdr.number;
+                aux->section.check_sum  = 0;
+                aux->section.comdat_sel = 0;
+                aux->section.num_relocs = hdr.relocs.size;
+                aux->section.num_lines  = hdr.line_nums.size;
+            }
+
+            auto symbols = hashtab::values(const_cast<symbol_table_t&>(file->symbols));
+            defer(array::free(symbols));
+
+            for (auto symbol : symbols) {
+                const auto intern_rc = string::interned::get(symbol->name);
+                if (!OK(intern_rc.status))
+                    return status_t::symbol_not_found;
+                auto sym = coff::symbol_table::make_symbol(coff, intern_rc.slice);
+                sym->value   = symbol->value;
+                sym->section = symbol->section;
+                sym->type    = symbol->type;
+                sym->sclass  = symbol->sclass;
+            }
+
+            return status;
         }
 
-        u0 write_aux_section_record(session_t& s,
-                                    u32 len,
-                                    u16 num_relocs,
-                                    u16 num_lines,
-                                    u32 check_sum,
-                                    u16 sect_num,
-                                    u8 comdat_sel) {
-            session::write_u32(s, len);
-            session::write_u16(s, num_relocs);
-            session::write_u16(s, num_lines);
-            session::write_u32(s, check_sum);
-            session::write_u16(s, sect_num);
-            session::write_u8(s, comdat_sel);
-            session::write_u8(s, 0);    // XXX: unused
-            session::write_u8(s, 0);    //      "
-            session::write_u8(s, 0);    //      "
+        u0 update_symbol_table(coff_t& coff) {
+            coff.symbol_table.file.offset = coff.offset;
+            coff.string_table.file.offset = coff.symbol_table.file.offset + coff.symbol_table.file.size;
+        }
+
+        u0 write_string_table(session_t& s, coff_t& coff) {
+            session::write_u32(s, coff.string_table.file.size);
+            for (auto str : coff.string_table.list)
+                session::write_cstr(s, str);
         }
 
         u0 write_symbol_table(session_t& s, coff_t& coff) {
-            using type_t = objfmt::section::type_t;
-
-            session::seek(s, coff.symbol_table.offset);
-            auto symbols = hashtab::values(const_cast<symbol_table_t&>(s.file->symbols));
-            defer(array::free(symbols));
-            std::sort(
-                std::begin(symbols),
-                std::end(symbols),
-                [](auto lhs, auto rhs) {
-                    return lhs < rhs;
-                });
-            u32 num_long_strs{};
-            for (u32 i = 0; i < coff.num_hdrs; ++i) {
-                const auto& hdr = coff.hdrs[i];
-                if (hdr.section->type != type_t::custom && hdr.name.length > 8)
-                    num_long_strs++;
-            }
-            for (auto symbol : symbols) {
-                if (symbol->length > 8)
-                    num_long_strs++;
-            }
-            str::slice_t strs[num_long_strs];
-            u32 idx{};
-            coff.string_table.offset = coff.symbol_table.offset + coff.symbol_table.size;
-            coff.string_table.size   = sizeof(u32);
-            for (u32 i = 0; i < coff.num_hdrs; ++i) {
-                const auto& hdr   = coff.hdrs[i];
-                if (hdr.section->type == type_t::custom)
-                    continue;
-                const auto& slice = hdr.name;
-                if (slice.length > 8) {
-                    strs[idx++] = slice;
-                    u64 name = coff.string_table.size;
-                    name <<= u32(32);
-                    session::write_u64(s, name);
-                    coff.string_table.size += slice.length + 1;
+            session::seek(s, coff.symbol_table.file.offset);
+//            std::sort(
+//                std::begin(coff.symbol_table.list),
+//                std::end(coff.symbol_table.list),
+//                [](auto lhs, auto rhs) {
+//                    return lhs < rhs;
+//                });
+            for (const auto& symbol : coff.symbol_table.list) {
+                if (symbol.inlined) {
+                    session::write_pad8(s, symbol.name.slice);
                 } else {
-                    session::write_pad8(s, slice);
+                    session::write_u64(s, symbol.name.offset);
                 }
-                session::write_u32(s, 0);
-                session::write_s16(s, hdr.number);
-                session::write_u16(s, 0);
-                session::write_u8(s, u8(storage::class_t::static_));
-                session::write_u8(s, 1);
-
-                write_aux_section_record(s, hdr.size, hdr.relocs.size, hdr.line_nums.size, 0, hdr.number, 0);
+                session::write_u32(s, symbol.value);
+                session::write_s16(s, symbol.section);
+                session::write_u16(s, u16(symbol.type));
+                session::write_u8(s, u8(symbol.sclass));
+                session::write_u8(s, symbol.aux_records.size);
+                for (const auto& aux : symbol.aux_records)
+                    write_aux_record(s, aux);
             }
-            for (auto symbol : symbols) {
-                const auto intern_rc = string::interned::get(symbol->name);
-                if (intern_rc.slice.length > 8) {
-                    strs[idx++] = intern_rc.slice;
-                    u64 name = coff.string_table.size;
-                    name <<= u32(32);
-                    session::write_u64(s, name);
-                    coff.string_table.size += intern_rc.slice.length + 1;
-                } else {
-                    session::write_pad8(s, intern_rc.slice);
-                }
-                session::write_u32(s, symbol->value);
-                session::write_s16(s, symbol->section);
-                session::write_u16(s, u16(symbol->type));
-                session::write_u8(s, u8(symbol->sclass));
-                session::write_u8(s, 0);
-            }
-            session::write_u32(s, coff.string_table.size);
-            for (auto str : strs)
-                session::write_cstr(s, str);
+            write_string_table(s, coff);
         }
 
         status_t build_sections(session_t& s, coff_t& coff) {
             coff.size.headers = coff.offset
                               + coff::header_size
-                              + (coff.num_hdrs * coff::section::header_size);
+                              + (coff.headers.size * coff::section::header_size);
             coff.offset = align(coff.size.headers, coff.align.file);
             coff.rva    = align(coff.size.headers, coff.align.section);
-            for (u32 i = 0; i < coff.num_hdrs; ++i) {
-                auto status = build_section(s, coff, coff.hdrs[i]);
+            for (auto& hdr : coff.headers) {
+                auto status = build_section(s, coff, hdr);
                 if (!OK(status))
                     return status;
             }
-            coff.symbol_table.offset = coff.offset;
+            update_symbol_table(coff);
             return status_t::ok;
         }
 
         u0 write_section_headers(session_t& s, coff_t& coff) {
-            for (u32 i = 0; i < coff.num_hdrs; ++i)
-                write_section_header(s, coff, coff.hdrs[i]);
+            for (auto& hdr : coff.headers)
+                write_section_header(s, coff, hdr);
         }
 
         status_t write_sections_data(session_t& s, coff_t& coff) {
-            for (u32 i = 0; i < coff.num_hdrs; ++i) {
-                auto status = write_section_data(s, coff, coff.hdrs[i]);
+            for (auto& hdr : coff.headers) {
+                auto status = write_section_data(s, coff, hdr);
                 if (!OK(status))
                     return status;
             }
             return status_t::ok;
         }
 
-        u0 write_aux_file_record(session_t& s, str::slice_t name) {
-            const s32 pad_len = std::max<s32>(symbol_table::entry_size - name.length, 0);
-            for (u32 i = 0; i < std::min<u32>(name.length, 18); ++i)
-                session::write_u8(s, name[i]);
-            for (u32 i = 0; i < pad_len; ++i)
-                session::write_u8(s, 0);
-        }
-
         u0 write_header(session_t& s, coff_t& coff, u16 opt_hdr_size) {
             session::write_u16(s, coff.machine);
-            session::write_u16(s, coff.num_hdrs);
+            session::write_u16(s, coff.headers.size);
             session::write_u32(s, std::time(nullptr));
-            session::write_u32(s, coff.symbol_table.offset);
-            session::write_u32(s, coff.symbol_table.size / symbol_table::entry_size);
+            session::write_u32(s, coff.symbol_table.file.offset);
+            session::write_u32(s, coff.symbol_table.file.size / symbol_table::entry_size);
             session::write_u16(s, opt_hdr_size);
             session::write_u16(s, coff.flags.image);
         }
 
-        status_t build_section(session_t& s, coff_t& coff, section_hdr_t& hdr) {
+        u0 write_aux_record(session_t& s, const coff_aux_record_t& record) {
+            switch (record.type) {
+                case coff_aux_record_type_t::xf:
+                    session::write_u32(s, 0);
+                    session::write_u16(s, record.xf.line_num);
+                    session::write_u32(s, 0);
+                    session::write_u16(s, 0);
+                    session::write_u32(s, record.xf.ptr_next_func);
+                    session::write_u16(s, 0);
+                    break;
+                case coff_aux_record_type_t::file: {
+                    const auto sym = record.file.sym;
+                    if (sym->inlined) {
+                        const auto len = sym->name.slice.length;
+                        const s32 pad_len = std::max<s32>(symbol_table::entry_size - len, 0);
+                        for (u32 i = 0; i < std::min<u32>(len, 18); ++i)
+                            session::write_u8(s, sym->name.slice[i]);
+                        for (u32 i = 0; i < pad_len; ++i)
+                            session::write_u8(s, 0);
+                    } else {
+                        u64 name = sym->name.offset;
+                        name <<= u32(32);
+                        session::write_u64(s, name);
+                        for (u32 i = 0; i < 8; ++i)
+                            session::write_u8(s, 0);
+                    }
+                    break;
+                }
+                case coff_aux_record_type_t::section:
+                    session::write_u32(s, record.section.len);
+                    session::write_u16(s, record.section.num_relocs);
+                    session::write_u16(s, record.section.num_lines);
+                    session::write_u32(s, record.section.check_sum);
+                    session::write_u16(s, record.section.sect_num);
+                    session::write_u8(s, record.section.comdat_sel);
+                    session::write_u8(s, 0);    // XXX: unused
+                    session::write_u8(s, 0);    //      "
+                    session::write_u8(s, 0);    //      "
+                    break;
+                case coff_aux_record_type_t::func_def:
+                    session::write_u32(s, record.func_def.tag_idx);
+                    session::write_u32(s, record.func_def.total_size);
+                    session::write_u32(s, record.func_def.ptr_line_num);
+                    session::write_u32(s, record.func_def.ptr_next_func);
+                    session::write_u16(s, 0);
+                    break;
+                case coff_aux_record_type_t::weak_extern:
+                    session::write_u32(s, record.weak_extern.tag_idx);
+                    session::write_u32(s, record.weak_extern.flags);
+                    session::write_u64(s, 0);
+                    session::write_u16(s, 0);
+                    break;
+            }
+        }
+
+        status_t build_section(session_t& s, coff_t& coff, coff_section_hdr_t& hdr) {
             using type_t = objfmt::section::type_t;
 
             hdr.offset = coff.offset;
@@ -400,6 +502,8 @@ namespace basecode::objfmt::container {
                         coff.offset     = align(coff.offset + hdr.size, coff.align.file);
                         coff.rva        = align(coff.rva + hdr.size, coff.align.section);
                     } else {
+                        if (!coff.uninit_data.base)
+                            coff.uninit_data.base = hdr.rva;
                         hdr.size = sc.size;
                         coff.uninit_data.size += hdr.size;
                         coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
@@ -417,21 +521,22 @@ namespace basecode::objfmt::container {
                     return status_t::not_implemented;
             }
 
+            auto& section_rec = hdr.symbol->aux_records[0];
+            section_rec.section.len = hdr.size;
+
             return status_t::ok;
         }
 
-        u0 write_section_header(session_t& s, coff_t& coff, section_hdr_t& hdr) {
+        u0 write_section_header(session_t& s, coff_t& coff, coff_section_hdr_t& hdr) {
             using type_t = objfmt::section::type_t;
 
             const auto type = hdr.section->type;
             const auto& flags = hdr.section->flags;
 
-            if (type == type_t::custom) {
-                const auto symbol = objfmt::file::get_symbol(*s.file, hdr.section->symbol);
-                const auto intern_rc = string::interned::get(symbol->name);
-                session::write_pad8(s, intern_rc.slice);
+            if (hdr.symbol->inlined) {
+                session::write_pad8(s, hdr.symbol->name.slice);
             } else {
-                session::write_pad8(s, hdr.name);
+                session::write_u64(s, hdr.symbol->name.offset);
             }
 
             session::write_u32(s, hdr.size);
@@ -465,23 +570,7 @@ namespace basecode::objfmt::container {
             session::write_u32(s, bitmask);
         }
 
-        u0 write_aux_xf_record(session_t& s, u16 line_num, u32 ptr_next_func) {
-            session::write_u32(s, 0);
-            session::write_u16(s, line_num);
-            session::write_u32(s, 0);
-            session::write_u16(s, 0);
-            session::write_u32(s, ptr_next_func);
-            session::write_u16(s, 0);
-        }
-
-        u0 write_aux_weak_extern_record(session_t& s, u32 tag_idx, u32 flags) {
-            session::write_u32(s, tag_idx);
-            session::write_u32(s, flags);
-            session::write_u64(s, 0);
-            session::write_u16(s, 0);
-        }
-
-        status_t write_section_data(session_t& s, coff_t& coff, section_hdr_t& hdr) {
+        status_t write_section_data(session_t& s, coff_t& coff, coff_section_hdr_t& hdr) {
             using type_t = objfmt::section::type_t;
 
             const auto type = hdr.section->type;
@@ -519,14 +608,6 @@ namespace basecode::objfmt::container {
                 return status_t::cannot_map_section_name;
             name = entry->name;
             return status_t::ok;
-        }
-
-        u0 write_aux_funcdef_record(session_t& s, u32 tag_idx, u32 total_size, u32 ptr_line_num, u32 ptr_next_func) {
-            session::write_u32(s, tag_idx);
-            session::write_u32(s, total_size);
-            session::write_u32(s, ptr_line_num);
-            session::write_u32(s, ptr_next_func);
-            session::write_u16(s, 0);
         }
     }
 }

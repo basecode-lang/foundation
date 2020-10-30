@@ -82,61 +82,94 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    file_t rot13_pgm{};
-    REQUIRE(OK(file::init(rot13_pgm)));
-    defer(file::free(rot13_pgm));
-    path::set(rot13_pgm.path, "rot13.exe");
-    rot13_pgm.machine = machine::type_t::x86_64;
+    file_t pe_file{};
+    REQUIRE(OK(file::init(pe_file)));
+    defer(file::free(pe_file));
+    path::set(pe_file.path, "rot13.exe");
+    pe_file.machine = machine::type_t::x86_64;
 
     /* .text section */ {
-        auto text_rc = file::make_section(rot13_pgm,
-                                          section::type_t::code);
-        auto text = file::get_section(rot13_pgm, text_rc.id);
-        section::data(text, s_rot13_code, sizeof(s_rot13_code));
-        text->flags.code = true;
-        text->flags.read = true;
-        text->flags.exec = true;
-
+        auto text_rc = file::make_section(pe_file,
+                                          section::type_t::code,
+                                          {
+                                              .flags = {
+                                                  .code = true,
+                                                  .read = true,
+                                                  .exec = true
+                                              }
+                                          });
+        auto set_data_rc = section::data(pe_file,
+                                         text_rc.id,
+                                         s_rot13_code,
+                                         sizeof(s_rot13_code));
+        REQUIRE(OK(set_data_rc.status));
         REQUIRE(OK(text_rc.status));
-        REQUIRE(text);
     }
 
     /* .rdata section */ {
-        auto rdata_rc = file::make_section(rot13_pgm,
-                                           section::type_t::data);
-        auto rdata = file::get_section(rot13_pgm, rdata_rc.id);
-        section::data(rdata, s_rot13_table, sizeof(s_rot13_table));
-        rdata->flags.data = true;
-        rdata->flags.read = true;
-        rdata->flags.init = true;
+        auto rdata_rc = file::make_section(pe_file,
+                                           section::type_t::data,
+                                           {
+                                               .flags = {
+                                                   .data = true,
+                                                   .init = true,
+                                                   .read = true,
+                                               }
+                                           });
+        auto set_data_rc = section::data(pe_file,
+                                         rdata_rc.id,
+                                         s_rot13_table,
+                                         sizeof(s_rot13_table));
+        REQUIRE(OK(set_data_rc.status));
         REQUIRE(OK(rdata_rc.status));
-        REQUIRE(rdata);
     }
 
     /* .idata section */ {
-        auto idata_rc = file::make_section(rot13_pgm,
-                                           section::type_t::import);
-        auto idata = file::get_section(rot13_pgm, idata_rc.id);
-        idata->flags.data  = true;
-        idata->flags.read  = true;
-        idata->flags.init  = true;
-        idata->flags.write = true;
-
-        const auto func_type = SYMBOL_TYPE(symbol::type::derived::function, symbol::type::base::null_);
-        auto kernel32_sym_rc = file::make_symbol(rot13_pgm,
+        auto idata_rc = file::make_section(pe_file,
+                                           section::type_t::import,
+                                           {
+                                                .flags = {
+                                                    .data = true,
+                                                    .init = true,
+                                                    .read = true,
+                                                    .write = true,
+                                                }
+                                           });
+        const auto func_type = SYMBOL_TYPE(symbol::type::derived::function,
+                                           symbol::type::base::null_);
+        auto kernel32_sym_rc = file::make_symbol(pe_file,
                                                  "kernel32.dll"_ss,
-                                                 {.section = idata->id, .value = 1, .sclass = storage::class_t::static_});
-        auto read_file_sym_rc = file::make_symbol(rot13_pgm,
+                                                 {
+                                                     .section = idata_rc.id,
+                                                     .value = 1,
+                                                     .sclass = storage::class_t::static_
+                                                 });
+        auto read_file_sym_rc = file::make_symbol(pe_file,
                                                   "ReadFile"_ss,
-                                                  {.section = idata->id, .type = func_type, .value = 2, .sclass = storage::class_t::external_});
-        auto write_file_sym_rc = file::make_symbol(rot13_pgm,
+                                                  {
+                                                      .section = idata_rc.id,
+                                                      .type = func_type,
+                                                      .value = 2,
+                                                      .sclass = storage::class_t::external_
+                                                  });
+        auto write_file_sym_rc = file::make_symbol(pe_file,
                                                    "WriteFile"_ss,
-                                                   {.section = idata->id, .type = func_type, .value = 3, .sclass = storage::class_t::external_});
-        auto get_std_handle_sym_rc = file::make_symbol(rot13_pgm,
+                                                   {
+                                                       .section = idata_rc.id,
+                                                       .type = func_type,
+                                                       .value = 3,
+                                                       .sclass = storage::class_t::external_
+                                                   });
+        auto get_std_handle_sym_rc = file::make_symbol(pe_file,
                                                        "GetStdHandle"_ss,
-                                                       {.section = idata->id, .type = func_type, .value = 4, .sclass = storage::class_t::external_});
-        auto kernel32_imp_rc = section::import_module(idata, kernel32_sym_rc.id);
-        auto kernel32_imp    = section::get_import(idata, kernel32_imp_rc.id);
+                                                       {
+                                                           .section = idata_rc.id,
+                                                           .type = func_type,
+                                                           .value = 4,
+                                                           .sclass = storage::class_t::external_
+                                                       });
+        auto kernel32_imp_rc = section::import_module(pe_file, idata_rc.id, kernel32_sym_rc.id);
+        auto kernel32_imp    = section::get_import(pe_file, idata_rc.id, kernel32_imp_rc.id);
         import::add_symbol(kernel32_imp, get_std_handle_sym_rc.id);
         import::add_symbol(kernel32_imp, read_file_sym_rc.id);
         import::add_symbol(kernel32_imp, write_file_sym_rc.id);
@@ -146,7 +179,6 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
         REQUIRE(OK(write_file_sym_rc.status));
         REQUIRE(OK(get_std_handle_sym_rc.status));
         REQUIRE(OK(idata_rc.status));
-        REQUIRE(idata);
         REQUIRE(OK(kernel32_imp_rc.status));
         REQUIRE(kernel32_imp);
         REQUIRE(kernel32_imp->symbols.size == 3);
@@ -156,14 +188,18 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
     }
 
     /* .bss section */ {
-        auto bss_rc = file::make_section(rot13_pgm,
-                                         section::type_t::data);
-        auto bss = file::get_section(rot13_pgm, bss_rc.id);
-        section::reserve(bss, 4096);
-        bss->flags.data   = true;
-        bss->flags.read   = true;
-        bss->flags.init   = false;
-        bss->flags.write  = true;
+        auto bss_rc = file::make_section(pe_file,
+                                         section::type_t::data,
+                                         {
+                                            .flags = {
+                                                .data   = true,
+                                                .init   = false,
+                                                .read   = true,
+                                                .write  = true,
+                                            }
+                                         });
+        auto bss = file::get_section(pe_file, bss_rc.id);
+        section::reserve(pe_file, bss_rc.id, 4096);
 
         REQUIRE(OK(bss_rc.status));
         REQUIRE(bss);
@@ -173,7 +209,7 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
     container::session_t s{};
     container::session::init(s);
     defer(container::session::free(s));
-    s.file                  = &rot13_pgm;
+    s.file                  = &pe_file;
     s.type                  = container::type_t::pe;
     s.output_type           = container::output_type_t::exe;
     s.versions.linker.major = 6;

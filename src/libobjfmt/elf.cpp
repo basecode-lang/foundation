@@ -41,78 +41,41 @@ namespace basecode::objfmt::container {
         static status_t write(session_t& s) {
             const auto file = s.file;
 
-            u32 num_section_hdr{};
-            u32 num_program_hdr{};
-
-            for (u32 i = 0; i < file->sections.size; ++i) {
-                auto section = &file->sections[i];
-                switch (section->type) {
-                    case section::type_t::data:
-                    case section::type_t::code:
-                    case section::type_t::reloc:
-                    case section::type_t::debug:
-                    case section::type_t::custom: {
-                        ++num_section_hdr;
-                        break;
-                    }
-                    case section::type_t::tls:
-                    case section::type_t::import:
-                    case section::type_t::export_:
-                    case section::type_t::resource:
-                    case section::type_t::exception: {
-                        ++num_program_hdr;
-                        break;
-                    }
-                }
-            }
-
-            section_hdr_t sect_hdrs[num_section_hdr];
-            program_hdr_t prog_hdrs[num_program_hdr];
-            u32 sect_idx{};
-            u32 prog_idx{};
-            for (u32 i = 0; i < file->sections.size; ++i) {
-                auto section = &file->sections[i];
-                switch (section->type) {
-                    case section::type_t::data:
-                    case section::type_t::code:
-                    case section::type_t::debug:
-                    case section::type_t::custom: {
-                        auto& hdr = sect_hdrs[sect_idx];
-                        hdr = {};
-                        hdr.section = section;
-                        hdr.number  = sect_idx + 1;
-                        ++sect_idx;
-                        break;
-                    }
-                    case section::type_t::tls:
-                    case section::type_t::reloc:
-                    case section::type_t::import:
-                    case section::type_t::export_:
-                    case section::type_t::resource:
-                    case section::type_t::exception: {
-                        auto& hdr = prog_hdrs[prog_idx];
-                        hdr = {};
-                        hdr.section = section;
-                        hdr.number  = prog_idx + 1;
-                        ++prog_idx;
-                        break;
-                    }
-                }
-            }
-
             elf_opts_t opts{};
-            opts.alloc = g_elf_sys.alloc;
-            opts.headers.section = sect_hdrs;
-            opts.headers.size_section = 64;
-            opts.headers.num_section = num_section_hdr;
-
-            opts.headers.program = prog_hdrs;
-            opts.headers.size_program = 56;
-            opts.headers.num_program = num_program_hdr;
+            opts.alloc       = g_elf_sys.alloc;
+            opts.entry_point = s.opts.base_addr;
 
             elf_t elf{};
             elf::init(elf, opts);
             defer(elf::free(elf));
+
+            for (u32 i = 0; i < file->sections.size; ++i) {
+                auto section = &file->sections[i];
+                switch (section->type) {
+                    case section::type_t::data:
+                    case section::type_t::code:
+                    case section::type_t::debug:
+                    case section::type_t::custom: {
+                        auto& hdr = array::append(elf.sections);
+                        hdr = {};
+                        hdr.section = section;
+                        hdr.number  = elf.sections.size;
+                        break;
+                    }
+                    case section::type_t::tls:
+                    case section::type_t::reloc:
+                    case section::type_t::import:
+                    case section::type_t::export_:
+                    case section::type_t::resource:
+                    case section::type_t::exception: {
+                        auto& hdr = array::append(elf.segments);
+                        hdr = {};
+                        hdr.section = section;
+                        hdr.number  = elf.segments.size;
+                        break;
+                    }
+                }
+            }
 
             switch (file->machine) {
                 case machine::type_t::unknown:
@@ -216,7 +179,8 @@ namespace basecode::objfmt::container {
         }
 
         u0 free(elf_t& elf) {
-            UNUSED(elf);
+            array::free(elf.sections);
+            array::free(elf.segments);
         }
 
         u64 hash(const u8* name) {
@@ -248,25 +212,19 @@ namespace basecode::objfmt::container {
             session::write_u64(s, elf.program.offset);
             session::write_u64(s, elf.section.offset);
             session::write_u32(s, elf.proc_flags);
-            session::write_u16(s, elf.header_size);
-            session::write_u16(s, elf.headers.size_program);
-            session::write_u16(s, elf.headers.num_program);
-            session::write_u16(s, elf.headers.size_section);
-            session::write_u16(s, elf.headers.num_section);
+            session::write_u16(s, elf::file::header_size);
+            session::write_u16(s, elf::segment::header_size);
+            session::write_u16(s, elf.segments.size);
+            session::write_u16(s, elf::section::header_size);
+            session::write_u16(s, elf.sections.size);
             session::write_u16(s, elf.str_ndx);
         }
 
         status_t init(elf_t& elf, const elf_opts_t& opts) {
             elf.alloc       = opts.alloc;
-            elf.header_size          = 64;
-            elf.entry_point          = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
-            elf.headers.section      = opts.headers.section;
-            elf.headers.num_section  = opts.headers.num_section;
-            elf.headers.size_section = opts.headers.size_section;
-            elf.headers.program      = opts.headers.program;
-            elf.headers.num_program  = opts.headers.num_program;
-            elf.headers.size_program = opts.headers.size_program;
-
+            array::init(elf.sections, elf.alloc);
+            array::init(elf.segments, elf.alloc);
+            elf.entry_point = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
             return status_t::ok;
         }
 
@@ -289,7 +247,7 @@ namespace basecode::objfmt::container {
             session::write_u64(s, info);
         }
 
-        u0 write_section_header(session_t& s, elf_t& elf, section_hdr_t& hdr) {
+        u0 write_section_header(session_t& s, elf_t& elf, elf_section_hdr_t& hdr) {
             session::write_u32(s, hdr.name_index);
             session::write_u32(s, hdr.type);
             session::write_u64(s, hdr.flags);
@@ -303,7 +261,13 @@ namespace basecode::objfmt::container {
             session::write_u64(s, hdr.entry_size);
         }
 
-        u0 write_pgm_section_header(session_t& s, elf_t& elf, program_hdr_t& hdr) {
+        u0 write_rela(session_t& s, elf_t& elf, u64 offset, u64 info, s64 addend) {
+            session::write_u64(s, offset);
+            session::write_u64(s, info);
+            session::write_s64(s, addend);
+        }
+
+        u0 write_pgm_section_header(session_t& s, elf_t& elf, elf_program_hdr_t& hdr) {
             session::write_u32(s, hdr.type);
             session::write_u32(s, hdr.flags);
             session::write_u64(s, hdr.file.offset);
@@ -312,12 +276,6 @@ namespace basecode::objfmt::container {
             session::write_u64(s, hdr.file.size);
             session::write_u64(s, hdr.addr.size);
             session::write_u64(s, hdr.align);
-        }
-
-        u0 write_rela(session_t& s, elf_t& elf, u64 offset, u64 info, s64 addend) {
-            session::write_u64(s, offset);
-            session::write_u64(s, info);
-            session::write_s64(s, addend);
         }
 
         status_t get_section_name(const objfmt::section_t* section, str::slice_t& name) {

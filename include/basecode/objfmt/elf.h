@@ -81,7 +81,7 @@ namespace basecode::objfmt::container {
         u8                      other;
     };
 
-    struct section_hdr_t final {
+    struct elf_section_hdr_t final {
         const section_t*        section;
         struct {
             u64                 base;
@@ -99,7 +99,7 @@ namespace basecode::objfmt::container {
         u32                     name_index;
     };
 
-    struct program_hdr_t final {
+    struct elf_program_hdr_t final {
         const section_t*        section;
         struct {
             u64                 offset;
@@ -116,21 +116,18 @@ namespace basecode::objfmt::container {
         u32                     number;
     };
 
+    using elf_sect_hdr_list_t    = array_t<elf_section_hdr_t>;
+    using elf_prog_hdr_list_t    = array_t<elf_program_hdr_t>;
+
     struct elf_opts_t final {
         alloc_t*                alloc;
         u64                     entry_point;
-        struct {
-            section_hdr_t*      section;
-            program_hdr_t*      program;
-            u16                 num_section;
-            u16                 num_program;
-            u16                 size_section;
-            u16                 size_program;
-        }                       headers;
     };
 
     struct elf_t final {
         alloc_t*                alloc;
+        elf_sect_hdr_list_t     sections;
+        elf_prog_hdr_list_t     segments;
         u64                     entry_point;
         struct {
             u64                 offset;
@@ -138,17 +135,8 @@ namespace basecode::objfmt::container {
         struct {
             u64                 offset;
         }                       section;
-        struct {
-            section_hdr_t*      section;
-            program_hdr_t*      program;
-            u16                 num_section;
-            u16                 num_program;
-            u16                 size_section;
-            u16                 size_program;
-        }                       headers;
         u32                     proc_flags;
         u16                     machine;
-        u16                     header_size;
         u16                     str_ndx;
     };
 
@@ -187,6 +175,8 @@ namespace basecode::objfmt::container {
                 dyn,
                 core
             };
+
+            [[maybe_unused]] constexpr u16 header_size  = 64;
         }
 
         namespace dynamic {
@@ -218,6 +208,41 @@ namespace basecode::objfmt::container {
             };
         }
 
+        namespace section {
+            enum class type_t : u8 {
+                null_,
+                progbits,
+                symtab,
+                strtab,
+                rela,
+                hash,
+                dynamic,
+                note,
+                nobits,
+                rel,
+                shlib,
+                dynsym,
+            };
+
+            [[maybe_unused]] constexpr u16 header_size  = 64;
+
+            namespace indexes {
+                [[maybe_unused]] constexpr u32 undef            = 0;
+                [[maybe_unused]] constexpr u32 live_patch       = 0xff20;
+                [[maybe_unused]] constexpr u32 live_abs         = 0xfff1;
+                [[maybe_unused]] constexpr u32 live_common      = 0xfff2;
+            }
+
+            namespace flags {
+                [[maybe_unused]] constexpr u32 write            = 0x1;
+                [[maybe_unused]] constexpr u32 alloc            = 0x2;
+                [[maybe_unused]] constexpr u32 exec_instr       = 0x4;
+                [[maybe_unused]] constexpr u32 rela_live_patch  = 0x0010000;
+                [[maybe_unused]] constexpr u32 ro_after_init    = 0x0020000;
+                [[maybe_unused]] constexpr u32 mask_proc        = 0xf000000;
+            }
+        }
+
         namespace segment {
             enum class type_t : u32 {
                 null_,
@@ -229,6 +254,14 @@ namespace basecode::objfmt::container {
                 pgm_hdr,
                 tls,
             };
+
+            enum class permissions_t : u8 {
+                read    = 0x4,
+                write   = 0x2,
+                exec    = 0x1,
+            };
+
+            [[maybe_unused]] constexpr u16 header_size  = 56;
         }
 
         namespace symbol_table {
@@ -249,47 +282,6 @@ namespace basecode::objfmt::container {
             };
         }
 
-        namespace section {
-            enum class type_t : u8 {
-                null_,
-                progbits,
-                symtab,
-                strtab,
-                rela,
-                hash,
-                dynamic,
-                note,
-                nobits,
-                rel,
-                shlib,
-                dynsym,
-            };
-
-            namespace indexes {
-                [[maybe_unused]] constexpr u32 undef            = 0;
-                [[maybe_unused]] constexpr u32 live_patch       = 0xff20;
-                [[maybe_unused]] constexpr u32 live_abs         = 0xfff1;
-                [[maybe_unused]] constexpr u32 live_common      = 0xfff2;
-            }
-
-            namespace flags {
-                [[maybe_unused]] constexpr u32 write            = 0x1;
-                [[maybe_unused]] constexpr u32 alloc            = 0x2;
-                [[maybe_unused]] constexpr u32 exec_instr       = 0x4;
-                [[maybe_unused]] constexpr u32 rela_live_patch  = 0x0010000;
-                [[maybe_unused]] constexpr u32 ro_after_init    = 0x0020000;
-                [[maybe_unused]] constexpr u32 mask_proc        = 0xf000000;
-            }
-
-            namespace program_header {
-                enum class permissions_t : u8 {
-                    read    = 0x4,
-                    write   = 0x2,
-                    exec    = 0x1,
-                };
-            }
-        }
-
         system_t* system();
 
         u0 free(elf_t& elf);
@@ -306,11 +298,11 @@ namespace basecode::objfmt::container {
 
         u0 write_rel(session_t& s, elf_t& elf, u64 offset, u64 info);
 
-        u0 write_section_header(session_t& s, elf_t& elf, section_hdr_t& hdr);
+        u0 write_section_header(session_t& s, elf_t& elf, elf_section_hdr_t& hdr);
 
         u0 write_rela(session_t& s, elf_t& elf, u64 offset, u64 info, s64 addend);
 
-        u0 write_pgm_section_header(session_t& s, elf_t& elf, program_hdr_t& hdr);
+        u0 write_pgm_section_header(session_t& s, elf_t& elf, elf_program_hdr_t& hdr);
 
         status_t get_section_name(const objfmt::section_t* section, str::slice_t& name);
 

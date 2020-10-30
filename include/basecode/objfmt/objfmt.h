@@ -34,13 +34,13 @@ namespace basecode::objfmt {
     namespace section {
         u0 free(section_t& section);
 
-        u0 reserve(section_t* section, u64 size);
+        result_t reserve(file_t& file, section_id id, u64 size);
 
-        import_t* get_import(section_t* section, import_id id);
+        import_t* get_import(file_t& file, section_id id, import_id import);
 
-        u0 data(section_t* section, const u8* data, u32 length);
+        result_t import_module(file_t& file, section_id id, symbol_id symbol);
 
-        result_t import_module(section_t* section, symbol_id symbol);
+        result_t data(file_t& file, section_id id, const u8* data, u32 length);
 
         status_t init(section_t& section, section::type_t type, symbol_id symbol);
     }
@@ -56,13 +56,13 @@ namespace basecode::objfmt {
 
         symbol_t* find_symbol(const file_t& file, const s8* name, s32 len = -1);
 
-        result_t make_section(file_t& file, section::type_t type, symbol_id symbol = {});
-
         u0 find_sections(const file_t& file, symbol_id symbol, section_ptr_list_t& list);
 
         const symbol_t* find_symbol(const file_t& file, const String_Concept auto& name) {
             return find_symbol(file, (const s8*) name.data, name.length);
         }
+
+        result_t make_section(file_t& file, section::type_t type, const section_opts_t& opts = {});
 
         result_t make_symbol(file_t& file, const symbol_opts_t& opts, const s8* name, s32 len = -1);
 

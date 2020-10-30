@@ -31,16 +31,32 @@ TEST_CASE("basecode::objfmt ELF test") {
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    file_t rot13_pgm{};
-    REQUIRE(OK(file::init(rot13_pgm)));
-    defer(file::free(rot13_pgm));
-    path::set(rot13_pgm.path, "rot13");
-    rot13_pgm.machine = machine::type_t::x86_64;
+    file_t elf_file{};
+    REQUIRE(OK(file::init(elf_file)));
+    defer(file::free(elf_file));
+    path::set(elf_file.path, "rot13");
+    elf_file.machine = machine::type_t::x86_64;
+
+    /* .rdata section */ {
+        auto rdata_rc = file::make_section(elf_file,
+                                           section::type_t::data,
+                                           {
+                                               .flags = {
+                                                   .data = true,
+                                                   .init = true,
+                                                   .read = true,
+                                               }
+                                           });
+        auto rdata = file::get_section(elf_file, rdata_rc.id);
+        section::data(elf_file, rdata_rc.id, s_rot13_table, sizeof(s_rot13_table));
+        REQUIRE(OK(rdata_rc.status));
+        REQUIRE(rdata);
+    }
 
     container::session_t s{};
     container::session::init(s);
     defer(container::session::free(s));
-    s.file                  = &rot13_pgm;
+    s.file                  = &elf_file;
     s.type                  = container::type_t::elf;
     s.output_type           = container::output_type_t::exe;
     s.versions.linker.major = 6;

@@ -21,6 +21,15 @@
 #include <basecode/objfmt/container.h>
 
 namespace basecode::objfmt::container {
+    struct coff_symbol_t;
+    struct coff_aux_record_t;
+    struct coff_section_hdr_t;
+
+    using coff_symbol_list_t    = array_t<coff_symbol_t>;
+    using coff_string_list_t    = array_t<str::slice_t>;
+    using coff_aux_list_t       = array_t<coff_aux_record_t>;
+    using section_hdr_list_t    = array_t<coff_section_hdr_t>;
+
     struct rva_t final {
         u32                     base;
         u32                     size;
@@ -31,9 +40,61 @@ namespace basecode::objfmt::container {
         u32                     size;
     };
 
-    struct section_hdr_t final {
+    enum class coff_aux_record_type_t : u8 {
+        xf,
+        file,
+        section,
+        func_def,
+        weak_extern,
+    };
+
+    struct coff_aux_record_t final {
+        union {
+            struct {
+                coff_symbol_t*  sym;
+            }                   file;
+            struct {
+                u32             ptr_next_func;
+                u16             line_num;
+            }                   xf;
+            struct {
+                u32             tag_idx;
+                u32             flags;
+            }                   weak_extern;
+            struct {
+                u32             tag_idx;
+                u32             total_size;
+                u32             ptr_line_num;
+                u32             ptr_next_func;
+            }                   func_def;
+            struct {
+                u32             len;
+                u32             check_sum;
+                u16             num_relocs;
+                u16             num_lines;
+                u16             sect_num;
+                u8              comdat_sel;
+            }                   section;
+        };
+        coff_aux_record_type_t  type;
+    };
+
+    struct coff_symbol_t final {
+        coff_aux_list_t         aux_records;
+        union {
+            u64                 offset;
+            str::slice_t        slice;
+        }                       name;
+        u32                     value;
+        symbol::type_t          type;
+        s16                     section;
+        storage::class_t        sclass;
+        b8                      inlined;
+    };
+
+    struct coff_section_hdr_t final {
         const section_t*        section;
-        str::slice_t            name;
+        coff_symbol_t*          symbol;
         u32                     rva;
         u32                     size;
         u32                     number;
@@ -43,10 +104,18 @@ namespace basecode::objfmt::container {
     };
 
     struct coff_t final {
-        section_hdr_t*          hdrs;
-        u32                     num_hdrs;
+        alloc_t*                alloc;
+        section_hdr_list_t      headers;
         u32                     rva;
         u32                     offset;
+        struct {
+            raw_t               file;
+            coff_string_list_t  list;
+        }                       string_table;
+        struct {
+            raw_t               file;
+            coff_symbol_list_t  list;
+        }                       symbol_table;
         struct {
             u32                 image;
             u32                 headers;
@@ -62,8 +131,6 @@ namespace basecode::objfmt::container {
         rva_t                   relocs;
         rva_t                   init_data;
         rva_t                   uninit_data;
-        raw_t                   symbol_table;
-        raw_t                   string_table;
         u16                     machine;
     };
 
@@ -123,8 +190,24 @@ namespace basecode::objfmt::container {
             [[maybe_unused]] constexpr u32 bytes_reversed_hi            = 0x8000;
         }
 
+        namespace string_table {
+            u0 free(coff_t& coff);
+
+            u0 init(coff_t& coff, alloc_t* alloc);
+
+            u32 add(coff_t& coff, str::slice_t str);
+        }
+
         namespace symbol_table {
             [[maybe_unused]] constexpr u32 entry_size                   = 0x12;
+
+            u0 free(coff_t& sym);
+
+            u0 init(coff_t& sym, alloc_t* alloc);
+
+            coff_symbol_t* make_symbol(coff_t& coff, str::slice_t name);
+
+            coff_aux_record_t* make_aux_record(coff_t& coff, coff_symbol_t* sym, coff_aux_record_type_t type);
         }
 
         system_t* system();
@@ -132,10 +215,12 @@ namespace basecode::objfmt::container {
         u0 free(coff_t& coff);
 
         status_t init(coff_t& coff,
-                      section_hdr_t* hdrs,
-                      u32 num_hdrs,
-                      objfmt::machine::type_t machine,
+                      const file_t* file,
                       alloc_t* alloc);
+
+        u0 update_symbol_table(coff_t& coff);
+
+        u0 write_string_table(session_t& s, coff_t& coff);
 
         u0 write_symbol_table(session_t& s, coff_t& coff);
 
@@ -145,24 +230,16 @@ namespace basecode::objfmt::container {
 
         status_t write_sections_data(session_t& s, coff_t& coff);
 
-        u0 write_aux_file_record(session_t& s, str::slice_t name);
+        u0 write_aux_record(session_t& s, const coff_aux_record_t& record);
 
         u0 write_header(session_t& s, coff_t& coff, u16 opt_hdr_size = {});
 
-        u0 write_aux_xf_record(session_t& s, u16 line_num, u32 ptr_next_func);
+        status_t build_section(session_t& s, coff_t& coff, coff_section_hdr_t& hdr);
 
-        u0 write_aux_weak_extern_record(session_t& s, u32 tag_idx, u32 flags);
-
-        status_t build_section(session_t& s, coff_t& coff, section_hdr_t& hdr);
-
-        u0 write_section_header(session_t& s, coff_t& coff, section_hdr_t& hdr);
-
-        status_t write_section_data(session_t& s, coff_t& coff, section_hdr_t& hdr);
+        u0 write_section_header(session_t& s, coff_t& coff, coff_section_hdr_t& hdr);
 
         status_t get_section_name(const objfmt::section_t* section, str::slice_t& name);
 
-        u0 write_aux_funcdef_record(session_t& s, u32 tag_idx, u32 total_size, u32 ptr_line_num, u32 ptr_next_func);
-
-        u0 write_aux_section_record(session_t& s, u32 len, u16 num_relocs, u16 num_lines, u32 check_sum, u16 sect_num, u8 comdat_sel);
+        status_t write_section_data(session_t& s, coff_t& coff, coff_section_hdr_t& hdr);
     }
 }

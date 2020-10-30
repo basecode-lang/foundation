@@ -63,7 +63,8 @@ namespace basecode::objfmt {
         not_implemented                 = 2011,
         invalid_machine_type            = 2012,
         invalid_output_type             = 2013,
-        cannot_map_section_name         = 2014
+        cannot_map_section_name         = 2014,
+        section_not_found               = 2015,
     };
 
     namespace symbol {
@@ -254,11 +255,17 @@ namespace basecode::objfmt {
         const file_t*           file;
         symbol_list_t           symbols;
         section_subclass_t      subclass;
+        u32                     align;
         symbol_id               symbol;
         section_id              id;
         section::flags_t        flags;
         section::type_t         type;
-        u8                      align;
+    };
+
+    struct section_opts_t final {
+        symbol_id               symbol;
+        section::flags_t        flags;
+        u32                     align;
     };
 
     struct version_t final {
