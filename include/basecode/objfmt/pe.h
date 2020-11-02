@@ -22,10 +22,14 @@
 
 namespace basecode::objfmt::container {
     struct pe_thunk_t;
+    struct pe_reloc_t;
     struct pe_name_hint_t;
+    struct pe_export_addr_t;
     struct pe_import_module_t;
 
+    using pe_reloc_list_t               = array_t<pe_reloc_t>;
     using pe_name_hint_list_t           = array_t<pe_name_hint_t>;
+    using pe_export_addr_list_t         = array_t<pe_export_addr_t>;
     using pe_import_module_list_t       = array_t<pe_import_module_t>;
 
     enum dir_type_t : u8 {
@@ -38,7 +42,7 @@ namespace basecode::objfmt::container {
         global_table                = 8,
         resource_table              = 2,
         exception_table             = 3,
-        relocation_table            = 5,
+        base_reloc_table            = 5,
         certificate_table           = 4,
         load_config_table           = 10,
         bound_import_table          = 11,
@@ -56,6 +60,15 @@ namespace basecode::objfmt::container {
             }                   thunk;
             u64                 bits;
         };
+    };
+
+    struct pe_debug_t final {
+        u32                     flags;
+        u32                     time_stamp;
+        version_t               version;
+        u32                     type;
+        rva_t                   mem;
+        raw_t                   file;
     };
 
     struct pe_name_hint_t final {
@@ -88,9 +101,60 @@ namespace basecode::objfmt::container {
         }                       name_hints;
     };
 
+    struct pe_export_addr_t final {
+        struct {
+            str::slice_t        slice;
+            rva_t               rva;
+        }                       name;
+        u32                     rva;
+        u16                     ordinal;
+    };
+
+    // 40-byte header struct
+    //      export_address_table_rva    = .table.base
+    //      1...n   32-bit rva values
+    //
+    //      ordinals.base               = 1
+    //      1...n   16-bit ordinal index into export_address_table_rva
+    //
+    //      name.pointers
+    //      1...n   32-bit rva to null terminated string
+    //
+    struct pe_export_t final {
+        pe_export_addr_list_t   exports;
+        u32                     flags;
+        u32                     time_stamp;
+        version_t               version;
+        struct {
+            str::slice_t        name;
+            rva_t               rva;
+        }                       module;
+        struct {
+            rva_t               table;
+            u32                 base;
+        }                       ordinal;
+        struct {
+            rva_t               table;
+            rva_t               pointers;
+        }                       name;
+        rva_t                   table;
+    };
+
+    struct pe_reloc_t final {
+        u16                     offset: 12;
+        u16                     type:   4;
+    };
+
+    struct pe_base_reloc_t final {
+        pe_reloc_list_t         relocs;
+        rva_t                   page;
+    };
+
     struct pe_dir_t final {
         union {
             pe_import_t         import;
+            pe_export_t         export_;
+            pe_base_reloc_t     base_reloc;
         }                       subclass;
         rva_t                   rva;
         dir_type_t              type;
@@ -129,6 +193,12 @@ namespace basecode::objfmt::container {
     };
 
     namespace pe {
+        namespace base_reloc {
+            namespace type {
+                [[maybe_unused]] constexpr u8 unknown  = 0;
+            }
+        }
+
         namespace dir_entry {
             u0 free(pe_t& pe, dir_type_t type);
 

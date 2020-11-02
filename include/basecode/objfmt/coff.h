@@ -40,6 +40,13 @@ namespace basecode::objfmt::container {
         u32                     size;
     };
 
+    // .pdata
+    struct coff_exception_t final {
+        u32                     begin_rva;
+        u32                     end_rva;
+        u32                     unwind_info;
+    };
+
     enum class coff_aux_record_type_t : u8 {
         xf,
         file,
@@ -103,6 +110,11 @@ namespace basecode::objfmt::container {
         raw_t                   line_nums;
     };
 
+    // .debug$S (symbolic info)
+    // .debug$T (type info)
+    struct coff_debug_t final {
+    };
+
     struct coff_t final {
         alloc_t*                alloc;
         section_hdr_list_t      headers;
@@ -136,6 +148,11 @@ namespace basecode::objfmt::container {
 
     namespace coff {
         [[maybe_unused]] constexpr u32 header_size                      = 0x14;
+
+        namespace debug {
+            [[maybe_unused]] constexpr u32 unknown                      = 0;
+            [[maybe_unused]] constexpr u32 code_view                    = 2;
+        }
 
         namespace machine {
             [[maybe_unused]] constexpr u16 amd64                        = 0x8664;

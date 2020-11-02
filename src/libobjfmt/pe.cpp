@@ -176,7 +176,7 @@ namespace basecode::objfmt::container {
                     case global_table:break;
                     case resource_table:break;
                     case exception_table:break;
-                    case relocation_table:break;
+                    case base_reloc_table:break;
                     case load_config_table:break;
                     case certificate_table:break;
                     case architecture_table:break;
@@ -207,7 +207,7 @@ namespace basecode::objfmt::container {
                     case resource_table:break;
                     case exception_table:break;
                     case certificate_table:break;
-                    case relocation_table:break;
+                    case base_reloc_table:break;
                     case architecture_table:break;
                     case load_config_table:break;
                     case bound_import_table:break;
