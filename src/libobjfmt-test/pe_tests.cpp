@@ -35,10 +35,10 @@ static const u8 s_rot13_code[] = {
     0x57,                                           //000000000401005: 57                      push        rdi
     0x48,0x83,0xec,0x30,                            //000000000401006: 48 83 EC 30             sub         rsp,30h
     0xb9,0xf6,0xff,0xff,0xff,                       //00000000040100A: B9 F6 FF FF FF          mov         ecx,0FFFFFFF6h
-    0xff,0x15,0xeb,0x1f,0x00,0x00,                  //00000000040100F: FF 15 00 00 00 00       call        qword ptr [__imp_GetStdHandle]
+    0xff,0x15,0x40,0x20,0x00,0x00,                  //00000000040100F: FF 15 00 00 00 00       call        qword ptr [__imp_GetStdHandle]
     0xb9,0xf5,0xff,0xff,0xff,                       //000000000401015: B9 F5 FF FF FF          mov         ecx,0FFFFFFF5h
     0x48,0x8b,0xd8,                                 //00000000040101A: 48 8B D8                mov         rbx,rax
-    0xff,0x15,0xdd,0x1f,0x00,0x00,                  //00000000040101D: FF 15 00 00 00 00       call        qword ptr [__imp_GetStdHandle]
+    0xff,0x15,0x32,0x20,0x00,0x00,                  //00000000040101D: FF 15 00 00 00 00       call        qword ptr [__imp_GetStdHandle]
     0x48,0x8b,0xf8,                                 //000000000401023: 48 8B F8                mov         rdi,rax
     0xeb,0x4f,                                      //000000000401026: EB 4F                   jmp         0000000000000077
     0x83,0x64,0x24,0x48,0x00,                       //000000000401028: 83 64 24 48 00          and         dword ptr [rsp+48h],0
@@ -59,13 +59,13 @@ static const u8 s_rot13_code[] = {
     0x44,0x8b,0xc2,                                 //000000000401064: 44 8B C2                mov         r8d,edx
     0x48,0x8b,0xcf,                                 //000000000401067: 48 8B CF                mov         rcx,rdi
     0x48,0x8d,0x15,0x8f,0x2f,0x00,0x00,             //00000000040106A: 48 8D 15 00 00 00 00    lea         rdx,[buffer]
-    0xff,0x15,0x99,0x1f,0x00,0x00,                  //000000000401071: FF 15 00 00 00 00       call        qword ptr [__imp_WriteFile]
+    0xff,0x15,0xee,0x1f,0x00,0x00,                  //000000000401071: FF 15 00 00 00 00       call        qword ptr [__imp_WriteFile]
     0x48,0x83,0x64,0x24,0x20,0x00,                  //000000000401077: 48 83 64 24 20 00       and         qword ptr [rsp+20h],0
     0x4c,0x8d,0x4c,0x24,0x40,                       //00000000040107D: 4C 8D 4C 24 40          lea         r9,[rsp+40h]
     0x41,0xb8,0x00,0x10,0x00,0x00,                  //000000000401082: 41 B8 00 10 00 00       mov         r8d,1000h
     0x48,0x8d,0x15,0x71,0x2f,0x00,0x00,             //000000000401088: 48 8D 15 00 00 00 00    lea         rdx,[buffer]
     0x48,0x8b,0xcb,                                 //00000000040108F: 48 8B CB                mov         rcx,rbx
-    0xff,0x15,0x70,0x1f,0x00,0x00,                  //000000000401092: FF 15 00 00 00 00       call        qword ptr [__imp_ReadFile]
+    0xff,0x15,0xc5,0x1f,0x00,0x00,                  //000000000401092: FF 15 00 00 00 00       call        qword ptr [__imp_ReadFile]
     0x8b,0x54,0x24,0x40,                            //000000000401098: 8B 54 24 40             mov         edx,dword ptr [rsp+40h]
     0x85,0xd2,                                      //00000000040109C: 85 D2                   test        edx,edx
     0x75,0x88,                                      //00000000040109E: 75 88                   jne         0000000000000028

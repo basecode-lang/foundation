@@ -155,7 +155,75 @@ namespace basecode::objfmt::container {
     }
 
     namespace pe {
+        namespace dir_entry {
+            u0 free(pe_t& pe, dir_type_t type) {
+                auto& entry = pe.dirs[u32(type)];
+                if (!entry.init)
+                    return;
+                switch (type) {
+                    case tls_table:break;
+                    case com_header:break;
+                    case debug_table:
+                        break;
+                    case export_table:
+                        break;
+                    case import_table: {
+                        auto& import = entry.subclass.import;
+                        for (auto& module : import.modules)
+                            array::free(module.symbols);
+                        array::free(import.modules);
+                        break;
+                    }
+                    case global_table:break;
+                    case resource_table:break;
+                    case exception_table:break;
+                    case relocation_table:break;
+                    case load_config_table:break;
+                    case certificate_table:break;
+                    case architecture_table:break;
+                    case bound_import_table:break;
+                    case import_address_table:break;
+                    case delay_import_descriptor:break;
+                    default:
+                        break;
+                }
+            }
+
+            status_t init(pe_t& pe, dir_type_t type) {
+                auto& entry = pe.dirs[u32(type)];
+                if (entry.init)
+                    return status_t::ok;
+                switch (type) {
+                    case tls_table:break;
+                    case com_header:break;
+                    case debug_table:break;
+                    case export_table:break;
+                    case import_table: {
+                        auto& import = entry.subclass.import;
+                        array::init(import.modules, pe.coff.alloc);
+                        break;
+                    }
+                    case global_table:break;
+                    case resource_table:break;
+                    case exception_table:break;
+                    case certificate_table:break;
+                    case relocation_table:break;
+                    case architecture_table:break;
+                    case load_config_table:break;
+                    case bound_import_table:break;
+                    case import_address_table:break;
+                    case delay_import_descriptor:break;
+                    default:
+                        break;
+                }
+                entry.init = true;
+                return status_t::ok;
+            }
+        }
+
         u0 free(pe_t& pe) {
+            for (u32 dir_type = 0; dir_type < max_dir_entry_count; ++dir_type)
+                dir_entry::free(pe, dir_type_t(dir_type));
             coff::free(pe.coff);
         }
 
@@ -179,7 +247,12 @@ namespace basecode::objfmt::container {
             // XXX: is this size constant for x64 images?
             pe.size.opt_hdr  = 0xf0;
 
-            ZERO_MEM(pe.dirs, pe.dirs);
+            for (u32 dir_type = 0; dir_type < max_dir_entry_count; ++dir_type) {
+                auto& dir_entry = pe.dirs[dir_type];
+                dir_entry.rva  = {};
+                dir_entry.init = false;
+                dir_entry.type = dir_type_t(dir_type);
+            }
 
             return status_t::ok;
         }
@@ -258,8 +331,8 @@ namespace basecode::objfmt::container {
             session::write_u32(s, max_dir_entry_count);
 
             for (const auto& dir : pe.dirs) {
-                session::write_u32(s, dir.base);
-                session::write_u32(s, dir.size);
+                session::write_u32(s, dir.rva.base);
+                session::write_u32(s, dir.rva.size);
             }
         }
 
@@ -295,6 +368,27 @@ namespace basecode::objfmt::container {
             return status_t::ok;
         }
 
+        //
+        // 0x....3000: import directory table
+        //      import lookup table rva:    0x.....301c
+        //      time/date stamp             (time_t)
+        //      forwarder chain             (module name rva + name rva)
+        //      module name rva             0x.....3014
+        //      import address table rva    0x.....3055
+        //
+        //          ...
+        //
+        //      20-byte null sentinel value
+        //
+        // 0x.....3014: kernel32.dll\0
+        // 0x.....301c: import directory table:
+        //      1...n 8-byte thunk values
+        //      0     8-byte null marker
+        //
+        //
+        // 0x.....3055: import address table
+        //      1...n 8-byte rva
+        //      0     8-byte null marker
         status_t build_section(session_t& s, pe_t& pe, coff_section_hdr_t& hdr) {
             auto& coff = pe.coff;
 
@@ -309,37 +403,85 @@ namespace basecode::objfmt::container {
                     return status_t::not_implemented;
                 }
                 case section::type_t::import: {
-                    auto& import_table = pe.dirs[dir_type_t::import_table];
-                    auto& import_address_table = pe.dirs[dir_type_t::import_address_table];
+                    status_t status;
+
+                    status = dir_entry::init(pe, dir_type_t::import_table);
+                    if (!OK(status))
+                        return status;
+
+                    status = dir_entry::init(pe, dir_type_t::import_address_table);
+                    if (!OK(status))
+                        return status;
+
                     const auto& imports = hdr.section->subclass.imports;
-                    import_address_table.base = coff.rva;
-                    u32 imported_count{};
-                    for (const auto& import : imports)
-                        imported_count += import.symbols.size;
-                    import_address_table.size = (imported_count + 1) * import_addr_table::entry_size;
-                    coff.rva += import_address_table.size;
 
-                    import_table.base = coff.rva;
-                    import_table.size = import_dir_table::entry_size * 2;
-                    coff.rva += import_table.size;
+                    auto& import_table_entry = pe.dirs[dir_type_t::import_table];
+                    import_table_entry.rva.base = coff.rva;
+                    import_table_entry.rva.size = (imports.size + 1) * import_dir_table::entry_size;
 
-                    pe.import_lookup_table.base = coff.rva;
-                    coff.rva += import_address_table.size;
+                    u32 num_symbols{};
+                    u32 size = import_dir_table::entry_size;
+                    for (const auto& import : imports) {
+                        num_symbols += import.symbols.size;
+                        const auto symbol    = file::get_symbol(*s.file, import.module);
+                        const auto intern_rc = string::interned::get(symbol->name);
+                        if (!OK(intern_rc.status))
+                            return status_t::symbol_not_found;
+                        size += import_dir_table::entry_size
+                            + (intern_rc.slice.length + 1)
+                            + ((import.symbols.size + 1) * import_lookup_table::entry_size);
+                    }
 
-                    pe.name_table.base = coff.rva;
-                    pe.name_table.size = (imported_count + 1) * name_table::entry_size;
-                    coff.rva += pe.name_table.size;
+                    auto& iat_entry = pe.dirs[dir_type_t::import_address_table];
+                    iat_entry.rva.base = import_table_entry.rva.base + size;
+                    iat_entry.rva.size = (num_symbols + 1) * import_addr_table::entry_size;
 
-                    hdr.size = coff.rva - import_address_table.base;
+                    auto& import_table  = import_table_entry.subclass.import;
+                    import_table.name_table.base = iat_entry.rva.base + iat_entry.rva.size;
+                    import_table.num_names = {};
+
+                    u32 name_table_rva = import_table.name_table.base;
+                    u32 lookup_rva = import_table_entry.rva.base + import_table_entry.rva.size;
+                    for (const auto& import : imports) {
+                        auto& module = array::append(import_table.modules);
+                        module.thunk_rva  = iat_entry.rva.base;
+                        module.fwd_chain  = {};
+                        module.time_stamp = {};
+                        {
+                            const auto symbol = file::get_symbol(*s.file, import.module);
+                            const auto symbol_intern = string::interned::get(symbol->name);
+                            if (!OK(symbol_intern.status))
+                                return status_t::symbol_not_found;
+                            module.name.slice = symbol_intern.slice;
+                            module.name.rva   = lookup_rva;
+                            lookup_rva += module.name.slice.length + 1;
+                        }
+                        module.lookup_rva = lookup_rva;
+                        lookup_rva += (import.symbols.size + 1) * import_lookup_table::entry_size;
+                        array::init(module.symbols, pe.coff.alloc);
+                        for (const auto& symbol_id : import.symbols) {
+                            auto& name_hint = array::append(module.symbols);
+                            name_hint.hint = 0;
+                            const auto symbol = file::get_symbol(*s.file, symbol_id);
+                            const auto symbol_intern = string::interned::get(symbol->name);
+                            if (!OK(symbol_intern.status))
+                                return status_t::symbol_not_found;
+                            name_hint.name     = symbol_intern.slice;
+                            name_hint.rva.base = name_table_rva;
+                            name_hint.pad      = (name_table_rva % 2) != 0;
+                            name_hint.rva.size = 2 + name_hint.name.length + 1 + (name_hint.pad ? 1 : 0);
+                            name_table_rva += name_hint.rva.size;
+                            import_table.name_table.size += name_hint.rva.size;
+                            ++import_table.num_names;
+                        }
+                    }
+
+                    hdr.size = (import_table.name_table.base + import_table.name_table.size) - import_table_entry.rva.base;
 
                     coff.init_data.size += hdr.size;
                     coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
                     coff.offset     = align(coff.offset + hdr.size, coff.align.file);
-                    coff.rva        = align(coff.rva, coff.align.section);
-
-                    // XXX: FIXME
-                    auto& section_rec = hdr.symbol->aux_records[0];
-                    section_rec.section.len = hdr.size;
+                    coff.rva        = align(coff.rva + hdr.size, coff.align.section);
 
                     break;
                 }
@@ -347,8 +489,12 @@ namespace basecode::objfmt::container {
                     auto status = coff::build_section(s, coff, hdr);
                     if (!OK(status))
                         return status;
+                    return status_t::ok;
                 }
             }
+
+            auto& section_rec = hdr.symbol->aux_records[0];
+            section_rec.section.len = hdr.size;
 
             return status_t::ok;
         }
@@ -358,64 +504,53 @@ namespace basecode::objfmt::container {
             if (type == section::type_t::data && !hdr.section->flags.init)
                 return status_t::ok;
 
-            const auto& sc = hdr.section->subclass;
             session::seek(s, hdr.offset);
 
             switch (type) {
                 case section::type_t::reloc: {
                     return status_t::not_implemented;
                 }
-                case section::type_t::export_: {
-                    return status_t::not_implemented;
-                }
                 case section::type_t::import: {
-                    const auto& imports = sc.imports;
-                    for (const auto& import : imports) {
-                        const auto module_symbol = file::get_symbol(*s.file, import.module);
-                        const auto module_intern = string::interned::get(module_symbol->name);
-
-                        // import address table
-                        u32 name_table_ptr = pe.name_table.base + name_table::entry_size;
-                        for (u32 j = 0; j < import.symbols.size; ++j) {
-                            session::write_u64(s, name_table_ptr);
-                            name_table_ptr += name_table::entry_size;
+                    const auto& iat_entry = pe.dirs[dir_type_t::import_address_table];
+                    const auto& import_table_entry = pe.dirs[dir_type_t::import_table];
+                    const auto& import_table  = import_table_entry.subclass.import;
+                    pe_name_hint_t name_hints[import_table.num_names];
+                    u32 name_idx{};
+                    for (const auto& module : import_table.modules) {
+                        session::write_u32(s, module.lookup_rva);
+                        session::write_u32(s, 0);
+                        session::write_u32(s, 0);
+                        session::write_u32(s, module.name.rva);
+                        session::write_u32(s, iat_entry.rva.base);
+                        for (const auto& name_hint : module.symbols)
+                            name_hints[name_idx++] = name_hint;
+                    }
+                    session::write_u32(s, 0);
+                    session::write_u32(s, 0);
+                    session::write_u32(s, 0);
+                    session::write_u32(s, 0);
+                    session::write_u32(s, 0);
+                    for (const auto& module : import_table.modules) {
+                        session::write_cstr(s, module.name.slice);
+                        for (const auto& name_hint : name_hints) {
+                            session::write_u64(s, name_hint.rva.base);
                         }
                         session::write_u64(s, 0);
-
-                        // import directory table
-                        session::write_u32(s, pe.import_lookup_table.base);
-                        session::write_u32(s, 0);
-                        session::write_u32(s, 0);
-                        session::write_u32(s, pe.name_table.base);
-                        session::write_u32(s, pe.dirs[dir_type_t::import_address_table].base);
-
-                        // null node
-                        session::write_u32(s, 0);
-                        session::write_u32(s, 0);
-                        session::write_u32(s, 0);
-                        session::write_u32(s, 0);
-                        session::write_u32(s, 0);
-
-                        // import lookup table
-                        name_table_ptr = pe.name_table.base + name_table::entry_size;
-                        for (u32 j = 0; j < import.symbols.size; ++j) {
-                            session::write_u64(s, name_table_ptr);
-                            name_table_ptr += name_table::entry_size;
-                        }
-                        session::write_u64(s, 0);
-
-                        // name table
-                        session::write_pad16(s, module_intern.slice);
-                        session::write_u8(s, 0);
-                        session::write_u8(s, 0);
-                        for (auto symbol_id : import.symbols) {
-                            const auto symbol = file::get_symbol(*s.file, symbol_id);
-                            const auto symbol_intern = string::interned::get(symbol->name);
-                            session::write_u16(s, 0);    // XXX: hint
-                            session::write_pad16(s, symbol_intern.slice);
-                        }
+                    }
+                    for (const auto& name_hint : name_hints) {
+                        session::write_u64(s, name_hint.rva.base);
+                    }
+                    session::write_u64(s, 0);
+                    for (const auto& name_hint : name_hints) {
+                        session::write_u16(s, name_hint.hint);
+                        session::write_cstr(s, name_hint.name);
+                        if (name_hint.pad)
+                            session::write_u8(s, 0);
                     }
                     break;
+                }
+                case section::type_t::export_: {
+                    return status_t::not_implemented;
                 }
                 default: {
                     auto status = coff::write_section_data(s, pe.coff, hdr);

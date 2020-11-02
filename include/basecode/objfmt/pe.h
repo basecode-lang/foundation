@@ -21,25 +21,71 @@
 #include <basecode/objfmt/coff.h>
 
 namespace basecode::objfmt::container {
+    struct pe_thunk_t;
+    struct pe_name_hint_t;
+    struct pe_import_module_t;
+
+    using pe_name_hint_list_t           = array_t<pe_name_hint_t>;
+    using pe_import_module_list_t       = array_t<pe_import_module_t>;
+
     enum dir_type_t : u8 {
-        export_table,
-        import_table,
-        resource_table,
-        exception_table,
-        certificate_table,
-        relocation_table,
-        debug_table,
-        architecture_table,
-        global_table,
-        tls_table,
-        load_config_table,
-        bound_import_table,
-        import_address_table,
-        delay_import_descriptor,
-        com_header,
-        reserved
+        reserved                    = 15,
+        tls_table                   = 9,
+        com_header                  = 14,
+        debug_table                 = 6,
+        export_table                = 0,
+        import_table                = 1,
+        global_table                = 8,
+        resource_table              = 2,
+        exception_table             = 3,
+        relocation_table            = 5,
+        certificate_table           = 4,
+        load_config_table           = 10,
+        bound_import_table          = 11,
+        architecture_table          = 7,
+        import_address_table        = 12,
+        delay_import_descriptor     = 13,
     };
-    constexpr u32 max_dir_entry_count = 16;
+    constexpr u32 max_dir_entry_count   = 16;
+
+    struct pe_thunk_t final {
+        u64                     by_ordinal: 1;
+        u64                     value:      63;
+    };
+
+    struct pe_name_hint_t final {
+        str::slice_t            name;
+        rva_t                   rva;
+        u16                     hint;
+        b8                      pad;
+    };
+
+    struct pe_import_module_t final {
+        pe_name_hint_list_t     symbols;
+        u32                     lookup_rva;
+        u32                     time_stamp;
+        u32                     fwd_chain;
+        struct {
+            str::slice_t        slice;
+            u32                 rva;
+        }                       name;
+        u32                     thunk_rva;
+    };
+
+    struct pe_import_t final {
+        pe_import_module_list_t modules;
+        rva_t                   name_table;
+        u32                     num_names;
+    };
+
+    struct pe_dir_t final {
+        union {
+            pe_import_t         import;
+        }                       subclass;
+        rva_t                   rva;
+        dir_type_t              type;
+        b8                      init;
+    };
 
     struct pe_t final {
         coff_t                  coff;
@@ -61,9 +107,7 @@ namespace basecode::objfmt::container {
             u32                 pad:                    31;
         }                       opts;
         u32                     start_offset;
-        rva_t                   name_table;
-        rva_t                   import_lookup_table;
-        rva_t                   dirs[max_dir_entry_count];
+        pe_dir_t                dirs[max_dir_entry_count];
     };
 
     struct pe_opts_t final {
@@ -75,6 +119,12 @@ namespace basecode::objfmt::container {
     };
 
     namespace pe {
+        namespace dir_entry {
+            u0 free(pe_t& pe, dir_type_t type);
+
+            status_t init(pe_t& pe, dir_type_t type);
+        }
+
         u0 free(pe_t& pe);
 
         system_t* system();
