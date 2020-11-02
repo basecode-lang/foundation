@@ -23,34 +23,71 @@
 namespace basecode::objfmt::container {
     struct pe_thunk_t;
     struct pe_reloc_t;
+    struct pe_res_data_t;
     struct pe_name_hint_t;
+    struct pe_res_entry_t;
     struct pe_export_addr_t;
     struct pe_import_module_t;
 
     using pe_reloc_list_t               = array_t<pe_reloc_t>;
+    using pe_res_data_list_t            = array_t<pe_res_data_t>;
+    using pe_res_entry_list_t           = array_t<pe_res_entry_t>;
     using pe_name_hint_list_t           = array_t<pe_name_hint_t>;
     using pe_export_addr_list_t         = array_t<pe_export_addr_t>;
+    using pe_tls_callback_list_t        = array_t<u64>;
     using pe_import_module_list_t       = array_t<pe_import_module_t>;
 
     enum dir_type_t : u8 {
-        reserved                    = 15,
-        tls_table                   = 9,
-        com_header                  = 14,
-        debug_table                 = 6,
-        export_table                = 0,
-        import_table                = 1,
-        global_table                = 8,
-        resource_table              = 2,
-        exception_table             = 3,
-        base_reloc_table            = 5,
-        certificate_table           = 4,
-        load_config_table           = 10,
-        bound_import_table          = 11,
-        architecture_table          = 7,
-        import_address_table        = 12,
-        delay_import_descriptor     = 13,
+        reserved                        = 15,
+        tls_table                       = 9,
+        com_header                      = 14,
+        debug_table                     = 6,
+        gp_register                     = 8,
+        export_table                    = 0,
+        import_table                    = 1,
+        resource_table                  = 2,
+        exception_table                 = 3,
+        base_reloc_table                = 5,
+        certificate_table               = 4,
+        load_config_table               = 10,
+        bound_import_table              = 11,
+        architecture_table              = 7,
+        import_address_table            = 12,
+        delay_import_descriptor         = 13,
     };
     constexpr u32 max_dir_entry_count   = 16;
+
+    struct pe_res_data_t final {
+        str::slice_t            data;
+        rva_t                   rva;
+        u32                     code_page;
+    };
+
+    struct pe_res_entry_t final {
+        u32                     id;
+        u32                     offset;
+        b8                      is_name;
+        b8                      is_subdir;
+    };
+
+    struct pe_res_t final {
+        pe_res_entry_list_t     entries;
+        pe_res_data_list_t      blocks;
+        u32                     flags;
+        u32                     time_stamp;
+        version_t               version;
+    };
+
+    struct pe_tls_t final {
+        pe_tls_callback_list_t  callbacks;
+        struct {
+            u64                 start_va;
+            u64                 end_va;
+        }                       raw_data;
+        u64                     index_addr;
+        u32                     size_zero_fill;
+        u32                     flags;
+    };
 
     struct pe_thunk_t final {
         union {
@@ -69,6 +106,51 @@ namespace basecode::objfmt::container {
         u32                     type;
         rva_t                   mem;
         raw_t                   file;
+    };
+
+    struct pe_load_cfg_t final {
+        u32                     flags;
+        u32                     time_stamp;
+        version_t               version;
+        struct {
+            u32                 clear;
+            u32                 set;
+        }                       global_flags;
+        u32                     critical_section_default_timeout;
+        struct {
+            u64                 free;
+            u64                 total;
+        }                       de_commit_threshold;
+        // x86 only
+        //u64                     lock_prefix_table;
+        u64                     maximum_allocation_size;
+        u64                     virtual_memory_threshold;
+        u64                     processor_affinity_mask;
+        u32                     process_heap_flags;
+        u16                     csd_version;
+        // write only
+        //u16                     reserved;
+        //u64                     edit_list;
+        u64                     security_cookie;
+        // x86 only
+        //u64                     se_handler_table;
+        //u64                     se_handler_count;
+        u64                     guard_cf_check_function_ptr;
+        u64                     guard_cf_dispatch_function_ptr;
+        struct {
+            u64                 addr;
+            u64                 size;
+        }                       guard_cf_function;
+        u32                     guard_flags;
+        u8                      code_integrity[12];
+        struct {
+            u64                 addr;
+            u64                 size;
+        }                       guard_address_taken;
+        struct {
+            u64                 addr;
+            u64                 size;
+        }                       guard_long_jump_target;
     };
 
     struct pe_name_hint_t final {
@@ -110,16 +192,6 @@ namespace basecode::objfmt::container {
         u16                     ordinal;
     };
 
-    // 40-byte header struct
-    //      export_address_table_rva    = .table.base
-    //      1...n   32-bit rva values
-    //
-    //      ordinals.base               = 1
-    //      1...n   16-bit ordinal index into export_address_table_rva
-    //
-    //      name.pointers
-    //      1...n   32-bit rva to null terminated string
-    //
     struct pe_export_t final {
         pe_export_addr_list_t   exports;
         u32                     flags;
@@ -152,8 +224,11 @@ namespace basecode::objfmt::container {
 
     struct pe_dir_t final {
         union {
+            pe_tls_t            tls;
+            pe_res_t            resources;
             pe_import_t         import;
             pe_export_t         export_;
+            pe_load_cfg_t       load_cfg;
             pe_base_reloc_t     base_reloc;
         }                       subclass;
         rva_t                   rva;

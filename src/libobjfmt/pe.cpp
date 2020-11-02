@@ -161,28 +161,33 @@ namespace basecode::objfmt::container {
                 if (!entry.init)
                     return;
                 switch (type) {
-                    case tls_table:break;
-                    case com_header:break;
-                    case debug_table:
+                    case tls_table: {
+                        auto& tls = entry.subclass.tls;
+                        array::free(tls.callbacks);
                         break;
-                    case export_table:
+                    }
+                    case export_table: {
+                        auto& export_ = entry.subclass.export_;
+                        array::free(export_.exports);
                         break;
+                    }
                     case import_table: {
                         auto& import = entry.subclass.import;
                         array::free(import.modules);
                         array::free(import.name_hints.list);
                         break;
                     }
-                    case global_table:break;
-                    case resource_table:break;
-                    case exception_table:break;
-                    case base_reloc_table:break;
-                    case load_config_table:break;
-                    case certificate_table:break;
-                    case architecture_table:break;
-                    case bound_import_table:break;
-                    case import_address_table:break;
-                    case delay_import_descriptor:break;
+                    case resource_table: {
+                        auto& resources = entry.subclass.resources;
+                        array::free(resources.entries);
+                        array::free(resources.blocks);
+                        break;
+                    }
+                    case base_reloc_table: {
+                        auto& base_reloc = entry.subclass.base_reloc;
+                        array::free(base_reloc.relocs);
+                        break;
+                    }
                     default:
                         break;
                 }
@@ -193,26 +198,33 @@ namespace basecode::objfmt::container {
                 if (entry.init)
                     return status_t::ok;
                 switch (type) {
-                    case tls_table:break;
-                    case com_header:break;
-                    case debug_table:break;
-                    case export_table:break;
+                    case tls_table: {
+                        auto& tls = entry.subclass.tls;
+                        array::init(tls.callbacks, pe.coff.alloc);
+                        break;
+                    }
+                    case export_table: {
+                        auto& export_ = entry.subclass.export_;
+                        array::init(export_.exports, pe.coff.alloc);
+                        break;
+                    }
                     case import_table: {
                         auto& import = entry.subclass.import;
                         array::init(import.modules, pe.coff.alloc);
                         array::init(import.name_hints.list, pe.coff.alloc);
                         break;
                     }
-                    case global_table:break;
-                    case resource_table:break;
-                    case exception_table:break;
-                    case certificate_table:break;
-                    case base_reloc_table:break;
-                    case architecture_table:break;
-                    case load_config_table:break;
-                    case bound_import_table:break;
-                    case import_address_table:break;
-                    case delay_import_descriptor:break;
+                    case resource_table: {
+                        auto& resources = entry.subclass.resources;
+                        array::init(resources.entries, pe.coff.alloc);
+                        array::init(resources.blocks, pe.coff.alloc);
+                        break;
+                    }
+                    case base_reloc_table: {
+                        auto& base_reloc = entry.subclass.base_reloc;
+                        array::init(base_reloc.relocs);
+                        break;
+                    }
                     default:
                         break;
                 }
