@@ -49,8 +49,13 @@ namespace basecode::objfmt::container {
     constexpr u32 max_dir_entry_count   = 16;
 
     struct pe_thunk_t final {
-        u64                     by_ordinal: 1;
-        u64                     value:      63;
+        union {
+            struct {
+                u64             value:      63;
+                u64             by_ordinal: 1;
+            }                   thunk;
+            u64                 bits;
+        };
     };
 
     struct pe_name_hint_t final {
@@ -61,7 +66,6 @@ namespace basecode::objfmt::container {
     };
 
     struct pe_import_module_t final {
-        pe_name_hint_list_t     symbols;
         u32                     lookup_rva;
         u32                     time_stamp;
         u32                     fwd_chain;
@@ -69,13 +73,19 @@ namespace basecode::objfmt::container {
             str::slice_t        slice;
             u32                 rva;
         }                       name;
-        u32                     thunk_rva;
+        struct {
+            u32                 start;
+            u32                 size;
+        }                       symbols;
+        u32                     iat_rva;
     };
 
     struct pe_import_t final {
         pe_import_module_list_t modules;
-        rva_t                   name_table;
-        u32                     num_names;
+        struct {
+            pe_name_hint_list_t list;
+            rva_t               rva;
+        }                       name_hints;
     };
 
     struct pe_dir_t final {

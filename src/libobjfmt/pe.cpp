@@ -169,9 +169,8 @@ namespace basecode::objfmt::container {
                         break;
                     case import_table: {
                         auto& import = entry.subclass.import;
-                        for (auto& module : import.modules)
-                            array::free(module.symbols);
                         array::free(import.modules);
+                        array::free(import.name_hints.list);
                         break;
                     }
                     case global_table:break;
@@ -201,6 +200,7 @@ namespace basecode::objfmt::container {
                     case import_table: {
                         auto& import = entry.subclass.import;
                         array::init(import.modules, pe.coff.alloc);
+                        array::init(import.name_hints.list, pe.coff.alloc);
                         break;
                     }
                     case global_table:break;
@@ -415,68 +415,63 @@ namespace basecode::objfmt::container {
 
                     const auto& imports = hdr.section->subclass.imports;
 
+                    auto& iat_entry          = pe.dirs[dir_type_t::import_address_table];
                     auto& import_table_entry = pe.dirs[dir_type_t::import_table];
+                    auto& import_table       = import_table_entry.subclass.import;
                     import_table_entry.rva.base = coff.rva;
                     import_table_entry.rva.size = (imports.size + 1) * import_dir_table::entry_size;
 
-                    u32 num_symbols{};
+                    u32 name_hint_offset{};
                     u32 size = import_dir_table::entry_size;
-                    for (const auto& import : imports) {
-                        num_symbols += import.symbols.size;
-                        const auto symbol    = file::get_symbol(*s.file, import.module);
-                        const auto intern_rc = string::interned::get(symbol->name);
-                        if (!OK(intern_rc.status))
-                            return status_t::symbol_not_found;
-                        size += import_dir_table::entry_size
-                            + (intern_rc.slice.length + 1)
-                            + ((import.symbols.size + 1) * import_lookup_table::entry_size);
-                    }
-
-                    auto& iat_entry = pe.dirs[dir_type_t::import_address_table];
-                    iat_entry.rva.base = import_table_entry.rva.base + size;
-                    iat_entry.rva.size = (num_symbols + 1) * import_addr_table::entry_size;
-
-                    auto& import_table  = import_table_entry.subclass.import;
-                    import_table.name_table.base = iat_entry.rva.base + iat_entry.rva.size;
-                    import_table.num_names = {};
-
-                    u32 name_table_rva = import_table.name_table.base;
                     u32 lookup_rva = import_table_entry.rva.base + import_table_entry.rva.size;
                     for (const auto& import : imports) {
                         auto& module = array::append(import_table.modules);
-                        module.thunk_rva  = iat_entry.rva.base;
-                        module.fwd_chain  = {};
-                        module.time_stamp = {};
+                        module.iat_rva = module.fwd_chain = module.time_stamp = {};
                         {
-                            const auto symbol = file::get_symbol(*s.file, import.module);
-                            const auto symbol_intern = string::interned::get(symbol->name);
-                            if (!OK(symbol_intern.status))
+                            const auto symbol    = file::get_symbol(*s.file, import.module);
+                            const auto intern_rc = string::interned::get(symbol->name);
+                            if (!OK(intern_rc.status))
                                 return status_t::symbol_not_found;
-                            module.name.slice = symbol_intern.slice;
+                            module.name.slice = intern_rc.slice;
                             module.name.rva   = lookup_rva;
                             lookup_rva += module.name.slice.length + 1;
+                            size += import_dir_table::entry_size
+                                    + (intern_rc.slice.length + 1)
+                                    + ((import.symbols.size + 1) * import_lookup_table::entry_size);
                         }
-                        module.lookup_rva = lookup_rva;
+                        module.lookup_rva    = lookup_rva;
+                        module.symbols.start = import_table.name_hints.list.size;
+                        module.symbols.size  = import.symbols.size;
                         lookup_rva += (import.symbols.size + 1) * import_lookup_table::entry_size;
-                        array::init(module.symbols, pe.coff.alloc);
-                        for (const auto& symbol_id : import.symbols) {
-                            auto& name_hint = array::append(module.symbols);
-                            name_hint.hint = 0;
-                            const auto symbol = file::get_symbol(*s.file, symbol_id);
-                            const auto symbol_intern = string::interned::get(symbol->name);
-                            if (!OK(symbol_intern.status))
+                        for (auto symbol_id : import.symbols) {
+                            const auto symbol    = file::get_symbol(*s.file, symbol_id);
+                            const auto intern_rc = string::interned::get(symbol->name);
+                            if (!OK(intern_rc.status))
                                 return status_t::symbol_not_found;
-                            name_hint.name     = symbol_intern.slice;
-                            name_hint.rva.base = name_table_rva;
-                            name_hint.pad      = (name_table_rva % 2) != 0;
+                            auto& name_hint = array::append(import_table.name_hints.list);
+                            name_hint.hint     = 0;
+                            name_hint.name     = intern_rc.slice;
+                            name_hint.rva.base = name_hint_offset;
+                            name_hint.pad      = (name_hint_offset % 2) != 0;
                             name_hint.rva.size = 2 + name_hint.name.length + 1 + (name_hint.pad ? 1 : 0);
-                            name_table_rva += name_hint.rva.size;
-                            import_table.name_table.size += name_hint.rva.size;
-                            ++import_table.num_names;
+                            name_hint_offset += name_hint.rva.size;
                         }
                     }
 
-                    hdr.size = (import_table.name_table.base + import_table.name_table.size) - import_table_entry.rva.base;
+                    iat_entry.rva.base = import_table_entry.rva.base + size;
+                    iat_entry.rva.size = (import_table.name_hints.list.size + 1) * import_addr_table::entry_size;
+
+                    import_table.name_hints.rva.base = iat_entry.rva.base + iat_entry.rva.size;
+                    import_table.name_hints.rva.size = name_hint_offset;
+
+                    for (auto& module : import_table.modules)
+                        module.iat_rva = iat_entry.rva.base;
+
+                    for (auto& name_hint : import_table.name_hints.list)
+                        name_hint.rva.base += import_table.name_hints.rva.base;
+
+                    hdr.size = (import_table.name_hints.rva.base + import_table.name_hints.rva.size)
+                        - import_table_entry.rva.base;
 
                     coff.init_data.size += hdr.size;
                     coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
@@ -514,16 +509,12 @@ namespace basecode::objfmt::container {
                     const auto& iat_entry = pe.dirs[dir_type_t::import_address_table];
                     const auto& import_table_entry = pe.dirs[dir_type_t::import_table];
                     const auto& import_table  = import_table_entry.subclass.import;
-                    pe_name_hint_t name_hints[import_table.num_names];
-                    u32 name_idx{};
                     for (const auto& module : import_table.modules) {
                         session::write_u32(s, module.lookup_rva);
                         session::write_u32(s, 0);
                         session::write_u32(s, 0);
                         session::write_u32(s, module.name.rva);
                         session::write_u32(s, iat_entry.rva.base);
-                        for (const auto& name_hint : module.symbols)
-                            name_hints[name_idx++] = name_hint;
                     }
                     session::write_u32(s, 0);
                     session::write_u32(s, 0);
@@ -532,16 +523,22 @@ namespace basecode::objfmt::container {
                     session::write_u32(s, 0);
                     for (const auto& module : import_table.modules) {
                         session::write_cstr(s, module.name.slice);
-                        for (const auto& name_hint : name_hints) {
-                            session::write_u64(s, name_hint.rva.base);
+                        for (const auto& name_hint : import_table.name_hints.list) {
+                            pe_thunk_t data{};
+                            data.thunk.by_ordinal = false;
+                            data.thunk.value      = name_hint.rva.base;
+                            session::write_u64(s, data.bits);
                         }
                         session::write_u64(s, 0);
                     }
-                    for (const auto& name_hint : name_hints) {
-                        session::write_u64(s, name_hint.rva.base);
+                    for (const auto& name_hint : import_table.name_hints.list) {
+                        pe_thunk_t data{};
+                        data.thunk.by_ordinal = false;
+                        data.thunk.value      = name_hint.rva.base;
+                        session::write_u64(s, data.bits);
                     }
                     session::write_u64(s, 0);
-                    for (const auto& name_hint : name_hints) {
+                    for (const auto& name_hint : import_table.name_hints.list) {
                         session::write_u16(s, name_hint.hint);
                         session::write_cstr(s, name_hint.name);
                         if (name_hint.pad)
