@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include <basecode/objfmt/types.h>
+#include <basecode/binfmt/types.h>
 
-namespace basecode::objfmt {
+namespace basecode::binfmt {
     namespace system {
         u0 fini();
 

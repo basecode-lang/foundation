@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include <basecode/objfmt/container.h>
+#include <basecode/binfmt/io.h>
 
-namespace basecode::objfmt::container {
+namespace basecode::binfmt::io {
     /* 64-bit ELF base types. */
 //    typedef __u64	Elf64_Addr;
 //    typedef __u16	Elf64_Half;
@@ -304,7 +304,7 @@ namespace basecode::objfmt::container {
 
         u0 write_pgm_section_header(session_t& s, elf_t& elf, elf_program_hdr_t& hdr);
 
-        status_t get_section_name(const objfmt::section_t* section, str::slice_t& name);
+        status_t get_section_name(const binfmt::section_t* section, str::slice_t& name);
 
         u0 write_note(session_t& s, elf_t& elf, u32 name_size, u32 desc_size, u32 type);
     }

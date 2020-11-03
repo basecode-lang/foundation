@@ -21,13 +21,13 @@
 #include <basecode/core/path.h>
 #include <basecode/core/intern.h>
 #include <basecode/core/hashtab.h>
-#include <basecode/objfmt/configure.h>
+#include <basecode/binfmt/configure.h>
 #include <basecode/core/memory/system/slab.h>
 
 #define SYMBOL_DERIVED_TYPE(type)   (u32((type)) >> 16U & 0xffffU)
 #define SYMBOL_TYPE(derived, type)  (u32((derived)) << 16U | u32((type)))
 
-namespace basecode::objfmt {
+namespace basecode::binfmt {
     struct file_t;
     struct reloc_t;
     struct symbol_t;

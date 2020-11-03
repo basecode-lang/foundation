@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include <basecode/objfmt/coff.h>
+#include <basecode/binfmt/coff.h>
 
-namespace basecode::objfmt::container {
+namespace basecode::binfmt::io {
     struct pe_thunk_t;
     struct pe_reloc_t;
     struct pe_res_data_t;

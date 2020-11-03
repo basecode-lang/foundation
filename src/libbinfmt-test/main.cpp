@@ -32,7 +32,7 @@
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/network.h>
-#include <basecode/objfmt/objfmt.h>
+#include <basecode/binfmt/binfmt.h>
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
 #include <basecode/core/log/system/spdlog.h>
@@ -107,9 +107,9 @@ s32 main(s32 argc, const s8** argv) {
     if (!OK(network::system::init()))   return 1;
 
     {
-        auto status = objfmt::system::init();
+        auto status = binfmt::system::init();
         if (!OK(status)) {
-            format::print(stderr, "objfmt::system::init error: {}\n",
+            format::print(stderr, "binfmt::system::init error: {}\n",
                           string::localized::status_name(status));
             return (s32) status;
         }
@@ -120,7 +120,7 @@ s32 main(s32 argc, const s8** argv) {
     path::free(config_path);
     path::free(core_config_path);
 
-    objfmt::system::fini();
+    binfmt::system::fini();
     network::system::fini();
     filesys::fini();
     ffi::system::fini();

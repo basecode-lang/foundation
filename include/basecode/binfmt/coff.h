@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include <basecode/objfmt/container.h>
+#include <basecode/binfmt/io.h>
 
-namespace basecode::objfmt::container {
+namespace basecode::binfmt::io {
     struct coff_symbol_t;
     struct coff_aux_record_t;
     struct coff_section_hdr_t;
@@ -255,7 +255,7 @@ namespace basecode::objfmt::container {
 
         u0 write_section_header(session_t& s, coff_t& coff, coff_section_hdr_t& hdr);
 
-        status_t get_section_name(const objfmt::section_t* section, str::slice_t& name);
+        status_t get_section_name(const binfmt::section_t* section, str::slice_t& name);
 
         status_t write_section_data(session_t& s, coff_t& coff, coff_section_hdr_t& hdr);
     }

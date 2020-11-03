@@ -160,7 +160,7 @@
 ;; test runner support
 ;;
 ;; -------------------------------------------------------------
-(= objfmt-tests (fn ()
+(= binfmt-tests (fn ()
     nil))
 
 (= core-tests (fn ()
@@ -224,6 +224,6 @@
 (if (cvar-ref cvar:test-runner)
     (do
         (let product-name (cvar-ref cvar:product-name))
-        (if (is product-name "Basecode Foundation Object Format Library") (objfmt-tests)
+        (if (is product-name "Basecode Foundation Binary Format Library") (binfmt-tests)
             (is product-name "Basecode Foundation Core Library")          (core-tests)
             nil)))

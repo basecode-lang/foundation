@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(basecode-objfmt-test)
+project(basecode-binfmt-test)
 
 add_executable(
     ${PROJECT_NAME}
@@ -9,7 +9,7 @@ add_executable(
     elf_tests.cpp
     pe_tests.cpp
 )
-target_link_libraries(${PROJECT_NAME} basecode-core basecode-objfmt)
+target_link_libraries(${PROJECT_NAME} basecode-core basecode-binfmt)
 if (NOT MSVC)
     target_link_options(${PROJECT_NAME} PRIVATE -fuse-ld=lld)
 endif ()

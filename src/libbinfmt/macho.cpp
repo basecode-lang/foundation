@@ -16,9 +16,9 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/objfmt/macho.h>
+#include <basecode/binfmt/macho.h>
 
-namespace basecode::objfmt::container {
+namespace basecode::binfmt::io {
     namespace internal {
         static u0 fini() {
         }

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(basecode-objfmt C CXX ASM)
+project(basecode-binfmt C CXX ASM)
 
 # -----------------------------------------------------------------------------
 #
@@ -9,10 +9,10 @@ project(basecode-objfmt C CXX ASM)
 
 set(VERSION_MAJOR       0)
 set(VERSION_MINOR       1)
-set(PRODUCT_NAME        "Basecode Foundation Object Format Library")
-set(LIBRARY_NAME        "basecode-objfmt")
-set(LIBRARY_TARGET      "${PROJECT_NAME}-lib")
-set(INC_DIR             "${INC_DIR_BASE}/basecode/objfmt")
+set(PRODUCT_NAME        "Basecode Foundation Binary Format Library")
+set(LIBRARY_NAME        "basecode-binfmt")
+set(LIBRARY_TARGET      "${LIBRARY_NAME}-lib")
+set(INC_DIR             "${INC_DIR_BASE}/basecode/binfmt")
 
 # -----------------------------------------------------------------------------
 #
@@ -22,25 +22,25 @@ set(INC_DIR             "${INC_DIR_BASE}/basecode/objfmt")
 
 configure_file(
     configure.in.h
-    "${CMAKE_BINARY_DIR}/include/basecode/objfmt/configure.h"
+    "${CMAKE_BINARY_DIR}/include/basecode/binfmt/configure.h"
 )
 configure_file(
-    ${PROJECT_DIR_BASE}/etc/objfmt.fe
-    ${CMAKE_BINARY_DIR}/etc/objfmt.fe COPYONLY
+    ${PROJECT_DIR_BASE}/etc/binfmt.fe
+    ${CMAKE_BINARY_DIR}/etc/binfmt.fe COPYONLY
 )
 
 # -----------------------------------------------------------------------------
 #
-# libbasecode-objfmt static library
+# libbasecode-binfmt static library
 #
 # -----------------------------------------------------------------------------
 
 set(
-    OBJFMT_SOURCES
+    BINFMT_SOURCES
 
     coff.cpp ${INC_DIR}/coff.h
 
-    container.cpp ${INC_DIR}/container.h
+    io.cpp ${INC_DIR}/io.h
 
     elf.cpp ${INC_DIR}/elf.h
 
@@ -48,17 +48,17 @@ set(
 
     pe.cpp ${INC_DIR}/pe.h
 
-    objfmt.cpp ${INC_DIR}/objfmt.h
+    binfmt.cpp ${INC_DIR}/binfmt.h
 
     ${INC_DIR}/types.h
 )
-add_library(${LIBRARY_TARGET} ${OBJFMT_SOURCES})
+add_library(${LIBRARY_TARGET} ${BINFMT_SOURCES})
 target_include_directories(
     ${LIBRARY_TARGET} PUBLIC
 
     ${INC_DIR_BASE}
     ${CMAKE_BINARY_DIR}/include)
-set_target_properties(${LIBRARY_TARGET} PROPERTIES LIBRARY_OUTPUT_NAME ${LIBRARY_NAME})
+set_target_properties(${LIBRARY_TARGET} PROPERTIES OUTPUT_NAME ${LIBRARY_NAME})
 if (LINUX)
     set_target_properties(${LIBRARY_TARGET} PROPERTIES POSITION_INDEPENDENT_CODE True)
 endif()

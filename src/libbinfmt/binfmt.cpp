@@ -16,28 +16,28 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/binfmt/io.h>
 #include <basecode/core/error.h>
 #include <basecode/core/string.h>
 #include <basecode/core/config.h>
 #include <basecode/core/filesys.h>
-#include <basecode/objfmt/objfmt.h>
-#include <basecode/objfmt/container.h>
+#include <basecode/binfmt/binfmt.h>
 
-namespace basecode::objfmt {
+namespace basecode::binfmt {
     struct system_t final {
         alloc_t*                alloc;
     };
 
-    system_t                    g_objfmt_sys;
+    system_t                    g_binfmt_sys;
 
     namespace system {
         u0 fini() {
-            container::fini();
+            io::fini();
         }
 
         status_t init(alloc_t* alloc) {
-            g_objfmt_sys.alloc = alloc;
-            auto   file_path = "../etc/objfmt.fe"_path;
+            g_binfmt_sys.alloc = alloc;
+            auto   file_path = "../etc/binfmt.fe"_path;
             path_t config_path{};
             filesys::bin_rel_path(config_path, file_path);
             defer({
@@ -45,7 +45,7 @@ namespace basecode::objfmt {
                 path::free(file_path);
             });
             {
-                auto status = container::init(g_objfmt_sys.alloc);
+                auto status = io::init(g_binfmt_sys.alloc);
                 if (!OK(status))
                     return status;
             }
@@ -86,7 +86,7 @@ namespace basecode::objfmt {
         status_t init(section_t* section,
                       section::type_t type,
                       const section_opts_t& opts) {
-            section->alloc = g_objfmt_sys.alloc;
+            section->alloc = g_binfmt_sys.alloc;
             array::init(section->symbols, section->alloc);
             section->type             = type;
             section->flags            = opts.flags;
@@ -162,7 +162,7 @@ namespace basecode::objfmt {
         }
 
         status_t init(file_t& file) {
-            file.alloc = g_objfmt_sys.alloc;
+            file.alloc = g_binfmt_sys.alloc;
             path::init(file.path, file.alloc);
             array::init(file.sections, file.alloc);
             hashtab::init(file.symbols, file.alloc);

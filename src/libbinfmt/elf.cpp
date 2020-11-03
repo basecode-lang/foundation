@@ -16,9 +16,9 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/objfmt/elf.h>
+#include <basecode/binfmt/elf.h>
 
-namespace basecode::objfmt::container {
+namespace basecode::binfmt::io {
     namespace internal {
         struct elf_system_t final {
             alloc_t*                alloc;
@@ -100,7 +100,7 @@ namespace basecode::objfmt::container {
         }
 
         static status_t init(alloc_t* alloc) {
-            using type_t = objfmt::section::type_t;
+            using type_t = binfmt::section::type_t;
 
             g_elf_sys.alloc = alloc;
             name_map::init(g_elf_sys.section_names, g_elf_sys.alloc);
@@ -278,7 +278,7 @@ namespace basecode::objfmt::container {
             session::write_u64(s, hdr.align);
         }
 
-        status_t get_section_name(const objfmt::section_t* section, str::slice_t& name) {
+        status_t get_section_name(const binfmt::section_t* section, str::slice_t& name) {
             const auto entry = name_map::find(internal::g_elf_sys.section_names,
                                               section->type,
                                               section->flags);

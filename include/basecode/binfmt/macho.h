@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <basecode/objfmt/container.h>
+#include <basecode/binfmt/io.h>
 
-namespace basecode::objfmt::container::macho {
+namespace basecode::binfmt::io::macho {
     system_t* system();
 }

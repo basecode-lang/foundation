@@ -18,11 +18,11 @@
 
 #include <basecode/core/utf.h>
 #include <basecode/core/bits.h>
-#include <basecode/objfmt/pe.h>
+#include <basecode/binfmt/pe.h>
 #include <basecode/core/string.h>
-#include <basecode/objfmt/objfmt.h>
+#include <basecode/binfmt/binfmt.h>
 
-namespace basecode::objfmt::container {
+namespace basecode::binfmt::io {
     [[maybe_unused]] static u8 s_dos_stub[64] = {
         0x0e, 0x1f, 0xba, 0x0e, 0x00, 0xb4, 0x09, 0xcd, 0x21, 0xb8, 0x01, 0x4c,
         0xcd, 0x21, 0x54, 0x68, 0x69, 0x73, 0x20, 0x70, 0x72, 0x6f, 0x67, 0x72,

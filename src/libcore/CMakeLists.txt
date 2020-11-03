@@ -11,7 +11,7 @@ set(VERSION_MAJOR       0)
 set(VERSION_MINOR       1)
 set(PRODUCT_NAME        "Basecode Foundation Core Library")
 set(LIBRARY_NAME        "basecode-core")
-set(LIBRARY_TARGET      "${PROJECT_NAME}-lib")
+set(LIBRARY_TARGET      "${LIBRARY_NAME}-lib")
 set(CORE_INC_DIR        "${INC_DIR_BASE}/basecode/core")
 if (WIN32)
     set(PLATFORM_INC_DIR    "${INC_DIR_BASE}/platform/win32")
@@ -232,7 +232,7 @@ target_compile_options(
     PUBLIC  "$<$<COMPILE_LANGUAGE:C,CXX>:-march=native>"
     PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:-Wno-array-bounds>"
 )
-set_target_properties(${LIBRARY_TARGET} PROPERTIES LIBRARY_OUTPUT_NAME ${LIBRARY_NAME})
+set_target_properties(${LIBRARY_TARGET} PROPERTIES OUTPUT_NAME ${LIBRARY_NAME})
 if (LINUX)
     set_target_properties(${LIBRARY_TARGET} PROPERTIES POSITION_INDEPENDENT_CODE True)
 endif()

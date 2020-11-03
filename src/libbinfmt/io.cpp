@@ -16,11 +16,10 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/binfmt/io.h>
 #include <basecode/core/string.h>
-#include <basecode/objfmt/types.h>
-#include <basecode/objfmt/container.h>
 
-namespace basecode::objfmt::container {
+namespace basecode::binfmt::io {
     static alloc_t*             s_alloc{};
     static system_t*            s_systems[max_type_count];
 

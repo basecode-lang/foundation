@@ -17,11 +17,10 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/bits.h>
-#include <basecode/objfmt/coff.h>
+#include <basecode/binfmt/coff.h>
 #include <basecode/core/string.h>
-#include <basecode/objfmt/objfmt.h>
 
-namespace basecode::objfmt::container {
+namespace basecode::binfmt::io {
     namespace internal {
         struct coff_system_t final {
             alloc_t*                alloc;
@@ -268,7 +267,7 @@ namespace basecode::objfmt::container {
         status_t init(coff_t& coff,
                       const file_t* file,
                       alloc_t* alloc) {
-            using type_t = objfmt::section::type_t;
+            using type_t = binfmt::section::type_t;
 
             coff.alloc = alloc;
 
@@ -280,12 +279,12 @@ namespace basecode::objfmt::container {
             coff.align.section = 0x1000;
 
             switch (file->machine) {
-                case objfmt::machine::type_t::unknown:
+                case binfmt::machine::type_t::unknown:
                     return status_t::invalid_machine_type;
-                case objfmt::machine::type_t::x86_64:
+                case binfmt::machine::type_t::x86_64:
                     coff.machine = machine::amd64;
                     break;
-                case objfmt::machine::type_t::aarch64:
+                case binfmt::machine::type_t::aarch64:
                     coff.machine = machine::arm64;
                     break;
             }
@@ -476,7 +475,7 @@ namespace basecode::objfmt::container {
         }
 
         status_t build_section(session_t& s, coff_t& coff, coff_section_hdr_t& hdr) {
-            using type_t = objfmt::section::type_t;
+            using type_t = binfmt::section::type_t;
 
             hdr.offset = coff.offset;
             hdr.rva    = coff.rva;
@@ -528,7 +527,7 @@ namespace basecode::objfmt::container {
         }
 
         u0 write_section_header(session_t& s, coff_t& coff, coff_section_hdr_t& hdr) {
-            using type_t = objfmt::section::type_t;
+            using type_t = binfmt::section::type_t;
 
             const auto type = hdr.section->type;
             const auto& flags = hdr.section->flags;
@@ -571,7 +570,7 @@ namespace basecode::objfmt::container {
         }
 
         status_t write_section_data(session_t& s, coff_t& coff, coff_section_hdr_t& hdr) {
-            using type_t = objfmt::section::type_t;
+            using type_t = binfmt::section::type_t;
 
             const auto type = hdr.section->type;
 
@@ -602,7 +601,7 @@ namespace basecode::objfmt::container {
             return status_t::ok;
         }
 
-        status_t get_section_name(const objfmt::section_t* section, str::slice_t& name) {
+        status_t get_section_name(const binfmt::section_t* section, str::slice_t& name) {
             const auto entry = name_map::find(internal::g_coff_sys.section_names, section->type, section->flags);
             if (!entry)
                 return status_t::cannot_map_section_name;

@@ -17,10 +17,10 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
+#include <basecode/binfmt/io.h>
 #include <basecode/core/defer.h>
-#include <basecode/objfmt/objfmt.h>
+#include <basecode/binfmt/binfmt.h>
 #include <basecode/core/stopwatch.h>
-#include <basecode/objfmt/container.h>
 #include "test.h"
 
 using namespace basecode;
@@ -76,8 +76,8 @@ static const u8 s_rot13_code[] = {
     0xc3,                                           //0000000004010AC: C3                      ret
 };
 
-TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
-    using namespace objfmt;
+TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
+    using namespace binfmt;
 
     stopwatch_t timer{};
     stopwatch::start(timer);
@@ -206,20 +206,20 @@ TEST_CASE("basecode::objfmt rot13 to PE/COFF exe") {
         REQUIRE(bss->subclass.size == 4096);
     }
 
-    container::session_t s{};
-    container::session::init(s);
-    defer(container::session::free(s));
+    io::session_t s{};
+    io::session::init(s);
+    defer(io::session::free(s));
     s.file                  = &pe_file;
-    s.type                  = container::type_t::pe;
-    s.output_type           = container::output_type_t::exe;
+    s.type                  = io::type_t::pe;
+    s.output_type           = io::output_type_t::exe;
     s.versions.linker.major = 6;
     s.versions.linker.minor = 0;
     s.versions.min_os.major = 4;
     s.versions.min_os.minor = 0;
     s.flags.console         = true;
 //    s.opts.base_addr        = 0x140000000;
-    REQUIRE(OK(container::write(s)));
+    REQUIRE(OK(io::write(s)));
 
     stopwatch::stop(timer);
-    stopwatch::print_elapsed("objfmt write PE executable time"_ss, 40, timer);
+    stopwatch::print_elapsed("binfmt write PE executable time"_ss, 40, timer);
 }

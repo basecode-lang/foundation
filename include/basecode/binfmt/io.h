@@ -19,9 +19,9 @@
 #pragma once
 
 #include <basecode/core/buf.h>
-#include <basecode/objfmt/types.h>
+#include <basecode/binfmt/types.h>
 
-namespace basecode::objfmt::container {
+namespace basecode::binfmt::io {
     enum class type_t : u8 {
         pe,
         elf,
