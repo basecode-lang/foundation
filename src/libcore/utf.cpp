@@ -24,7 +24,7 @@ namespace basecode::utf {
         u8                      high;
     };
 
-    static const uint8_t s_utf8_first[256] = {
+    static const u8 s_utf8_first[256] = {
         0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x00-0x0F
         0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x10-0x1F
         0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, 0xf0, // 0x20-0x2F
@@ -97,9 +97,9 @@ namespace basecode::utf {
             return cp;
         }
         s32 t = cp - 0x10000;
-        h = ((t << 12 >> 22) + 0xd800);
-        l = ((t << 22 >> 22) + 0xdc00);
-        return (h << 16 | (l & 0x0000ffff));
+        h = ((t << u32(12) >> u32(22)) + 0xd800);
+        l = ((t << u32(22) >> u32(22)) + 0xdc00);
+        return h << u32(16) | (l & u32(0x0000ffff));
     }
 
     b8 decode(const s8* str, u32 length, s32& cp) {
@@ -135,7 +135,7 @@ namespace basecode::utf {
             return cp;
 
         if (sz == 2) {
-            cp = (s0 & u32(0x1f)) << 6 | (b1 & u32(0x3f));
+            cp = (s0 & u32(0x1f)) << u32(6) | (b1 & u32(0x3f));
             return true;
         }
 
@@ -144,7 +144,7 @@ namespace basecode::utf {
             return cp;
 
         if (sz == 3) {
-            cp = (s0 & 0x1f) << 12 | (b1 & 0x3f) << 6 | (b2 & 0x3f);
+            cp = (s0 & u32(0x1f)) << u32(12) | (b1 & u32(0x3f)) << u32(6) | (b2 & u32(0x3f));
             return true;
         }
 
@@ -152,10 +152,10 @@ namespace basecode::utf {
         if (!(b3 >= 0x80 && b3 <= 0xbf))
             return true;
 
-        cp = (s0 & 0x07) << 18
-             | (b1 & 0x3f) << 12
-             | (b2 & 0x3f) << 6
-             | (b3 & 0x3f);
+        cp = (s0 & u32(0x07))   << u32(18)
+             | (b1 & u32(0x3f)) << u32(12)
+             | (b2 & u32(0x3f)) << u32(6)
+             | (b3 & u32(0x3f));
 
         return true;
     }
