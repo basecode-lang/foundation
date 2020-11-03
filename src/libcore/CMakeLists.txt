@@ -182,6 +182,8 @@ set(
     thread.cpp ${CORE_INC_DIR}/thread.h
 
     token.cpp ${CORE_INC_DIR}/token.h
+
+    utf.cpp ${CORE_INC_DIR}/utf.h
 )
 if (WIN32)
     set (

@@ -116,7 +116,6 @@ else ()
     set(BZIP2_LIBRARIES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libbz2.a")
 endif ()
 
-
 # libpng
 option(PNG_STATIC "" ON)
 option(PNG_SHARED "" OFF)
@@ -150,6 +149,7 @@ add_subdirectory(ext/spdlog-1.8.1 EXCLUDE_FROM_ALL)
 
 # utf8proc
 add_subdirectory(ext/utf8proc-2.5.0 EXCLUDE_FROM_ALL)
+target_include_directories(utf8proc PUBLIC ext/utf8proc-2.5.0)
 
 # blake3
 set(

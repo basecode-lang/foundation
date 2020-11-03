@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/utf.h>
 #include <basecode/core/bits.h>
 #include <basecode/objfmt/pe.h>
 #include <basecode/core/string.h>
