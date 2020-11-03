@@ -162,49 +162,23 @@ namespace basecode::binfmt {
         };
 
         struct flags_t final {
-            u32                     code:       1;
-            u32                     data:       1;
-            u32                     init:       1;
-            u32                     read:       1;
-            u32                     exec:       1;
-            u32                     write:      1;
-            u32                     alloc:      1;
-            u32                     can_free:   1;
-            u32                     pad:        24;
+            u32                 code:       1;
+            u32                 data:       1;
+            u32                 init:       1;
+            u32                 read:       1;
+            u32                 exec:       1;
+            u32                 write:      1;
+            u32                 alloc:      1;
+            u32                 can_free:   1;
+            u32                 pad:        24;
         };
     }
 
     namespace storage {
         enum class class_t : u8 {
-            null_,
-            auto_,
-            external_,
+            none,
             static_,
-            register_,
-            extern_def,
-            label,
-            undef_label,
-            member_of_struct,
-            argument,
-            struct_tag,
-            member_of_union,
-            union_tag,
-            type_def,
-            undef_static,
-            enum_tag,
-            member_of_enum,
-            register_param,
-            bit_field,
-            auto_argument,
-            dummy_entry,
-            block,
-            function,
-            end_of_struct,
-            file_name,
-            line_number,
-            alias,
-            hidden,
-            end_of_function,
+            external_,
         };
     }
 

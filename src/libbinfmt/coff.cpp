@@ -254,6 +254,16 @@ namespace basecode::binfmt::io {
             }
         }
 
+        namespace storage_class {
+            u8 coff_storage_class(storage::class_t cls) {
+                switch (cls) {
+                    case storage::class_t::none:        return null_;
+                    case storage::class_t::static_:     return static_;
+                    case storage::class_t::external_:   return external_;
+                }
+            }
+        }
+
         system_t* system() {
             return &internal::g_coff_backend;
         }
@@ -315,7 +325,7 @@ namespace basecode::binfmt::io {
                 hdr.symbol->value   = {};
                 hdr.symbol->type    = SYMBOL_TYPE(symbol::type::derived::none,
                                                   symbol::type::base::null_);
-                hdr.symbol->sclass  = storage::class_t::static_;
+                hdr.symbol->sclass  = storage_class::static_;
 
                 auto aux = coff::symbol_table::make_aux_record(coff,
                                                                hdr.symbol,
@@ -339,7 +349,7 @@ namespace basecode::binfmt::io {
                 sym->value   = symbol->value;
                 sym->section = symbol->section;
                 sym->type    = symbol->type;
-                sym->sclass  = symbol->sclass;
+                sym->sclass  = storage_class::coff_storage_class(symbol->sclass);
             }
 
             return status;

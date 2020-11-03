@@ -208,7 +208,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     io::session::init(s);
     defer(io::session::free(s));
 
-    auto rot13_exe_path = "rot1e.exe"_path;
+    auto rot13_exe_path = "rot13.exe"_path;
     defer(path::free(rot13_exe_path));
     auto rot13_exe_file = io::session::add_file(s,
                                                 mod,

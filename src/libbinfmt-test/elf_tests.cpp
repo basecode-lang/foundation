@@ -43,6 +43,7 @@ TEST_CASE("basecode::binfmt ELF test") {
                                                    .data = true,
                                                    .init = true,
                                                    .read = true,
+                                                   .alloc = true
                                                }
                                            });
         auto rdata = module::get_section(mod, rdata_rc.id);
@@ -55,7 +56,7 @@ TEST_CASE("basecode::binfmt ELF test") {
     io::session::init(s);
     defer(io::session::free(s));
 
-    auto rot13_exe_path = "rot1e.exe"_path;
+    auto rot13_exe_path = "rot13_elf.exe"_path;
     defer(path::free(rot13_exe_path));
     auto rot13_exe_file = io::session::add_file(s,
                                                 &mod,
