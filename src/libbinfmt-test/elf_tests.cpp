@@ -32,7 +32,7 @@ TEST_CASE("basecode::binfmt ELF test") {
     stopwatch::start(timer);
 
     module_t mod{};
-    REQUIRE(OK(module::init(mod)));
+    REQUIRE(OK(module::init(mod, 20)));
     defer(module::free(mod));
 
     /* .rdata section */ {

@@ -24,6 +24,12 @@ namespace basecode::binfmt {
     namespace system {
         u0 fini();
 
+        u0 free_module(module_t* mod);
+
+        module_t* get_module(module_id id);
+
+        status_t make_module(module_id id, module_t** mod);
+
         status_t init(alloc_t* alloc = context::top()->alloc);
     }
 
@@ -48,7 +54,7 @@ namespace basecode::binfmt {
     namespace module {
         u0 free(module_t& module);
 
-        status_t init(module_t& module);
+        status_t init(module_t& module, module_id id);
 
         symbol_t* get_symbol(const module_t& module, symbol_id id);
 

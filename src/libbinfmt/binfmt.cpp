@@ -21,21 +21,33 @@
 #include <basecode/core/config.h>
 #include <basecode/core/filesys.h>
 #include <basecode/binfmt/binfmt.h>
+#include <basecode/core/stable_array.h>
 
 namespace basecode::binfmt {
+    using module_map_t          = hashtab_t<module_id, module_t*>;
+    using module_list_t         = stable_array_t<module_t>;
+
     struct system_t final {
         alloc_t*                alloc;
+        module_list_t           modules;
+        module_map_t            module_map;
     };
 
     system_t                    g_binfmt_sys;
 
     namespace system {
         u0 fini() {
+            for (auto mod : g_binfmt_sys.modules)
+                module::free(*mod);
+            stable_array::free(g_binfmt_sys.modules);
+            hashtab::free(g_binfmt_sys.module_map);
             io::fini();
         }
 
         status_t init(alloc_t* alloc) {
             g_binfmt_sys.alloc = alloc;
+            hashtab::init(g_binfmt_sys.module_map, g_binfmt_sys.alloc);
+            stable_array::init(g_binfmt_sys.modules, g_binfmt_sys.alloc);
             auto   file_path = "../etc/binfmt.fe"_path;
             path_t config_path{};
             filesys::bin_rel_path(config_path, file_path);
@@ -54,6 +66,26 @@ namespace basecode::binfmt {
                 if (!OK(status))
                     return status_t::config_eval_error;
             }
+            return status_t::ok;
+        }
+
+        u0 free_module(module_t* mod) {
+            hashtab::remove(g_binfmt_sys.module_map, mod->id);
+            module::free(*mod);
+            stable_array::erase(g_binfmt_sys.modules, mod);
+        }
+
+        module_t* get_module(module_id id) {
+            return hashtab::find(g_binfmt_sys.module_map, id);
+        }
+
+        status_t make_module(module_id id, module_t** mod) {
+            auto new_mod = &stable_array::append(g_binfmt_sys.modules);
+            auto status = module::init(*new_mod, id);
+            if (!OK(status))
+                return status;
+            hashtab::insert(g_binfmt_sys.module_map, id, new_mod);
+            *mod = new_mod;
             return status_t::ok;
         }
     }
@@ -159,8 +191,9 @@ namespace basecode::binfmt {
             hashtab::free(module.symbols);
         }
 
-        status_t init(module_t& module) {
+        status_t init(module_t& module, module_id id) {
             module.alloc = g_binfmt_sys.alloc;
+            module.id    = id;
             array::init(module.sections, module.alloc);
             hashtab::init(module.symbols, module.alloc);
             return status_t::ok;

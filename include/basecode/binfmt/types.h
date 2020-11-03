@@ -37,6 +37,7 @@ namespace basecode::binfmt {
 
     using import_id             = u32;
     using symbol_id             = u32;
+    using module_id             = u32;
     using section_id            = u32;
 
     using id_list_t             = array_t<u32>;
@@ -274,9 +275,10 @@ namespace basecode::binfmt {
     };
 
     struct module_t final {
-        alloc_t*                alloc       {};
-        symbol_table_t          symbols     {};
-        section_list_t          sections    {};
+        alloc_t*                alloc;
+        symbol_table_t          symbols;
+        section_list_t          sections;
+        module_id               id;
     };
 
     struct result_t final {

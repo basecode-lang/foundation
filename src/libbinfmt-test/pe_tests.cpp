@@ -82,11 +82,12 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    module_t mod{};
-    REQUIRE(OK(module::init(mod)));
-    defer(module::free(mod));
+    module_t* mod{};
+    REQUIRE(OK(system::make_module(10, &mod)));
+    REQUIRE(system::get_module(10) != nullptr);
+
     /* .text section */ {
-        auto text_rc = module::make_section(mod,
+        auto text_rc = module::make_section(*mod,
                                             section::type_t::code,
                                             {
                                               .flags = {
@@ -95,7 +96,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                   .exec = true
                                               }
                                           });
-        auto set_data_rc = section::data(mod,
+        auto set_data_rc = section::data(*mod,
                                          text_rc.id,
                                          s_rot13_code,
                                          sizeof(s_rot13_code));
@@ -104,7 +105,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     }
 
     /* .rdata section */ {
-        auto rdata_rc = module::make_section(mod,
+        auto rdata_rc = module::make_section(*mod,
                                              section::type_t::data,
                                              {
                                                .flags = {
@@ -113,7 +114,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                    .read = true,
                                                }
                                            });
-        auto set_data_rc = section::data(mod,
+        auto set_data_rc = section::data(*mod,
                                          rdata_rc.id,
                                          s_rot13_table,
                                          sizeof(s_rot13_table));
@@ -122,7 +123,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     }
 
     /* .idata section */ {
-        auto idata_rc = module::make_section(mod,
+        auto idata_rc = module::make_section(*mod,
                                              section::type_t::import,
                                              {
                                                 .flags = {
@@ -134,14 +135,14 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                            });
         const auto func_type = SYMBOL_TYPE(symbol::type::derived::function,
                                            symbol::type::base::null_);
-        auto kernel32_sym_rc = module::make_symbol(mod,
+        auto kernel32_sym_rc = module::make_symbol(*mod,
                                                    "kernel32.dll"_ss,
                                                    {
                                                      .section = idata_rc.id,
                                                      .value = 1,
                                                      .sclass = storage::class_t::static_
                                                  });
-        auto read_file_sym_rc = module::make_symbol(mod,
+        auto read_file_sym_rc = module::make_symbol(*mod,
                                                     "ReadFile"_ss,
                                                     {
                                                       .section = idata_rc.id,
@@ -149,7 +150,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                       .value = 2,
                                                       .sclass = storage::class_t::external_
                                                   });
-        auto write_file_sym_rc = module::make_symbol(mod,
+        auto write_file_sym_rc = module::make_symbol(*mod,
                                                      "WriteFile"_ss,
                                                      {
                                                        .section = idata_rc.id,
@@ -157,7 +158,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                        .value = 3,
                                                        .sclass = storage::class_t::external_
                                                    });
-        auto get_std_handle_sym_rc = module::make_symbol(mod,
+        auto get_std_handle_sym_rc = module::make_symbol(*mod,
                                                          "GetStdHandle"_ss,
                                                          {
                                                            .section = idata_rc.id,
@@ -165,8 +166,8 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                            .value = 4,
                                                            .sclass = storage::class_t::external_
                                                        });
-        auto kernel32_imp_rc = section::import_module(mod, idata_rc.id, kernel32_sym_rc.id);
-        auto kernel32_imp    = section::get_import(mod, idata_rc.id, kernel32_imp_rc.id);
+        auto kernel32_imp_rc = section::import_module(*mod, idata_rc.id, kernel32_sym_rc.id);
+        auto kernel32_imp    = section::get_import(*mod, idata_rc.id, kernel32_imp_rc.id);
         import::add_symbol(kernel32_imp, get_std_handle_sym_rc.id);
         import::add_symbol(kernel32_imp, read_file_sym_rc.id);
         import::add_symbol(kernel32_imp, write_file_sym_rc.id);
@@ -185,7 +186,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     }
 
     /* .bss section */ {
-        auto bss_rc = module::make_section(mod,
+        auto bss_rc = module::make_section(*mod,
                                            section::type_t::data,
                                            {
                                             .flags = {
@@ -195,8 +196,8 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                 .write  = true,
                                             }
                                          });
-        auto bss = module::get_section(mod, bss_rc.id);
-        section::reserve(mod, bss_rc.id, 4096);
+        auto bss = module::get_section(*mod, bss_rc.id);
+        section::reserve(*mod, bss_rc.id, 4096);
 
         REQUIRE(OK(bss_rc.status));
         REQUIRE(bss);
@@ -210,7 +211,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     auto rot13_exe_path = "rot1e.exe"_path;
     defer(path::free(rot13_exe_path));
     auto rot13_exe_file = io::session::add_file(s,
-                                                &mod,
+                                                mod,
                                                 rot13_exe_path,
                                                 machine::type_t::x86_64,
                                                 io::type_t::pe,
