@@ -87,13 +87,16 @@ namespace basecode {
 #ifdef _WIN32
         str::slice_t drive_name(const path_t& path);
 #endif
-        status_t set(path_t& path, const s8* value);
 
         status_t append(path_t& lhs, const path_t& rhs);
 
         s32 find_mark_index(const path_t& path, u8 type);
 
+        status_t set(path_t& path, const path_t& new_path);
+
         s32 find_last_mark_index(const path_t& path, u8 type);
+
+        status_t set(path_t& path, const s8* value, s32 len = -1);
 
         status_t parent_path(const path_t& path, path_t& new_path);
 

@@ -23,13 +23,13 @@ namespace basecode::binfmt::io {
         static u0 fini() {
         }
 
-        static status_t read(session_t& s) {
-            UNUSED(s);
+        static status_t read(file_t& file) {
+            UNUSED(file);
             return status_t::read_error;
         }
 
-        static status_t write(session_t& s) {
-            UNUSED(s);
+        static status_t write(file_t& file) {
+            UNUSED(file);
             return status_t::write_error;
         }
 

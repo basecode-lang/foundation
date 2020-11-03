@@ -28,8 +28,8 @@
 #define SYMBOL_TYPE(derived, type)  (u32((derived)) << 16U | u32((type)))
 
 namespace basecode::binfmt {
-    struct file_t;
     struct reloc_t;
+    struct module_t;
     struct symbol_t;
     struct import_t;
     struct section_t;
@@ -229,7 +229,7 @@ namespace basecode::binfmt {
 
     struct import_t final {
         id_list_t               symbols;
-        symbol_id               module;
+        symbol_id               module_symbol;
         section_id              section;
         import_id               id;
         struct {
@@ -252,7 +252,7 @@ namespace basecode::binfmt {
 
     struct section_t final {
         alloc_t*                alloc;
-        const file_t*           file;
+        const module_t*         module;
         symbol_list_t           symbols;
         section_subclass_t      subclass;
         u32                     align;
@@ -273,13 +273,10 @@ namespace basecode::binfmt {
         u16                     minor;
     };
 
-    struct file_t final {
+    struct module_t final {
         alloc_t*                alloc       {};
-        path_t                  path        {};
         symbol_table_t          symbols     {};
         section_list_t          sections    {};
-        version_t               version     {};
-        machine::type_t         machine     {};
     };
 
     struct result_t final {

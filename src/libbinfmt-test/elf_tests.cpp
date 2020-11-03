@@ -31,24 +31,22 @@ TEST_CASE("basecode::binfmt ELF test") {
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    file_t elf_file{};
-    REQUIRE(OK(file::init(elf_file)));
-    defer(file::free(elf_file));
-    path::set(elf_file.path, "rot13");
-    elf_file.machine = machine::type_t::x86_64;
+    module_t mod{};
+    REQUIRE(OK(module::init(mod)));
+    defer(module::free(mod));
 
     /* .rdata section */ {
-        auto rdata_rc = file::make_section(elf_file,
-                                           section::type_t::data,
-                                           {
+        auto rdata_rc = module::make_section(mod,
+                                             section::type_t::data,
+                                             {
                                                .flags = {
                                                    .data = true,
                                                    .init = true,
                                                    .read = true,
                                                }
                                            });
-        auto rdata = file::get_section(elf_file, rdata_rc.id);
-        section::data(elf_file, rdata_rc.id, s_rot13_table, sizeof(s_rot13_table));
+        auto rdata = module::get_section(mod, rdata_rc.id);
+        section::data(mod, rdata_rc.id, s_rot13_table, sizeof(s_rot13_table));
         REQUIRE(OK(rdata_rc.status));
         REQUIRE(rdata);
     }
@@ -56,14 +54,21 @@ TEST_CASE("basecode::binfmt ELF test") {
     io::session_t s{};
     io::session::init(s);
     defer(io::session::free(s));
-    s.file                  = &elf_file;
-    s.type                  = io::type_t::elf;
-    s.output_type           = io::output_type_t::exe;
-    s.versions.linker.major = 6;
-    s.versions.linker.minor = 0;
-    s.versions.min_os.major = 4;
-    s.versions.min_os.minor = 0;
-    s.flags.console         = true;
+
+    auto rot13_exe_path = "rot1e.exe"_path;
+    defer(path::free(rot13_exe_path));
+    auto rot13_exe_file = io::session::add_file(s,
+                                                &mod,
+                                                rot13_exe_path,
+                                                machine::type_t::x86_64,
+                                                io::type_t::elf,
+                                                io::output_type_t::exe);
+    rot13_exe_file->versions.linker.major = 6;
+    rot13_exe_file->versions.linker.minor = 0;
+    rot13_exe_file->versions.min_os.major = 4;
+    rot13_exe_file->versions.min_os.minor = 0;
+    rot13_exe_file->flags.console = true;
+
     REQUIRE(OK(io::write(s)));
 
     stopwatch::stop(timer);

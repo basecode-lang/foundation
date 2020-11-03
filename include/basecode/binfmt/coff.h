@@ -232,7 +232,7 @@ namespace basecode::binfmt::io {
         u0 free(coff_t& coff);
 
         status_t init(coff_t& coff,
-                      const file_t* file,
+                      file_t& file,
                       alloc_t* alloc);
 
         u0 update_symbol_table(coff_t& coff);

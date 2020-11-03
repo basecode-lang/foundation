@@ -33,24 +33,24 @@ namespace basecode::binfmt::io {
             name_map::free(g_elf_sys.segment_names);
         }
 
-        static status_t read(session_t& s) {
-            UNUSED(s);
+        static status_t read(file_t& file) {
+            UNUSED(file);
             return status_t::read_error;
         }
 
-        static status_t write(session_t& s) {
-            const auto file = s.file;
+        static status_t write(file_t& file) {
+            const auto module = file.module;
 
             elf_opts_t opts{};
             opts.alloc       = g_elf_sys.alloc;
-            opts.entry_point = s.opts.base_addr;
+            opts.entry_point = file.opts.base_addr;
 
             elf_t elf{};
             elf::init(elf, opts);
             defer(elf::free(elf));
 
-            for (u32 i = 0; i < file->sections.size; ++i) {
-                auto section = &file->sections[i];
+            for (u32 i = 0; i < module->sections.size; ++i) {
+                auto section = &module->sections[i];
                 switch (section->type) {
                     case section::type_t::data:
                     case section::type_t::code:
@@ -77,7 +77,7 @@ namespace basecode::binfmt::io {
                 }
             }
 
-            switch (file->machine) {
+            switch (file.machine) {
                 case machine::type_t::unknown:
                     return status_t::invalid_machine_type;
                 case machine::type_t::x86_64:
@@ -90,9 +90,9 @@ namespace basecode::binfmt::io {
 
             status_t status;
 
-            elf::write_header(s, elf);
+            elf::write_header(file, elf);
 
-            status = session::save(s);
+            status = file::save(file);
             if (!OK(status))
                 return status_t::write_error;
 
@@ -194,7 +194,8 @@ namespace basecode::binfmt::io {
             return h;
         }
 
-        u0 write_header(session_t& s, elf_t& elf) {
+        u0 write_header(file_t& file, elf_t& elf) {
+            auto& s = *file.session;
             session::write_u8(s, 0x7f);
             session::write_u8(s, 'E');
             session::write_u8(s, 'L');

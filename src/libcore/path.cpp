@@ -157,16 +157,13 @@ namespace basecode::path {
         return str::slice_t{.data = path.str.data + ext_idx, .length = u32(path.str.length - ext_idx)};
     }
 
-    status_t set(path_t& path, const s8* value) {
-        return set(path, str::slice_t{.data = (const u8*) value, .length = u32(strlen(value))});
-    }
     status_t init(path_t& path, alloc_t* alloc) {
         str::init(path.str, alloc);
         array::init(path.marks, alloc);
         return status_t::ok;
     }
-#ifdef _WIN32
 
+#ifdef _WIN32
     str::slice_t drive_name(const path_t& path) {
         if (empty(path))            return {};
         auto drive_name_idx = find_mark_index(path, path::marks::drive_name);
@@ -196,6 +193,18 @@ namespace basecode::path {
                 return mark.value;
         }
         return -1;
+    }
+
+    status_t set(path_t& path, const path_t& new_path) {
+        str::reset(path.str);
+        str::append(path.str, new_path.str);
+        tokenize(path);
+        return status_t::ok;
+    }
+
+    status_t set(path_t& path, const s8* value, s32 len) {
+        return set(path,
+                   slice::make((const u8*) value, len == -1 ? strlen(value) : len));
     }
 
     s32 find_last_mark_index(const path_t& path, u8 type) {

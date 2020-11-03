@@ -33,13 +33,13 @@ namespace basecode::binfmt::io {
             name_map::free(g_coff_sys.section_names);
         }
 
-        static status_t read(session_t& s) {
-            UNUSED(s);
+        static status_t read(file_t& file) {
+            UNUSED(file);
             return status_t::read_error;
         }
 
-        static status_t write(session_t& s) {
-            UNUSED(s);
+        static status_t write(file_t& file) {
+            UNUSED(file);
             return status_t::write_error;
         }
 
@@ -265,10 +265,11 @@ namespace basecode::binfmt::io {
         }
 
         status_t init(coff_t& coff,
-                      const file_t* file,
+                      file_t& file,
                       alloc_t* alloc) {
             using type_t = binfmt::section::type_t;
 
+            const auto module = file.module;
             coff.alloc = alloc;
 
             array::init(coff.headers, coff.alloc);
@@ -278,7 +279,7 @@ namespace basecode::binfmt::io {
             coff.align.file    = 0x200;
             coff.align.section = 0x1000;
 
-            switch (file->machine) {
+            switch (file.machine) {
                 case binfmt::machine::type_t::unknown:
                     return status_t::invalid_machine_type;
                 case binfmt::machine::type_t::x86_64:
@@ -291,11 +292,11 @@ namespace basecode::binfmt::io {
 
             status_t status{};
 
-            for (u32 i = 0; i < file->sections.size; ++i) {
+            for (u32 i = 0; i < module->sections.size; ++i) {
                 auto& hdr = array::append(coff.headers);
                 hdr = {};
                 hdr.number  = i + 1;
-                hdr.section = &file->sections[i];
+                hdr.section = &module->sections[i];
 
                 str::slice_t name{};
                 if (hdr.section->type == type_t::custom) {
@@ -327,7 +328,7 @@ namespace basecode::binfmt::io {
                 aux->section.num_lines  = hdr.line_nums.size;
             }
 
-            auto symbols = hashtab::values(const_cast<symbol_table_t&>(file->symbols));
+            auto symbols = hashtab::values(const_cast<symbol_table_t&>(module->symbols));
             defer(array::free(symbols));
 
             for (auto symbol : symbols) {

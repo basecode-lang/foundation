@@ -34,40 +34,40 @@ namespace basecode::binfmt {
     namespace section {
         u0 free(section_t& section);
 
-        result_t reserve(file_t& file, section_id id, u64 size);
+        result_t reserve(module_t& module, section_id id, u64 size);
 
-        import_t* get_import(file_t& file, section_id id, import_id import);
+        import_t* get_import(module_t& module, section_id id, import_id import);
 
-        result_t import_module(file_t& file, section_id id, symbol_id symbol);
-
-        result_t data(file_t& file, section_id id, const u8* data, u32 length);
+        result_t import_module(module_t& module, section_id id, symbol_id symbol);
 
         status_t init(section_t& section, section::type_t type, symbol_id symbol);
+
+        result_t data(module_t& module, section_id id, const u8* data, u32 length);
     }
 
-    namespace file {
-        u0 free(file_t& file);
+    namespace module {
+        u0 free(module_t& module);
 
-        status_t init(file_t& file);
+        status_t init(module_t& module);
 
-        symbol_t* get_symbol(const file_t& file, symbol_id id);
+        symbol_t* get_symbol(const module_t& module, symbol_id id);
 
-        section_t* get_section(const file_t& file, section_id id);
+        section_t* get_section(const module_t& module, section_id id);
 
-        symbol_t* find_symbol(const file_t& file, const s8* name, s32 len = -1);
+        symbol_t* find_symbol(const module_t& module, const s8* name, s32 len = -1);
 
-        u0 find_sections(const file_t& file, symbol_id symbol, section_ptr_list_t& list);
+        u0 find_sections(const module_t& module, symbol_id symbol, section_ptr_list_t& list);
 
-        const symbol_t* find_symbol(const file_t& file, const String_Concept auto& name) {
-            return find_symbol(file, (const s8*) name.data, name.length);
+        const symbol_t* find_symbol(const module_t& module, const String_Concept auto& name) {
+            return find_symbol(module, (const s8*) name.data, name.length);
         }
 
-        result_t make_section(file_t& file, section::type_t type, const section_opts_t& opts = {});
+        result_t make_section(module_t& module, section::type_t type, const section_opts_t& opts = {});
 
-        result_t make_symbol(file_t& file, const symbol_opts_t& opts, const s8* name, s32 len = -1);
+        result_t make_symbol(module_t& module, const symbol_opts_t& opts, const s8* name, s32 len = -1);
 
-        result_t make_symbol(file_t& file, const String_Concept auto& name, const symbol_opts_t& opts = {}) {
-            return make_symbol(file, opts, (const s8*) name.data, name.length);
+        result_t make_symbol(module_t& module, const String_Concept auto& name, const symbol_opts_t& opts = {}) {
+            return make_symbol(module, opts, (const s8*) name.data, name.length);
         }
     }
 }

@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/binfmt/io.h>
-#include <basecode/core/error.h>
 #include <basecode/core/string.h>
 #include <basecode/core/config.h>
 #include <basecode/core/filesys.h>
@@ -107,8 +106,8 @@ namespace basecode::binfmt {
             return status_t::ok;
         }
 
-        result_t reserve(file_t& file, section_id id, u64 size) {
-            auto section = file::get_section(file, id);
+        result_t reserve(module_t& module, section_id id, u64 size) {
+            auto section = module::get_section(module, id);
             if (!section)
                 return {0, status_t::section_not_found};
             if (section->type != section::type_t::data
@@ -121,95 +120,93 @@ namespace basecode::binfmt {
             return {section->id, status_t::ok};
         }
 
-        import_t* get_import(file_t& file, section_id id, import_id import) {
-            auto section = file::get_section(file, id);
+        import_t* get_import(module_t& module, section_id id, import_id import) {
+            auto section = module::get_section(module, id);
             if (!section || section->type != section::type_t::import)
                 return nullptr;
             return &section->subclass.imports[import - 1];
         }
 
-        result_t import_module(file_t& file, section_id id, symbol_id module) {
-            auto section = file::get_section(file, id);
-            if (!section)
-                return {0, status_t::section_not_found};
-            if (section->type != section::type_t::import)
-                return {0, status_t::invalid_section_type};
-            auto import = &array::append(section->subclass.imports);
-            import->id      = section->subclass.imports.size;
-            import->module  = module;
-            import->section = section->id;
-            import->flags   = {};
-            array::init(import->symbols);
-            return {import->id, status_t::ok};
-        }
-
-        result_t data(file_t& file, section_id id, const u8* data, u32 length) {
-            auto section = file::get_section(file, id);
+        result_t data(module_t& module, section_id id, const u8* data, u32 length) {
+            auto section = module::get_section(module, id);
             if (!section)
                 return {0, status_t::section_not_found};
             section->subclass.data = slice::make(data, length);
             return {section->id, status_t::ok};
         }
+
+        result_t import_module(module_t& module, section_id id, symbol_id module_symbol) {
+            auto section = module::get_section(module, id);
+            if (!section)
+                return {0, status_t::section_not_found};
+            if (section->type != section::type_t::import)
+                return {0, status_t::invalid_section_type};
+            auto import = &array::append(section->subclass.imports);
+            import->id            = section->subclass.imports.size;
+            import->module_symbol = module_symbol;
+            import->section       = section->id;
+            import->flags         = {};
+            array::init(import->symbols);
+            return {import->id, status_t::ok};
+        }
     }
 
-    namespace file {
-        u0 free(file_t& file) {
-            path::free(file.path);
-            for (auto section : file.sections)
+    namespace module {
+        u0 free(module_t& module) {
+            for (auto section : module.sections)
                 section::free(section);
-            array::free(file.sections);
-            hashtab::free(file.symbols);
+            array::free(module.sections);
+            hashtab::free(module.symbols);
         }
 
-        status_t init(file_t& file) {
-            file.alloc = g_binfmt_sys.alloc;
-            path::init(file.path, file.alloc);
-            array::init(file.sections, file.alloc);
-            hashtab::init(file.symbols, file.alloc);
+        status_t init(module_t& module) {
+            module.alloc = g_binfmt_sys.alloc;
+            array::init(module.sections, module.alloc);
+            hashtab::init(module.symbols, module.alloc);
             return status_t::ok;
         }
 
-        symbol_t* get_symbol(const file_t& file, symbol_id id) {
-            return hashtab::find(const_cast<symbol_table_t&>(file.symbols), id);
+        symbol_t* get_symbol(const module_t& module, symbol_id id) {
+            return hashtab::find(const_cast<symbol_table_t&>(module.symbols), id);
         }
 
-        section_t* get_section(const file_t& file, section_id id) {
-            return (section_t*) &file.sections[id - 1];
+        section_t* get_section(const module_t& module, section_id id) {
+            return (section_t*) &module.sections[id - 1];
         }
 
-        symbol_t* find_symbol(const file_t& file, const s8* name, s32 len) {
+        symbol_t* find_symbol(const module_t& module, const s8* name, s32 len) {
             const auto rc = string::interned::fold_for_result(name, len);
-            return hashtab::find(const_cast<symbol_table_t&>(file.symbols), rc.id);
+            return hashtab::find(const_cast<symbol_table_t&>(module.symbols), rc.id);
         }
 
-        u0 find_sections(const file_t& file, symbol_id symbol, section_ptr_list_t& list) {
+        u0 find_sections(const module_t& module, symbol_id symbol, section_ptr_list_t& list) {
             array::reset(list);
-            for (auto& section : file.sections) {
+            for (auto& section : module.sections) {
                 if (section.symbol == symbol)
                     array::append(list, (section_t*) &section);
             }
         }
 
-        result_t make_section(file_t& file, section::type_t type, const section_opts_t& opts) {
+        result_t make_section(module_t& module, section::type_t type, const section_opts_t& opts) {
             if (type != section::type_t::custom && opts.symbol != 0)
                 return {0, status_t::spec_section_custom_name};
-            auto section = &array::append(file.sections);
-            section->id   = file.sections.size;
-            section->file = &file;
+            auto section = &array::append(module.sections);
+            section->id     = module.sections.size;
+            section->module = &module;
             auto status = section::init(section, type, opts);
             if (!OK(status))
                 return {0, status};
             return {section->id, status_t::ok};
         }
 
-        result_t make_symbol(file_t& file, const symbol_opts_t& opts, const s8* name, s32 len) {
+        result_t make_symbol(module_t& module, const symbol_opts_t& opts, const s8* name, s32 len) {
             {
-                auto symbol = find_symbol(file, name, len);
+                auto symbol = find_symbol(module, name, len);
                 if (symbol)
                     return {0, status_t::duplicate_symbol};
             }
             const auto rc     = string::interned::fold_for_result(name, len);
-            auto       symbol = hashtab::emplace(file.symbols, rc.id);
+            auto       symbol = hashtab::emplace(module.symbols, rc.id);
             symbol->name    = rc.id;
             symbol->type    = opts.type;
             symbol->value   = opts.value;

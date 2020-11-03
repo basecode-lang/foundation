@@ -261,7 +261,7 @@ namespace basecode::binfmt::io {
 
     struct pe_opts_t final {
         alloc_t*                alloc;
-        const file_t*           file;
+        file_t*                 file;
         u64                     base_addr;
         u64                     heap_reserve;
         u64                     stack_reserve;
@@ -290,13 +290,13 @@ namespace basecode::binfmt::io {
 
         status_t init(pe_t& pe, const pe_opts_t& opts);
 
-        status_t build_sections(session_t& s, pe_t& pe);
+        status_t build_sections(file_t& file, pe_t& pe);
 
-        u0 write_optional_header(session_t& s, pe_t& pe);
+        u0 write_optional_header(file_t& file, pe_t& pe);
 
         status_t write_sections_data(session_t& s, pe_t& pe);
 
-        status_t build_section(session_t& s, pe_t& pe, coff_section_hdr_t& hdr);
+        status_t build_section(file_t& file, pe_t& pe, coff_section_hdr_t& hdr);
 
         status_t write_section_data(session_t& s, pe_t& pe, coff_section_hdr_t& hdr);
     }

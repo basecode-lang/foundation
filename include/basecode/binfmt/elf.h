@@ -288,7 +288,7 @@ namespace basecode::binfmt::io {
 
         u64 hash(const u8* name);
 
-        u0 write_header(session_t& s, elf_t& elf);
+        u0 write_header(file_t& file, elf_t& elf);
 
         status_t init(elf_t& elf, const elf_opts_t& opts);
 

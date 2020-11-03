@@ -77,20 +77,20 @@ namespace basecode::binfmt::io {
         static u0 fini() {
         }
 
-        static status_t read(session_t& s) {
-            UNUSED(s);
+        static status_t read(file_t& file) {
+            UNUSED(file);
             return status_t::ok;
         }
 
-        static status_t write(session_t& s) {
-            const auto file = s.file;
+        static status_t write(file_t& file) {
+            const auto module = file.module;
 
             pe_opts_t opts{};
-            opts.file          = file;
-            opts.alloc         = file->alloc;
-            opts.base_addr     = s.opts.base_addr;
-            opts.heap_reserve  = s.opts.heap_reserve;
-            opts.stack_reserve = s.opts.stack_reserve;
+            opts.alloc         = module->alloc;
+            opts.file          = &file;
+            opts.base_addr     = file.opts.base_addr;
+            opts.heap_reserve  = file.opts.heap_reserve;
+            opts.stack_reserve = file.opts.stack_reserve;
 
             pe_t pe{};
             pe::init(pe, opts);
@@ -99,7 +99,7 @@ namespace basecode::binfmt::io {
             status_t status;
             auto& coff = pe.coff;
 
-            switch (s.output_type) {
+            switch (file.output_type) {
                 case output_type_t::obj:
                 case output_type_t::lib:
                     return status_t::invalid_output_type;
@@ -118,25 +118,25 @@ namespace basecode::binfmt::io {
 
             pe.opts.include_symbol_table = true;    // XXX: temporary for testing
 
-            status = pe::build_sections(s, pe);
+            status = pe::build_sections(file, pe);
             if (!OK(status))
                 return status;
 
-            pe::write_dos_header(s, pe);
-            pe::write_pe_header(s, pe);
-            coff::write_header(s, coff, pe.size.opt_hdr);
-            pe::write_optional_header(s, pe);
-            coff::write_section_headers(s, coff);
-            status = pe::write_sections_data(s, pe);
+            pe::write_dos_header(*file.session, pe);
+            pe::write_pe_header(*file.session, pe);
+            coff::write_header(*file.session, coff, pe.size.opt_hdr);
+            pe::write_optional_header(file, pe);
+            coff::write_section_headers(*file.session, coff);
+            status = pe::write_sections_data(*file.session, pe);
             if (!OK(status))
                 return status;
             if (pe.opts.include_symbol_table) {
-                coff::write_symbol_table(s, coff);
+                coff::write_symbol_table(*file.session, coff);
             }
 
-            status = session::save(s);
+            status = file::save(file);
             if (!OK(status))
-                return status_t::write_error;
+                return status;
 
             return status_t::ok;
         }
@@ -245,7 +245,7 @@ namespace basecode::binfmt::io {
         }
 
         status_t init(pe_t& pe, const pe_opts_t& opts) {
-            auto status = coff::init(pe.coff, opts.file, opts.alloc);
+            auto status = coff::init(pe.coff, *opts.file, opts.alloc);
             if (!OK(status))
                 return status;
 
@@ -307,11 +307,12 @@ namespace basecode::binfmt::io {
                 session::write_u8(s, code_byte);
         }
 
-        u0 write_optional_header(session_t& s, pe_t& pe) {
+        u0 write_optional_header(file_t& file, pe_t& pe) {
+            auto      & s    = *file.session;
             const auto& coff = pe.coff;
             session::write_u16(s, pe64);
-            session::write_u8(s, s.versions.linker.major);
-            session::write_u8(s, s.versions.linker.minor);
+            session::write_u8(s, file.versions.linker.major);
+            session::write_u8(s, file.versions.linker.minor);
             session::write_u32(s, coff.code.size);
             session::write_u32(s, coff.init_data.size);
             session::write_u32(s, coff.uninit_data.size);
@@ -320,17 +321,17 @@ namespace basecode::binfmt::io {
             session::write_u64(s, pe.base_addr);
             session::write_u32(s, coff.align.section);
             session::write_u32(s, coff.align.file);
-            session::write_u16(s, s.versions.min_os.major);
-            session::write_u16(s, s.versions.min_os.minor);
+            session::write_u16(s, file.versions.min_os.major);
+            session::write_u16(s, file.versions.min_os.minor);
             session::write_u16(s, 0);
             session::write_u16(s, 0);
-            session::write_u16(s, s.versions.min_os.major);
-            session::write_u16(s, s.versions.min_os.minor);
+            session::write_u16(s, file.versions.min_os.major);
+            session::write_u16(s, file.versions.min_os.minor);
             session::write_u32(s, 0);
             session::write_u32(s, align(coff.rva + coff.size.image, coff.align.section));
             session::write_u32(s, align(coff.size.headers, pe.coff.align.file));
             session::write_u32(s, 0);
-            if (s.flags.console) {
+            if (file.flags.console) {
                 session::write_u16(s, subsystem::win_cui);
             } else {
                 session::write_u16(s, subsystem::win_gui);
@@ -349,7 +350,7 @@ namespace basecode::binfmt::io {
             }
         }
 
-        status_t build_sections(session_t& s, pe_t& pe) {
+        status_t build_sections(file_t& file, pe_t& pe) {
             auto& coff = pe.coff;
 
             coff.size.headers = coff.offset
@@ -359,7 +360,7 @@ namespace basecode::binfmt::io {
             coff.rva    = align(coff.size.headers, coff.align.section);
 
             for (auto& hdr : coff.headers) {
-                auto status = build_section(s, pe, hdr);
+                auto status = build_section(file, pe, hdr);
                 if (!OK(status))
                     return status;
             }
@@ -402,7 +403,8 @@ namespace basecode::binfmt::io {
         // 0x.....3055: import address table
         //      1...n 8-byte rva
         //      0     8-byte null marker
-        status_t build_section(session_t& s, pe_t& pe, coff_section_hdr_t& hdr) {
+        status_t build_section(file_t& file, pe_t& pe, coff_section_hdr_t& hdr) {
+            auto& s    = *file.session;
             auto& coff = pe.coff;
 
             hdr.offset = coff.offset;
@@ -441,7 +443,7 @@ namespace basecode::binfmt::io {
                         auto& module = array::append(import_table.modules);
                         module.iat_rva = module.fwd_chain = module.time_stamp = {};
                         {
-                            const auto symbol    = file::get_symbol(*s.file, import.module);
+                            const auto symbol    = module::get_symbol(*file.module, import.module_symbol);
                             const auto intern_rc = string::interned::get(symbol->name);
                             if (!OK(intern_rc.status))
                                 return status_t::symbol_not_found;
@@ -457,7 +459,7 @@ namespace basecode::binfmt::io {
                         module.symbols.size  = import.symbols.size;
                         lookup_rva += (import.symbols.size + 1) * import_lookup_table::entry_size;
                         for (auto symbol_id : import.symbols) {
-                            const auto symbol    = file::get_symbol(*s.file, symbol_id);
+                            const auto symbol    = module::get_symbol(*file.module, symbol_id);
                             const auto intern_rc = string::interned::get(symbol->name);
                             if (!OK(intern_rc.status))
                                 return status_t::symbol_not_found;

@@ -63,17 +63,27 @@ namespace basecode::binfmt::io {
     }
 
     status_t read(session_t& s) {
-        const auto idx = u32(s.type);
-        if (idx > max_type_count - 1)
-            return status_t::invalid_container_type;
-        return s_systems[idx]->read(s);
+        for (auto& file : s.files) {
+            const auto idx = u32(file.bin_type);
+            if (idx > max_type_count - 1)
+                return status_t::invalid_container_type;
+            auto status =  s_systems[idx]->read(file);
+            if (!OK(status))
+                return status;
+        }
+        return status_t::ok;
     }
 
     status_t write(session_t& s) {
-        const auto idx = u32(s.type);
-        if (idx > max_type_count - 1)
-            return status_t::invalid_container_type;
-        return s_systems[idx]->write(s);
+        for (auto& file : s.files) {
+            const auto idx = u32(file.bin_type);
+            if (idx > max_type_count - 1)
+                return status_t::invalid_container_type;
+            auto status = s_systems[idx]->write(file);
+            if (!OK(status))
+                return status;
+        }
+        return status_t::ok;
     }
 
     namespace name_map {
@@ -87,10 +97,10 @@ namespace basecode::binfmt::io {
 
         u0 add(name_list_t& names, section::type_t type, section::flags_t flags, str::slice_t name) {
             auto entry = &array::append(names);
-            entry->type = type;
-            entry->flags = flags;
+            entry->type      = type;
+            entry->flags     = flags;
             entry->flags.pad = {};
-            entry->name = string::interned::fold(name);
+            entry->name      = string::interned::fold(name);
         }
 
         const name_map_t* find(const name_list_t& names, section::type_t type, section::flags_t flags) {
@@ -104,8 +114,29 @@ namespace basecode::binfmt::io {
         }
     }
 
+    namespace file {
+        u0 free(file_t& file) {
+            path::free(file.path);
+        }
+
+        status_t save(file_t& file) {
+            auto status = buf::save(file.session->buf, file.path);
+            if (!OK(status))
+                return status_t::write_error;
+            return status_t::ok;
+        }
+
+        status_t init(file_t& file, alloc_t* alloc) {
+            path::init(file.path, alloc);
+            return status_t::ok;
+        }
+    }
+
     namespace session {
         u0 free(session_t& s) {
+            for (auto& file : s.files)
+                file::free(file);
+            array::free(s.files);
             buf::free(s.buf);
         }
 
@@ -114,18 +145,31 @@ namespace basecode::binfmt::io {
             s.buf.data[s.crsr.pos++] = 0;
         }
 
-        status_t save(session_t& s) {
-            auto status = buf::save(s.buf, s.file->path);
-            if (!OK(status))
-                return status_t::write_error;
-            return status_t::ok;
+        file_t* add_file(session_t& s,
+                         const module_t* module,
+                         const path_t& path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         output_type_t output_type) {
+            return add_file(s, module, path::c_str(path), machine, bin_type, output_type, path.str.length);
         }
 
-        status_t init(session_t& s) {
-            buf::init(s.buf, s_alloc);
-            buf::reserve(s.buf, 64 * 1024);
-            buf::cursor::init(s.crsr, s.buf);
-            return status_t::ok;
+        file_t* add_file(session_t& s,
+                         const module_t* module,
+                         const s8* path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         output_type_t output_type,
+                         s32 path_len) {
+            auto file = &array::append(s.files);
+            file::init(*file, s.alloc);
+            path::set(file->path, path, path_len);
+            file->session     = &s;
+            file->module      = module;
+            file->machine     = machine;
+            file->bin_type    = bin_type;
+            file->output_type = output_type;
+            return file;
         }
 
         u0 seek(session_t& s, u32 offset) {
@@ -160,6 +204,15 @@ namespace basecode::binfmt::io {
         u0 write_s64(session_t& s, s64 value) {
             buf::write(s.buf, s.crsr.pos, (const u8*) &value, sizeof(s64));
             s.crsr.pos += sizeof(s64);
+        }
+
+        status_t init(session_t& s, alloc_t* alloc) {
+            s.alloc = alloc;
+            array::init(s.files, s.alloc);
+            buf::init(s.buf, s.alloc);
+            buf::reserve(s.buf, 64 * 1024);
+            buf::cursor::init(s.crsr, s.buf);
+            return status_t::ok;
         }
 
         u0 write_pad8(session_t& s, str::slice_t slice) {
