@@ -52,20 +52,11 @@ namespace basecode::binfmt::io {
             elf::init(elf, opts);
             defer(elf::free(elf));
 
-            switch (file.machine) {
-                case machine::type_t::unknown:
-                    return status_t::invalid_machine_type;
-                case machine::type_t::x86_64:
-                    elf.machine = elf::machine::x86_64;
-                    break;
-                case machine::type_t::aarch64:
-                    elf.machine = elf::machine::aarch64;
-                    break;
-            }
-
             elf.section.offset = elf::file::header_size;
-            u64 rva         = elf.entry_point;
-            u64 data_offset = elf.section.offset + ((module->sections.size + 2) * elf::section::header_size);
+
+            u64 rva             {elf.entry_point};
+            str::slice_t name   {};
+
             switch (file.output_type) {
                 case output_type_t::obj:
                     break;
@@ -75,25 +66,31 @@ namespace basecode::binfmt::io {
                 case output_type_t::dll:
                     for (u32 i = 0; i < module->sections.size; ++i) {
                         auto                 section = &module->sections[i];
-                        u64                  size{};
-                        u64                  flags{};
-                        u64                  entry_size{};
-                        u32                  number{};
-                        elf_header_type_t    header_type{};
-                        elf::section::type_t section_type{};
+                        u64                  size           {};
+                        u64                  flags          {};
+                        u64                  entry_size     {};
+                        u32                  number         {};
+                        u32                  alignment;
+                        u32                  section_type   {};
+                        elf_header_type_t    header_type    {};
 
                         switch (section->type) {
                             case section::type_t::tls: {
                                 break;
                             }
                             case section::type_t::data: {
-                                number       = ++elf.num_section;
+                                number       = ++elf.section.count;
                                 header_type  = elf_header_type_t::section;
                                 if (!section->flags.init) {
-                                    section_type = elf::section::type_t::nobits;
+                                    section_type = elf::section::type::nobits;
+                                    size         = section->subclass.size;
                                 } else {
-                                    section_type = elf::section::type_t::progbits;
+                                    section_type = elf::section::type::progbits;
                                     size         = section->subclass.data.length;
+                                    auto& block = array::append(elf.blocks);
+                                    block.type       = elf_block_type_t::slice;
+                                    block.offset     = elf.data.rel_offset;
+                                    block.data.slice = &section->subclass.data;
                                 }
                                 flags = elf::section::flags::alloc;
                                 if (section->flags.write)
@@ -103,11 +100,15 @@ namespace basecode::binfmt::io {
                                 break;
                             }
                             case section::type_t::code: {
-                                number       = ++elf.num_section;
+                                number       = ++elf.section.count;
                                 header_type  = elf_header_type_t::section;
-                                section_type = elf::section::type_t::progbits;
+                                section_type = elf::section::type::progbits;
                                 size         = section->subclass.data.length;
                                 flags        = elf::section::flags::alloc | elf::section::flags::exec_instr;
+                                auto& block = array::append(elf.blocks);
+                                block.type       = elf_block_type_t::slice;
+                                block.offset     = elf.data.rel_offset;
+                                block.data.slice = &section->subclass.data;
                                 break;
                             }
                             case section::type_t::debug: {
@@ -138,24 +139,27 @@ namespace basecode::binfmt::io {
                         hdr.number  = number;
                         hdr.type    = header_type;
 
+                        alignment = std::max<u32>(section->align, sizeof(u64));
+
                         switch (header_type) {
                             case elf_header_type_t::none:
                                 return status_t::invalid_section_type;
                             case elf_header_type_t::section: {
                                 auto& sc = hdr.subclass.section;
-                                sc.flags      = flags;
-                                sc.type       = u32(section_type);
-                                str::slice_t name{};
+                                sc.flags = flags;
+                                sc.type  = section_type;
                                 auto status = elf::get_section_name(section, name);
                                 if (!OK(status))
                                     return status;
-                                sc.slice      = section->subclass.data;
                                 sc.addr.base  = rva;
-                                sc.size       = size;
-                                sc.offset     = data_offset;
+                                sc.addr.align = alignment;
                                 sc.entry_size = entry_size;
-                                // XXX: shouldn't be hard coded
-                                sc.addr.align = sizeof(u64);
+                                if (section->flags.init) {
+                                    sc.offset = elf.data.rel_offset;
+                                    sc.size   = size;
+                                } else {
+                                    sc.offset = sc.size = {};
+                                }
                                 sc.name_index = elf::strtab::add_str(elf.section_names, name);
                                 break;
                             }
@@ -164,47 +168,83 @@ namespace basecode::binfmt::io {
                             }
                         }
 
-                        rva         = align(rva + size, sizeof(u64));
-                        data_offset = align(data_offset + size, sizeof(u64));
+                        rva = align(rva + size, alignment);
+                        if (section->flags.init)
+                            elf.data.rel_offset = align(elf.data.rel_offset + size, alignment);
                     }
                     break;
             }
 
-            if (elf.num_section > 0) {
-                elf.str_ndx = ++elf.num_section;
+            if (module->symbols.size > 0) {
+                auto symbols = hashtab::values(const_cast<symbol_table_t&>(module->symbols));
+                defer(array::free(symbols));
 
-                auto& hdr = array::append(elf.headers);
-                hdr.section = {};
-                hdr.number  = elf.str_ndx;
-                hdr.type    = elf_header_type_t::section;
+                elf::symtab::resize(elf.symbols, symbols.size * 2);
 
-                auto& sc = hdr.subclass.section;
-                sc.flags      = 0;
-                sc.type       = u32(elf::section::type_t::strtab);
-                sc.offset     = data_offset;
-                sc.entry_size = 0;
-                sc.addr.align = sizeof(u64);
-                const auto name = string::interned::fold(".shstrtab"_ss);
-                sc.name_index = elf::strtab::add_str(elf.section_names, name);
-                sc.size       = elf.section_names.size;
-                data_offset   = align(data_offset + sc.size, sizeof(u64));
+                for (auto symbol : symbols) {
+                    auto status = elf::symtab::add_sym(elf.symbols, symbol);
+                    if (!OK(status))
+                        return status;
+                }
+
+                auto& strtab = elf::strtab::make_section(elf,
+                                                         ".strtab"_ss,
+                                                         &elf.strings);
+                elf.symbols.link = strtab.number - 1;
+
+                auto& symtab = elf::symtab::make_section(elf,
+                                                         ".symtab"_ss,
+                                                         &elf.symbols);
+                elf.symbols.hash.link = symtab.number - 1;
+
+                elf::hash::make_section(elf,
+                                        ".hash"_ss,
+                                        &elf.symbols.hash);
             }
 
-            status_t status;
+            if (elf.section.count > 0) {
+                auto& hdr = elf::strtab::make_section(elf,
+                                                      ".shstrtab"_ss,
+                                                      &elf.section_names);
+                elf.str_ndx = hdr.number - 1;
+            }
+
+            elf.data.base_offset = elf.section.offset
+                + elf.segment.offset
+                + (elf.section.count * elf::section::header_size)
+                + (elf.segment.count * elf::segment::header_size);
+            for (auto& hdr : elf.headers) {
+                switch (hdr.type) {
+                    case elf_header_type_t::none:
+                        break;
+                    case elf_header_type_t::section:
+                        hdr.subclass.section.offset += elf.data.base_offset;
+                        break;
+                    case elf_header_type_t::segment:
+                        hdr.subclass.segment.file.offset += elf.data.base_offset;
+                        break;
+                }
+            }
+
+            for (auto& block : elf.blocks)
+                block.offset += elf.data.base_offset;
 
             elf::write_file_header(file, elf);
+
             if (file.output_type == output_type_t::exe
             ||  file.output_type == output_type_t::dll) {
-                elf::write_segments(file, elf);
+                auto status = elf::write_segments(file, elf);
+                if (!OK(status))
+                    return status;
             }
-            elf::write_pad_section(file, elf);
-            elf::write_sections(file, elf);
 
-            status = file::save(file);
+            auto status = elf::write_sections(file, elf);
             if (!OK(status))
-                return status_t::write_error;
+                return status;
 
-            return status_t::ok;
+            elf::write_blocks(file, elf);
+
+            return file::save(file);
         }
 
         static status_t init(alloc_t* alloc) {
@@ -219,6 +259,7 @@ namespace basecode::binfmt::io {
                           {
                               .code = true,
                               .data = false,
+                              .init = true,
                               .read = true,
                               .exec = true,
                               .write = false,
@@ -282,21 +323,101 @@ namespace basecode::binfmt::io {
     }
 
     namespace elf {
+        namespace hash {
+            u0 free(elf_hash_t& hash) {
+                array::free(hash.buckets);
+            }
+
+            elf_header_t& make_section(elf_t& elf,
+                                       str::slice_t name,
+                                       const elf_hash_t* hash) {
+                auto& hdr = array::append(elf.headers);
+                hdr.section = {};
+                hdr.number  = ++elf.section.count;
+                hdr.type    = elf_header_type_t::section;
+
+                auto& sc = hdr.subclass.section;
+                sc.type       = elf::section::type::hash;
+                sc.link       = hash->link;
+                sc.offset     = elf.data.rel_offset;
+                sc.entry_size = elf::hash::entity_size;
+                sc.addr.align = sizeof(u64);
+                sc.name_index = elf::strtab::add_str(elf.section_names,
+                                                     string::interned::fold(name));
+                sc.size       = (2 + hash->buckets.size + hash->num_sym) * elf::hash::entity_size;
+
+                auto& block = array::append(elf.blocks);
+                block.type      = elf_block_type_t::hash;
+                block.offset    = elf.data.rel_offset;
+                block.data.hash = hash;
+
+                elf.data.rel_offset = align(elf.data.rel_offset + sc.size, sizeof(u64));
+
+                return hdr;
+            }
+
+            u0 resize(elf_hash_t& hash, u32 size) {
+                array::resize(hash.buckets, size);
+            }
+
+            u0 init(elf_hash_t& hash, alloc_t* alloc) {
+                array::init(hash.buckets, alloc);
+            }
+
+            u0 write(const elf_hash_t& hash, file_t& file) {
+                auto& s = *file.session;
+                session::write_u32(s, hash.buckets.size);
+                session::write_u32(s, hash.num_sym);
+                for (auto sym_idx : hash.buckets)
+                    session::write_u32(s, sym_idx);
+                for (u32 i = 0; i < hash.num_sym; ++i)
+                    session::write_u32(s, 0);
+            }
+        }
+
         namespace strtab {
             u0 free(elf_strtab_t& strtab) {
                 array::free(strtab.strings);
             }
 
-            u0 write(elf_strtab_t& strtab, file_t& file) {
-                auto& s = *file.session;
-                session::write_u8(s, 0);
-                for (const auto& str : strtab.strings)
-                    session::write_cstr(s, str);
+            elf_header_t& make_section(elf_t& elf,
+                                       str::slice_t name,
+                                       const elf_strtab_t* strtab) {
+                auto& hdr = array::append(elf.headers);
+                hdr.section = {};
+                hdr.number  = ++elf.section.count;
+                hdr.type    = elf_header_type_t::section;
+
+                auto& sc = hdr.subclass.section;
+                sc.flags      = elf::section::flags::strings;
+                sc.type       = elf::section::type::strtab;
+                sc.offset     = elf.data.rel_offset;
+                sc.entry_size = 0;
+                sc.addr.align = 1;
+                sc.name_index = elf::strtab::add_str(elf.section_names,
+                                                     string::interned::fold(name));
+                sc.size       = strtab->size;
+
+                auto& block = array::append(elf.blocks);
+                block.type        = elf_block_type_t::strtab;
+                block.offset      = elf.data.rel_offset;
+                block.data.strtab = strtab;
+
+                elf.data.rel_offset = align(elf.data.rel_offset + sc.size, sizeof(u64));
+
+                return hdr;
             }
 
             u0 init(elf_strtab_t& strtab, alloc_t* alloc) {
                 array::init(strtab.strings, alloc);
                 strtab.size = 1;
+            }
+
+            u0 write(const elf_strtab_t& strtab, file_t& file) {
+                auto& s = *file.session;
+                session::write_u8(s, 0);
+                for (const auto& str : strtab.strings)
+                    session::write_cstr(s, str);
             }
 
             u32 add_str(elf_strtab_t& strtab, str::slice_t str) {
@@ -307,42 +428,126 @@ namespace basecode::binfmt::io {
             }
         }
 
+        namespace symtab {
+            u0 free(elf_symtab_t& symtab) {
+                hash::free(symtab.hash);
+                array::free(symtab.symbols);
+            }
+
+            u64 hash_name(str::slice_t str) {
+                u64 h = 0, g;
+                for (auto ch : str) {
+                    h      = (h << u32(4)) + ch;
+                    if ((g = h & 0xf0000000))
+                        h ^= g >> u32(24);
+                    h &= u32(0x0fffffff);
+                }
+                return h;
+            }
+
+            elf_header_t& make_section(elf_t& elf,
+                                       str::slice_t name,
+                                       const elf_symtab_t* symtab) {
+                auto& hdr = array::append(elf.headers);
+                hdr.section = {};
+                hdr.number  = ++elf.section.count;
+                hdr.type    = elf_header_type_t::section;
+
+                auto& sc = hdr.subclass.section;
+                sc.type       = elf::section::type::symtab;
+                sc.link       = symtab->link;
+                sc.offset     = elf.data.rel_offset;
+                sc.entry_size = elf::symtab::entity_size;
+                sc.addr.align = sizeof(u64);
+                sc.name_index = elf::strtab::add_str(elf.section_names,
+                                                     string::interned::fold(name));
+                sc.size       = symtab->symbols.size * elf::symtab::entity_size;
+
+                auto& block = array::append(elf.blocks);
+                block.type        = elf_block_type_t::symtab;
+                block.offset      = elf.data.rel_offset;
+                block.data.symtab = symtab;
+
+                elf.data.rel_offset = align(elf.data.rel_offset + sc.size, sizeof(u64));
+
+                return hdr;
+            }
+
+            u0 resize(elf_symtab_t& symtab, u32 size) {
+                hash::resize(symtab.hash, size);
+            }
+
+            u0 write(const elf_symtab_t& symtab, file_t& file) {
+                auto& s = *file.session;
+                for (const auto& sym : symtab.symbols) {
+                    session::write_u32(s, sym.name_index);
+                    session::write_u8(s, sym.info);
+                    session::write_u8(s, sym.other);
+                    session::write_u16(s, sym.index);
+                    session::write_u64(s, sym.value);
+                    session::write_u64(s, sym.size);
+                }
+            }
+
+            status_t add_sym(elf_symtab_t& symtab, const symbol_t* symbol) {
+                const auto intern_rc = string::interned::get(symbol->name);
+                if (!OK(intern_rc.status))
+                    return status_t::symbol_not_found;
+
+                auto& sym = array::append(symtab.symbols);
+                sym.name_index = elf::strtab::add_str(*symtab.strtab, intern_rc.slice);
+                sym.value = symbol->value;
+                sym.size  = symbol->length;
+                sym.info  = {};
+                sym.other = {};
+                sym.index = symbol->section;
+
+                const auto name_hash  = hash_name(intern_rc.slice);
+                const auto bucket_idx = name_hash % symtab.hash.buckets.size;
+                symtab.hash.buckets[bucket_idx] = symtab.symbols.size - 1;
+                ++symtab.hash.num_sym;
+
+                return status_t::ok;
+            }
+
+            u0 init(elf_symtab_t& symtab, elf_strtab_t* strtab, alloc_t* alloc) {
+                symtab.strtab = strtab;
+                hash::init(symtab.hash, alloc);
+                array::init(symtab.symbols, alloc);
+            }
+        }
+
         system_t* system() {
             return &internal::g_elf_backend;
         }
 
         u0 free(elf_t& elf) {
+            array::free(elf.blocks);
             array::free(elf.headers);
+            symtab::free(elf.symbols);
             strtab::free(elf.strings);
             strtab::free(elf.section_names);
         }
 
-        u64 hash(const u8* name) {
-            u64 h = 0, g;
-            while (*name) {
-                h      = (h << u32(4)) + *name++;
-                if ((g = h & 0xf0000000))
-                    h ^= g >> u32(24);
-                h &= u32(0x0fffffff);
-            }
-            return h;
-        }
-
-        u0 write_symbol_hash(file_t& file, elf_t& elf) {
-        }
-
-        u0 write_pad_section(file_t& file, elf_t& elf) {
+        u0 write_blocks(file_t& file, elf_t& elf) {
             auto& s = *file.session;
-            session::write_u32(s, 0);
-            session::write_u32(s, 0);
-            session::write_u64(s, 0);
-            session::write_u64(s, 0);
-            session::write_u64(s, 0);
-            session::write_u64(s, 0);
-            session::write_u32(s, 0);
-            session::write_u32(s, 0);
-            session::write_u64(s, 0);
-            session::write_u64(s, 0);
+            for (const auto& block : elf.blocks) {
+                session::seek(s, block.offset);
+                switch (block.type) {
+                    case elf_block_type_t::slice:
+                        session::write_str(s, *block.data.slice);
+                        break;
+                    case elf_block_type_t::strtab:
+                        strtab::write(*block.data.strtab, file);
+                        break;
+                    case elf_block_type_t::hash:
+                        hash::write(*block.data.hash, file);
+                        break;
+                    case elf_block_type_t::symtab:
+                        symtab::write(*block.data.symtab, file);
+                        break;
+                }
+            }
         }
 
         u0 write_file_header(file_t& file, elf_t& elf) {
@@ -357,39 +562,19 @@ namespace basecode::binfmt::io {
             session::write_u8(s, os_abi_linux);
             for (u32 i = 0; i < 8; ++i)
                 session::write_u8(s, 0);
-            switch (file.output_type) {
-                case output_type_t::obj:
-                    session::write_u16(s, u16(file::type_t::rel));
-                    break;
-                case output_type_t::lib:
-                    // XXX
-                    session::write_u16(s, u16(file::type_t::none));
-                    break;
-                case output_type_t::exe:
-                    session::write_u16(s, u16(file::type_t::exec));
-                    break;
-                case output_type_t::dll:
-                    session::write_u16(s, u16(file::type_t::dyn));
-                    break;
-            }
+            session::write_u16(s, elf.file_type);
             session::write_u16(s, elf.machine);
             session::write_u32(s, version_current);
             session::write_u64(s, elf.entry_point);
-            session::write_u64(s, elf.program.offset);
+            session::write_u64(s, elf.segment.offset);
             session::write_u64(s, elf.section.offset);
             session::write_u32(s, elf.proc_flags);
             session::write_u16(s, elf::file::header_size);
             session::write_u16(s, elf::segment::header_size);
-            session::write_u16(s, elf.num_segment);
+            session::write_u16(s, elf.segment.count);
             session::write_u16(s, elf::section::header_size);
-            session::write_u16(s, elf.num_section + 1);
+            session::write_u16(s, elf.section.count);
             session::write_u16(s, elf.str_ndx);
-        }
-
-        u0 write_symbol_table(file_t& file, elf_t& elf) {
-        }
-
-        u0 write_string_table(file_t& file, elf_t& elf) {
         }
 
         status_t write_segments(file_t& file, elf_t& elf) {
@@ -411,37 +596,55 @@ namespace basecode::binfmt::io {
                 if (!OK(status))
                     return status;
             }
-            for (const auto& hdr : elf.headers) {
-                if (hdr.type != elf_header_type_t::section)
-                    continue;
-                const auto& sc = hdr.subclass.section;
-                session::seek(*file.session, sc.offset);
-                if (sc.type == u32(elf::section::type_t::strtab)) {
-                    strtab::write(elf.section_names, file);
-                } else {
-                    session::write_str(*file.session, sc.slice);
-                }
-            }
             return status_t::ok;
         }
 
         status_t init(elf_t& elf, const elf_opts_t& opts) {
-            elf.alloc       = opts.alloc;
+            using type_t = binfmt::machine::type_t;
+
+            const auto& file = *opts.file;
+
+            elf.alloc = opts.alloc;
+            array::init(elf.blocks, elf.alloc);
             array::init(elf.headers, elf.alloc);
             strtab::init(elf.strings, elf.alloc);
             strtab::init(elf.section_names, elf.alloc);
-            elf.entry_point = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
-            return status_t::ok;
-        }
+            symtab::init(elf.symbols, &elf.strings, elf.alloc);
 
-        u0 write_sym(file_t& file, elf_t& elf, const elf_sym_t& sym) {
-            auto& s = *file.session;
-            session::write_u32(s, sym.name_index);
-            session::write_u8(s, sym.info);
-            session::write_u8(s, sym.other);
-            session::write_u16(s, sym.index);
-            session::write_u64(s, sym.value);
-            session::write_u64(s, sym.size);
+            elf.entry_point = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
+            ++elf.section.count;
+
+            auto& null_section = array::append(elf.headers);
+            ZERO_MEM(&null_section, elf_header_t);
+            null_section.type    = elf_header_type_t::section;
+
+            switch (file.machine) {
+                case type_t::unknown:
+                    return status_t::invalid_machine_type;
+                case type_t::x86_64:
+                    elf.machine = elf::machine::x86_64;
+                    break;
+                case type_t::aarch64:
+                    elf.machine = elf::machine::aarch64;
+                    break;
+            }
+
+            switch (file.output_type) {
+                case output_type_t::obj:
+                    elf.file_type = elf::file::type::rel;
+                    break;
+                case output_type_t::lib:
+                    elf.file_type = elf::file::type::none;
+                    break;
+                case output_type_t::exe:
+                    elf.file_type = elf::file::type::exec;
+                    break;
+                case output_type_t::dll:
+                    elf.file_type = elf::file::type::dyn;
+                    break;
+            }
+
+            return status_t::ok;
         }
 
         u0 write_dyn(file_t& file, elf_t& elf, const elf_dyn_t& dyn) {
@@ -497,7 +700,6 @@ namespace basecode::binfmt::io {
                     session::write_u32(s, sc.info);
                     session::write_u64(s, sc.addr.align);
                     session::write_u64(s, sc.entry_size);
-
                     break;
                 }
                 case elf_header_type_t::segment: {
