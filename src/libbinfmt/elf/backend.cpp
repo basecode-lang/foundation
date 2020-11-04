@@ -180,7 +180,8 @@ namespace basecode::binfmt::io::elf {
                 auto symbols = hashtab::values(const_cast<symbol_table_t&>(module->symbols));
                 defer(array::free(symbols));
 
-                elf::symtab::resize(elf.symbols, symbols.size * 2);
+                elf::symtab::rehash(elf.symbols, symbols.size + 1);
+                elf::symtab::add_sym(elf.symbols, nullptr);
 
                 for (auto symbol : symbols) {
                     auto status = elf::symtab::add_sym(elf.symbols, symbol);

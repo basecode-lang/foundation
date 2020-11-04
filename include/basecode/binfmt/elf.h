@@ -19,6 +19,7 @@
 #pragma once
 
 #include <basecode/binfmt/io.h>
+#include <basecode/core/str_array.h>
 
 #define ELF64_R_SYM(i)              ((i) >> 32)
 #define ELF64_R_TYPE(i)             ((i) & 0xffffffff)
@@ -44,12 +45,11 @@ namespace basecode::binfmt::io::elf {
     struct ver_aux_t;
     struct sym_bind_t;
 
-    using str_list_t            = array_t<str::slice_t>;
     using sym_list_t            = array_t<sym_t>;
     using note_list_t           = array_t<note_t>;
     using block_list_t          = array_t<block_t>;
-    using bucket_list_t         = array_t<u32>;
     using header_list_t         = array_t<header_t>;
+    using sym_idx_list_t        = array_t<u32>;
 
     enum class block_type_t : u8 {
         hash,
@@ -132,13 +132,12 @@ namespace basecode::binfmt::io::elf {
     };
 
     struct strtab_t final {
-        str_list_t              strings;
-        u32                     size;
+        str_array_t             strings;
     };
 
     struct hash_t final {
-        bucket_list_t           buckets;
-        u32                     num_sym;
+        sym_idx_list_t          buckets;
+        sym_idx_list_t          chains;
         u32                     link;
     };
 
@@ -587,7 +586,7 @@ namespace basecode::binfmt::io::elf {
                                str::slice_t name,
                                const hash_t* hash);
 
-        u0 resize(hash_t& hash, u32 size);
+        u0 rehash(hash_t& hash, u32 size);
 
         u0 init(hash_t& hash, alloc_t* alloc);
 
@@ -628,13 +627,15 @@ namespace basecode::binfmt::io::elf {
                                str::slice_t name,
                                const symtab_t* symtab);
 
-        u0 resize(symtab_t& symtab, u32 size);
+        u0 rehash(symtab_t& symtab, u32 size);
 
         u0 write(const symtab_t& symtab, file_t& file);
 
         status_t add_sym(symtab_t& symtab, const symbol_t* symbol);
 
         u0 init(symtab_t& symtab, strtab_t* strtab, alloc_t* alloc);
+
+        status_t find_sym(symtab_t& symtab, str::slice_t name, sym_t** sym);
     }
 
     u0 free(elf_t& elf);

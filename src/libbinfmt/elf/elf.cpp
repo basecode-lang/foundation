@@ -24,6 +24,7 @@ namespace basecode::binfmt::io::elf {
     namespace hash {
         u0 free(hash_t& hash) {
             array::free(hash.buckets);
+            array::free(hash.chains);
         }
 
         header_t& make_section(elf_t& elf,
@@ -42,7 +43,7 @@ namespace basecode::binfmt::io::elf {
             sc.addr.align = sizeof(u64);
             sc.name_index = elf::strtab::add_str(elf.section_names,
                                                  string::interned::fold(name));
-            sc.size       = (2 + hash->buckets.size + hash->num_sym) * elf::hash::entity_size;
+            sc.size       = (2 + hash->buckets.size + hash->chains.size) * elf::hash::entity_size;
 
             auto& block = array::append(elf.blocks);
             block.type      = block_type_t::hash;
@@ -54,30 +55,32 @@ namespace basecode::binfmt::io::elf {
             return hdr;
         }
 
-        u0 resize(hash_t& hash, u32 size) {
-            array::resize(hash.buckets, size);
+        u0 rehash(hash_t& hash, u32 size) {
+            array::resize(hash.chains, size);
+            array::resize(hash.buckets, size * 3);
         }
 
         u0 init(hash_t& hash, alloc_t* alloc) {
             array::init(hash.buckets, alloc);
+            array::init(hash.chains, alloc);
         }
 
         u0 write(const hash_t& hash, file_t& file) {
-            auto& s     = *file.session;
+            auto& s = *file.session;
             session::write_u32(s, hash.buckets.size);
-            session::write_u32(s, hash.num_sym);
+            session::write_u32(s, hash.chains.size);
             for (auto sym_idx : hash.buckets) {
                 session::write_u32(s, sym_idx);
             }
-            for (u32  i = 0; i < hash.num_sym; ++i) {
-                session::write_u32(s, 0);
+            for (auto sym_idx : hash.chains) {
+                session::write_u32(s, sym_idx);
             }
         }
     }
 
     namespace strtab {
         u0 free(strtab_t& strtab) {
-            array::free(strtab.strings);
+            str_array::free(strtab.strings);
         }
 
         header_t& make_section(elf_t& elf,
@@ -96,7 +99,7 @@ namespace basecode::binfmt::io::elf {
             sc.addr.align = 1;
             sc.name_index = elf::strtab::add_str(elf.section_names,
                                                  string::interned::fold(name));
-            sc.size       = strtab->size;
+            sc.size       = strtab->strings.buf.size + 1;
 
             auto& block = array::append(elf.blocks);
             block.type        = block_type_t::strtab;
@@ -109,22 +112,20 @@ namespace basecode::binfmt::io::elf {
         }
 
         u0 init(strtab_t& strtab, alloc_t* alloc) {
-            array::init(strtab.strings, alloc);
-            strtab.size = 1;
+            str_array::init(strtab.strings, alloc);
         }
 
         u0 write(const strtab_t& strtab, file_t& file) {
             auto& s = *file.session;
             session::write_u8(s, 0);
-            for (const auto& str : strtab.strings) {
-                session::write_cstr(s, str);
-            }
+            const auto slice = slice::make(strtab.strings.buf.data,
+                                           strtab.strings.buf.size);
+            session::write_str(s, slice);
         }
 
         u32 add_str(strtab_t& strtab, str::slice_t str) {
-            const auto offset = strtab.size;
-            array::append(strtab.strings, str);
-            strtab.size += str.length + 1;
+            const auto offset = strtab.strings.buf.size + 1;
+            str_array::append(strtab.strings, str);
             return offset;
         }
     }
@@ -174,8 +175,8 @@ namespace basecode::binfmt::io::elf {
             return hdr;
         }
 
-        u0 resize(symtab_t& symtab, u32 size) {
-            hash::resize(symtab.hash, size);
+        u0 rehash(symtab_t& symtab, u32 size) {
+            hash::rehash(symtab.hash, size);
         }
 
         u0 write(const symtab_t& symtab, file_t& file) {
@@ -191,22 +192,38 @@ namespace basecode::binfmt::io::elf {
         }
 
         status_t add_sym(symtab_t& symtab, const symbol_t* symbol) {
-            const auto intern_rc = string::interned::get(symbol->name);
-            if (!OK(intern_rc.status))
-                return status_t::symbol_not_found;
+            u32 name_index;
+            u32 bucket_idx{};
+
+            if (symbol) {
+                const auto intern_rc = string::interned::get(symbol->name);
+                if (!OK(intern_rc.status))
+                    return status_t::symbol_not_found;
+                name_index = elf::strtab::add_str(*symtab.strtab, intern_rc.slice);
+                const auto name_hash  = hash_name(intern_rc.slice);
+                bucket_idx = name_hash % symtab.hash.buckets.size;
+            }
 
             auto& sym = array::append(symtab.symbols);
-            sym.name_index = elf::strtab::add_str(*symtab.strtab, intern_rc.slice);
-            sym.value      = symbol->value;
-            sym.size       = symbol->length;
-            sym.info       = {};
-            sym.other      = {};
-            sym.index      = symbol->section;
+            if (symbol) {
+                sym.name_index = name_index;
+                sym.value      = symbol->value;
+                sym.size       = symbol->length;
+                sym.info       = {};
+                sym.other      = {};
+                sym.index      = symbol->section;
+            }
 
-            const auto name_hash  = hash_name(intern_rc.slice);
-            const auto bucket_idx = name_hash % symtab.hash.buckets.size;
-            symtab.hash.buckets[bucket_idx] = symtab.symbols.size - 1;
-            ++symtab.hash.num_sym;
+            u32 sym_idx = symtab.hash.buckets[bucket_idx];
+            if (sym_idx == 0) {
+                sym_idx = symtab.symbols.size - 1;
+                symtab.hash.buckets[bucket_idx]             = sym_idx;
+                symtab.hash.chains[symtab.symbols.size - 1] = sym_idx;
+            } else {
+                while (symtab.hash.chains[sym_idx] != 0)
+                    ++sym_idx;
+                symtab.hash.chains[sym_idx] = symtab.symbols.size - 1;
+            }
 
             return status_t::ok;
         }
@@ -215,6 +232,27 @@ namespace basecode::binfmt::io::elf {
             symtab.strtab = strtab;
             hash::init(symtab.hash, alloc);
             array::init(symtab.symbols, alloc);
+        }
+
+        status_t find_sym(symtab_t& symtab, str::slice_t name, sym_t** sym) {
+            *sym = nullptr;
+
+            const auto name_hash = hash_name(name);
+            const auto bucket_idx = name_hash % symtab.hash.buckets.size;
+
+            auto chain_idx = symtab.hash.buckets[bucket_idx];
+            while (chain_idx != 0 && chain_idx < symtab.hash.chains.size) {
+                auto temp_sym = &symtab.symbols[symtab.hash.chains[chain_idx]];
+                auto str_offset = (const s8*) symtab.strtab->strings.buf.data + temp_sym->name_index;
+                auto cmp = strncmp(str_offset, (const s8*) name.data, name.length);
+                if (cmp == 0) {
+                    *sym = temp_sym;
+                    return status_t::ok;
+                }
+                ++chain_idx;
+            }
+
+            return status_t::symbol_not_found;
         }
     }
 
@@ -231,13 +269,17 @@ namespace basecode::binfmt::io::elf {
         for (const auto& block : elf.blocks) {
             session::seek(s, block.offset);
             switch (block.type) {
-                case block_type_t::slice:session::write_str(s, *block.data.slice);
+                case block_type_t::slice:
+                    session::write_str(s, *block.data.slice);
                     break;
-                case block_type_t::strtab:strtab::write(*block.data.strtab, file);
+                case block_type_t::strtab:
+                    strtab::write(*block.data.strtab, file);
                     break;
-                case block_type_t::hash:hash::write(*block.data.hash, file);
+                case block_type_t::hash:
+                    hash::write(*block.data.hash, file);
                     break;
-                case block_type_t::symtab:symtab::write(*block.data.symtab, file);
+                case block_type_t::symtab:
+                    symtab::write(*block.data.symtab, file);
                     break;
             }
         }
@@ -263,21 +305,28 @@ namespace basecode::binfmt::io::elf {
         null_section.type = header_type_t::section;
 
         switch (file.machine) {
-            case type_t::unknown:return status_t::invalid_machine_type;
-            case type_t::x86_64:elf.machine = elf::machine::x86_64;
+            case type_t::unknown:
+                return status_t::invalid_machine_type;
+            case type_t::x86_64:
+                elf.machine = elf::machine::x86_64;
                 break;
-            case type_t::aarch64:elf.machine = elf::machine::aarch64;
+            case type_t::aarch64:
+                elf.machine = elf::machine::aarch64;
                 break;
         }
 
         switch (file.output_type) {
-            case output_type_t::obj:elf.file_type = elf::file::type::rel;
+            case output_type_t::obj:
+                elf.file_type = elf::file::type::rel;
                 break;
-            case output_type_t::lib:elf.file_type = elf::file::type::none;
+            case output_type_t::lib:
+                elf.file_type = elf::file::type::none;
                 break;
-            case output_type_t::exe:elf.file_type = elf::file::type::exec;
+            case output_type_t::exe:
+                elf.file_type = elf::file::type::exec;
                 break;
-            case output_type_t::dll:elf.file_type = elf::file::type::dyn;
+            case output_type_t::dll:
+                elf.file_type = elf::file::type::dyn;
                 break;
         }
 
