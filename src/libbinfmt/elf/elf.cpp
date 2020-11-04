@@ -149,7 +149,8 @@ namespace basecode::binfmt::io::elf {
 
         header_t& make_section(elf_t& elf,
                                str::slice_t name,
-                               const symtab_t* symtab) {
+                               const symtab_t* symtab,
+                               u32 first_global_idx) {
             auto& hdr = array::append(elf.headers);
             hdr.section = {};
             hdr.number  = ++elf.section.count;
@@ -158,6 +159,7 @@ namespace basecode::binfmt::io::elf {
             auto& sc = hdr.subclass.section;
             sc.type       = elf::section::type::symtab;
             sc.link       = symtab->link;
+            sc.info       = first_global_idx;
             sc.offset     = elf.data.rel_offset;
             sc.entry_size = elf::symtab::entity_size;
             sc.addr.align = sizeof(u64);

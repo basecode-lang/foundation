@@ -625,7 +625,8 @@ namespace basecode::binfmt::io::elf {
 
         header_t& make_section(elf_t& elf,
                                str::slice_t name,
-                               const symtab_t* symtab);
+                               const symtab_t* symtab,
+                               u32 first_global_idx);
 
         u0 rehash(symtab_t& symtab, u32 size);
 

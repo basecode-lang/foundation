@@ -183,6 +183,8 @@ namespace basecode::binfmt::io::elf {
                 elf::symtab::rehash(elf.symbols, symbols.size + 1);
                 elf::symtab::add_sym(elf.symbols, nullptr);
 
+                // XXX: sort the symbols list based on ELF ordering rules
+                //
                 for (auto symbol : symbols) {
                     auto status = elf::symtab::add_sym(elf.symbols, symbol);
                     if (!OK(status))
@@ -194,9 +196,12 @@ namespace basecode::binfmt::io::elf {
                                                          &elf.strings);
                 elf.symbols.link = strtab.number - 1;
 
+                // XXX: first_global_idx is hard coded!!!
+                //      need to set this while walking the symbols list
                 auto& symtab = elf::symtab::make_section(elf,
                                                          ".symtab"_ss,
-                                                         &elf.symbols);
+                                                         &elf.symbols,
+                                                         1);
                 elf.symbols.hash.link = symtab.number - 1;
 
                 elf::hash::make_section(elf,
