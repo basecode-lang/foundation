@@ -169,12 +169,12 @@ TEST_CASE("basecode::binfmt ELF test") {
 
     auto rot13_exe_path = "rot13_elf.exe"_path;
     defer(path::free(rot13_exe_path));
-    auto rot13_exe_file = io::session::add_file(s,
-                                                &mod,
-                                                rot13_exe_path,
-                                                machine::type_t::x86_64,
-                                                io::type_t::elf,
-                                                io::output_type_t::exe);
+    auto rot13_exe_file = io::session::add_input_file(s,
+                                                      &mod,
+                                                      rot13_exe_path,
+                                                      machine::type_t::x86_64,
+                                                      io::type_t::elf,
+                                                      io::file_type_t::exe);
     rot13_exe_file->versions.linker.major = 6;
     rot13_exe_file->versions.linker.minor = 0;
     rot13_exe_file->versions.min_os.major = 4;

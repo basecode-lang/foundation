@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/bits.h>
+#include <basecode/binfmt/ar.h>
 #include <basecode/binfmt/elf.h>
 
 namespace basecode::binfmt::io::elf {
@@ -35,8 +36,27 @@ namespace basecode::binfmt::io::elf {
         }
 
         static status_t read(file_t& file) {
-            UNUSED(file);
-            return status_t::read_error;
+            auto& s = *file.session;
+
+            switch (file.file_type) {
+                case file_type_t::obj:
+                    break;
+                case file_type_t::lib: {
+                    auto status = ar::read(s.ar, file.path);
+                    if (!OK(status))
+                        return status;
+
+                    // XXX: 1. loop over each file in the archive
+                    //      2. read as obj
+                    //      3. create module_t matching read obj
+                    break;
+                }
+                case file_type_t::exe:
+                case file_type_t::dll:
+                    break;
+            }
+
+            return status_t::ok;
         }
 
         static status_t write(file_t& file) {
@@ -58,122 +78,124 @@ namespace basecode::binfmt::io::elf {
             u64 rva             {elf.entry_point};
             str::slice_t name   {};
 
-            switch (file.output_type) {
-                case output_type_t::obj:
-                    break;
-                case output_type_t::lib:
-                    break;
-                case output_type_t::exe:
-                case output_type_t::dll:
-                    for (u32 i = 0; i < module->sections.size; ++i) {
-                        auto          section = &module->sections[i];
-                        u64           size{};
-                        u64           flags{};
-                        u64           entry_size{};
-                        u32           number{};
-                        u32           alignment;
-                        u32           section_type{};
-                        header_type_t header_type{};
+            for (u32 i = 0; i < module->sections.size; ++i) {
+                auto          section = &module->sections[i];
+                u64           size{};
+                u64           flags{};
+                u64           entry_size{};
+                u32           number{};
+                u32           alignment;
+                u32           section_type{};
+                header_type_t header_type{};
 
-                        switch (section->type) {
-                            case type_t::tls: {
-                                break;
-                            }
-                            case type_t::data: {
-                                number       = ++elf.section.count;
-                                header_type  = elf::header_type_t::section;
-                                if (!section->flags.init) {
-                                    section_type = elf::section::type::nobits;
-                                    size         = section->subclass.size;
-                                } else {
-                                    section_type = elf::section::type::progbits;
-                                    size         = section->subclass.data.length;
-                                    auto& block = array::append(elf.blocks);
-                                    block.type       = elf::block_type_t::slice;
-                                    block.offset     = elf.data.rel_offset;
-                                    block.data.slice = &section->subclass.data;
-                                }
-                                flags = elf::section::flags::alloc;
-                                if (section->flags.write)
-                                    flags |= elf::section::flags::write;
-                                if (section->flags.exec)
-                                    flags |= elf::section::flags::exec_instr;
-                                break;
-                            }
-                            case type_t::code: {
-                                number       = ++elf.section.count;
-                                header_type  = elf::header_type_t::section;
-                                section_type = elf::section::type::progbits;
-                                size         = section->subclass.data.length;
-                                flags        = elf::section::flags::alloc | elf::section::flags::exec_instr;
-                                auto& block = array::append(elf.blocks);
-                                block.type       = elf::block_type_t::slice;
-                                block.offset     = elf.data.rel_offset;
-                                block.data.slice = &section->subclass.data;
-                                break;
-                            }
-                            case type_t::debug: {
-                                break;
-                            }
-                            case type_t::reloc: {
-                                break;
-                            }
-                            case type_t::import: {
-                                break;
-                            }
-                            case type_t::custom: {
-                                break;
-                            }
-                            case type_t::export_: {
-                                break;
-                            }
-                            case type_t::resource: {
-                                break;
-                            }
-                            case type_t::exception: {
-                                break;
-                            }
-                        }
-
-                        auto& hdr = array::append(elf.headers);
-                        hdr.section = section;
-                        hdr.number  = number;
-                        hdr.type    = header_type;
-
-                        alignment = std::max<u32>(section->align, sizeof(u64));
-
-                        switch (header_type) {
-                            case header_type_t::none:
-                                return status_t::invalid_section_type;
-                            case header_type_t::section: {
-                                auto& sc = hdr.subclass.section;
-                                sc.flags = flags;
-                                sc.type  = section_type;
-                                auto status = elf::get_section_name(section, name);
-                                if (!OK(status))
-                                    return status;
-                                sc.addr.base  = rva;
-                                sc.addr.align = alignment;
-                                sc.entry_size = entry_size;
-                                if (section->flags.init) {
-                                    sc.offset = elf.data.rel_offset;
-                                    sc.size   = size;
-                                } else {
-                                    sc.offset = sc.size = {};
-                                }
-                                sc.name_index = elf::strtab::add_str(elf.section_names, name);
-                                break;
-                            }
-                            case header_type_t::segment: {
-                                break;
-                            }
-                        }
-
-                        rva = align(rva + size, alignment);
-                        if (section->flags.init)
-                            elf.data.rel_offset = align(elf.data.rel_offset + size, alignment);
+                switch (section->type) {
+                    case type_t::tls: {
+                        break;
                     }
-                    break;
+                    case type_t::data: {
+                        number       = ++elf.section.count;
+                        header_type  = elf::header_type_t::section;
+                        if (!section->flags.init) {
+                            section_type = elf::section::type::nobits;
+                            size         = section->subclass.size;
+                        } else {
+                            section_type = elf::section::type::progbits;
+                            size         = section->subclass.data.length;
+                            auto& block = array::append(elf.blocks);
+                            block.type       = elf::block_type_t::slice;
+                            block.offset     = elf.data.rel_offset;
+                            block.data.slice = &section->subclass.data;
+                        }
+                        flags = elf::section::flags::alloc;
+                        if (section->flags.write)
+                            flags |= elf::section::flags::write;
+                        if (section->flags.exec)
+                            flags |= elf::section::flags::exec_instr;
+                        break;
+                    }
+                    case type_t::code: {
+                        number       = ++elf.section.count;
+                        header_type  = elf::header_type_t::section;
+                        section_type = elf::section::type::progbits;
+                        size         = section->subclass.data.length;
+                        flags        = elf::section::flags::alloc | elf::section::flags::exec_instr;
+                        auto& block = array::append(elf.blocks);
+                        block.type       = elf::block_type_t::slice;
+                        block.offset     = elf.data.rel_offset;
+                        block.data.slice = &section->subclass.data;
+                        break;
+                    }
+                    case type_t::debug: {
+                        break;
+                    }
+                    case type_t::reloc: {
+                        break;
+                    }
+                    case type_t::import: {
+                        // .dyntab
+                        //      - DT_STRTAB
+                        //      - DT_STRSZ
+                        //      - DT_SYMTAB
+                        //      - DT_SYMENT
+                        //      - DT_REL        (.reltab)
+                        //      - DT_RELSZ
+                        //      - DT_RELENT
+                        //      - DT_HASH
+                        //      - DT_NEEDED     (shared library string name)
+                        //      - DT_NULL
+                        break;
+                    }
+                    case type_t::custom: {
+                        break;
+                    }
+                    case type_t::export_: {
+                        break;
+                    }
+                    case type_t::resource: {
+                        break;
+                    }
+                    case type_t::exception: {
+                        break;
+                    }
+                }
+
+                auto& hdr = array::append(elf.headers);
+                hdr.section = section;
+                hdr.number  = number;
+                hdr.type    = header_type;
+
+                alignment = std::max<u32>(section->align, sizeof(u64));
+
+                switch (header_type) {
+                    case header_type_t::none:
+                        return status_t::invalid_section_type;
+                    case header_type_t::section: {
+                        auto& sc = hdr.subclass.section;
+                        sc.flags = flags;
+                        sc.type  = section_type;
+                        auto status = elf::get_section_name(section, name);
+                        if (!OK(status))
+                            return status;
+                        sc.addr.base  = rva;
+                        sc.addr.align = alignment;
+                        sc.entry_size = entry_size;
+                        if (section->flags.init) {
+                            sc.offset = elf.data.rel_offset;
+                            sc.size   = size;
+                        } else {
+                            sc.offset = sc.size = {};
+                        }
+                        sc.name_index = elf::strtab::add_str(elf.section_names, name);
+                        break;
+                    }
+                    case header_type_t::segment: {
+                        break;
+                    }
+                }
+
+                rva = align(rva + size, alignment);
+                if (section->flags.init)
+                    elf.data.rel_offset = align(elf.data.rel_offset + size, alignment);
             }
 
             if (module->symbols.size > 0) {
@@ -216,6 +238,25 @@ namespace basecode::binfmt::io::elf {
                 elf.str_ndx = hdr.number - 1;
             }
 
+            switch (file.file_type) {
+                case file_type_t::obj:
+                    break;
+                case file_type_t::lib:
+                    break;
+                case file_type_t::exe:
+                case file_type_t::dll:
+                    // XXX:
+                    //      NULL        (of course)
+                    //      PT_INTERP   default: /lib/ld-linux.so.2
+                    //      PT_LOAD
+                    //      PT_DYNAMIC  (import)
+                    //      PT_NOTE     (maybe?)
+                    //      GNU_EH_FRAME
+                    //      GNU_STACK
+                    //      GNU_RELRO
+                    break;
+            }
+
             elf.data.base_offset = elf.section.offset
                                    + elf.segment.offset
                                    + (elf.section.count * elf::section::header_size)
@@ -238,8 +279,8 @@ namespace basecode::binfmt::io::elf {
 
             elf::write_file_header(file, elf);
 
-            if (file.output_type == output_type_t::exe
-            ||  file.output_type == output_type_t::dll) {
+            if (file.file_type == file_type_t::exe
+            || file.file_type == file_type_t::dll) {
                 auto status = elf::write_segments(file, elf);
                 if (!OK(status))
                     return status;
@@ -251,7 +292,7 @@ namespace basecode::binfmt::io::elf {
 
             elf::write_blocks(file, elf);
 
-            return io::file::save(file);
+            return status_t::ok;
         }
 
         static status_t init(alloc_t* alloc) {

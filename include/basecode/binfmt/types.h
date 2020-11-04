@@ -42,8 +42,8 @@ namespace basecode::binfmt {
     using import_list_t         = array_t<import_t>;
     using symbol_list_t         = array_t<symbol_t>;
     using section_list_t        = array_t<section_t>;
-    using section_ptr_list_t    = array_t<section_t*>;
     using symbol_table_t        = hashtab_t<intern_id, symbol_t>;
+    using section_ptr_list_t    = array_t<section_t*>;
 
     enum class status_t : u32 {
         ok                              = 0,

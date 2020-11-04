@@ -29,6 +29,15 @@
 #define ELF64_ST_VISIBILITY(o)      ((o) & 0x03)
 #define ELF64_ST_INFO(bind, type)   (((bind) <<4 ) + ((type) & 0xf))
 
+// XXX:
+//  STT_GNU_IFUNC?
+//
+//  - .common section?
+//  - .got section
+//  - .plt section
+//  - .gnu.version/.gnu.version.r
+//  - init/fini array symbols
+//
 namespace basecode::binfmt::io::elf {
     struct elf_t;
     struct dyn_t;
@@ -659,7 +668,7 @@ namespace basecode::binfmt::io::elf {
 
     u0 write_note(file_t& file, elf_t& elf, const note_t& note);
 
-    status_t write_header(file_t& s, elf_t& elf, const header_t& hdr);
+    status_t write_header(file_t& file, elf_t& elf, const header_t& hdr);
 
     status_t get_section_name(const binfmt::section_t* section, str::slice_t& name);
 }

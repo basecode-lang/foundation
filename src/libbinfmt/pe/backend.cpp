@@ -45,18 +45,18 @@ namespace basecode::binfmt::io::pe {
             status_t status;
             auto& coff = pe.coff;
 
-            switch (file.output_type) {
-                case output_type_t::obj:
-                case output_type_t::lib:
+            switch (file.file_type) {
+                case file_type_t::obj:
+                case file_type_t::lib:
                     return status_t::invalid_output_type;
-                case output_type_t::exe:
+                case file_type_t::exe:
                     // XXX: relocs_stripped can be determined from file once we have field in the struct
                     // XXX: large_address_aware is (probably?) a fixed requirement for x64
                     coff.flags.image = coff::flags::relocs_stripped
                                        | coff::flags::executable_type
                                        | coff::flags::large_address_aware;
                     break;
-                case output_type_t::dll:
+                case file_type_t::dll:
                     pe.flags.dll = 0; // XXX: FIXME!
                     coff.flags.image |= coff::flags::dll_type;
                     break;
@@ -68,21 +68,17 @@ namespace basecode::binfmt::io::pe {
             if (!OK(status))
                 return status;
 
-            pe::write_dos_header(*file.session, pe);
-            pe::write_pe_header(*file.session, pe);
-            coff::write_header(*file.session, coff, pe.size.opt_hdr);
+            pe::write_dos_header(file, pe);
+            pe::write_pe_header(file, pe);
+            coff::write_header(file, coff, pe.size.opt_hdr);
             pe::write_optional_header(file, pe);
-            coff::write_section_headers(*file.session, coff);
-            status = pe::write_sections_data(*file.session, pe);
+            coff::write_section_headers(file, coff);
+            status = pe::write_sections_data(file, pe);
             if (!OK(status))
                 return status;
             if (pe.opts.include_symbol_table) {
-                coff::write_symbol_table(*file.session, coff);
+                coff::write_symbol_table(file, coff);
             }
-
-            status = file::save(file);
-            if (!OK(status))
-                return status;
 
             return status_t::ok;
         }

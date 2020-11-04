@@ -194,47 +194,47 @@ namespace basecode::binfmt::io::coff {
         coff.string_table.file.offset = coff.symbol_table.file.offset + coff.symbol_table.file.size;
     }
 
-    u0 write_string_table(session_t& s, coff_t& coff) {
-        session::write_u32(s, coff.string_table.file.size);
+    u0 write_string_table(file_t& file, coff_t& coff) {
+        file::write_u32(file, coff.string_table.file.size);
         for (auto str : coff.string_table.list) {
-            session::write_cstr(s, str);
+            file::write_cstr(file, str);
         }
     }
 
-    u0 write_symbol_table(session_t& s, coff_t& coff) {
-        session::seek(s, coff.symbol_table.file.offset);
+    u0 write_symbol_table(file_t& file, coff_t& coff) {
+        file::seek(file, coff.symbol_table.file.offset);
 //            std::sort(
 //                std::begin(coff.symbol_table.list),
 //                std::end(coff.symbol_table.list),
-//                [](auto lhs, auto rhs) {
+//                [](auto lhfile, auto rhs) {
 //                    return lhs < rhs;
 //                });
         for (const auto& symbol : coff.symbol_table.list) {
             if (symbol.inlined) {
-                session::write_pad8(s, symbol.name.slice);
+                file::write_pad8(file, symbol.name.slice);
             } else {
-                session::write_u64(s, symbol.name.offset);
+                file::write_u64(file, symbol.name.offset);
             }
-            session::write_u32(s, symbol.value);
-            session::write_s16(s, symbol.section);
-            session::write_u16(s, symbol.type);
-            session::write_u8(s, symbol.sclass);
-            session::write_u8(s, symbol.aux_records.size);
+            file::write_u32(file, symbol.value);
+            file::write_s16(file, symbol.section);
+            file::write_u16(file, symbol.type);
+            file::write_u8(file, symbol.sclass);
+            file::write_u8(file, symbol.aux_records.size);
             for (const auto& aux : symbol.aux_records) {
-                write_aux_record(s, aux);
+                write_aux_record(file, aux);
             }
         }
-        write_string_table(s, coff);
+        write_string_table(file, coff);
     }
 
-    status_t build_sections(session_t& s, coff_t& coff) {
+    status_t build_sections(file_t& file, coff_t& coff) {
         coff.size.headers = coff.offset
                             + coff::header_size
                             + (coff.headers.size * coff::section::header_size);
         coff.offset       = align(coff.size.headers, coff.align.file);
         coff.rva          = align(coff.size.headers, coff.align.section);
         for (auto& hdr : coff.headers) {
-            auto status = build_section(s, coff, hdr);
+            auto status = build_section(file, coff, hdr);
             if (!OK(status))
                 return status;
         }
@@ -242,40 +242,40 @@ namespace basecode::binfmt::io::coff {
         return status_t::ok;
     }
 
-    u0 write_section_headers(session_t& s, coff_t& coff) {
+    u0 write_section_headers(file_t& file, coff_t& coff) {
         for (auto& hdr : coff.headers) {
-            write_section_header(s, coff, hdr);
+            write_section_header(file, coff, hdr);
         }
     }
 
-    status_t write_sections_data(session_t& s, coff_t& coff) {
+    status_t write_sections_data(file_t& file, coff_t& coff) {
         for (auto& hdr : coff.headers) {
-            auto status = write_section_data(s, coff, hdr);
+            auto status = write_section_data(file, coff, hdr);
             if (!OK(status))
                 return status;
         }
         return status_t::ok;
     }
 
-    u0 write_header(session_t& s, coff_t& coff, u16 opt_hdr_size) {
-        session::write_u16(s, coff.machine);
-        session::write_u16(s, coff.headers.size);
-        session::write_u32(s, std::time(nullptr));
-        session::write_u32(s, coff.symbol_table.file.offset);
-        session::write_u32(s, coff.symbol_table.file.size / symbol_table::entry_size);
-        session::write_u16(s, opt_hdr_size);
-        session::write_u16(s, coff.flags.image);
+    u0 write_header(file_t& file, coff_t& coff, u16 opt_hdr_size) {
+        file::write_u16(file, coff.machine);
+        file::write_u16(file, coff.headers.size);
+        file::write_u32(file, std::time(nullptr));
+        file::write_u32(file, coff.symbol_table.file.offset);
+        file::write_u32(file, coff.symbol_table.file.size / symbol_table::entry_size);
+        file::write_u16(file, opt_hdr_size);
+        file::write_u16(file, coff.flags.image);
     }
 
-    u0 write_aux_record(session_t& s, const aux_record_t& record) {
+    u0 write_aux_record(file_t& file, const aux_record_t& record) {
         switch (record.type) {
             case aux_record_type_t::xf:
-                session::write_u32(s, 0);
-                session::write_u16(s, record.xf.line_num);
-                session::write_u32(s, 0);
-                session::write_u16(s, 0);
-                session::write_u32(s, record.xf.ptr_next_func);
-                session::write_u16(s, 0);
+                file::write_u32(file, 0);
+                file::write_u16(file, record.xf.line_num);
+                file::write_u32(file, 0);
+                file::write_u16(file, 0);
+                file::write_u32(file, record.xf.ptr_next_func);
+                file::write_u16(file, 0);
                 break;
             case aux_record_type_t::file: {
                 const auto sym = record.file.sym;
@@ -283,49 +283,49 @@ namespace basecode::binfmt::io::coff {
                     const auto len     = sym->name.slice.length;
                     const s32  pad_len = std::max<s32>(symbol_table::entry_size - len, 0);
                     for (u32 i = 0; i < std::min<u32>(len, 18); ++i) {
-                        session::write_u8(s, sym->name.slice[i]);
+                        file::write_u8(file, sym->name.slice[i]);
                     }
                     for (u32 i = 0; i < pad_len; ++i) {
-                        session::write_u8(s, 0);
+                        file::write_u8(file, 0);
                     }
                 } else {
                     u64 name = sym->name.offset;
                     name <<= u32(32);
-                    session::write_u64(s, name);
+                    file::write_u64(file, name);
                     for (u32 i = 0; i < 8; ++i) {
-                        session::write_u8(s, 0);
+                        file::write_u8(file, 0);
                     }
                 }
                 break;
             }
             case aux_record_type_t::section:
-                session::write_u32(s, record.section.len);
-                session::write_u16(s, record.section.num_relocs);
-                session::write_u16(s, record.section.num_lines);
-                session::write_u32(s, record.section.check_sum);
-                session::write_u16(s, record.section.sect_num);
-                session::write_u8(s, record.section.comdat_sel);
-                session::write_u8(s, 0);    // XXX: unused
-                session::write_u8(s, 0);    //      "
-                session::write_u8(s, 0);    //      "
+                file::write_u32(file, record.section.len);
+                file::write_u16(file, record.section.num_relocs);
+                file::write_u16(file, record.section.num_lines);
+                file::write_u32(file, record.section.check_sum);
+                file::write_u16(file, record.section.sect_num);
+                file::write_u8(file, record.section.comdat_sel);
+                file::write_u8(file, 0);    // XXX: unused
+                file::write_u8(file, 0);    //      "
+                file::write_u8(file, 0);    //      "
                 break;
             case aux_record_type_t::func_def:
-                session::write_u32(s, record.func_def.tag_idx);
-                session::write_u32(s, record.func_def.total_size);
-                session::write_u32(s, record.func_def.ptr_line_num);
-                session::write_u32(s, record.func_def.ptr_next_func);
-                session::write_u16(s, 0);
+                file::write_u32(file, record.func_def.tag_idx);
+                file::write_u32(file, record.func_def.total_size);
+                file::write_u32(file, record.func_def.ptr_line_num);
+                file::write_u32(file, record.func_def.ptr_next_func);
+                file::write_u16(file, 0);
                 break;
             case aux_record_type_t::weak_extern:
-                session::write_u32(s, record.weak_extern.tag_idx);
-                session::write_u32(s, record.weak_extern.flags);
-                session::write_u64(s, 0);
-                session::write_u16(s, 0);
+                file::write_u32(file, record.weak_extern.tag_idx);
+                file::write_u32(file, record.weak_extern.flags);
+                file::write_u64(file, 0);
+                file::write_u16(file, 0);
                 break;
         }
     }
 
-    status_t build_section(session_t& s, coff_t& coff, section_hdr_t& hdr) {
+    status_t build_section(file_t& file, coff_t& coff, section_hdr_t& hdr) {
         using type_t = binfmt::section::type_t;
 
         hdr.offset = coff.offset;
@@ -377,33 +377,33 @@ namespace basecode::binfmt::io::coff {
         return status_t::ok;
     }
 
-    u0 write_section_header(session_t& s, coff_t& coff, section_hdr_t& hdr) {
+    u0 write_section_header(file_t& file, coff_t& coff, section_hdr_t& hdr) {
         using type_t = binfmt::section::type_t;
 
         const auto type = hdr.section->type;
         const auto& flags = hdr.section->flags;
 
         if (hdr.symbol->inlined) {
-            session::write_pad8(s, hdr.symbol->name.slice);
+            file::write_pad8(file, hdr.symbol->name.slice);
         } else {
-            session::write_u64(s, hdr.symbol->name.offset);
+            file::write_u64(file, hdr.symbol->name.offset);
         }
 
-        session::write_u32(s, hdr.size);
-        session::write_u32(s, hdr.rva);
+        file::write_u32(file, hdr.size);
+        file::write_u32(file, hdr.rva);
 
         if (type == type_t::data && !hdr.section->flags.init) {
-            session::write_u32(s, 0);
-            session::write_u32(s, 0);
+            file::write_u32(file, 0);
+            file::write_u32(file, 0);
         } else {
-            session::write_u32(s, align(hdr.size, coff.align.file));
-            session::write_u32(s, hdr.offset);
+            file::write_u32(file, align(hdr.size, coff.align.file));
+            file::write_u32(file, hdr.offset);
         }
 
-        session::write_u32(s, hdr.relocs.offset);
-        session::write_u32(s, hdr.line_nums.offset);
-        session::write_u16(s, hdr.relocs.size);
-        session::write_u16(s, hdr.line_nums.size);
+        file::write_u32(file, hdr.relocs.offset);
+        file::write_u32(file, hdr.line_nums.offset);
+        file::write_u16(file, hdr.relocs.size);
+        file::write_u16(file, hdr.line_nums.size);
 
         u32 bitmask{};
         if (flags.code) bitmask |= section::code;
@@ -417,10 +417,10 @@ namespace basecode::binfmt::io::coff {
         if (flags.write) bitmask |= section::memory_write;
         if (flags.exec) bitmask |= section::memory_execute;
 
-        session::write_u32(s, bitmask);
+        file::write_u32(file, bitmask);
     }
 
-    status_t write_section_data(session_t& s, coff_t& coff, section_hdr_t& hdr) {
+    status_t write_section_data(file_t& file, coff_t& coff, section_hdr_t& hdr) {
         using type_t = binfmt::section::type_t;
 
         const auto type = hdr.section->type;
@@ -429,13 +429,13 @@ namespace basecode::binfmt::io::coff {
             return status_t::ok;
 
         const auto& sc = hdr.section->subclass;
-        session::seek(s, hdr.offset);
+        file::seek(file, hdr.offset);
 
         switch (type) {
             case type_t::code:
             case type_t::data:
             case type_t::custom:
-                session::write_str(s, sc.data);
+                file::write_str(file, sc.data);
                 break;
             case type_t::import:
             case type_t::export_:

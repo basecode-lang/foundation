@@ -38,6 +38,8 @@ configure_file(
 set(
     BINFMT_SOURCES
 
+    ar.cpp ${INC_DIR}/ar.h
+
     binfmt.cpp ${INC_DIR}/binfmt.h
 
     coff/backend.cpp

@@ -6,6 +6,7 @@ add_executable(
 
     test.h
     main.cpp
+    ar_tests.cpp
     elf_tests.cpp
     pe_tests.cpp
 )

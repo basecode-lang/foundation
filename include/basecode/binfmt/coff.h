@@ -271,27 +271,27 @@ namespace basecode::binfmt::io::coff {
 
     u0 update_symbol_table(coff_t& coff);
 
-    u0 write_string_table(session_t& s, coff_t& coff);
+    u0 write_string_table(file_t& file, coff_t& coff);
 
-    u0 write_symbol_table(session_t& s, coff_t& coff);
+    u0 write_symbol_table(file_t& file, coff_t& coff);
 
-    status_t build_sections(session_t& s, coff_t& coff);
+    status_t build_sections(file_t& file, coff_t& coff);
 
-    u0 write_section_headers(session_t& s, coff_t& coff);
+    u0 write_section_headers(file_t& file, coff_t& coff);
 
-    status_t write_sections_data(session_t& s, coff_t& coff);
+    status_t write_sections_data(file_t& file, coff_t& coff);
 
     status_t init(coff_t& coff, file_t& file, alloc_t* alloc);
 
-    u0 write_aux_record(session_t& s, const aux_record_t& record);
+    u0 write_aux_record(file_t& file, const aux_record_t& record);
 
-    u0 write_header(session_t& s, coff_t& coff, u16 opt_hdr_size = {});
+    u0 write_header(file_t& file, coff_t& coff, u16 opt_hdr_size = {});
 
-    status_t build_section(session_t& s, coff_t& coff, section_hdr_t& hdr);
+    status_t build_section(file_t& file, coff_t& coff, section_hdr_t& hdr);
 
-    u0 write_section_header(session_t& s, coff_t& coff, section_hdr_t& hdr);
+    u0 write_section_header(file_t& file, coff_t& coff, section_hdr_t& hdr);
 
-    status_t write_section_data(session_t& s, coff_t& coff, section_hdr_t& hdr);
+    status_t write_section_data(file_t& file, coff_t& coff, section_hdr_t& hdr);
 
     status_t get_section_name(const binfmt::section_t* section, str::slice_t& name);
 }

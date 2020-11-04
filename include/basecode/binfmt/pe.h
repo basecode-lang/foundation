@@ -281,9 +281,9 @@ namespace basecode::binfmt::io::pe {
 
     u0 free(pe_t& pe);
 
-    u0 write_pe_header(session_t& s, pe_t& pe);
+    u0 write_pe_header(file_t& file, pe_t& pe);
 
-    u0 write_dos_header(session_t& s, pe_t& pe);
+    u0 write_dos_header(file_t& file, pe_t& pe);
 
     status_t init(pe_t& pe, const opts_t& opts);
 
@@ -291,9 +291,9 @@ namespace basecode::binfmt::io::pe {
 
     u0 write_optional_header(file_t& file, pe_t& pe);
 
-    status_t write_sections_data(session_t& s, pe_t& pe);
+    status_t write_sections_data(file_t& file, pe_t& pe);
 
     status_t build_section(file_t& file, pe_t& pe, coff::section_hdr_t& hdr);
 
-    status_t write_section_data(session_t& s, pe_t& pe, coff::section_hdr_t& hdr);
+    status_t write_section_data(file_t& file, pe_t& pe, coff::section_hdr_t& hdr);
 }
