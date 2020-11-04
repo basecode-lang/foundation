@@ -18,7 +18,7 @@
 
 #include <basecode/binfmt/macho.h>
 
-namespace basecode::binfmt::io {
+namespace basecode::binfmt::io::macho {
     namespace internal {
         static u0 fini() {
         }
@@ -47,9 +47,7 @@ namespace basecode::binfmt::io {
         };
     }
 
-    namespace macho {
-        system_t* system() {
-            return &internal::g_macho_sys;
-        }
+    system_t* system() {
+        return &internal::g_macho_sys;
     }
 }

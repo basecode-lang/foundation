@@ -638,8 +638,6 @@ namespace basecode::binfmt::io {
             u0 init(elf_symtab_t& symtab, elf_strtab_t* strtab, alloc_t* alloc);
         }
 
-        system_t* system();
-
         u0 free(elf_t& elf);
 
         u0 write_blocks(file_t& file, elf_t& elf);

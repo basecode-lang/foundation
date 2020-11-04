@@ -16,11 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#pragma once
+#include <basecode/binfmt/macho.h>
 
-#include <basecode/binfmt/io.h>
-
-namespace basecode::binfmt::io {
-    namespace macho {
-    }
+namespace basecode::binfmt::io::macho {
 }

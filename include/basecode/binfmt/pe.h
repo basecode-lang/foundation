@@ -282,8 +282,6 @@ namespace basecode::binfmt::io {
 
         u0 free(pe_t& pe);
 
-        system_t* system();
-
         u0 write_pe_header(session_t& s, pe_t& pe);
 
         u0 write_dos_header(session_t& s, pe_t& pe);

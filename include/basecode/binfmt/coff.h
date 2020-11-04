@@ -259,8 +259,6 @@ namespace basecode::binfmt::io {
             coff_aux_record_t* make_aux_record(coff_t& coff, coff_symbol_t* sym, coff_aux_record_type_t type);
         }
 
-        system_t* system();
-
         u0 free(coff_t& coff);
 
         status_t init(coff_t& coff,

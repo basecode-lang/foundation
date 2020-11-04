@@ -38,17 +38,21 @@ configure_file(
 set(
     BINFMT_SOURCES
 
-    coff.cpp ${INC_DIR}/coff.h
+    binfmt.cpp ${INC_DIR}/binfmt.h
+
+    coff/backend.cpp
+    coff/coff.cpp ${INC_DIR}/coff.h
+
+    elf/backend.cpp
+    elf/elf.cpp ${INC_DIR}/elf.h
 
     io.cpp ${INC_DIR}/io.h
 
-    elf.cpp ${INC_DIR}/elf.h
+    macho/backend.cpp
+    macho/macho.cpp ${INC_DIR}/macho.h
 
-    macho.cpp ${INC_DIR}/macho.h
-
-    pe.cpp ${INC_DIR}/pe.h
-
-    binfmt.cpp ${INC_DIR}/binfmt.h
+    pe/backend.cpp
+    pe/pe.cpp ${INC_DIR}/pe.h
 
     ${INC_DIR}/types.h
 )
