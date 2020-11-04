@@ -26,6 +26,34 @@ namespace basecode::buf {
             return crsr;
         }
 
+        u8 read_u8(buf_crsr_t& crsr) {
+            u8 value;
+            read(*crsr.buf, crsr.pos, &value, sizeof(u8));
+            crsr.pos += sizeof(u8);
+            return value;
+        }
+
+        u16 read_u16(buf_crsr_t& crsr) {
+            u16 value;
+            read(*crsr.buf, crsr.pos, &value, sizeof(u16));
+            crsr.pos += sizeof(u16);
+            return value;
+        }
+
+        u32 read_u32(buf_crsr_t& crsr) {
+            u32 value;
+            read(*crsr.buf, crsr.pos, &value, sizeof(u32));
+            crsr.pos += sizeof(u32);
+            return value;
+        }
+
+        u64 read_u64(buf_crsr_t& crsr) {
+            u64 value;
+            read(*crsr.buf, crsr.pos, &value, sizeof(u64));
+            crsr.pos += sizeof(u64);
+            return value;
+        }
+
         u0 seek(buf_crsr_t& crsr, u32 offset) {
             crsr.pos = offset;
         }
@@ -58,6 +86,11 @@ namespace basecode::buf {
         u0 write_u64(buf_crsr_t& crsr, u64 value) {
             write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u64));
             crsr.pos += sizeof(u64);
+        }
+
+        u0 read_obj(buf_crsr_t& crsr, u0* data, u32 length) {
+            read(*crsr.buf, crsr.pos, data, length);
+            crsr.pos += length;
         }
     }
 
@@ -170,6 +203,10 @@ namespace basecode::buf {
 
     u0 zero_fill(buf_t& buf, u32 offset, u32 length) {
         std::memset(buf.data + offset, 0, length);
+    }
+
+    u0 read(buf_t& buf, u32 offset, u0* data, u32 length) {
+        std::memcpy(data, buf.data + offset, length);
     }
 
     u0 write(buf_t& buf, u32 offset, FILE* file, u32 length) {

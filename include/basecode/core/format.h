@@ -53,7 +53,7 @@ namespace basecode {
     namespace format {
         str_t vformat(alloc_t* alloc, fmt_str_t format_str, fmt_args_t args);
         u0 vprint(alloc_t* alloc, FILE* file, fmt_str_t format_str, fmt_args_t args);
-        u0 hex_dump(fmt_buf_t& buf, const u0* data, u32 size, b8 show_address = true);
+        u0 hex_dump(str_buf_t& buf, const u0* data, u32 size, b8 show_address = true);
 
         force_inline str_t to_string(const fmt_buf_t& buf) {
             str_t str;
