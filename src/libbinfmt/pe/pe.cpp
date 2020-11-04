@@ -32,45 +32,45 @@ namespace basecode::binfmt::io::pe {
         0x00, 0x00, 0x00, 0x00
     };
 
-    [[maybe_unused]] constexpr u32 dos_header_size = 0x40;
-    [[maybe_unused]] constexpr u32 pe_sig_size     = 0x04;
+    [[maybe_unused]] constexpr u32 dos_header_size          = 0x40;
+    [[maybe_unused]] constexpr u32 pe_sig_size              = 0x04;
 
-    [[maybe_unused]] constexpr u16 pe32 = 0x10b;
-    [[maybe_unused]] constexpr u16 pe64 = 0x20b;
-    [[maybe_unused]] constexpr u16 rom  = 0x107;
+    [[maybe_unused]] constexpr u16 pe32                     = 0x10b;
+    [[maybe_unused]] constexpr u16 pe64                     = 0x20b;
+    [[maybe_unused]] constexpr u16 rom                      = 0x107;
 
     namespace name_table {
-        [[maybe_unused]] constexpr u32 entry_size = 0x12;
+        [[maybe_unused]] constexpr u32 entry_size           = 0x12;
     }
 
     namespace import_dir_table {
-        [[maybe_unused]] constexpr u32 entry_size = 0x14;
+        [[maybe_unused]] constexpr u32 entry_size           = 0x14;
     }
 
     namespace import_addr_table {
-        [[maybe_unused]] constexpr u32 entry_size = 0x08;
+        [[maybe_unused]] constexpr u32 entry_size           = 0x08;
     }
 
     namespace import_lookup_table {
-        [[maybe_unused]] constexpr u32 entry_size = 0x08;
+        [[maybe_unused]] constexpr u32 entry_size           = 0x08;
     }
 
     namespace subsystem {
-        [[maybe_unused]] constexpr u16 unknown             = 0;
-        [[maybe_unused]] constexpr u16 native              = 1;
-        [[maybe_unused]] constexpr u16 win_gui             = 2;
-        [[maybe_unused]] constexpr u16 win_cui             = 3;
-        [[maybe_unused]] constexpr u16 os2_cui             = 5;
-        [[maybe_unused]] constexpr u16 posix_cui           = 7;
-        [[maybe_unused]] constexpr u16 win_native          = 8;
-        [[maybe_unused]] constexpr u16 win_ce_gui          = 9;
-        [[maybe_unused]] constexpr u16 efi_app             = 10;
-        [[maybe_unused]] constexpr u16 efi_boot_svc_driver = 11;
-        [[maybe_unused]] constexpr u16 efi_runtime_driver  = 12;
-        [[maybe_unused]] constexpr u16 efi_rom             = 13;
-        [[maybe_unused]] constexpr u16 xbox                = 14;
-        [[maybe_unused]] constexpr u16 win_boot_app        = 16;
-        [[maybe_unused]] constexpr u16 xbox_code_catalog   = 17;
+        [[maybe_unused]] constexpr u16 unknown              = 0;
+        [[maybe_unused]] constexpr u16 native               = 1;
+        [[maybe_unused]] constexpr u16 win_gui              = 2;
+        [[maybe_unused]] constexpr u16 win_cui              = 3;
+        [[maybe_unused]] constexpr u16 os2_cui              = 5;
+        [[maybe_unused]] constexpr u16 posix_cui            = 7;
+        [[maybe_unused]] constexpr u16 win_native           = 8;
+        [[maybe_unused]] constexpr u16 win_ce_gui           = 9;
+        [[maybe_unused]] constexpr u16 efi_app              = 10;
+        [[maybe_unused]] constexpr u16 efi_boot_svc_driver  = 11;
+        [[maybe_unused]] constexpr u16 efi_runtime_driver   = 12;
+        [[maybe_unused]] constexpr u16 efi_rom              = 13;
+        [[maybe_unused]] constexpr u16 xbox                 = 14;
+        [[maybe_unused]] constexpr u16 win_boot_app         = 16;
+        [[maybe_unused]] constexpr u16 xbox_code_catalog    = 17;
     }
 
     namespace dir_entry {
@@ -156,7 +156,7 @@ namespace basecode::binfmt::io::pe {
         coff::free(pe.coff);
     }
 
-    status_t init(pe_t& pe, const pe_opts_t& opts) {
+    status_t init(pe_t& pe, const opts_t& opts) {
         auto status = coff::init(pe.coff, *opts.file, opts.alloc);
         if (!OK(status))
             return status;
@@ -317,7 +317,7 @@ namespace basecode::binfmt::io::pe {
     // 0x.....3055: import address table
     //      1...n 8-byte rva
     //      0     8-byte null marker
-    status_t build_section(file_t& file, pe_t& pe, coff_section_hdr_t& hdr) {
+    status_t build_section(file_t& file, pe_t& pe, coff::section_hdr_t& hdr) {
         auto& s    = *file.session;
         auto& coff = pe.coff;
 
@@ -401,8 +401,8 @@ namespace basecode::binfmt::io::pe {
                     name_hint.rva.base += import_table.name_hints.rva.base;
                 }
 
-                hdr.size        = (import_table.name_hints.rva.base + import_table.name_hints.rva.size)
-                                  - import_table_entry.rva.base;
+                hdr.size = (import_table.name_hints.rva.base + import_table.name_hints.rva.size)
+                           - import_table_entry.rva.base;
 
                 coff.init_data.size += hdr.size;
                 coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
@@ -425,7 +425,7 @@ namespace basecode::binfmt::io::pe {
         return status_t::ok;
     }
 
-    status_t write_section_data(session_t& s, pe_t& pe, coff_section_hdr_t& hdr) {
+    status_t write_section_data(session_t& s, pe_t& pe, coff::section_hdr_t& hdr) {
         const auto type = hdr.section->type;
         if (type == section::type_t::data && !hdr.section->flags.init)
             return status_t::ok;
@@ -455,7 +455,7 @@ namespace basecode::binfmt::io::pe {
                 for (const auto& module : import_table.modules) {
                     session::write_cstr(s, module.name.slice);
                     for (const auto& name_hint : import_table.name_hints.list) {
-                        pe_thunk_t data{};
+                        thunk_t data{};
                         data.thunk.by_ordinal = false;
                         data.thunk.value      = name_hint.rva.base;
                         session::write_u64(s, data.bits);
@@ -463,7 +463,7 @@ namespace basecode::binfmt::io::pe {
                     session::write_u64(s, 0);
                 }
                 for (const auto& name_hint : import_table.name_hints.list) {
-                    pe_thunk_t data{};
+                    thunk_t data{};
                     data.thunk.by_ordinal = false;
                     data.thunk.value      = name_hint.rva.base;
                     session::write_u64(s, data.bits);

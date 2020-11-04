@@ -52,7 +52,17 @@ namespace basecode::binfmt::io::coff {
             array::init(coff.symbol_table.list, alloc);
         }
 
-        coff_symbol_t* make_symbol(coff_t& coff, str::slice_t name) {
+        aux_record_t* make_aux_record(coff_t& coff,
+                                      symbol_t* sym,
+                                      aux_record_type_t type) {
+            auto aux = &array::append(sym->aux_records);
+            aux->type    = type;
+            aux->section = {};
+            coff.symbol_table.file.size += entry_size;
+            return aux;
+        }
+
+        symbol_t* make_symbol(coff_t& coff, str::slice_t name) {
             auto sym = &array::append(coff.symbol_table.list);
             array::init(sym->aux_records, coff.alloc);
             if (name.length > 8) {
@@ -65,14 +75,6 @@ namespace basecode::binfmt::io::coff {
             }
             coff.symbol_table.file.size += entry_size;
             return sym;
-        }
-
-        coff_aux_record_t* make_aux_record(coff_t& coff, coff_symbol_t* sym, coff_aux_record_type_t type) {
-            auto aux = &array::append(sym->aux_records);
-            aux->type    = type;
-            aux->section = {};
-            coff.symbol_table.file.size += entry_size;
-            return aux;
         }
     }
 
@@ -108,10 +110,13 @@ namespace basecode::binfmt::io::coff {
         coff.align.section = 0x1000;
 
         switch (file.machine) {
-            case binfmt::machine::type_t::unknown:return status_t::invalid_machine_type;
-            case binfmt::machine::type_t::x86_64:coff.machine = machine::amd64;
+            case binfmt::machine::type_t::unknown:
+                return status_t::invalid_machine_type;
+            case binfmt::machine::type_t::x86_64:
+                coff.machine = machine::amd64;
                 break;
-            case binfmt::machine::type_t::aarch64:coff.machine = machine::arm64;
+            case binfmt::machine::type_t::aarch64:
+                coff.machine = machine::arm64;
                 break;
         }
 
@@ -142,9 +147,7 @@ namespace basecode::binfmt::io::coff {
                                               symbol::type::base::null_);
             hdr.symbol->sclass  = storage_class::static_;
 
-            auto aux = coff::symbol_table::make_aux_record(coff,
-                                                           hdr.symbol,
-                                                           coff_aux_record_type_t::section);
+            auto aux = coff::symbol_table::make_aux_record(coff, hdr.symbol,aux_record_type_t::section);
             aux->section.len        = hdr.size;
             aux->section.sect_num   = hdr.number;
             aux->section.check_sum  = 0;
@@ -198,8 +201,8 @@ namespace basecode::binfmt::io::coff {
             }
             session::write_u32(s, symbol.value);
             session::write_s16(s, symbol.section);
-            session::write_u16(s, u16(symbol.type));
-            session::write_u8(s, u8(symbol.sclass));
+            session::write_u16(s, symbol.type);
+            session::write_u8(s, symbol.sclass);
             session::write_u8(s, symbol.aux_records.size);
             for (const auto& aux : symbol.aux_records) {
                 write_aux_record(s, aux);
@@ -248,16 +251,17 @@ namespace basecode::binfmt::io::coff {
         session::write_u16(s, coff.flags.image);
     }
 
-    u0 write_aux_record(session_t& s, const coff_aux_record_t& record) {
+    u0 write_aux_record(session_t& s, const aux_record_t& record) {
         switch (record.type) {
-            case coff_aux_record_type_t::xf:session::write_u32(s, 0);
+            case aux_record_type_t::xf:
+                session::write_u32(s, 0);
                 session::write_u16(s, record.xf.line_num);
                 session::write_u32(s, 0);
                 session::write_u16(s, 0);
                 session::write_u32(s, record.xf.ptr_next_func);
                 session::write_u16(s, 0);
                 break;
-            case coff_aux_record_type_t::file: {
+            case aux_record_type_t::file: {
                 const auto sym = record.file.sym;
                 if (sym->inlined) {
                     const auto len     = sym->name.slice.length;
@@ -278,7 +282,8 @@ namespace basecode::binfmt::io::coff {
                 }
                 break;
             }
-            case coff_aux_record_type_t::section:session::write_u32(s, record.section.len);
+            case aux_record_type_t::section:
+                session::write_u32(s, record.section.len);
                 session::write_u16(s, record.section.num_relocs);
                 session::write_u16(s, record.section.num_lines);
                 session::write_u32(s, record.section.check_sum);
@@ -288,13 +293,15 @@ namespace basecode::binfmt::io::coff {
                 session::write_u8(s, 0);    //      "
                 session::write_u8(s, 0);    //      "
                 break;
-            case coff_aux_record_type_t::func_def:session::write_u32(s, record.func_def.tag_idx);
+            case aux_record_type_t::func_def:
+                session::write_u32(s, record.func_def.tag_idx);
                 session::write_u32(s, record.func_def.total_size);
                 session::write_u32(s, record.func_def.ptr_line_num);
                 session::write_u32(s, record.func_def.ptr_next_func);
                 session::write_u16(s, 0);
                 break;
-            case coff_aux_record_type_t::weak_extern:session::write_u32(s, record.weak_extern.tag_idx);
+            case aux_record_type_t::weak_extern:
+                session::write_u32(s, record.weak_extern.tag_idx);
                 session::write_u32(s, record.weak_extern.flags);
                 session::write_u64(s, 0);
                 session::write_u16(s, 0);
@@ -302,7 +309,7 @@ namespace basecode::binfmt::io::coff {
         }
     }
 
-    status_t build_section(session_t& s, coff_t& coff, coff_section_hdr_t& hdr) {
+    status_t build_section(session_t& s, coff_t& coff, section_hdr_t& hdr) {
         using type_t = binfmt::section::type_t;
 
         hdr.offset = coff.offset;
@@ -325,25 +332,27 @@ namespace basecode::binfmt::io::coff {
                         coff.init_data.base = hdr.rva;
                     hdr.size                = sc.data.length;
                     coff.init_data.size += hdr.size;
-                    coff.size.image         = align(coff.size.image + hdr.size, coff.align.section);
-                    coff.offset             = align(coff.offset + hdr.size, coff.align.file);
-                    coff.rva                = align(coff.rva + hdr.size, coff.align.section);
+                    coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
+                    coff.offset     = align(coff.offset + hdr.size, coff.align.file);
+                    coff.rva        = align(coff.rva + hdr.size, coff.align.section);
                 } else {
                     if (!coff.uninit_data.base)
                         coff.uninit_data.base = hdr.rva;
                     hdr.size                  = sc.size;
                     coff.uninit_data.size += hdr.size;
-                    coff.size.image           = align(coff.size.image + hdr.size, coff.align.section);
-                    coff.rva                  = align(coff.rva + hdr.size, coff.align.section);
+                    coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
+                    coff.rva        = align(coff.rva + hdr.size, coff.align.section);
                 }
                 break;
             case type_t::reloc:
             case type_t::import:
-            case type_t::export_:return status_t::invalid_section_type;
+            case type_t::export_:
+                return status_t::invalid_section_type;
             case type_t::tls:
             case type_t::debug:
             case type_t::resource:
-            case type_t::exception:return status_t::not_implemented;
+            case type_t::exception:
+                return status_t::not_implemented;
         }
 
         auto& section_rec = hdr.symbol->aux_records[0];
@@ -352,7 +361,7 @@ namespace basecode::binfmt::io::coff {
         return status_t::ok;
     }
 
-    u0 write_section_header(session_t& s, coff_t& coff, coff_section_hdr_t& hdr) {
+    u0 write_section_header(session_t& s, coff_t& coff, section_hdr_t& hdr) {
         using type_t = binfmt::section::type_t;
 
         const auto type = hdr.section->type;
@@ -395,7 +404,7 @@ namespace basecode::binfmt::io::coff {
         session::write_u32(s, bitmask);
     }
 
-    status_t write_section_data(session_t& s, coff_t& coff, coff_section_hdr_t& hdr) {
+    status_t write_section_data(session_t& s, coff_t& coff, section_hdr_t& hdr) {
         using type_t = binfmt::section::type_t;
 
         const auto type = hdr.section->type;
@@ -409,15 +418,19 @@ namespace basecode::binfmt::io::coff {
         switch (type) {
             case type_t::code:
             case type_t::data:
-            case type_t::custom:session::write_str(s, sc.data);
+            case type_t::custom:
+                session::write_str(s, sc.data);
                 break;
             case type_t::import:
-            case type_t::export_:return status_t::invalid_section_type;
+            case type_t::export_:
+                return status_t::invalid_section_type;
             case type_t::tls:
             case type_t::debug:
             case type_t::resource:
-            case type_t::exception:return status_t::not_implemented;
-            default:break;
+            case type_t::exception:
+                return status_t::not_implemented;
+            default:
+                break;
         }
 
         return status_t::ok;

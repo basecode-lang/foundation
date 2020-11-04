@@ -18,7 +18,6 @@
 
 #include <basecode/core/bits.h>
 #include <basecode/binfmt/elf.h>
-#include <basecode/core/string.h>
 
 namespace basecode::binfmt::io::elf {
     namespace internal {
@@ -45,7 +44,7 @@ namespace basecode::binfmt::io::elf {
 
             const auto module = file.module;
 
-            elf_opts_t opts{};
+            opts_t opts{};
             opts.file        = &file;
             opts.alloc       = g_elf_sys.alloc;
             opts.entry_point = file.opts.base_addr;
@@ -67,14 +66,14 @@ namespace basecode::binfmt::io::elf {
                 case output_type_t::exe:
                 case output_type_t::dll:
                     for (u32 i = 0; i < module->sections.size; ++i) {
-                        auto                 section = &module->sections[i];
-                        u64                  size           {};
-                        u64                  flags          {};
-                        u64                  entry_size     {};
-                        u32                  number         {};
-                        u32                  alignment;
-                        u32                  section_type   {};
-                        elf_header_type_t    header_type    {};
+                        auto          section = &module->sections[i];
+                        u64           size{};
+                        u64           flags{};
+                        u64           entry_size{};
+                        u32           number{};
+                        u32           alignment;
+                        u32           section_type{};
+                        header_type_t header_type{};
 
                         switch (section->type) {
                             case type_t::tls: {
@@ -82,7 +81,7 @@ namespace basecode::binfmt::io::elf {
                             }
                             case type_t::data: {
                                 number       = ++elf.section.count;
-                                header_type  = elf_header_type_t::section;
+                                header_type  = elf::header_type_t::section;
                                 if (!section->flags.init) {
                                     section_type = elf::section::type::nobits;
                                     size         = section->subclass.size;
@@ -90,7 +89,7 @@ namespace basecode::binfmt::io::elf {
                                     section_type = elf::section::type::progbits;
                                     size         = section->subclass.data.length;
                                     auto& block = array::append(elf.blocks);
-                                    block.type       = elf_block_type_t::slice;
+                                    block.type       = elf::block_type_t::slice;
                                     block.offset     = elf.data.rel_offset;
                                     block.data.slice = &section->subclass.data;
                                 }
@@ -103,12 +102,12 @@ namespace basecode::binfmt::io::elf {
                             }
                             case type_t::code: {
                                 number       = ++elf.section.count;
-                                header_type  = elf_header_type_t::section;
+                                header_type  = elf::header_type_t::section;
                                 section_type = elf::section::type::progbits;
                                 size         = section->subclass.data.length;
                                 flags        = elf::section::flags::alloc | elf::section::flags::exec_instr;
                                 auto& block = array::append(elf.blocks);
-                                block.type       = elf_block_type_t::slice;
+                                block.type       = elf::block_type_t::slice;
                                 block.offset     = elf.data.rel_offset;
                                 block.data.slice = &section->subclass.data;
                                 break;
@@ -144,9 +143,9 @@ namespace basecode::binfmt::io::elf {
                         alignment = std::max<u32>(section->align, sizeof(u64));
 
                         switch (header_type) {
-                            case elf_header_type_t::none:
+                            case header_type_t::none:
                                 return status_t::invalid_section_type;
-                            case elf_header_type_t::section: {
+                            case header_type_t::section: {
                                 auto& sc = hdr.subclass.section;
                                 sc.flags = flags;
                                 sc.type  = section_type;
@@ -165,7 +164,7 @@ namespace basecode::binfmt::io::elf {
                                 sc.name_index = elf::strtab::add_str(elf.section_names, name);
                                 break;
                             }
-                            case elf_header_type_t::segment: {
+                            case header_type_t::segment: {
                                 break;
                             }
                         }
@@ -217,12 +216,12 @@ namespace basecode::binfmt::io::elf {
                                    + (elf.segment.count * elf::segment::header_size);
             for (auto& hdr : elf.headers) {
                 switch (hdr.type) {
-                    case elf_header_type_t::none:
+                    case header_type_t::none:
                         break;
-                    case elf_header_type_t::section:
+                    case header_type_t::section:
                         hdr.subclass.section.offset += elf.data.base_offset;
                         break;
-                    case elf_header_type_t::segment:
+                    case header_type_t::segment:
                         hdr.subclass.segment.file.offset += elf.data.base_offset;
                         break;
                 }
@@ -234,7 +233,7 @@ namespace basecode::binfmt::io::elf {
             elf::write_file_header(file, elf);
 
             if (file.output_type == output_type_t::exe
-                ||  file.output_type == output_type_t::dll) {
+            ||  file.output_type == output_type_t::dll) {
                 auto status = elf::write_segments(file, elf);
                 if (!OK(status))
                     return status;

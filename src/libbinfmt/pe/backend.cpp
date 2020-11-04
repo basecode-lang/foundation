@@ -31,7 +31,7 @@ namespace basecode::binfmt::io::pe {
         static status_t write(file_t& file) {
             const auto module = file.module;
 
-            pe_opts_t opts{};
+            opts_t opts{};
             opts.alloc         = module->alloc;
             opts.file          = &file;
             opts.base_addr     = file.opts.base_addr;
