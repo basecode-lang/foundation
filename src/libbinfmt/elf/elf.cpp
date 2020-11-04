@@ -206,11 +206,58 @@ namespace basecode::binfmt::io::elf {
 
             auto& sym = array::append(symtab.symbols);
             if (symbol) {
+                u32 scope{};
+                u32 type{};
+                u32 vis{};
+
+                switch (symbol->type) {
+                    case symbol::type_t::none:
+                        type = elf::symtab::type::notype;
+                        break;
+                    case symbol::type_t::file:
+                        type = elf::symtab::type::file;
+                        break;
+                    case symbol::type_t::object:
+                        type = elf::symtab::type::object;
+                        break;
+                    case symbol::type_t::function:
+                        type = elf::symtab::type::func;
+                        break;
+                }
+
+                switch (symbol->scope) {
+                    case symbol::scope_t::none:
+                    case symbol::scope_t::local:
+                        scope = elf::symtab::scope::local;
+                        break;
+                    case symbol::scope_t::global:
+                        scope = elf::symtab::scope::global;
+                        break;
+                    case symbol::scope_t::weak:
+                        scope = elf::symtab::scope::weak;
+                        break;
+                }
+
+                switch (symbol->visibility) {
+                    case symbol::visibility_t::default_:
+                        vis = elf::symtab::visibility::default_;
+                        break;
+                    case symbol::visibility_t::internal_:
+                        vis = elf::symtab::visibility::internal;
+                        break;
+                    case symbol::visibility_t::hidden:
+                        vis = elf::symtab::visibility::hidden;
+                        break;
+                    case symbol::visibility_t::protected_:
+                        vis = elf::symtab::visibility::protected_;
+                        break;
+                }
+
                 sym.name_index = name_index;
                 sym.value      = symbol->value;
-                sym.size       = symbol->length;
-                sym.info       = {};
-                sym.other      = {};
+                sym.size       = symbol->size;
+                sym.info       = ELF64_ST_INFO(scope, type);
+                sym.other      = ELF64_ST_VISIBILITY(vis);
                 sym.index      = symbol->section;
             }
 

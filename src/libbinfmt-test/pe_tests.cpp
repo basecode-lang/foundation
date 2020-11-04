@@ -133,38 +133,37 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                     .write = true,
                                                 }
                                            });
-        const auto func_type = SYMBOL_TYPE(symbol::type::derived::function,
-                                           symbol::type::base::null_);
         auto kernel32_sym_rc = module::make_symbol(*mod,
                                                    "kernel32.dll"_ss,
                                                    {
-                                                     .section = idata_rc.id,
                                                      .value = 1,
-                                                     .sclass = storage::class_t::static_
+                                                     .section = idata_rc.id,
+                                                     .type   = symbol::type_t::file,
+                                                     .scope  = symbol::scope_t::local
                                                  });
         auto read_file_sym_rc = module::make_symbol(*mod,
                                                     "ReadFile"_ss,
                                                     {
-                                                      .section = idata_rc.id,
-                                                      .type = func_type,
                                                       .value = 2,
-                                                      .sclass = storage::class_t::external_
+                                                      .section = idata_rc.id,
+                                                      .type = symbol::type_t::function,
+                                                      .scope = symbol::scope_t::global,
                                                   });
         auto write_file_sym_rc = module::make_symbol(*mod,
                                                      "WriteFile"_ss,
                                                      {
-                                                       .section = idata_rc.id,
-                                                       .type = func_type,
                                                        .value = 3,
-                                                       .sclass = storage::class_t::external_
+                                                       .section = idata_rc.id,
+                                                       .type = symbol::type_t::function,
+                                                       .scope = symbol::scope_t::global,
                                                    });
         auto get_std_handle_sym_rc = module::make_symbol(*mod,
                                                          "GetStdHandle"_ss,
                                                          {
-                                                           .section = idata_rc.id,
-                                                           .type = func_type,
                                                            .value = 4,
-                                                           .sclass = storage::class_t::external_
+                                                           .section = idata_rc.id,
+                                                           .type = symbol::type_t::function,
+                                                           .scope = symbol::scope_t::global,
                                                        });
         auto kernel32_imp_rc = section::import_module(*mod, idata_rc.id, kernel32_sym_rc.id);
         auto kernel32_imp    = section::get_import(*mod, idata_rc.id, kernel32_imp_rc.id);

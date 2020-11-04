@@ -78,16 +78,6 @@ namespace basecode::binfmt::io::coff {
         }
     }
 
-    namespace storage_class {
-        u8 coff_storage_class(storage::class_t cls) {
-            switch (cls) {
-                case storage::class_t::none: return null_;
-                case storage::class_t::static_: return static_;
-                case storage::class_t::external_: return external_;
-            }
-        }
-    }
-
     u0 free(coff_t& coff) {
         array::free(coff.headers);
         string_table::free(coff);
@@ -143,9 +133,8 @@ namespace basecode::binfmt::io::coff {
             hdr.symbol          = coff::symbol_table::make_symbol(coff, name);
             hdr.symbol->section = hdr.number;
             hdr.symbol->value   = {};
-            hdr.symbol->type    = SYMBOL_TYPE(symbol::type::derived::none,
-                                              symbol::type::base::null_);
-            hdr.symbol->sclass  = storage_class::static_;
+            hdr.symbol->type    = 0;
+            hdr.symbol->sclass  = symbol_table::storage_class::static_;
 
             auto aux = coff::symbol_table::make_aux_record(coff, hdr.symbol,aux_record_type_t::section);
             aux->section.len        = hdr.size;
@@ -166,8 +155,35 @@ namespace basecode::binfmt::io::coff {
             auto sym = coff::symbol_table::make_symbol(coff, intern_rc.slice);
             sym->value   = symbol->value;
             sym->section = symbol->section;
-            sym->type    = symbol->type;
-            sym->sclass  = storage_class::coff_storage_class(symbol->sclass);
+            switch (symbol->type) {
+                case symbol::type_t::none:
+                case symbol::type_t::object:
+                    sym->type = 0;
+                    break;
+                case symbol::type_t::file:
+                    sym->type = 0;
+                    sym->sclass = symbol_table::storage_class::file;
+                    break;
+                case symbol::type_t::function:
+                    sym->type = symbol_table::derived_type::function << u32(8);
+                    break;
+            }
+            if (!sym->sclass) {
+                switch (symbol->scope) {
+                    case symbol::scope_t::none:
+                        sym->sclass = symbol_table::storage_class::null_;
+                        break;
+                    case symbol::scope_t::local:
+                        sym->sclass = symbol_table::storage_class::static_;
+                        break;
+                    case symbol::scope_t::global:
+                        sym->sclass = symbol_table::storage_class::external_;
+                        break;
+                    case symbol::scope_t::weak:
+                        sym->sclass = symbol_table::storage_class::weak_external;
+                        break;
+                }
+            }
         }
 
         return status;
@@ -266,10 +282,10 @@ namespace basecode::binfmt::io::coff {
                 if (sym->inlined) {
                     const auto len     = sym->name.slice.length;
                     const s32  pad_len = std::max<s32>(symbol_table::entry_size - len, 0);
-                    for (u32   i       = 0; i < std::min<u32>(len, 18); ++i) {
+                    for (u32 i = 0; i < std::min<u32>(len, 18); ++i) {
                         session::write_u8(s, sym->name.slice[i]);
                     }
-                    for (u32   i       = 0; i < pad_len; ++i) {
+                    for (u32 i = 0; i < pad_len; ++i) {
                         session::write_u8(s, 0);
                     }
                 } else {

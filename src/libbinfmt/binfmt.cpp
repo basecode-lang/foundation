@@ -240,12 +240,13 @@ namespace basecode::binfmt {
             }
             const auto rc     = string::interned::fold_for_result(name, len);
             auto       symbol = hashtab::emplace(module.symbols, rc.id);
-            symbol->name    = rc.id;
-            symbol->type    = opts.type;
-            symbol->value   = opts.value;
-            symbol->sclass  = opts.sclass;
-            symbol->section = opts.section;
-            symbol->length  = rc.slice.length;
+            symbol->name       = rc.id;
+            symbol->type       = opts.type;
+            symbol->size       = opts.size;
+            symbol->value      = opts.value;
+            symbol->scope      = opts.scope;
+            symbol->section    = opts.section;
+            symbol->visibility = opts.visibility;
             return {symbol->name, status_t::ok};
         }
     }

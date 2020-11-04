@@ -206,38 +206,6 @@ namespace basecode::binfmt::io::coff {
         [[maybe_unused]] constexpr u32 bytes_reversed_hi       = 0x8000;
     }
 
-    namespace storage_class {
-        [[maybe_unused]] constexpr u8 null_            = 0;
-        [[maybe_unused]] constexpr u8 auto_            = 1;
-        [[maybe_unused]] constexpr u8 external_        = 2;
-        [[maybe_unused]] constexpr u8 static_          = 3;
-        [[maybe_unused]] constexpr u8 register_        = 4;
-        [[maybe_unused]] constexpr u8 extern_def       = 5;
-        [[maybe_unused]] constexpr u8 label            = 6;
-        [[maybe_unused]] constexpr u8 undef_label      = 7;
-        [[maybe_unused]] constexpr u8 member_of_struct = 8;
-        [[maybe_unused]] constexpr u8 argument         = 9;
-        [[maybe_unused]] constexpr u8 struct_tag       = 10;
-        [[maybe_unused]] constexpr u8 member_of_union  = 11;
-        [[maybe_unused]] constexpr u8 union_tag        = 12;
-        [[maybe_unused]] constexpr u8 type_def         = 13;
-        [[maybe_unused]] constexpr u8 undef_static     = 14;
-        [[maybe_unused]] constexpr u8 enum_tag         = 15;
-        [[maybe_unused]] constexpr u8 member_of_enum   = 16;
-        [[maybe_unused]] constexpr u8 register_param   = 17;
-        [[maybe_unused]] constexpr u8 bit_field        = 18;
-        [[maybe_unused]] constexpr u8 block            = 100;
-        [[maybe_unused]] constexpr u8 function         = 101;
-        [[maybe_unused]] constexpr u8 end_of_struct    = 102;
-        [[maybe_unused]] constexpr u8 file             = 103;
-        [[maybe_unused]] constexpr u8 section          = 104;
-        [[maybe_unused]] constexpr u8 weak_external    = 105;
-        [[maybe_unused]] constexpr u8 clr_token        = 107;
-        [[maybe_unused]] constexpr u8 end_of_function  = 0xff;
-
-        u8 coff_storage_class(storage::class_t cls);
-    }
-
     namespace string_table {
         u0 free(coff_t& coff);
 
@@ -248,6 +216,45 @@ namespace basecode::binfmt::io::coff {
 
     namespace symbol_table {
         [[maybe_unused]] constexpr u32 entry_size = 0x12;
+
+        namespace base_type {
+            [[maybe_unused]] constexpr u8 none             = 0;
+        }
+
+        namespace derived_type {
+            [[maybe_unused]] constexpr u8 none             = 0;
+            [[maybe_unused]] constexpr u8 function         = 2;
+        }
+
+        namespace storage_class {
+            [[maybe_unused]] constexpr u8 null_            = 0;
+            [[maybe_unused]] constexpr u8 auto_            = 1;
+            [[maybe_unused]] constexpr u8 external_        = 2;
+            [[maybe_unused]] constexpr u8 static_          = 3;
+            [[maybe_unused]] constexpr u8 register_        = 4;
+            [[maybe_unused]] constexpr u8 extern_def       = 5;
+            [[maybe_unused]] constexpr u8 label            = 6;
+            [[maybe_unused]] constexpr u8 undef_label      = 7;
+            [[maybe_unused]] constexpr u8 member_of_struct = 8;
+            [[maybe_unused]] constexpr u8 argument         = 9;
+            [[maybe_unused]] constexpr u8 struct_tag       = 10;
+            [[maybe_unused]] constexpr u8 member_of_union  = 11;
+            [[maybe_unused]] constexpr u8 union_tag        = 12;
+            [[maybe_unused]] constexpr u8 type_def         = 13;
+            [[maybe_unused]] constexpr u8 undef_static     = 14;
+            [[maybe_unused]] constexpr u8 enum_tag         = 15;
+            [[maybe_unused]] constexpr u8 member_of_enum   = 16;
+            [[maybe_unused]] constexpr u8 register_param   = 17;
+            [[maybe_unused]] constexpr u8 bit_field        = 18;
+            [[maybe_unused]] constexpr u8 block            = 100;
+            [[maybe_unused]] constexpr u8 function         = 101;
+            [[maybe_unused]] constexpr u8 end_of_struct    = 102;
+            [[maybe_unused]] constexpr u8 file             = 103;
+            [[maybe_unused]] constexpr u8 section          = 104;
+            [[maybe_unused]] constexpr u8 weak_external    = 105;
+            [[maybe_unused]] constexpr u8 clr_token        = 107;
+            [[maybe_unused]] constexpr u8 end_of_function  = 0xff;
+        }
 
         u0 free(coff_t& sym);
 

@@ -98,31 +98,29 @@ TEST_CASE("basecode::binfmt ELF test") {
                                          s_rot13_code,
                                          sizeof(s_rot13_code));
 
-        const auto func_type = SYMBOL_TYPE(symbol::type::derived::function,
-                                           symbol::type::base::null_);
         module::make_symbol(mod,
                             "ReadFile"_ss,
                             {
-                                .section = text_rc.id,
-                                .type = func_type,
                                 .value = 2,
-                                .sclass = storage::class_t::external_
+                                .section = text_rc.id,
+                                .type = symbol::type_t::function,
+                                .scope = symbol::scope_t::global
                             });
         module::make_symbol(mod,
                             "WriteFile"_ss,
                             {
-                                .section = text_rc.id,
-                                .type = func_type,
                                 .value = 3,
-                                .sclass = storage::class_t::external_
+                                .section = text_rc.id,
+                                .type = symbol::type_t::function,
+                                .scope  = symbol::scope_t::global
                             });
         module::make_symbol(mod,
                             "GetStdHandle"_ss,
                             {
-                                .section = text_rc.id,
-                                .type = func_type,
                                 .value = 4,
-                                .sclass = storage::class_t::external_
+                                .section = text_rc.id,
+                                .type = symbol::type_t::function,
+                                .scope  = symbol::scope_t::global
                             });
         REQUIRE(OK(set_data_rc.status));
         REQUIRE(OK(text_rc.status));
