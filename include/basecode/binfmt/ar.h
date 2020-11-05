@@ -26,7 +26,10 @@ namespace basecode::binfmt::ar {
     struct member_t final {
         str::slice_t            name;
         str::slice_t            content;
-        u32                     offset;
+        struct {
+            u32                 header;
+            u32                 data;
+        }                       offset;
         u32                     date;
         u32                     uid;
         u32                     gid;
@@ -43,7 +46,15 @@ namespace basecode::binfmt::ar {
         member_list_t           members;
         symbol_map_t            symbol_map;
         bitset_t                symbol_module_bitmap;
+        struct {
+            u8                  long_names;
+            u8                  symbol_table;
+            u8                  ecoff_symbol_table;
+            u8                  pad;
+        }                       known;
     };
+
+    constexpr u32 header_size   = 60;
 
     u0 free(ar_t& ar);
 

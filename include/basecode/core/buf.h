@@ -20,8 +20,10 @@
 
 #include <basecode/core/path.h>
 #include <basecode/core/defer.h>
+#include <basecode/core/stack.h>
 
 #define CRSR_POS(c)             ((c).pos)
+#define CRSR_PTR(c)             ((c).buf->data + (c).pos)
 #define CRSR_NEXT(c)            SAFE_SCOPE(++(c).pos; ++(c).column;)
 #define CRSR_READ(c)            ((c).buf->data[(c).pos])
 #define CRSR_PEEK(c)            ((c).buf->data[(c).pos + 1])
@@ -50,6 +52,7 @@ namespace basecode {
 
     struct buf_crsr_t final {
         buf_t*                  buf;
+        stack_t<u32>            stack;
         u32                     pos;
         u32                     line;
         u32                     column;
@@ -70,7 +73,11 @@ namespace basecode {
         u0 write(buf_t& buf, u32 offset, const u8* data, u32 length);
 
         namespace cursor {
-            buf_crsr_t make(buf_t& buf);
+            u0 pop(buf_crsr_t& crsr);
+
+            u0 push(buf_crsr_t& crsr);
+
+            u0 free(buf_crsr_t& crsr);
 
             u8 read_u8(buf_crsr_t& crsr);
 
@@ -85,6 +92,10 @@ namespace basecode {
             u0 init(buf_crsr_t& crsr, buf_t& buf);
 
             u0 write_u8(buf_crsr_t& crsr, u8 value);
+
+            u0 seek_fwd(buf_crsr_t& crsr, u32 offset);
+
+            u0 seek_rev(buf_crsr_t& crsr, u32 offset);
 
             u0 write_u16(buf_crsr_t& crsr, u16 value);
 

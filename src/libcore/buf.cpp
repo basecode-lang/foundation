@@ -17,13 +17,21 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/buf.h>
+#include <basecode/core/filesys.h>
+#include <basecode/core/stopwatch.h>
 
 namespace basecode::buf {
     namespace cursor {
-        buf_crsr_t make(buf_t& buf) {
-            buf_crsr_t crsr{};
-            init(crsr, buf);
-            return crsr;
+        u0 pop(buf_crsr_t& crsr) {
+            crsr.pos = stack::pop(crsr.stack);
+        }
+
+        u0 push(buf_crsr_t& crsr) {
+            stack::push(crsr.stack, crsr.pos);
+        }
+
+        u0 free(buf_crsr_t& crsr) {
+            stack::free(crsr.stack);
         }
 
         u8 read_u8(buf_crsr_t& crsr) {
@@ -61,6 +69,7 @@ namespace basecode::buf {
         u0 init(buf_crsr_t& crsr, buf_t& buf) {
             crsr.buf = &buf;
             crsr.pos = crsr.line = crsr.column = {};
+            stack::init(crsr.stack, buf.alloc);
         }
 
         u0 write_u8(buf_crsr_t& crsr, u8 value) {
@@ -81,6 +90,14 @@ namespace basecode::buf {
         u0 write_u32(buf_crsr_t& crsr, u32 value) {
             write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u32));
             crsr.pos += sizeof(u32);
+        }
+
+        u0 seek_fwd(buf_crsr_t& crsr, u32 offset) {
+            crsr.pos += offset;
+        }
+
+        u0 seek_rev(buf_crsr_t& crsr, u32 offset) {
+            crsr.pos -= offset;
         }
 
         u0 write_u64(buf_crsr_t& crsr, u64 value) {
@@ -176,6 +193,9 @@ namespace basecode::buf {
     }
 
     u0 reserve(buf_t& buf, u32 new_capacity) {
+        stopwatch_t timer{};
+        stopwatch::start(timer);
+
         if (new_capacity == 0) {
             memory::free(buf.alloc, buf.data);
             buf.data     = {};
@@ -190,17 +210,27 @@ namespace basecode::buf {
         new_capacity = new_capacity + (-new_capacity & 15U);
         buf.data = (u8*) memory::realloc(buf.alloc, buf.data, new_capacity, 16);
         buf.capacity = new_capacity;
+
+        stopwatch::stop(timer);
+        stopwatch::print_elapsed("buf::reserve (internal) time"_ss, 40, timer);
     }
 
     status_t load(buf_t& buf, const path_t& path) {
+        stopwatch_t timer{};
+        stopwatch::start(timer);
+
+        usize file_size{};
+        if (!OK(filesys::file_size(path, file_size)))
+            return status_t::unable_to_open_file;
         auto file = fopen(str::c_str(const_cast<str_t&>(path.str)), "rb");
         if (!file)
             return status_t::unable_to_open_file;
         defer(fclose(file));
-        fseek(file, 0, SEEK_END);
-        const auto length = ftell(file) + 1;
-        fseek(file, 0, SEEK_SET);
-        write(buf, 0, file, length);
+        write(buf, 0, file, file_size);
+
+        stopwatch::stop(timer);
+        stopwatch::print_elapsed("buf::load (internal) time"_ss, 40, timer);
+
         return status_t::ok;
     }
 
@@ -217,7 +247,6 @@ namespace basecode::buf {
             grow(buf, offset + length + 1);
         fread(buf.data + offset, 1, length, file);
         buf.length += offset + length > buf.length ? offset + length : length;
-//        buf.data[buf.length] = 255;
     }
 
     u0 write(buf_t& buf, u32 offset, const u8* data, u32 length) {
@@ -225,7 +254,6 @@ namespace basecode::buf {
             grow(buf, offset + length + 1);
         std::memcpy(buf.data + offset, data, length);
         buf.length += offset + length > buf.length ? offset + length : length;
-//        buf.data[buf.length] = 255;
     }
 
     status_t save(buf_t& buf, const path_t& path, u32 offset, u32 length) {

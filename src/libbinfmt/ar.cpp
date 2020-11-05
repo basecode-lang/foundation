@@ -19,6 +19,7 @@
 #include <basecode/core/bits.h>
 #include <basecode/binfmt/ar.h>
 #include <basecode/core/numbers.h>
+#include <basecode/core/stopwatch.h>
 
 namespace basecode::binfmt::ar {
     struct sym_offset_t final {
@@ -34,6 +35,221 @@ namespace basecode::binfmt::ar {
         s8                      mode[8];
         s8                      size[10];
     };
+
+    static status_t parse_headers(ar_t& ar, buf_crsr_t& c) {
+        s8          marker[2];
+        header_t    hdr{};
+        u64_bytes_t thunk_u64{};
+
+        thunk_u64.value = buf::cursor::read_u64(c);
+        if (memcmp(thunk_u64.bytes, "!<arch>\n", 8) != 0)
+            return status_t::read_error;
+
+        while (CRSR_MORE(c)) {
+            const auto hdr_offset = CRSR_POS(c);
+
+            if (!buf::cursor::read_obj(c, &hdr, sizeof(header_t)))
+                break;
+
+            hdr.name[15] = 0;
+            hdr.date[11] = 0;
+            hdr.uid[5]   = 0;
+            hdr.gid[5]   = 0;
+            hdr.mode[7]  = 0;
+            hdr.size[9]  = 0;
+
+            if (!buf::cursor::read_obj(c, marker, 2))
+                break;
+
+            if (marker[0] != 0x60 || marker[1] != 0x0a)
+                return status_t::read_error;
+
+            auto& member = array::append(ar.members);
+            member.name.data     = c.buf->data + hdr_offset;
+            member.name.length   = 16;
+            member.offset.header = hdr_offset;
+
+            numbers::status_t parse_rc;
+
+            const auto date_slice = slice::make(hdr.date, 12);
+            parse_rc = numbers::integer::parse(date_slice, 10, member.date);
+            if (!OK(parse_rc))
+                return status_t::read_error;
+
+            const auto uid_slice = slice::make(hdr.uid, 6);
+            parse_rc = numbers::integer::parse(uid_slice, 10, member.uid);
+            if (!OK(parse_rc))
+                return status_t::read_error;
+
+            const auto gid_slice = slice::make(hdr.gid, 6);
+            parse_rc = numbers::integer::parse(gid_slice, 10, member.gid);
+            if (!OK(parse_rc))
+                return status_t::read_error;
+
+            const auto mode_slice = slice::make(hdr.mode, 8);
+            parse_rc = numbers::integer::parse(mode_slice, 8, member.mode);
+            if (!OK(parse_rc))
+                return status_t::read_error;
+
+            const auto size_slice = slice::make(hdr.size, 10);
+            parse_rc = numbers::integer::parse(size_slice, 10, member.content.length);
+            if (!OK(parse_rc))
+                return status_t::read_error;
+
+            member.offset.data  = CRSR_POS(c);
+            member.content.data = CRSR_PTR(c);
+            buf::cursor::seek_fwd(c, member.content.length);
+
+            while (CRSR_MORE(c) && CRSR_READ(c) == '\n')
+                CRSR_NEXT(c);
+        }
+
+        return status_t::ok;
+    }
+
+    static status_t parse_ecoff_symbol_table(ar_t& ar, buf_crsr_t& c) {
+        ar.known.ecoff_symbol_table = 2;
+
+        auto& symbol_table = ar.members[ar.known.ecoff_symbol_table - 1];
+        buf::cursor::push(c);
+        defer(buf::cursor::pop(c));
+
+        buf::cursor::seek(c, symbol_table.offset.data);
+
+        u32 num_members = buf::cursor::read_u32(c);
+        u32 mem_offsets[num_members];
+        for (u32 i = 0; i < num_members; ++i) {
+            mem_offsets[i] = buf::cursor::read_u32(c);
+        }
+        u32 num_symbols = buf::cursor::read_u32(c);
+        u32 sym_indexes[num_symbols];
+        for (u32 i = 0; i < num_symbols; ++i) {
+            sym_indexes[i] = buf::cursor::read_u16(c);
+        }
+        while (num_symbols) {
+            u8 ch = buf::cursor::read_u8(c);
+            if (ch == 0)
+                --num_symbols;
+        }
+
+        return status_t::ok;
+    }
+
+    static status_t parse_symbol_table(ar_t& ar, buf_crsr_t& c) {
+        if (ar.members.size == 0)
+            return status_t::ok;
+
+        auto& symbol_table = ar.members[0];
+        if (symbol_table.name[0] != '/' && symbol_table.name[1] != ' ')
+            return status_t::ok;
+
+        ar.known.symbol_table = 1;
+        if (ar.members.size > 1) {
+            const auto& ecoff_table = ar.members[1];
+            if (ecoff_table.name[0] == '/' && ecoff_table.name[1] == ' ')
+                return parse_ecoff_symbol_table(ar, c);
+        }
+
+        hashtab_t<u32, u32> offset_member_idx{};
+        hashtab::init(offset_member_idx, ar.alloc);
+
+        array_t<sym_offset_t> sym_offsets{};
+        array::init(sym_offsets, ar.alloc);
+
+        buf::cursor::push(c);
+        buf::cursor::seek(c, symbol_table.offset.data);
+
+        defer(
+            buf::cursor::pop(c);
+            array::free(sym_offsets);
+            hashtab::free(offset_member_idx));
+
+        u32 num_symbols = endian_swap_dword(buf::cursor::read_u32(c));
+        array::resize(sym_offsets, num_symbols);
+        for (u32 i = 0; i < num_symbols; ++i) {
+            auto& sym = sym_offsets[i];
+            sym.offset = endian_swap_dword(buf::cursor::read_u32(c));
+        }
+        u32  idx{};
+        auto symbol_offset = CRSR_POS(c);
+        while (num_symbols) {
+            u8 ch = buf::cursor::read_u8(c);
+            if (ch == 0) {
+                auto& sym = sym_offsets[idx++];
+                sym.name = slice::make(c.buf->data + symbol_offset,
+                                       CRSR_POS(c) - symbol_offset - 1);
+                symbol_offset = CRSR_POS(c);
+                --num_symbols;
+            }
+        }
+
+        while (CRSR_READ(c) == 0)
+            CRSR_NEXT(c);
+
+        for (u32 i = 0; i < ar.members.size; ++i)
+            hashtab::insert(offset_member_idx, ar.members[i].offset.header, i);
+
+        // XXX: revisit this
+        for (u32 i = 0; i < sym_offsets.size; ++i)
+            hashtab::insert(ar.symbol_map, sym_offsets[i].name, i * ar.members.size);
+
+        bitset::resize(ar.symbol_module_bitmap,
+                       ar.symbol_map.size * ar.members.size);
+
+        for (u32 i = 0; i < sym_offsets.size; ++i) {
+            auto& sym = sym_offsets[i];
+            const auto bm_offset = *hashtab::find(ar.symbol_map, sym.name);
+            auto member_idx = *hashtab::find(offset_member_idx, sym.offset);
+            bitset::write(ar.symbol_module_bitmap, bm_offset + member_idx, true);
+        }
+
+        return status_t::ok;
+    }
+
+    static status_t parse_long_name_ref(ar_t& ar, member_t& member) {
+        if (!ar.known.long_names)
+            return status_t::ok;
+
+        if (member.name[0] != '/' || !isdigit(member.name[1]))
+            return status_t::ok;
+
+        auto& long_names = ar.members[ar.known.long_names - 1];
+
+        u32 offset{};
+        const auto name_slice = slice::make(member.name.data + 1, 15);
+        auto status = numbers::integer::parse(name_slice, 10, offset);
+        if (!OK(status))
+            return status_t::read_error;
+
+        member.name.data    = long_names.content.data + offset;
+        member.name.length  = strlen((const s8*) member.name.data);
+
+        return status_t::ok;
+    }
+
+    static status_t parse_long_names(ar_t& ar, buf_crsr_t& c) {
+        for (u32 i = 0; i < ar.members.size; ++i) {
+            const auto& m = ar.members[i];
+            if (m.name[0] == '/' && m.name[1] == '/') {
+                ar.known.long_names = i + 1;
+                break;
+            }
+        }
+
+        if (!ar.known.long_names)
+            return status_t::ok;
+
+        auto& member = ar.members[ar.known.long_names - 1];
+        auto p   = (u8*) member.content.data;
+        auto end = p + member.content.length;
+        while (p < end) {
+            u8 ch = *p;
+            if (ch == '\n')
+                *p = 0;
+            ++p;
+        }
+        return status_t::ok;
+    }
 
     u0 free(ar_t& ar) {
         buf::free(ar.buf);
@@ -60,173 +276,38 @@ namespace basecode::binfmt::ar {
 
     status_t read(ar_t& ar, const path_t& path) {
         {
+            stopwatch_t timer{};
+            stopwatch::start(timer);
+
             auto status = buf::load(ar.buf, path);
             if (!OK(status))
                 return status_t::read_error;
-        }
 
-        array_t<sym_offset_t> sym_offsets{};
-        array::init(sym_offsets, ar.alloc);
-        defer(array::free(sym_offsets));
+            stopwatch::stop(timer);
+            stopwatch::print_elapsed("ar buf::load time"_ss, 40, timer);
+        }
 
         buf_crsr_t c{};
         buf::cursor::init(c, ar.buf);
+        defer(buf::cursor::free(c));
 
-        u32 name_base_off{};
-        u32 linker_mem_no{};
+        auto status = parse_headers(ar, c);
+        if (!OK(status))
+            return status;
 
-        u64_bytes_t t{};
-        t.value = buf::cursor::read_u64(c);
-        if (memcmp(t.bytes, "!<arch>\n", 8) != 0)
-            return status_t::read_error;
+        status = parse_long_names(ar, c);
+        if (!OK(status))
+            return status;
 
-        while (CRSR_MORE(c)) {
-            const auto hdr_offset = CRSR_POS(c);
-
-            header_t hdr{};
-            if (!buf::cursor::read_obj(c, &hdr, sizeof(header_t)))
-                break;
-
-            hdr.name[15] = 0;
-            hdr.date[11] = 0;
-            hdr.uid[5]   = 0;
-            hdr.gid[5]   = 0;
-            hdr.mode[7]  = 0;
-            hdr.size[9]  = 0;
-
-            s8 marker[2];
-            if (!buf::cursor::read_obj(c, marker, 2))
-                break;
-
-            if (marker[0] != 0x60 || marker[1] != 0x0a)
-                return status_t::read_error;
-
-            member_t member{};
-            numbers::integer::parse(slice::make(hdr.date, 12),
-                                    10,
-                                    member.date);
-
-            numbers::integer::parse(slice::make(hdr.uid, 6),
-                                    10,
-                                    member.uid);
-
-            numbers::integer::parse(slice::make(hdr.gid, 6),
-                                    10,
-                                    member.gid);
-
-            numbers::integer::parse(slice::make(hdr.mode, 8),
-                                    8,
-                                    member.mode);
-
-            numbers::integer::parse(slice::make(hdr.size, 10),
-                                    10,
-                                    member.content.length);
-
-            if (hdr.name[0] == '/') {
-                switch (hdr.name[1]) {
-                    case '/': {
-                        name_base_off = CRSR_POS(c);
-                        auto size = member.content.length;
-                        while (size) {
-                            u8 ch = buf::cursor::read_u8(c);
-                            if (ch == '\n') {
-                                ar.buf.data[c.pos - 1] = 0;
-                            }
-                            --size;
-                        }
-                        break;
-                    }
-                    case '0' ... '9': {
-                        u32 offset{};
-                        numbers::integer::parse(slice::make(hdr.name + 1, 15),
-                                                10,
-                                                offset);
-                        member.name.data    = ar.buf.data + name_base_off + offset;
-                        member.name.length  = strlen((const s8*) member.name.data);
-                        member.content.data = c.buf->data + c.pos;
-                        member.offset       = hdr_offset;
-                        add_member(ar, member);
-                        buf::cursor::seek(c, c.pos + member.content.length);
-                        break;
-                    }
-                    default: {
-                        if (linker_mem_no == 0) {
-                            u32 num_symbols = endian_swap_dword(buf::cursor::read_u32(c));
-                            array::resize(sym_offsets, num_symbols);
-                            for (u32 i = 0; i < num_symbols; ++i) {
-                                auto& sym = sym_offsets[i];
-                                sym.offset = endian_swap_dword(buf::cursor::read_u32(c));
-                            }
-                            u32 i{};
-                            auto symbol_offset = CRSR_POS(c);
-                            while (num_symbols) {
-                                u8 ch = buf::cursor::read_u8(c);
-                                if (ch == 0) {
-                                    auto& sym = sym_offsets[i++];
-                                    sym.name = slice::make(c.buf->data + symbol_offset,
-                                                           CRSR_POS(c) - symbol_offset - 1);
-                                    symbol_offset = CRSR_POS(c);
-                                    --num_symbols;
-                                }
-                            }
-                            while (CRSR_READ(c) == 0)
-                                CRSR_NEXT(c);
-                            linker_mem_no++;
-                        } else if (linker_mem_no == 1) {
-                            u32 num_members = buf::cursor::read_u32(c);
-                            u32 mem_offsets[num_members];
-                            for (u32 i = 0; i < num_members; ++i)
-                                mem_offsets[i] = buf::cursor::read_u32(c);
-                            u32 num_symbols = buf::cursor::read_u32(c);
-                            u32 sym_indexes[num_symbols];
-                            for (u32 i = 0; i < num_symbols; ++i)
-                                sym_indexes[i] = buf::cursor::read_u16(c);
-                            while (num_symbols) {
-                                u8 ch = buf::cursor::read_u8(c);
-                                if (ch == 0)
-                                    --num_symbols;
-                            }
-                            linker_mem_no++;
-                        } else {
-                            return status_t::read_error;
-                        }
-                        break;
-                    }
-                }
-            } else {
-                auto end_ptr = c.buf->data + hdr_offset;
-                while (*end_ptr != '/')
-                    ++end_ptr;
-                member.name.data    = ar.buf.data + hdr_offset;
-                member.name.length  = end_ptr - member.name.data;
-                member.content.data = c.buf->data + c.pos;
-                member.offset       = hdr_offset;
-                add_member(ar, member);
-                buf::cursor::seek(c, c.pos + member.content.length);
-            }
-            while (CRSR_MORE(c) && CRSR_READ(c) == '\n')
-                CRSR_NEXT(c);
+        for (auto& member : ar.members) {
+            status = parse_long_name_ref(ar, member);
+            if (!OK(status))
+                return status;
         }
 
-        hashtab_t<u32, u32> offset_member_idx{};
-        hashtab::init(offset_member_idx, ar.alloc);
-        defer(hashtab::free(offset_member_idx));
-
-        for (u32 i = 0; i < ar.members.size; ++i)
-            hashtab::insert(offset_member_idx, ar.members[i].offset, i);
-
-        for (u32 i = 0; i < sym_offsets.size; ++i)
-            hashtab::insert(ar.symbol_map, sym_offsets[i].name, i * ar.members.size);
-
-        bitset::resize(ar.symbol_module_bitmap,
-                       ar.symbol_map.size * ar.members.size);
-
-        for (u32 i = 0; i < sym_offsets.size; ++i) {
-            auto& sym = sym_offsets[i];
-            const auto bm_offset = *hashtab::find(ar.symbol_map, sym.name);
-            auto member_idx = *hashtab::find(offset_member_idx, sym.offset);
-            bitset::write(ar.symbol_module_bitmap, bm_offset + member_idx, true);
-        }
+        status = parse_symbol_table(ar, c);
+        if (!OK(status))
+            return status;
 
         return status_t::ok;
     }

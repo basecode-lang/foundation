@@ -53,7 +53,8 @@ TEST_CASE("basecode::binfmt ar read test") {
         str_buf_t buf(&s);
         for (const auto& member : ar.members) {
             format::format_to(buf, "file . . . . . . . {}\n", member.name);
-            format::format_to(buf, "offset . . . . . . {}\n", member.offset);
+            format::format_to(buf, "header offset  . . {}\n", member.offset.header);
+            format::format_to(buf, "data offset  . . . {}\n", member.offset.data);
             format::format_to(buf, "size . . . . . . . ");
             format::unitized_byte_size(buf, member.content.length);
             format::format_to(buf, "\ndate . . . . . . . {:%Y-%m-%d %H:%M:%S}\n", fmt::localtime(member.date));

@@ -21,6 +21,21 @@
 #include <cstdlib>
 #include <basecode/core/numbers.h>
 
+#define VALIDATE_INT_PARSE(sn, sx, ux)          SAFE_SCOPE({    \
+    if ((errno == ERANGE && out == (sx))                        \
+    ||   out > (ux)) {                                          \
+        return status_t::overflow;                              \
+    }                                                           \
+    if ((errno == ERANGE && out == (sn))) {                     \
+        return status_t::underflow;                             \
+    }                                                           \
+    if (*begin == '\0') return status_t::not_convertible;       \
+    if ((radix != 16 && !isspace(*end) && *end != '\0')         \
+    ||  (!isspace(*end) && !isalpha(*end) && *end != '\0')) {   \
+        return status_t::not_convertible;                       \
+    }                                                           \
+    return status_t::ok; })
+
 namespace basecode::numbers {
     namespace fp {
         status_t parse(str::slice_t value, f32& out) {
@@ -30,8 +45,10 @@ namespace basecode::numbers {
             out = strtof(begin, &end);
             if (errno == ERANGE)
                 return status_t::overflow;
-            if (*begin == '\0' || *end != '\0')
+            if (*begin == '\0'
+            || (!isspace(*end) && !isalpha(*end) && *end != '\0')) {
                 return status_t::not_convertible;
+            }
             return status_t::ok;
         }
 
@@ -42,8 +59,10 @@ namespace basecode::numbers {
             out = strtod(begin, &end);
             if (errno == ERANGE)
                 return status_t::overflow;
-            if (*begin == '\0' || *end != '\0')
+            if (*begin == '\0'
+            || (!isspace(*end) && !isalpha(*end) && *end != '\0')) {
                 return status_t::not_convertible;
+            }
             return status_t::ok;
         }
     }
@@ -54,17 +73,7 @@ namespace basecode::numbers {
             s8* end;
             errno = 0;
             out = strtoul(begin, &end, radix);
-            if ((errno == ERANGE && out == INT_MAX)
-            ||   out > UINT_MAX) {
-                return status_t::overflow;
-            }
-            if ((errno == ERANGE && out == INT_MIN)) {
-                return status_t::underflow;
-            }
-            if (*begin == '\0' || *end != '\0') {
-                return status_t::not_convertible;
-            }
-            return status_t::ok;
+            VALIDATE_INT_PARSE(INT_MIN, INT_MAX, UINT_MAX);
         }
 
         status_t parse(str::slice_t value, u8 radix, s32& out) {
@@ -72,17 +81,7 @@ namespace basecode::numbers {
             s8* end;
             errno = 0;
             out = strtol(begin, &end, radix);
-            if ((errno == ERANGE && out == INT_MAX)
-            ||   out > UINT_MAX) {
-                return status_t::overflow;
-            }
-            if ((errno == ERANGE && out == INT_MIN)) {
-                return status_t::underflow;
-            }
-            if (*begin == '\0' || *end != '\0') {
-                return status_t::not_convertible;
-            }
-            return status_t::ok;
+            VALIDATE_INT_PARSE(INT_MIN, INT_MAX, UINT_MAX);
         }
 
         status_t parse(str::slice_t value, u8 radix, u64& out) {
@@ -90,17 +89,7 @@ namespace basecode::numbers {
             s8* end;
             errno = 0;
             out = strtoull(begin, &end, radix);
-            if ((errno == ERANGE && out == LONG_MAX)
-            ||   out > ULONG_MAX) {
-                return status_t::overflow;
-            }
-            if ((errno == ERANGE && out == LONG_MIN)) {
-                return status_t::underflow;
-            }
-            if (*begin == '\0' || *end != '\0') {
-                return status_t::not_convertible;
-            }
-            return status_t::ok;
+            VALIDATE_INT_PARSE(LONG_MIN, LONG_MAX, ULONG_MAX);
         }
 
         status_t parse(str::slice_t value, u8 radix, s64& out) {
@@ -108,17 +97,7 @@ namespace basecode::numbers {
             s8* end;
             errno = 0;
             out = strtoll(begin, &end, radix);
-            if ((errno == ERANGE && out == LONG_MAX)
-            ||   out > ULONG_MAX) {
-                return status_t::overflow;
-            }
-            if ((errno == ERANGE && out == LONG_MIN)) {
-                return status_t::underflow;
-            }
-            if (*begin == '\0' || *end != '\0') {
-                return status_t::not_convertible;
-            }
-            return status_t::ok;
+            VALIDATE_INT_PARSE(LONG_MIN, LONG_MAX, ULONG_MAX);
         }
     }
 }
