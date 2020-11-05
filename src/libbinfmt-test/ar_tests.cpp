@@ -18,11 +18,14 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/binfmt/io.h>
-#include <basecode/binfmt/ar.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/stopwatch.h>
 
 using namespace basecode;
+
+struct capture_t final {
+    str_buf_t*                  buf;
+    binfmt::ar_t*               ar;
+};
 
 TEST_CASE("basecode::binfmt ar read test") {
     using namespace binfmt;
@@ -31,6 +34,7 @@ TEST_CASE("basecode::binfmt ar read test") {
     stopwatch::start(timer);
 
     auto lib_path = R"(C:\src\basecode-lang\foundation\build\msvc\debug\lib\basecode-binfmt.lib)"_path;
+//    auto lib_path = R"(C:\src\basecode-lang\foundation\build\clang\debug\lib\libbasecode-binfmt.a)"_path;
 
     ar_t ar{};
     ar::init(ar);
@@ -42,6 +46,48 @@ TEST_CASE("basecode::binfmt ar read test") {
     REQUIRE(OK(ar::read(ar, lib_path)));
 
     stopwatch::stop(timer);
+
+    str_t s{};
+    str::init(s);
+    {
+        str_buf_t buf(&s);
+        for (const auto& member : ar.members) {
+            format::format_to(buf, "file . . . . . . . {}\n", member.name);
+            format::format_to(buf, "offset . . . . . . {}\n", member.offset);
+            format::format_to(buf, "size . . . . . . . ");
+            format::unitized_byte_size(buf, member.content.length);
+            format::format_to(buf, "\ndate . . . . . . . {:%Y-%m-%d %H:%M:%S}\n", fmt::localtime(member.date));
+            format::format_to(buf, "user id  . . . . . {}\n", member.uid);
+            format::format_to(buf, "group id . . . . . {}\n", member.gid);
+            format::format_to(buf, "mode . . . . . . . {}\n\n", member.mode);
+            format::hex_dump(buf, member.content.data, 128, false);
+            format::format_to(buf, "\n----\n\n");
+        }
+
+        capture_t capture{};
+        capture.buf = &buf;
+        capture.ar = &ar;
+
+        hashtab::for_each_pair(
+            ar.symbol_map,
+            [](const auto& key, auto& value, u0* user) {
+                auto c = (capture_t*)user;
+                format::format_to(*c->buf, "symbol . . . . . . . {}\n", key);
+                format::format_to(*c->buf, "bitmap offset  . . . {}\n", value);
+                format::format_to(*c->buf, "found in members:\n");
+                for (u32 i = 0; i < c->ar->members.size; ++i) {
+                    if (bitset::read(c->ar->symbol_module_bitmap, value + i)) {
+                        const auto& member = c->ar->members[i];
+                        format::format_to(*c->buf, "  {:>04}: {}\n", i, member.name);
+                    }
+                }
+                format::format_to(*c->buf, "\n");
+                return true;
+            },
+            &capture);
+    }
+    format::print("{}", s);
+
     stopwatch::print_elapsed("binfmt ar read time"_ss, 40, timer);
 }
 

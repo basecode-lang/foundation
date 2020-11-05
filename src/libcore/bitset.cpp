@@ -161,6 +161,12 @@ namespace basecode {
             return set.capacity * sizeof(u64);
         }
 
+        bitset_t make(alloc_t* allocator) {
+            bitset_t set{};
+            init(set, allocator);
+            return set;
+        }
+
         b8 next_set_bit(bitset_t& set, u32& bit) {
             u32 word_index = bit >> (u32) 6;
             if (word_index >= set.capacity) {
@@ -226,7 +232,9 @@ namespace basecode {
             const auto smallest = new_capacity < set.capacity ? new_capacity : set.capacity;
             if (set.capacity < new_capacity) {
                 u64* new_data{};
-                new_data = (u64*) memory::alloc(set.allocator, capacity_in_words * sizeof(u64), alignof(u64));
+                new_data = (u64*) memory::alloc(set.allocator,
+                                                capacity_in_words * sizeof(u64),
+                                                alignof(u64));
                 if (set.data)
                     std::memcpy(new_data, set.data, sizeof(u64) * set.capacity);
                 memory::free(set.allocator, set.data);
@@ -241,18 +249,12 @@ namespace basecode {
             }
         }
 
-        bitset_t make(alloc_t* allocator) {
-            bitset_t set{};
-            init(set, allocator);
-            return set;
-        }
-
         u0 write(bitset_t& set, u32 bit, b8 flag) {
             const auto shifted_bit = bit >> (u32) 6;
             const auto mask = ((u64) 1) << (bit % 64);
             const auto new_mask = ((u64) flag) << (bit % 64);
             if (shifted_bit >= set.capacity)
-                resize(set, shifted_bit + 1);
+                resize(set, (set.capacity * 2) * 64);
             auto word = set.data[shifted_bit];
             word &= ~mask;
             word |= new_mask;

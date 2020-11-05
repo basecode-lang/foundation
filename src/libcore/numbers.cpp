@@ -49,18 +49,57 @@ namespace basecode::numbers {
     }
 
     namespace integer {
+        result_t parse(str::slice_t value, u8 radix, u32& out) {
+            const s8* begin = (const s8*) value.data;
+            s8* end;
+            errno = 0;
+            out = strtoul(begin, &end, radix);
+            if ((errno == ERANGE && out == INT_MAX)
+            ||   out > UINT_MAX) {
+                return result_t::overflow;
+            }
+            if ((errno == ERANGE && out == INT_MIN)) {
+                return result_t::underflow;
+            }
+            if (*begin == '\0' || *end != '\0') {
+                return result_t::not_convertible;
+            }
+            return result_t::ok;
+        }
+
         result_t parse(str::slice_t value, u8 radix, s32& out) {
             const s8* begin = (const s8*) value.data;
             s8* end;
             errno = 0;
             out = strtol(begin, &end, radix);
             if ((errno == ERANGE && out == INT_MAX)
-                ||   out > UINT_MAX)
+            ||   out > UINT_MAX) {
                 return result_t::overflow;
-            if ((errno == ERANGE && out == INT_MIN))
+            }
+            if ((errno == ERANGE && out == INT_MIN)) {
                 return result_t::underflow;
-            if (*begin == '\0' || *end != '\0')
+            }
+            if (*begin == '\0' || *end != '\0') {
                 return result_t::not_convertible;
+            }
+            return result_t::ok;
+        }
+
+        result_t parse(str::slice_t value, u8 radix, u64& out) {
+            const s8* begin = (const s8*) value.data;
+            s8* end;
+            errno = 0;
+            out = strtoull(begin, &end, radix);
+            if ((errno == ERANGE && out == LONG_MAX)
+            ||   out > ULONG_MAX) {
+                return result_t::overflow;
+            }
+            if ((errno == ERANGE && out == LONG_MIN)) {
+                return result_t::underflow;
+            }
+            if (*begin == '\0' || *end != '\0') {
+                return result_t::not_convertible;
+            }
             return result_t::ok;
         }
 
@@ -70,12 +109,15 @@ namespace basecode::numbers {
             errno = 0;
             out = strtoll(begin, &end, radix);
             if ((errno == ERANGE && out == LONG_MAX)
-                ||   out > UINT_MAX)
+            ||   out > ULONG_MAX) {
                 return result_t::overflow;
-            if ((errno == ERANGE && out == LONG_MIN))
+            }
+            if ((errno == ERANGE && out == LONG_MIN)) {
                 return result_t::underflow;
-            if (*begin == '\0' || *end != '\0')
+            }
+            if (*begin == '\0' || *end != '\0') {
                 return result_t::not_convertible;
+            }
             return result_t::ok;
         }
     }

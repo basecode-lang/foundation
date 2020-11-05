@@ -21,25 +21,27 @@
 #include <basecode/core/types.h>
 #include <basecode/core/slice.h>
 
-namespace basecode {
-    namespace numbers {
-        enum class result_t : u8 {
-            ok,
-            overflow,
-            underflow,
-            not_convertible
-        };
+namespace basecode::numbers {
+    enum class result_t : u8 {
+        ok,
+        overflow,
+        underflow,
+        not_convertible
+    };
 
-        namespace fp {
-            result_t parse(str::slice_t value, f32& out);
+    namespace fp {
+        result_t parse(str::slice_t value, f32& out);
 
-            result_t parse(str::slice_t value, f64& out);
-        }
+        result_t parse(str::slice_t value, f64& out);
+    }
 
-        namespace integer {
-            result_t parse(str::slice_t value, u8 radix, s32& out);
+    namespace integer {
+        result_t parse(str::slice_t value, u8 radix, u32& out);
 
-            result_t parse(str::slice_t value, u8 radix, s64& out);
-        }
+        result_t parse(str::slice_t value, u8 radix, s32& out);
+
+        result_t parse(str::slice_t value, u8 radix, u64& out);
+
+        result_t parse(str::slice_t value, u8 radix, s64& out);
     }
 }

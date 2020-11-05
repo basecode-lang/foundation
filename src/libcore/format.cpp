@@ -23,7 +23,9 @@ namespace basecode::format {
         const u8* bytes = (const u8*) data;
         for (u32 i = 0; i < size; i += 16) {
             if (show_address)
-                format::format_to(buf, "${:016x}:{:08x}: ", (u64) (bytes + i), i);
+                format::format_to(buf, "${:016x}: ", (u64) (bytes + i));
+            else
+                format::format_to(buf, "{:08x}: ", i);
             for (u32 j = 0; j < 16; j++) {
                 if (i + j < size)
                     format::format_to(buf, "{:02x} ", bytes[i + j]);

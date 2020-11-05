@@ -94,7 +94,7 @@ namespace basecode {
 
             u0 write_u64(buf_crsr_t& crsr, u64 value);
 
-            u0 read_obj(buf_crsr_t& crsr, u0* data, u32 length);
+            b8 read_obj(buf_crsr_t& crsr, u0* data, u32 length);
 
             u0 write_str(buf_crsr_t& crsr, const String_Concept auto& str) {
                 write(*crsr.buf, crsr.pos, str.data, str.length);

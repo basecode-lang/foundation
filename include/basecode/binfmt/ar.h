@@ -19,15 +19,30 @@
 #pragma once
 
 #include <basecode/core/buf.h>
+#include <basecode/core/bitset.h>
 #include <basecode/binfmt/binfmt.h>
 
 namespace basecode::binfmt {
-   using ar_catalog_t          = hashtab_t<str::slice_t, str::slice_t>;
+    struct ar_member_t final {
+        str::slice_t            name;
+        str::slice_t            content;
+        u32                     offset;
+        u32                     date;
+        u32                     uid;
+        u32                     gid;
+        u32                     mode;
+    };
+
+    using ar_symbol_map_t       = hashtab_t<str::slice_t, u32>;
+    using ar_member_list_t      = array_t<ar_member_t>;
+    using ar_member_ptr_list_t  = array_t<ar_member_t*>;
 
     struct ar_t final {
         alloc_t*                alloc;
         buf_t                   buf;
-        ar_catalog_t            catalog;
+        ar_member_list_t        members;
+        ar_symbol_map_t         symbol_map;
+        bitset_t                symbol_module_bitmap;
     };
 
     namespace ar {
@@ -39,6 +54,10 @@ namespace basecode::binfmt {
 
         status_t write(ar_t& ar, const path_t& path);
 
+        u0 add_member(ar_t& ar, ar_member_t& member);
+
         status_t init(ar_t& ar, alloc_t* alloc = context::top()->alloc);
+
+        u0 find_member(ar_t& ar, str::slice_t name, ar_member_ptr_list_t& list);
     }
 }

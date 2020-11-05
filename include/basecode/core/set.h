@@ -39,10 +39,10 @@ namespace basecode {
         template <typename T> u0 init(set_t<T>& set, alloc_t* alloc = context::top()->alloc, f32 load_factor = .5f);
 
         inline b8 requires_rehash(u32 size, u32 capacity, f32 load_factor) {
-            return capacity == 0 || size + 1 > (capacity - 1) * load_factor;
+            return capacity == 0 || f32(size) + 1 > f32(capacity - 1) * load_factor;
         }
 
-        inline b8 find_free_bucket(u64* hashes, u32 size, u32 start, u32* found) {
+        inline b8 find_free_bucket(const u64* hashes, u32 size, u32 start, u32* found) {
             for (u32 i = start; i < size; ++i) {
                 if (!hashes[i]) {
                     *found = i;
@@ -58,12 +58,14 @@ namespace basecode {
             return false;
         }
 
-        template<typename T, typename B = std::remove_pointer_t<T>, b8 IsPtr = std::is_pointer<T>::value>
+        template <typename T,
+                  typename B = std::remove_pointer_t<T>,
+                  b8 IsPtr = std::is_pointer<T>::value>
         B* find(set_t<T>& set, const T& value) {
             if (set.size == 0) return nullptr;
 
             u64 hash         = hash::hash64(value);
-            u32 bucket_index = ((u128) hash * (u128) set.capacity) >> 64;
+            u32 bucket_index = u128(hash) * u128(set.capacity) >> 64U;
             u32 found_index;
             if (find_value(set, bucket_index, hash, value, &found_index)) {
                 if constexpr (IsPtr) {
@@ -76,13 +78,19 @@ namespace basecode {
             return nullptr;
         }
 
-        template<typename T, typename B = std::remove_pointer_t<T>, b8 IsPtr = std::is_pointer<T>::value>
+        template <typename T,
+                  typename B = std::remove_pointer_t<T>,
+                  b8 IsPtr = std::is_pointer<T>::value>
         B* insert(set_t<T>& set, const T& value) {
+            auto v = find(set, value);
+            if (v)
+                return v;
+
             if (requires_rehash(set.size, set.capacity, set.load_factor))
                 rehash(set, set.capacity << 1);
 
             u64 hash         = hash::hash64(value);
-            u32 bucket_index = ((u128) hash * (u128) set.capacity) >> 64;
+            u32 bucket_index = u128(hash) * u128(set.capacity) >> 64U;
             u32 found_index;
 
             if (find_free_bucket(set.hashes, set.capacity, bucket_index, &found_index)) {
@@ -111,7 +119,8 @@ namespace basecode {
         }
 
         template <typename T> u0 reset(set_t<T>& set) {
-            if (set.hashes) std::memset(set.hashes, 0, set.capacity * sizeof(u64));
+            if (set.hashes)
+                std::memset(set.hashes, 0, set.capacity * sizeof(u64));
             set.size = {};
         }
 
@@ -122,7 +131,7 @@ namespace basecode {
         template<typename T> b8 remove(set_t<T>& set, const T& value) {
             if (set.size == 0) return false;
             u64 hash         = hash::hash64(value);
-            u32 bucket_index = ((u128) hash * (u128) set.capacity) >> 64;
+            u32 bucket_index = u128(hash) * u128(set.capacity) >> 64U;
             u32 found_index;
             if (!find_value(set, bucket_index, hash, value, &found_index))
                 return false;
@@ -143,12 +152,14 @@ namespace basecode {
 
             u32  values_align{};
             auto new_hashes = (u64*) buf;
-            auto new_values = (T*) memory::system::align_forward(buf + size_of_hashes, alignof(T), values_align);
+            auto new_values = (T*) memory::system::align_forward(buf + size_of_hashes,
+                                                                 alignof(T),
+                                                                 values_align);
 
             for (u32 i = 0; i < set.capacity; ++i) {
                 if (!set.hashes[i]) continue;
 
-                u32 bucket_index = ((u128) set.hashes[i] * (u128) new_capacity) >> 64;
+                u32 bucket_index = u128(set.hashes[i]) * u128(new_capacity) >> 64U;
                 u32 found_index;
                 find_free_bucket(new_hashes, new_capacity, bucket_index, &found_index);
 

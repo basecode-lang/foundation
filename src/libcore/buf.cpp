@@ -88,9 +88,12 @@ namespace basecode::buf {
             crsr.pos += sizeof(u64);
         }
 
-        u0 read_obj(buf_crsr_t& crsr, u0* data, u32 length) {
+        b8 read_obj(buf_crsr_t& crsr, u0* data, u32 length) {
+            if (crsr.pos + length > crsr.buf->length)
+                return false;
             read(*crsr.buf, crsr.pos, data, length);
             crsr.pos += length;
+            return true;
         }
     }
 
