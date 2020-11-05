@@ -107,6 +107,7 @@ namespace basecode::binfmt::ar {
         return status_t::ok;
     }
 
+    // XXX: this isn't finished but m$ sucks so...there
     static status_t parse_ecoff_symbol_table(ar_t& ar, buf_crsr_t& c) {
         ar.known.ecoff_symbol_table = 2;
 
@@ -178,6 +179,7 @@ namespace basecode::binfmt::ar {
                 auto& sym = sym_offsets[idx++];
                 sym.name = slice::make(c.buf->data + symbol_offset,
                                        CRSR_POS(c) - symbol_offset - 1);
+                hashtab::insert(ar.symbol_map, sym.name, 0);
                 symbol_offset = CRSR_POS(c);
                 --num_symbols;
             }
@@ -189,12 +191,15 @@ namespace basecode::binfmt::ar {
         for (u32 i = 0; i < ar.members.size; ++i)
             hashtab::insert(offset_member_idx, ar.members[i].offset.header, i);
 
-        // XXX: revisit this
-        for (u32 i = 0; i < sym_offsets.size; ++i)
-            hashtab::insert(ar.symbol_map, sym_offsets[i].name, i * ar.members.size);
-
         bitset::resize(ar.symbol_module_bitmap,
                        ar.symbol_map.size * ar.members.size);
+
+        hashtab::for_each_pair(ar.symbol_map,
+                               [](const auto idx, const auto& key, auto& value, u0* user) {
+                                   value = idx * *((u32*) user);
+                                   return true;
+                               },
+                               &ar.members.size);
 
         for (u32 i = 0; i < sym_offsets.size; ++i) {
             auto& sym = sym_offsets[i];
@@ -207,9 +212,6 @@ namespace basecode::binfmt::ar {
     }
 
     static status_t parse_long_name_ref(ar_t& ar, member_t& member) {
-        if (!ar.known.long_names)
-            return status_t::ok;
-
         if (member.name[0] != '/' || !isdigit(member.name[1]))
             return status_t::ok;
 
@@ -222,32 +224,10 @@ namespace basecode::binfmt::ar {
             return status_t::read_error;
 
         member.name.data    = long_names.content.data + offset;
-        member.name.length  = strlen((const s8*) member.name.data);
+        auto p = member.name.data;
+        while (*p != '\n') p++;
+        member.name.length  = p - member.name.data;
 
-        return status_t::ok;
-    }
-
-    static status_t parse_long_names(ar_t& ar, buf_crsr_t& c) {
-        for (u32 i = 0; i < ar.members.size; ++i) {
-            const auto& m = ar.members[i];
-            if (m.name[0] == '/' && m.name[1] == '/') {
-                ar.known.long_names = i + 1;
-                break;
-            }
-        }
-
-        if (!ar.known.long_names)
-            return status_t::ok;
-
-        auto& member = ar.members[ar.known.long_names - 1];
-        auto p   = (u8*) member.content.data;
-        auto end = p + member.content.length;
-        while (p < end) {
-            u8 ch = *p;
-            if (ch == '\n')
-                *p = 0;
-            ++p;
-        }
         return status_t::ok;
     }
 
@@ -295,14 +275,17 @@ namespace basecode::binfmt::ar {
         if (!OK(status))
             return status;
 
-        status = parse_long_names(ar, c);
-        if (!OK(status))
-            return status;
-
-        for (auto& member : ar.members) {
-            status = parse_long_name_ref(ar, member);
-            if (!OK(status))
-                return status;
+        for (u32 i = 0; i < ar.members.size; ++i) {
+            const auto& m = ar.members[i];
+            if (m.name[0] == '/' && m.name[1] == '/') {
+                ar.known.long_names = i + 1;
+                for (auto& member : ar.members) {
+                    status = parse_long_name_ref(ar, member);
+                    if (!OK(status))
+                        return status;
+                }
+                break;
+            }
         }
 
         status = parse_symbol_table(ar, c);

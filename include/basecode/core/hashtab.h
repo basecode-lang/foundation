@@ -45,7 +45,7 @@ namespace basecode {
     struct hashtab_t final {
         using key_type          = K;
         using value_type        = V;
-        using each_callback     = b8 (*)(const K&, V&, u0*);
+        using each_callback     = b8 (*)(u32, const K&, V&, u0*);
 
         u64*                    hashes;
         K*                      keys;
@@ -338,9 +338,10 @@ namespace basecode {
 
         template<typename T> requires Hash_Table<T>
         b8 for_each_pair(T& table, typename T::each_callback cb, u0* user = {}) {
+            u32 idx{};
             for (u32 i = 0; i < table.capacity; ++i) {
                 if (!table.hashes[i]) continue;
-                if (!cb(table.keys[i], table.values[i], user))
+                if (!cb(idx++, table.keys[i], table.values[i], user))
                     return false;
             }
             return true;

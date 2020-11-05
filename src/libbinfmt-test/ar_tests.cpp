@@ -71,7 +71,7 @@ TEST_CASE("basecode::binfmt ar read test") {
 
         hashtab::for_each_pair(
             ar.symbol_map,
-            [](const auto& key, auto& value, u0* user) {
+            [](const auto idx, const auto& key, auto& value, u0* user) {
                 auto c = (capture_t*)user;
                 format::format_to(*c->buf, "symbol . . . . . . . {}\n", key);
                 format::format_to(*c->buf, "bitmap offset  . . . {}\n", value);
