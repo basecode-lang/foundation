@@ -35,6 +35,10 @@ namespace basecode {
     struct path_t final {
         str_t                   str;
         path_mark_list_t        marks;
+
+        b8 operator==(const path_t& other) const {
+            return str == other.str;
+        }
     };
     static_assert(sizeof(path_t) <= 48, "path_t is now larger than 48 bytes!");
 
@@ -61,6 +65,8 @@ namespace basecode {
         }
 
         u0 free(path_t& path);
+
+        u0 reset(path_t& path);
 
         u0 tokenize(path_t& path);
 

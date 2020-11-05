@@ -41,13 +41,22 @@ namespace basecode {
         u32                     len;
     };
 
+    enum class buf_mode_t : u8 {
+        none,
+        alloc,
+        mapped
+    };
+
     struct buf_t final {
         alloc_t*                alloc;
         u8*                     data;
         array_t<buf_line_t>     lines;
         array_t<buf_token_t>    tokens;
+        path_t                  path;
         u32                     length;
         u32                     capacity;
+        s32                     file;
+        buf_mode_t              mode;
     };
 
     struct buf_crsr_t final {
@@ -60,8 +69,14 @@ namespace basecode {
 
     namespace buf {
         enum class status_t : u8 {
-            ok                  = 0,
-            unable_to_open_file = 100,
+            ok                              = 0,
+            unable_to_open_file             = 100,
+            mmap_error,
+            munmap_error,
+            cannot_unmap_buf,
+            buf_already_mapped,
+            cannot_reset_mapped_buf,
+            cannot_save_over_mapped_path,
         };
 
         u0 zero_fill(buf_t& buf, u32 offset, u32 length);
@@ -113,15 +128,19 @@ namespace basecode {
             }
         }
 
-        u0 free(buf_t& buf);
-
-        u0 reset(buf_t& buf);
-
         u0 index(buf_t& buf);
+
+        status_t free(buf_t& buf);
+
+        status_t reset(buf_t& buf);
+
+        status_t unmap(buf_t& buf);
 
         str::slice_t line(buf_t& buf, u32 idx);
 
         u0 reserve(buf_t& buf, u32 new_capacity);
+
+        status_t map(buf_t& buf, const path_t& path);
 
         status_t load(buf_t& buf, const path_t& path);
 
@@ -130,11 +149,15 @@ namespace basecode {
         u0 init(buf_t& buf, alloc_t* alloc = context::top()->alloc);
 
         status_t load(buf_t& buf, const String_Concept auto& value) {
+            if (buf.mode == buf_mode_t::mapped)
+                return status_t::buf_already_mapped;
             auto file = ::fmemopen((u0*) value.data, value.length, "r");
             if (!file)
                 return status_t::unable_to_open_file;
             defer(::fclose(file));
+            buf.mode = buf_mode_t::alloc;
             write(buf, 0, file, value.length);
+            path::reset(buf.path);
             return status_t::ok;
         }
 

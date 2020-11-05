@@ -43,6 +43,7 @@ FILE* fmemopen(void* buf, size_t len, const char* type);
 #include <io.h>
 #include <process.h>
 #include <direct.h>
+#include <fcntl.h>
 #include <sys/sys_types.h>
 #include <sys/stat.h>
 #include <sys/utime.h>
@@ -59,6 +60,7 @@ FILE* fmemopen(void* buf, size_t len, const char* type);
 #define getcwd              _getcwd
 #define dup2                _dup2
 #define dup                 _dup
+#define open                _open
 #define close               _close
 #define chdir               _chdir
 #define getpid              _getpid

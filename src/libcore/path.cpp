@@ -85,6 +85,11 @@ namespace basecode::path {
         array::free(path.marks);
     }
 
+    u0 reset(path_t& path) {
+        str::reset(path.str);
+        array::reset(path.marks);
+    }
+
     b8 empty(const path_t& path) {
         return path.str.length == 0;
     }

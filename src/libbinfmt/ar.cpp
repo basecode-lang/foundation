@@ -259,12 +259,12 @@ namespace basecode::binfmt::ar {
             stopwatch_t timer{};
             stopwatch::start(timer);
 
-            auto status = buf::load(ar.buf, path);
+            auto status = buf::map(ar.buf, path);
             if (!OK(status))
                 return status_t::read_error;
 
             stopwatch::stop(timer);
-            stopwatch::print_elapsed("ar buf::load time"_ss, 40, timer);
+            stopwatch::print_elapsed("ar buf::map time"_ss, 40, timer);
         }
 
         buf_crsr_t c{};

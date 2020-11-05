@@ -18,12 +18,16 @@
 
 #pragma once
 
-#ifdef WIN32
+#ifdef _WIN32
+
 #include <cstdint>
+#include <fcntl.h>
+#include <sys/stat.h>
+
 #if defined(_WIN64)
-typedef int64_t OffsetType;
+    typedef int64_t OffsetType;
 #else
-typedef uint32_t OffsetType;
+    typedef uint32_t OffsetType;
 #endif
 
 #define PROT_NONE       0

@@ -33,8 +33,8 @@ TEST_CASE("basecode::binfmt ar read test") {
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    auto lib_path = R"(C:\src\basecode-lang\foundation\build\msvc\debug\lib\basecode-binfmt.lib)"_path;
-//    auto lib_path = R"(C:\src\basecode-lang\foundation\build\clang\debug\lib\libbasecode-binfmt.a)"_path;
+    auto lib_path = R"(C:\temp\test\msvc\basecode-binfmt.lib)"_path;
+//    auto lib_path = R"(C:\temp\test\clang\libbasecode-binfmt.a)"_path;
 
     ar::ar_t ar{};
     ar::init(ar);
