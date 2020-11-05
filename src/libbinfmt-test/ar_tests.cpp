@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/binfmt/io.h>
+#include <basecode/binfmt/ar.h>
 #include <basecode/core/stopwatch.h>
 
 using namespace basecode;

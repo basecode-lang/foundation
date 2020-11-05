@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/binfmt/ar.h>
+#include <basecode/core/buf.h>
 #include <basecode/binfmt/types.h>
 
 namespace basecode::binfmt::io {
@@ -30,16 +30,17 @@ namespace basecode::binfmt::io {
     using file_list_t           = array_t<file_t>;
 
     enum class type_t : u8 {
+        ar,
         pe,
         elf,
         coff,
         macho
     };
-    constexpr u32 max_type_count = 4;
+    constexpr u32 max_type_count = 5;
 
     enum class file_type_t : u8 {
+        none,
         obj,
-        lib,
         exe,
         dll
     };
@@ -52,13 +53,14 @@ namespace basecode::binfmt::io {
 
     struct file_t final {
         session_t*              session;
-        const module_t*         module;
+        module_t*               module;
         path_t                  path;
         buf_t                   buf;
         buf_crsr_t              crsr;
         machine::type_t         machine;
         struct {
             u32                 gui:        1;
+            u32                 save:       1;
             u32                 console:    1;
             u32                 pad:        30;
         }                       flags;
@@ -77,9 +79,7 @@ namespace basecode::binfmt::io {
 
     struct session_t final {
         alloc_t*                alloc;
-        file_list_t             input_files;
-        file_list_t             output_files;
-        ar::ar_t                ar;
+        file_list_t             files;
     };
 
     namespace file {
@@ -134,34 +134,38 @@ namespace basecode::binfmt::io {
     namespace session {
         u0 free(session_t& s);
 
-        file_t* add_input_file(session_t& s,
-                               const module_t* module,
-                               const s8* path,
-                               machine::type_t machine,
-                               type_t bin_type,
-                               file_type_t output_type,
-                               s32 path_len = -1);
+        file_t* add_file(session_t& s,
+                         module_t* module,
+                         const s8* path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         file_type_t output_type,
+                         b8 save_to_disk = true,
+                         s32 path_len = -1);
 
-        file_t* add_input_file(session_t& s,
-                               const module_t* module,
-                               const path_t& path,
-                               machine::type_t machine,
-                               type_t bin_type,
-                               file_type_t output_type);
+        file_t* add_file(session_t& s,
+                         module_t* module,
+                         const path_t& path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         file_type_t output_type,
+                         b8 save_to_disk = true);
 
-        file_t* add_input_file(session_t& s,
-                               const module_t* module,
-                               const String_Concept auto& path,
-                               machine::type_t machine,
-                               type_t bin_type,
-                               file_type_t output_type) {
-            return add_input_file(s,
-                                  module,
-                                  (const s8*) path.data,
-                                  machine,
-                                  bin_type,
-                                  output_type,
-                                  path.length);
+        file_t* add_file(session_t& s,
+                         module_t* module,
+                         const String_Concept auto& path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         file_type_t output_type,
+                         b8 save_to_disk = true) {
+            return add_file(s,
+                            module,
+                            (const s8*) path.data,
+                            machine,
+                            bin_type,
+                            output_type,
+                            path.length,
+                            save_to_disk);
         }
 
         status_t init(session_t& s, alloc_t* alloc = context::top()->alloc);

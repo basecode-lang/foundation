@@ -90,6 +90,8 @@ namespace basecode::binfmt::io::coff {
         using type_t = binfmt::section::type_t;
 
         const auto module = file.module;
+        auto& module_sc = module->subclass.object;
+
         coff.alloc = alloc;
 
         array::init(coff.headers, coff.alloc);
@@ -112,11 +114,11 @@ namespace basecode::binfmt::io::coff {
 
         status_t status{};
 
-        for (u32 i = 0; i < module->sections.size; ++i) {
+        for (u32 i = 0; i < module_sc.sections.size; ++i) {
             auto& hdr = array::append(coff.headers);
             hdr = {};
             hdr.number  = i + 1;
-            hdr.section = &module->sections[i];
+            hdr.section = &module_sc.sections[i];
 
             str::slice_t name{};
             if (hdr.section->type == type_t::custom) {
@@ -145,7 +147,7 @@ namespace basecode::binfmt::io::coff {
             aux->section.num_lines  = hdr.line_nums.size;
         }
 
-        hashtab::for_each_pair(const_cast<symbol_table_t&>(module->symbols),
+        hashtab::for_each_pair(module->symbols,
                                [](const auto idx, const auto& key, auto& symbol, auto* user) -> u32 {
                                    auto& coff = *((coff_t*)user);
                                    const auto intern_rc = string::interned::get(symbol.name);

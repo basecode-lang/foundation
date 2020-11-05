@@ -28,9 +28,9 @@ namespace basecode::binfmt {
 
         module_t* get_module(module_id id);
 
-        status_t make_module(module_id id, module_t** mod);
-
         status_t init(alloc_t* alloc = context::top()->alloc);
+
+        status_t make_module(module_type_t type, module_id id, module_t** mod);
     }
 
     namespace import {
@@ -54,11 +54,11 @@ namespace basecode::binfmt {
     namespace module {
         u0 free(module_t& module);
 
-        status_t init(module_t& module, module_id id);
-
         symbol_t* get_symbol(const module_t& module, symbol_id id);
 
         section_t* get_section(const module_t& module, section_id id);
+
+        status_t init(module_t& module, module_type_t type, module_id id);
 
         symbol_t* find_symbol(const module_t& module, const s8* name, s32 len = -1);
 

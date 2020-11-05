@@ -361,11 +361,9 @@ namespace basecode::binfmt::io::elf {
         }
 
         switch (file.file_type) {
+            case file_type_t::none:
             case file_type_t::obj:
                 elf.file_type = elf::file::type::rel;
-                break;
-            case file_type_t::lib:
-                elf.file_type = elf::file::type::none;
                 break;
             case file_type_t::exe:
                 elf.file_type = elf::file::type::exec;

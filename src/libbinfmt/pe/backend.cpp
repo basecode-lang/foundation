@@ -46,8 +46,8 @@ namespace basecode::binfmt::io::pe {
             auto& coff = pe.coff;
 
             switch (file.file_type) {
+                case file_type_t::none:
                 case file_type_t::obj:
-                case file_type_t::lib:
                     return status_t::invalid_output_type;
                 case file_type_t::exe:
                     // XXX: relocs_stripped can be determined from file once we have field in the struct

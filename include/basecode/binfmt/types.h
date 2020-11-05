@@ -29,21 +29,26 @@ namespace basecode::binfmt {
     struct module_t;
     struct symbol_t;
     struct import_t;
+    struct member_t;
     struct section_t;
     struct version_t;
+    struct symbol_offs_t;
 
     using import_id             = u32;
     using symbol_id             = u32;
     using module_id             = u32;
+    using member_id             = u32;
     using section_id            = u32;
 
     using id_list_t             = array_t<u32>;
     using reloc_list_t          = array_t<reloc_t>;
     using import_list_t         = array_t<import_t>;
     using symbol_list_t         = array_t<symbol_t>;
+    using member_list_t         = array_t<member_t>;
     using section_list_t        = array_t<section_t>;
     using symbol_table_t        = hashtab_t<intern_id, symbol_t>;
     using section_ptr_list_t    = array_t<section_t*>;
+    using symbol_offs_list_t    = array_t<symbol_offs_t>;
 
     enum class status_t : u32 {
         ok                              = 0,
@@ -63,6 +68,11 @@ namespace basecode::binfmt {
         invalid_output_type             = 2013,
         cannot_map_section_name         = 2014,
         section_not_found               = 2015,
+    };
+
+    enum class module_type_t : u8 {
+        archive,
+        object,
     };
 
     namespace symbol {
@@ -175,6 +185,11 @@ namespace basecode::binfmt {
         symbol::visibility_t    visibility;
     };
 
+    struct symbol_offs_t final {
+        symbol_id               symbol;
+        u32                     offset;
+    };
+
     struct import_t final {
         id_list_t               symbols;
         symbol_id               module_symbol;
@@ -216,16 +231,44 @@ namespace basecode::binfmt {
         u32                     align;
     };
 
+    enum class member_type_t : u8 {
+        module,
+        raw
+    };
+
+    union member_subclass_t final {
+        str::slice_t            raw;
+        module_t*               module;
+    };
+
+    struct member_t final {
+        str::slice_t            name;
+        member_subclass_t       subclass;
+        member_id               id;
+        member_type_t           type;
+    };
+
     struct version_t final {
         u16                     major;
         u16                     minor;
     };
 
+    union module_subclass_t final {
+        struct {
+            section_list_t      sections;
+        }                       object;
+        struct {
+            member_list_t       members;
+            symbol_offs_list_t  offsets;
+        }                       archive;
+    };
+
     struct module_t final {
         alloc_t*                alloc;
         symbol_table_t          symbols;
-        section_list_t          sections;
+        module_subclass_t       subclass;
         module_id               id;
+        module_type_t           type;
     };
 
     struct result_t final {

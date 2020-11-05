@@ -40,6 +40,10 @@ namespace basecode::binfmt::io {
         system_t* system();
     }
 
+    namespace archive {
+        system_t* system();
+    }
+
     u0 fini() {
         for (auto sys : s_systems)
             sys->fini();
@@ -48,6 +52,7 @@ namespace basecode::binfmt::io {
     status_t init(alloc_t* alloc) {
         s_alloc = alloc;
 
+        s_systems[u32(type_t::ar)]    = archive::system();
         s_systems[u32(type_t::pe)]    = pe::system();
         s_systems[u32(type_t::elf)]   = elf::system();
         s_systems[u32(type_t::coff)]  = coff::system();
@@ -63,12 +68,10 @@ namespace basecode::binfmt::io {
     }
 
     status_t read(session_t& s) {
-        for (auto& file : s.input_files) {
+        for (auto& file : s.files) {
             const auto idx = u32(file.bin_type);
             if (idx > max_type_count - 1)
                 return status_t::invalid_container_type;
-            if (file.file_type == file_type_t::lib)
-                ar::reset(s.ar);
             auto status =  s_systems[idx]->read(file);
             if (!OK(status))
                 return status;
@@ -77,25 +80,19 @@ namespace basecode::binfmt::io {
     }
 
     status_t write(session_t& s) {
-        b8 is_archive = s.output_files.size == 1
-                        && s.output_files[0].file_type == file_type_t::lib;
-        if (is_archive)
-            ar::reset(s.ar);
-        for (auto& file : s.input_files) {
+        for (auto& file : s.files) {
             const auto idx = u32(file.bin_type);
             if (idx > max_type_count - 1)
                 return status_t::invalid_container_type;
             auto status = s_systems[idx]->write(file);
             if (!OK(status))
                 return status;
-            if (!is_archive) {
+            if (file.flags.save) {
                 status = file::save(file);
                 if (!OK(status))
                     return status;
             }
         }
-        if (is_archive)
-            return ar::write(s.ar, s.output_files[0].path);
         return status_t::ok;
     }
 
@@ -218,53 +215,51 @@ namespace basecode::binfmt::io {
 
     namespace session {
         u0 free(session_t& s) {
-            for (auto& file : s.input_files)
+            for (auto& file : s.files)
                 file::free(file);
-            for (auto& file : s.output_files)
-                file::free(file);
-            array::free(s.input_files);
-            array::free(s.output_files);
-            ar::free(s.ar);
+            array::free(s.files);
         }
 
-        file_t* add_input_file(session_t& s,
-                               const module_t* module,
-                               const path_t& path,
-                               machine::type_t machine,
-                               type_t bin_type,
-                               file_type_t output_type) {
-            return add_input_file(s,
-                                  module,
-                                  path::c_str(path),
-                                  machine,
-                                  bin_type,
-                                  output_type,
-                                  path.str.length);
+        file_t* add_file(session_t& s,
+                         module_t* module,
+                         const path_t& path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         file_type_t output_type,
+                         b8 save_to_disk) {
+            return add_file(s,
+                            module,
+                            path::c_str(path),
+                            machine,
+                            bin_type,
+                            output_type,
+                            save_to_disk,
+                            path.str.length);
         }
 
-        file_t* add_input_file(session_t& s,
-                               const module_t* module,
-                               const s8* path,
-                               machine::type_t machine,
-                               type_t bin_type,
-                               file_type_t output_type,
-                               s32 path_len) {
-            auto file = &array::append(s.input_files);
+        file_t* add_file(session_t& s,
+                         module_t* module,
+                         const s8* path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         file_type_t output_type,
+                         b8 save_to_disk,
+                         s32 path_len) {
+            auto file = &array::append(s.files);
             file::init(*file, s.alloc);
             path::set(file->path, path, path_len);
-            file->session   = &s;
-            file->module    = module;
-            file->machine   = machine;
-            file->bin_type  = bin_type;
-            file->file_type = output_type;
+            file->session    = &s;
+            file->module     = module;
+            file->machine    = machine;
+            file->bin_type   = bin_type;
+            file->file_type  = output_type;
+            file->flags.save = save_to_disk;
             return file;
         }
 
         status_t init(session_t& s, alloc_t* alloc) {
             s.alloc = alloc;
-            ar::init(s.ar, s.alloc);
-            array::init(s.input_files, s.alloc);
-            array::init(s.output_files, s.alloc);
+            array::init(s.files, s.alloc);
             return status_t::ok;
         }
     }

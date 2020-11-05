@@ -79,9 +79,9 @@ namespace basecode::binfmt {
             return hashtab::find(g_binfmt_sys.module_map, id);
         }
 
-        status_t make_module(module_id id, module_t** mod) {
+        status_t make_module(module_type_t type, module_id id, module_t** mod) {
             auto new_mod = &stable_array::append(g_binfmt_sys.modules);
-            auto status = module::init(*new_mod, id);
+            auto status = module::init(*new_mod, type, id);
             if (!OK(status))
                 return status;
             hashtab::insert(g_binfmt_sys.module_map, id, new_mod);
@@ -185,16 +185,40 @@ namespace basecode::binfmt {
 
     namespace module {
         u0 free(module_t& module) {
-            for (auto section : module.sections)
-                section::free(section);
-            array::free(module.sections);
+            switch (module.type) {
+                case module_type_t::archive: {
+                    auto& sc = module.subclass.archive;
+                    array::free(sc.members);
+                    array::free(sc.offsets);
+                    break;
+                }
+                case module_type_t::object: {
+                    auto& sc = module.subclass.object;
+                    for (auto section : sc.sections)
+                        section::free(section);
+                    array::free(sc.sections);
+                    break;
+                }
+            }
             hashtab::free(module.symbols);
         }
 
-        status_t init(module_t& module, module_id id) {
+        status_t init(module_t& module, module_type_t type, module_id id) {
             module.alloc = g_binfmt_sys.alloc;
             module.id    = id;
-            array::init(module.sections, module.alloc);
+            module.type  = type;
+            switch (module.type) {
+                case module_type_t::archive: {
+                    auto& sc = module.subclass.archive;
+                    array::init(sc.members, module.alloc);
+                    array::init(sc.offsets, module.alloc);
+                    break;
+                }
+                case module_type_t::object:
+                    auto& sc = module.subclass.object;
+                    array::init(sc.sections, module.alloc);
+                    break;
+            }
             hashtab::init(module.symbols, module.alloc);
             return status_t::ok;
         }
@@ -204,7 +228,10 @@ namespace basecode::binfmt {
         }
 
         section_t* get_section(const module_t& module, section_id id) {
-            return (section_t*) &module.sections[id - 1];
+            if (module.type != module_type_t::object)
+                return nullptr;
+            auto& sc = module.subclass.object;
+            return (section_t*) &sc.sections[id - 1];
         }
 
         symbol_t* find_symbol(const module_t& module, const s8* name, s32 len) {
@@ -213,18 +240,24 @@ namespace basecode::binfmt {
         }
 
         u0 find_sections(const module_t& module, symbol_id symbol, section_ptr_list_t& list) {
+            if (module.type != module_type_t::object)
+                return;
+            auto& sc = module.subclass.object;
             array::reset(list);
-            for (auto& section : module.sections) {
+            for (auto& section : sc.sections) {
                 if (section.symbol == symbol)
                     array::append(list, (section_t*) &section);
             }
         }
 
         result_t make_section(module_t& module, section::type_t type, const section_opts_t& opts) {
+            if (module.type != module_type_t::object)
+                return {0, status_t::invalid_section_type}; // FIXME
             if (type != section::type_t::custom && opts.symbol != 0)
                 return {0, status_t::spec_section_custom_name};
-            auto section = &array::append(module.sections);
-            section->id     = module.sections.size;
+            auto& sc = module.subclass.object;
+            auto section = &array::append(sc.sections);
+            section->id     = sc.sections.size;
             section->module = &module;
             auto status = section::init(section, type, opts);
             if (!OK(status))

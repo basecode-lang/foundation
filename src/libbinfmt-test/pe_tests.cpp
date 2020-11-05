@@ -18,7 +18,6 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/binfmt/io.h>
-#include <basecode/core/defer.h>
 #include <basecode/binfmt/binfmt.h>
 #include <basecode/core/stopwatch.h>
 #include "test.h"
@@ -83,7 +82,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     stopwatch::start(timer);
 
     module_t* mod{};
-    REQUIRE(OK(system::make_module(10, &mod)));
+    REQUIRE(OK(system::make_module(module_type_t::object, 10, &mod)));
     REQUIRE(system::get_module(10) != nullptr);
 
     /* .text section */ {
@@ -209,12 +208,12 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
 
     auto rot13_exe_path = "rot13.exe"_path;
     defer(path::free(rot13_exe_path));
-    auto rot13_exe_file = io::session::add_input_file(s,
-                                                      mod,
-                                                      rot13_exe_path,
-                                                      machine::type_t::x86_64,
-                                                      io::type_t::pe,
-                                                      io::file_type_t::exe);
+    auto rot13_exe_file = io::session::add_file(s,
+                                                mod,
+                                                rot13_exe_path,
+                                                machine::type_t::x86_64,
+                                                io::type_t::pe,
+                                                io::file_type_t::exe);
     rot13_exe_file->versions.linker.major = 6;
     rot13_exe_file->versions.linker.minor = 0;
     rot13_exe_file->versions.min_os.major = 4;

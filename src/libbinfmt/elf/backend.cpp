@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/bits.h>
-#include <basecode/binfmt/ar.h>
 #include <basecode/binfmt/elf.h>
 
 namespace basecode::binfmt::io::elf {
@@ -36,21 +35,10 @@ namespace basecode::binfmt::io::elf {
         }
 
         static status_t read(file_t& file) {
-            auto& s = *file.session;
-
             switch (file.file_type) {
+                case file_type_t::none:
                 case file_type_t::obj:
                     break;
-                case file_type_t::lib: {
-                    auto status = ar::read(s.ar, file.path);
-                    if (!OK(status))
-                        return status;
-
-                    // XXX: 1. loop over each file in the archive
-                    //      2. read as obj
-                    //      3. create module_t matching read obj
-                    break;
-                }
                 case file_type_t::exe:
                 case file_type_t::dll:
                     break;
@@ -63,6 +51,7 @@ namespace basecode::binfmt::io::elf {
             using type_t = basecode::binfmt::section::type_t;
 
             const auto module = file.module;
+            auto& module_sc   = module->subclass.object;
 
             opts_t opts{};
             opts.file        = &file;
@@ -78,8 +67,8 @@ namespace basecode::binfmt::io::elf {
             u64 rva             {elf.entry_point};
             str::slice_t name   {};
 
-            for (u32 i = 0; i < module->sections.size; ++i) {
-                auto          section = &module->sections[i];
+            for (u32 i = 0; i < module_sc.sections.size; ++i) {
+                auto          section = &module_sc.sections[i];
                 u64           size{};
                 u64           flags{};
                 u64           entry_size{};
@@ -204,7 +193,7 @@ namespace basecode::binfmt::io::elf {
 
                 // XXX: sort the symbols list based on ELF ordering rules
                 //
-                hashtab::for_each_pair(const_cast<symbol_table_t&>(module->symbols),
+                hashtab::for_each_pair(module->symbols,
                                        [](const auto idx, const auto& key, auto& symbol, auto* user) -> u32 {
                                            auto& elf = *(elf_t*)user;
                                            auto status = elf::symtab::add_sym(elf.symbols, &symbol);
@@ -240,9 +229,8 @@ namespace basecode::binfmt::io::elf {
             }
 
             switch (file.file_type) {
+                case file_type_t::none:
                 case file_type_t::obj:
-                    break;
-                case file_type_t::lib:
                     break;
                 case file_type_t::exe:
                 case file_type_t::dll:
