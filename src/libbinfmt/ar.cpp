@@ -195,9 +195,9 @@ namespace basecode::binfmt::ar {
                        ar.symbol_map.size * ar.members.size);
 
         hashtab::for_each_pair(ar.symbol_map,
-                               [](const auto idx, const auto& key, auto& value, u0* user) {
+                               [](const auto idx, const auto& key, auto& value, u0* user) -> u32 {
                                    value = idx * *((u32*) user);
-                                   return true;
+                                   return 0;
                                },
                                &ar.members.size);
 

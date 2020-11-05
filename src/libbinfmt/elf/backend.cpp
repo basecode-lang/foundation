@@ -199,19 +199,20 @@ namespace basecode::binfmt::io::elf {
             }
 
             if (module->symbols.size > 0) {
-                auto symbols = hashtab::values(const_cast<symbol_table_t&>(module->symbols));
-                defer(array::free(symbols));
-
-                elf::symtab::rehash(elf.symbols, symbols.size + 1);
+                elf::symtab::rehash(elf.symbols, module->symbols.size + 1);
                 elf::symtab::add_sym(elf.symbols, nullptr);
 
                 // XXX: sort the symbols list based on ELF ordering rules
                 //
-                for (auto symbol : symbols) {
-                    auto status = elf::symtab::add_sym(elf.symbols, symbol);
-                    if (!OK(status))
-                        return status;
-                }
+                hashtab::for_each_pair(const_cast<symbol_table_t&>(module->symbols),
+                                       [](const auto idx, const auto& key, auto& symbol, auto* user) -> u32 {
+                                           auto& elf = *(elf_t*)user;
+                                           auto status = elf::symtab::add_sym(elf.symbols, &symbol);
+                                           if (!OK(status))
+                                               return u32(status);
+                                           return 0;
+                                       },
+                                       &elf);
 
                 auto& strtab = elf::strtab::make_section(elf,
                                                          ".strtab"_ss,

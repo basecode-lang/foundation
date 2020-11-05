@@ -145,46 +145,46 @@ namespace basecode::binfmt::io::coff {
             aux->section.num_lines  = hdr.line_nums.size;
         }
 
-        auto symbols = hashtab::values(const_cast<symbol_table_t&>(module->symbols));
-        defer(array::free(symbols));
-
-        for (auto symbol : symbols) {
-            const auto intern_rc = string::interned::get(symbol->name);
-            if (!OK(intern_rc.status))
-                return status_t::symbol_not_found;
-            auto sym = coff::symbol_table::make_symbol(coff, intern_rc.slice);
-            sym->value   = symbol->value;
-            sym->section = symbol->section;
-            switch (symbol->type) {
-                case symbol::type_t::none:
-                case symbol::type_t::object:
-                    sym->type = 0;
-                    break;
-                case symbol::type_t::file:
-                    sym->type = 0;
-                    sym->sclass = symbol_table::storage_class::file;
-                    break;
-                case symbol::type_t::function:
-                    sym->type = symbol_table::derived_type::function << u32(8);
-                    break;
-            }
-            if (!sym->sclass) {
-                switch (symbol->scope) {
-                    case symbol::scope_t::none:
-                        sym->sclass = symbol_table::storage_class::null_;
-                        break;
-                    case symbol::scope_t::local:
-                        sym->sclass = symbol_table::storage_class::static_;
-                        break;
-                    case symbol::scope_t::global:
-                        sym->sclass = symbol_table::storage_class::external_;
-                        break;
-                    case symbol::scope_t::weak:
-                        sym->sclass = symbol_table::storage_class::weak_external;
-                        break;
-                }
-            }
-        }
+        hashtab::for_each_pair(const_cast<symbol_table_t&>(module->symbols),
+                               [](const auto idx, const auto& key, auto& symbol, auto* user) -> u32 {
+                                   auto& coff = *((coff_t*)user);
+                                   const auto intern_rc = string::interned::get(symbol.name);
+                                   if (!OK(intern_rc.status))
+                                       return u32(status_t::symbol_not_found);
+                                   auto sym = coff::symbol_table::make_symbol(coff, intern_rc.slice);
+                                   sym->value   = symbol.value;
+                                   sym->section = symbol.section;
+                                   switch (symbol.type) {
+                                       case symbol::type_t::none:
+                                       case symbol::type_t::object:sym->type = 0;
+                                           break;
+                                       case symbol::type_t::file:
+                                           sym->type   = 0;
+                                           sym->sclass = symbol_table::storage_class::file;
+                                           break;
+                                       case symbol::type_t::function:
+                                           sym->type = symbol_table::derived_type::function << u32(8);
+                                           break;
+                                   }
+                                   if (!sym->sclass) {
+                                       switch (symbol.scope) {
+                                           case symbol::scope_t::none:
+                                               sym->sclass = symbol_table::storage_class::null_;
+                                               break;
+                                           case symbol::scope_t::local:
+                                               sym->sclass = symbol_table::storage_class::static_;
+                                               break;
+                                           case symbol::scope_t::global:
+                                               sym->sclass = symbol_table::storage_class::external_;
+                                               break;
+                                           case symbol::scope_t::weak:
+                                               sym->sclass = symbol_table::storage_class::weak_external;
+                                               break;
+                                       }
+                                   }
+                                   return 0;
+                               },
+                               &coff);
 
         return status;
     }
