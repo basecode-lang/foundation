@@ -17,6 +17,11 @@
 // ----------------------------------------------------------------------------
 
 #include <sys/mman.h>
+#ifndef _WIN32
+#   include <sys/types.h>
+#   include <sys/stat.h>
+#   include <fcntl.h>
+#endif
 #include <basecode/core/buf.h>
 #include <basecode/core/filesys.h>
 
@@ -250,7 +255,12 @@ namespace basecode::buf {
             return status_t::unable_to_open_file;
 
         mode_t mode = S_IRUSR | S_IWUSR;
-        buf.file = open(path::c_str(path), O_BINARY | O_RDWR, mode);
+#ifdef _WIN32
+        s32 flags = O_BINARY | O_RDWR;
+#else
+        s32 flags = O_RDWR;
+#endif
+        buf.file = open(path::c_str(path), flags, mode);
         if (buf.file == -1)
             return status_t::unable_to_open_file;
 
