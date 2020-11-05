@@ -24,7 +24,7 @@ using namespace basecode;
 
 struct capture_t final {
     str_buf_t*                  buf;
-    binfmt::ar_t*               ar;
+    binfmt::ar::ar_t*           ar;
 };
 
 TEST_CASE("basecode::binfmt ar read test") {
@@ -36,7 +36,7 @@ TEST_CASE("basecode::binfmt ar read test") {
     auto lib_path = R"(C:\src\basecode-lang\foundation\build\msvc\debug\lib\basecode-binfmt.lib)"_path;
 //    auto lib_path = R"(C:\src\basecode-lang\foundation\build\clang\debug\lib\libbasecode-binfmt.a)"_path;
 
-    ar_t ar{};
+    ar::ar_t ar{};
     ar::init(ar);
     defer({
         ar::free(ar);

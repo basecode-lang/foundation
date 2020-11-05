@@ -79,7 +79,7 @@ namespace basecode::binfmt::io {
         alloc_t*                alloc;
         file_list_t             input_files;
         file_list_t             output_files;
-        ar_t                    ar;
+        ar::ar_t                ar;
     };
 
     namespace file {

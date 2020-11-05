@@ -22,7 +22,7 @@
 #include <basecode/core/slice.h>
 
 namespace basecode::numbers {
-    enum class result_t : u8 {
+    enum class status_t : u8 {
         ok,
         overflow,
         underflow,
@@ -30,18 +30,18 @@ namespace basecode::numbers {
     };
 
     namespace fp {
-        result_t parse(str::slice_t value, f32& out);
+        status_t parse(str::slice_t value, f32& out);
 
-        result_t parse(str::slice_t value, f64& out);
+        status_t parse(str::slice_t value, f64& out);
     }
 
     namespace integer {
-        result_t parse(str::slice_t value, u8 radix, u32& out);
+        status_t parse(str::slice_t value, u8 radix, u32& out);
 
-        result_t parse(str::slice_t value, u8 radix, s32& out);
+        status_t parse(str::slice_t value, u8 radix, s32& out);
 
-        result_t parse(str::slice_t value, u8 radix, u64& out);
+        status_t parse(str::slice_t value, u8 radix, u64& out);
 
-        result_t parse(str::slice_t value, u8 radix, s64& out);
+        status_t parse(str::slice_t value, u8 radix, s64& out);
     }
 }

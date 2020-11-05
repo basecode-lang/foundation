@@ -23,102 +23,102 @@
 
 namespace basecode::numbers {
     namespace fp {
-        result_t parse(str::slice_t value, f32& out) {
+        status_t parse(str::slice_t value, f32& out) {
             const s8* begin = (const s8*) value.data;
             s8* end{};
             errno = 0;
             out = strtof(begin, &end);
             if (errno == ERANGE)
-                return result_t::overflow;
+                return status_t::overflow;
             if (*begin == '\0' || *end != '\0')
-                return result_t::not_convertible;
-            return result_t::ok;
+                return status_t::not_convertible;
+            return status_t::ok;
         }
 
-        result_t parse(str::slice_t value, f64& out) {
+        status_t parse(str::slice_t value, f64& out) {
             const s8* begin = (const s8*) value.data;
             s8* end{};
             errno = 0;
             out = strtod(begin, &end);
             if (errno == ERANGE)
-                return result_t::overflow;
+                return status_t::overflow;
             if (*begin == '\0' || *end != '\0')
-                return result_t::not_convertible;
-            return result_t::ok;
+                return status_t::not_convertible;
+            return status_t::ok;
         }
     }
 
     namespace integer {
-        result_t parse(str::slice_t value, u8 radix, u32& out) {
+        status_t parse(str::slice_t value, u8 radix, u32& out) {
             const s8* begin = (const s8*) value.data;
             s8* end;
             errno = 0;
             out = strtoul(begin, &end, radix);
             if ((errno == ERANGE && out == INT_MAX)
             ||   out > UINT_MAX) {
-                return result_t::overflow;
+                return status_t::overflow;
             }
             if ((errno == ERANGE && out == INT_MIN)) {
-                return result_t::underflow;
+                return status_t::underflow;
             }
             if (*begin == '\0' || *end != '\0') {
-                return result_t::not_convertible;
+                return status_t::not_convertible;
             }
-            return result_t::ok;
+            return status_t::ok;
         }
 
-        result_t parse(str::slice_t value, u8 radix, s32& out) {
+        status_t parse(str::slice_t value, u8 radix, s32& out) {
             const s8* begin = (const s8*) value.data;
             s8* end;
             errno = 0;
             out = strtol(begin, &end, radix);
             if ((errno == ERANGE && out == INT_MAX)
             ||   out > UINT_MAX) {
-                return result_t::overflow;
+                return status_t::overflow;
             }
             if ((errno == ERANGE && out == INT_MIN)) {
-                return result_t::underflow;
+                return status_t::underflow;
             }
             if (*begin == '\0' || *end != '\0') {
-                return result_t::not_convertible;
+                return status_t::not_convertible;
             }
-            return result_t::ok;
+            return status_t::ok;
         }
 
-        result_t parse(str::slice_t value, u8 radix, u64& out) {
+        status_t parse(str::slice_t value, u8 radix, u64& out) {
             const s8* begin = (const s8*) value.data;
             s8* end;
             errno = 0;
             out = strtoull(begin, &end, radix);
             if ((errno == ERANGE && out == LONG_MAX)
             ||   out > ULONG_MAX) {
-                return result_t::overflow;
+                return status_t::overflow;
             }
             if ((errno == ERANGE && out == LONG_MIN)) {
-                return result_t::underflow;
+                return status_t::underflow;
             }
             if (*begin == '\0' || *end != '\0') {
-                return result_t::not_convertible;
+                return status_t::not_convertible;
             }
-            return result_t::ok;
+            return status_t::ok;
         }
 
-        result_t parse(str::slice_t value, u8 radix, s64& out) {
+        status_t parse(str::slice_t value, u8 radix, s64& out) {
             const s8* begin = (const s8*) value.data;
             s8* end;
             errno = 0;
             out = strtoll(begin, &end, radix);
             if ((errno == ERANGE && out == LONG_MAX)
             ||   out > ULONG_MAX) {
-                return result_t::overflow;
+                return status_t::overflow;
             }
             if ((errno == ERANGE && out == LONG_MIN)) {
-                return result_t::underflow;
+                return status_t::underflow;
             }
             if (*begin == '\0' || *end != '\0') {
-                return result_t::not_convertible;
+                return status_t::not_convertible;
             }
-            return result_t::ok;
+            return status_t::ok;
         }
     }
 }

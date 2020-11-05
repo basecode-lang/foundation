@@ -22,8 +22,8 @@
 #include <basecode/core/bitset.h>
 #include <basecode/binfmt/binfmt.h>
 
-namespace basecode::binfmt {
-    struct ar_member_t final {
+namespace basecode::binfmt::ar {
+    struct member_t final {
         str::slice_t            name;
         str::slice_t            content;
         u32                     offset;
@@ -33,31 +33,29 @@ namespace basecode::binfmt {
         u32                     mode;
     };
 
-    using ar_symbol_map_t       = hashtab_t<str::slice_t, u32>;
-    using ar_member_list_t      = array_t<ar_member_t>;
-    using ar_member_ptr_list_t  = array_t<ar_member_t*>;
+    using symbol_map_t       = hashtab_t<str::slice_t, u32>;
+    using member_list_t      = array_t<member_t>;
+    using member_ptr_list_t  = array_t<member_t*>;
 
     struct ar_t final {
         alloc_t*                alloc;
         buf_t                   buf;
-        ar_member_list_t        members;
-        ar_symbol_map_t         symbol_map;
+        member_list_t           members;
+        symbol_map_t            symbol_map;
         bitset_t                symbol_module_bitmap;
     };
 
-    namespace ar {
-        u0 free(ar_t& ar);
+    u0 free(ar_t& ar);
 
-        u0 reset(ar_t& ar);
+    u0 reset(ar_t& ar);
 
-        status_t read(ar_t& ar, const path_t& path);
+    status_t read(ar_t& ar, const path_t& path);
 
-        status_t write(ar_t& ar, const path_t& path);
+    status_t write(ar_t& ar, const path_t& path);
 
-        u0 add_member(ar_t& ar, ar_member_t& member);
+    u0 add_member(ar_t& ar, const member_t& member);
 
-        status_t init(ar_t& ar, alloc_t* alloc = context::top()->alloc);
+    status_t init(ar_t& ar, alloc_t* alloc = context::top()->alloc);
 
-        u0 find_member(ar_t& ar, str::slice_t name, ar_member_ptr_list_t& list);
-    }
+    u0 find_member(ar_t& ar, str::slice_t name, member_ptr_list_t& list);
 }

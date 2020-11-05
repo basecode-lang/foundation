@@ -21,12 +21,12 @@
 #include <basecode/core/numbers.h>
 
 namespace basecode::binfmt::ar {
-    struct ar_sym_offset_t final {
+    struct sym_offset_t final {
         str::slice_t            name;
         u32                     offset;
     };
 
-    struct ar_header_t final {
+    struct header_t final {
         s8                      name[16];
         s8                      date[12];
         s8                      uid[6];
@@ -65,7 +65,7 @@ namespace basecode::binfmt::ar {
                 return status_t::read_error;
         }
 
-        array_t<ar_sym_offset_t> sym_offsets{};
+        array_t<sym_offset_t> sym_offsets{};
         array::init(sym_offsets, ar.alloc);
         defer(array::free(sym_offsets));
 
@@ -83,8 +83,8 @@ namespace basecode::binfmt::ar {
         while (CRSR_MORE(c)) {
             const auto hdr_offset = CRSR_POS(c);
 
-            ar_header_t hdr{};
-            if (!buf::cursor::read_obj(c, &hdr, sizeof(ar_header_t)))
+            header_t hdr{};
+            if (!buf::cursor::read_obj(c, &hdr, sizeof(header_t)))
                 break;
 
             hdr.name[15] = 0;
@@ -101,7 +101,7 @@ namespace basecode::binfmt::ar {
             if (marker[0] != 0x60 || marker[1] != 0x0a)
                 return status_t::read_error;
 
-            ar_member_t member{};
+            member_t member{};
             numbers::integer::parse(slice::make(hdr.date, 12),
                                     10,
                                     member.date);
@@ -235,11 +235,11 @@ namespace basecode::binfmt::ar {
         return status_t::ok;
     }
 
-    u0 add_member(ar_t& ar, ar_member_t& member) {
+    u0 add_member(ar_t& ar, const member_t& member) {
         array::append(ar.members, member);
     }
 
-    u0 find_member(ar_t& ar, str::slice_t name, ar_member_ptr_list_t& list) {
+    u0 find_member(ar_t& ar, str::slice_t name, member_ptr_list_t& list) {
         for (auto& member : ar.members) {
             if (member.name == name)
                 array::append(list, &member);
