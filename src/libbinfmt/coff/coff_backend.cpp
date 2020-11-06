@@ -53,19 +53,23 @@ namespace basecode::binfmt::io::coff {
             if (!OK(status))
                 return status_t::read_error;
 
+            status = coff::read_symbol_table(file, coff);
+            if (!OK(status))
+                return status_t::read_error;
+
             format::print("                                                         c i u l s e r w\n");
             format::print("                                                         o n n i h x e r\n");
             format::print("                                                         d i i n a e a i\n");
             format::print("                                                         e t n k e c d t\n");
             format::print("                                                             i   e     e\n");
             format::print("No Name             RVA      Size     Data Off Data Size     t          \n");
-            for (u32 i = 0; i < coff.headers.size; ++i) {
-                auto& hdr = coff.headers[i];
+            for (auto& hdr : coff.headers) {
+                auto sym = coff::section::get_symbol(coff, hdr);
                 format::print("{:02} ", hdr.number);
-                if (hdr.symbol && hdr.symbol->inlined) {
-                    format::print("{:<16} ", hdr.symbol->name.slice);
+                if (sym && sym->inlined) {
+                    format::print("{:<16} ", sym->name.slice);
                 } else {
-                    format::print("{:16} ", "<STRTAB>");
+                    format::print("{:16} ", coff::string_table::get(coff, sym->name.offset));
                 }
                 format::print("{:08x} {:08x} {:08x} {:08x}  ",
                               hdr.rva.base,
@@ -86,6 +90,50 @@ namespace basecode::binfmt::io::coff {
                 format::print("{} ", (hdr.flags & section::memory_execute) == section::memory_execute ? "X" : " ");
                 format::print("{} ", (hdr.flags & section::memory_read) == section::memory_read ? "X" : " ");
                 format::print("{} ", (hdr.flags & section::memory_write) == section::memory_write ? "X" : " ");
+                format::print("\n");
+            }
+
+            format::print("\nNo  Sec Value            Class  Type Name\n");
+            u32 i{};
+            for (const auto& sym : coff.symbol_table.list) {
+                format::print("{:>03} ", i++);
+                format::print("{:>03} ", sym.section);
+                format::print("{:016x} ", sym.value);
+                switch (sym.sclass) {
+                    case symbol_table::storage_class::file: {
+                        format::print("FILE   ");
+                        break;
+                    }
+                    case symbol_table::storage_class::static_: {
+                        format::print("STATIC ");
+                        break;
+                    }
+                    case symbol_table::storage_class::function: {
+                        format::print("FUNC   ");
+                        break;
+                    }
+                    case symbol_table::storage_class::external_: {
+                        format::print("EXTERN ");
+                        break;
+                    }
+                    default:
+                        format::print("NONE   ");
+                        break;
+                }
+                switch (sym.type) {
+                    case symbol_table::type::function: {
+                        format::print("FUNC ");
+                        break;
+                    }
+                    default:
+                        format::print("NONE ");
+                        break;
+                }
+                if (sym.inlined) {
+                    format::print("{} ", sym.name.slice);
+                } else {
+                    format::print("{} ", coff::string_table::get(coff, sym.name.offset));
+                }
                 format::print("\n");
             }
 

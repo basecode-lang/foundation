@@ -58,7 +58,7 @@ namespace basecode::binfmt::io::coff {
     struct aux_record_t final {
         union {
             struct {
-                symbol_t*       sym;
+                str::slice_t    value;
             }                   file;
             struct {
                 u32             ptr_next_func;
@@ -93,15 +93,17 @@ namespace basecode::binfmt::io::coff {
             str::slice_t        slice;
         }                       name;
         u32                     value;
+        u32                     id;
         u16                     type;
         s16                     section;
         u8                      sclass;
         b8                      inlined;
+        b8                      for_section;
     };
 
     struct section_hdr_t final {
         const section_t*        section;
-        symbol_t*               symbol;
+        u32                     symbol;
         rva_t                   rva;
         raw_t                   file;
         raw_t                   relocs;
@@ -122,12 +124,14 @@ namespace basecode::binfmt::io::coff {
         u32                     offset;
         u32                     timestamp;
         struct {
+            const s8*           buf;
             raw_t               file;
             string_list_t       list;
         }                       string_table;
         struct {
             raw_t               file;
             symbol_list_t       list;
+            u32                 num_symbols;
         }                       symbol_table;
         struct {
             u32                 image;
@@ -189,6 +193,8 @@ namespace basecode::binfmt::io::coff {
         [[maybe_unused]] constexpr u32 memory_execute      = 0x20000000;
         [[maybe_unused]] constexpr u32 memory_read         = 0x40000000;
         [[maybe_unused]] constexpr u32 memory_write        = 0x80000000;
+
+        symbol_t* get_symbol(coff_t& coff, section_hdr_t& hdr);
     }
 
     namespace flags {
@@ -216,18 +222,16 @@ namespace basecode::binfmt::io::coff {
         u0 init(coff_t& coff, alloc_t* alloc);
 
         u32 add(coff_t& coff, str::slice_t str);
+
+        const s8* get(coff_t& coff, u64 offset);
     }
 
     namespace symbol_table {
         [[maybe_unused]] constexpr u32 entry_size = 0x12;
 
-        namespace base_type {
+        namespace type {
             [[maybe_unused]] constexpr u8 none             = 0;
-        }
-
-        namespace derived_type {
-            [[maybe_unused]] constexpr u8 none             = 0;
-            [[maybe_unused]] constexpr u8 function         = 2;
+            [[maybe_unused]] constexpr u8 function         = 0x20;
         }
 
         namespace storage_class {
@@ -268,6 +272,8 @@ namespace basecode::binfmt::io::coff {
                                       symbol_t* sym,
                                       aux_record_type_t type);
 
+        symbol_t* make_symbol(coff_t& coff);
+
         symbol_t* make_symbol(coff_t& coff, u64 offset);
 
         symbol_t* make_symbol(coff_t& coff, str::slice_t name);
@@ -290,6 +296,10 @@ namespace basecode::binfmt::io::coff {
     status_t build_sections(file_t& file, coff_t& coff);
 
     u0 write_section_headers(file_t& file, coff_t& coff);
+
+    status_t read_string_table(file_t& file, coff_t& coff);
+
+    status_t read_symbol_table(file_t& file, coff_t& coff);
 
     status_t write_sections_data(file_t& file, coff_t& coff);
 

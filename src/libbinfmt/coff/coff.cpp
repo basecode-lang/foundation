@@ -21,6 +21,13 @@
 #include <basecode/core/string.h>
 
 namespace basecode::binfmt::io::coff {
+    namespace section {
+        symbol_t* get_symbol(coff_t& coff, section_hdr_t& hdr) {
+            if (!hdr.symbol) return nullptr;
+            return &coff.symbol_table.list[hdr.symbol - 1];
+        }
+    }
+
     namespace string_table {
         u0 free(coff_t& coff) {
             array::free(coff.string_table.list);
@@ -38,6 +45,10 @@ namespace basecode::binfmt::io::coff {
             coff.string_table.file.size += str.length + 1;
             return offset;
         }
+
+        const s8* get(coff_t& coff, u64 offset) {
+            return coff.string_table.buf + (offset >> u32(32));
+        }
     }
 
     namespace symbol_table {
@@ -46,6 +57,13 @@ namespace basecode::binfmt::io::coff {
                 array::free(sym.aux_records);
             }
             array::free(coff.symbol_table.list);
+        }
+
+        symbol_t* make_symbol(coff_t& coff) {
+            auto sym = &array::append(coff.symbol_table.list);
+            sym->id = coff.symbol_table.list.size;
+            array::init(sym->aux_records, coff.alloc);
+            return sym;
         }
 
         u0 init(coff_t& coff, alloc_t* alloc) {
@@ -64,6 +82,7 @@ namespace basecode::binfmt::io::coff {
 
         symbol_t* make_symbol(coff_t& coff, u64 offset) {
             auto sym = &array::append(coff.symbol_table.list);
+            sym->id = coff.symbol_table.list.size;
             array::init(sym->aux_records, coff.alloc);
             sym->name.offset = offset;
             sym->inlined     = false;
@@ -72,6 +91,7 @@ namespace basecode::binfmt::io::coff {
 
         symbol_t* make_symbol(coff_t& coff, str::slice_t name) {
             auto sym = &array::append(coff.symbol_table.list);
+            sym->id = coff.symbol_table.list.size;
             array::init(sym->aux_records, coff.alloc);
             if (name.length > 8) {
                 sym->name.offset = string_table::add(coff, name);
@@ -145,13 +165,14 @@ namespace basecode::binfmt::io::coff {
                     return status;
             }
 
-            hdr.symbol          = coff::symbol_table::make_symbol(coff, name);
-            hdr.symbol->section = hdr.number;
-            hdr.symbol->value   = {};
-            hdr.symbol->type    = 0;
-            hdr.symbol->sclass  = symbol_table::storage_class::static_;
+            auto sym = coff::symbol_table::make_symbol(coff, name);
+            sym->section = hdr.number;
+            sym->value   = {};
+            sym->type    = 0;
+            sym->sclass  = symbol_table::storage_class::static_;
+            hdr.symbol = sym->id;
 
-            auto aux = coff::symbol_table::make_aux_record(coff, hdr.symbol,aux_record_type_t::section);
+            auto aux = coff::symbol_table::make_aux_record(coff, sym, aux_record_type_t::section);
             aux->section.len        = hdr.rva.size;
             aux->section.sect_num   = hdr.number;
             aux->section.check_sum  = 0;
@@ -171,14 +192,15 @@ namespace basecode::binfmt::io::coff {
                                    sym->section = symbol.section;
                                    switch (symbol.type) {
                                        case symbol::type_t::none:
-                                       case symbol::type_t::object:sym->type = 0;
+                                       case symbol::type_t::object:
+                                           sym->type = 0;
                                            break;
                                        case symbol::type_t::file:
                                            sym->type   = 0;
                                            sym->sclass = symbol_table::storage_class::file;
                                            break;
                                        case symbol::type_t::function:
-                                           sym->type = symbol_table::derived_type::function << u32(8);
+                                           sym->type = symbol_table::type::function;
                                            break;
                                    }
                                    if (!sym->sclass) {
@@ -249,12 +271,11 @@ namespace basecode::binfmt::io::coff {
         if (!OK(file::read_u32(file, coff.symbol_table.file.offset)))
             return status_t::read_error;
 
-        u32 num_symbols{};
-        if (!OK(file::read_u32(file, num_symbols)))
+        if (!OK(file::read_u32(file, coff.symbol_table.num_symbols)))
             return status_t::read_error;
-        array::resize(coff.symbol_table.list, num_symbols);
-        coff.symbol_table.file.size   = num_symbols * symbol_table::entry_size;
+        coff.symbol_table.file.size   = coff.symbol_table.num_symbols * symbol_table::entry_size;
         coff.string_table.file.offset = coff.symbol_table.file.offset + coff.symbol_table.file.size;
+        coff.string_table.buf         = (const s8*) file.crsr.buf->data + coff.string_table.file.offset + 4;
 
         if (!OK(file::read_u16(file, coff.size.opt_hdr)))
             return status_t::read_error;
@@ -277,7 +298,7 @@ namespace basecode::binfmt::io::coff {
 //            std::sort(
 //                std::begin(coff.symbol_table.list),
 //                std::end(coff.symbol_table.list),
-//                [](auto lhfile, auto rhs) {
+//                [](auto lhs, auto rhs) {
 //                    return lhs < rhs;
 //                });
         for (const auto& symbol : coff.symbol_table.list) {
@@ -319,6 +340,159 @@ namespace basecode::binfmt::io::coff {
         }
     }
 
+    status_t read_string_table(file_t& file, coff_t& coff) {
+        if (!OK(file::read_u32(file, coff.string_table.file.size)))
+            return status_t::read_error;
+
+        auto size = coff.string_table.file.size;
+        u8* start = CRSR_PTR(file.crsr);
+        u8* end   = start;
+        while (size) {
+            while (*end != '\0')
+                ++end;
+            const auto len = end - start;
+            const auto slice = slice::make(start, len);
+            string_table::add(coff, slice);
+            size -= len + 1;
+            start += len + 1;
+            end = start;
+        }
+
+        return status_t::ok;
+    }
+
+    status_t read_symbol_table(file_t& file, coff_t& coff) {
+        file::push(file);
+        defer(file::pop(file));
+
+        file::seek(file, coff.symbol_table.file.offset);
+
+        u64_bytes_t u64_thunk{};
+        s8          buf[18];
+        u32         zero{};
+        u32         num_symbols = coff.symbol_table.num_symbols;
+
+        while (num_symbols) {
+            auto sym = symbol_table::make_symbol(coff);
+
+            if (!OK(file::read_u64(file, u64_thunk.value)))
+                return status_t::read_error;
+
+            if (memcmp(u64_thunk.bytes, &zero, 4) == 0) {
+                sym->name.offset = u64_thunk.value;
+                sym->inlined     = false;
+            } else {
+                u32 len{};
+                for (u8 byte : u64_thunk.bytes) {
+                    if (byte == 0)
+                        break;
+                    ++len;
+                }
+                const auto slice = slice::make(u64_thunk.bytes, len);
+                sym->name.slice = string::interned::fold(slice);
+                sym->inlined    = true;
+            }
+
+            if (!OK(file::read_u32(file, sym->value)))
+                return status_t::read_error;
+
+            if (!OK(file::read_s16(file, sym->section)))
+                return status_t::read_error;
+
+            if (!OK(file::read_u16(file, sym->type)))
+                return status_t::read_error;
+
+            if (!OK(file::read_u8(file, sym->sclass)))
+                return status_t::read_error;
+
+            u8 num_aux_recs{};
+            if (!OK(file::read_u8(file, num_aux_recs)))
+                return status_t::read_error;
+
+            if (num_aux_recs > 0) {
+                array::resize(sym->aux_records, num_aux_recs);
+                for (u32 j = 0; j < num_aux_recs; ++j) {
+                    auto& aux = sym->aux_records[j];
+                    switch (sym->sclass) {
+                        case symbol_table::storage_class::file: {
+                            if (!OK(file::read_obj(file, buf, 18)))
+                                return status_t::read_error;
+                            aux.type = aux_record_type_t::file;
+                            aux.file.value = string::interned::fold(slice::make(buf, 18));
+                            break;
+                        }
+                        case symbol_table::storage_class::static_: {
+                            if (sym->for_section || sym->type == 0) {
+                                if (!OK(file::read_u32(file, aux.section.len)))
+                                    return status_t::read_error;
+                                if (!OK(file::read_u16(file, aux.section.num_relocs)))
+                                    return status_t::read_error;
+                                if (!OK(file::read_u16(file, aux.section.num_lines)))
+                                    return status_t::read_error;
+                                if (!OK(file::read_u32(file, aux.section.check_sum)))
+                                    return status_t::read_error;
+                                if (!OK(file::read_u16(file, aux.section.sect_num)))
+                                    return status_t::read_error;
+                                if (!OK(file::read_u8(file, aux.section.comdat_sel)))
+                                    return status_t::read_error;
+                                if (!OK(file::seek_fwd(file, 3)))
+                                    return status_t::read_error;
+                                aux.type = aux_record_type_t::section;
+                            }
+                            break;
+                        }
+                        case symbol_table::storage_class::function: {
+                            if (!OK(file::seek_fwd(file, 4)))
+                                return status_t::read_error;
+                            if (!OK(file::read_u16(file, aux.xf.line_num)))
+                                return status_t::read_error;
+                            if (!OK(file::seek_fwd(file, 6)))
+                                return status_t::read_error;
+                            if (!OK(file::read_u32(file, aux.xf.ptr_next_func)))
+                                return status_t::read_error;
+                            if (!OK(file::seek_fwd(file, 2)))
+                                return status_t::read_error;
+                            aux.type = aux_record_type_t::xf;
+                            break;
+                        }
+                        case symbol_table::storage_class::external_: {
+                            if (sym->section == 0) {
+                                if (sym->value == 0 && sym->section == 0) {
+                                    if (!OK(file::read_u32(file, aux.weak_extern.tag_idx)))
+                                        return status_t::read_error;
+                                    if (!OK(file::read_u32(file, aux.weak_extern.flags)))
+                                        return status_t::read_error;
+                                    if (!OK(file::seek_fwd(file, 10)))
+                                        return status_t::read_error;
+                                    aux.type = aux_record_type_t::weak_extern;
+                                } else if (sym->type == symbol_table::type::function) {
+                                    if (!OK(file::read_u32(file, aux.func_def.tag_idx)))
+                                        return status_t::read_error;
+                                    if (!OK(file::read_u32(file, aux.func_def.total_size)))
+                                        return status_t::read_error;
+                                    if (!OK(file::read_u32(file, aux.func_def.ptr_next_func)))
+                                        return status_t::read_error;
+                                    if (!OK(file::seek_fwd(file, 2)))
+                                        return status_t::read_error;
+                                    aux.type = aux_record_type_t::func_def;
+                                }
+                            }
+                            break;
+                        }
+                        default: {
+                            file::seek_fwd(file, 18);
+                            break;
+                        }
+                    }
+                    --num_symbols;
+                }
+            }
+            --num_symbols;
+        }
+
+        return status_t::ok;
+    }
+
     status_t write_sections_data(file_t& file, coff_t& coff) {
         for (auto& hdr : coff.headers) {
             auto status = write_section_data(file, coff, hdr);
@@ -338,8 +512,9 @@ namespace basecode::binfmt::io::coff {
             if (!OK(file::read_u64(file, u64_thunk.value)))
                 return status_t::read_error;
 
+            symbol_t* sym;
             if (memcmp(u64_thunk.bytes, &zero, 4) == 0) {
-                hdr.symbol = symbol_table::make_symbol(coff, u64_thunk.value);
+                sym = symbol_table::make_symbol(coff, u64_thunk.value);
             } else {
                 u32 len{};
                 for (u32 j = 0; j < 8; ++j) {
@@ -348,8 +523,12 @@ namespace basecode::binfmt::io::coff {
                     ++len;
                 }
                 const auto slice = slice::make(u64_thunk.bytes, len);
-                hdr.symbol = symbol_table::make_symbol(coff, string::interned::fold(slice));
+                sym = symbol_table::make_symbol(coff, string::interned::fold(slice));
             }
+            sym->section     = hdr.number;
+            sym->sclass      = symbol_table::storage_class::static_;
+            sym->for_section = true;
+            hdr.symbol       = sym->id;
 
             if (!OK(file::read_u32(file, hdr.rva.size)))
                 return status_t::read_error;
@@ -397,24 +576,7 @@ namespace basecode::binfmt::io::coff {
                 file::write_u16(file, 0);
                 break;
             case aux_record_type_t::file: {
-                const auto sym = record.file.sym;
-                if (sym->inlined) {
-                    const auto len     = sym->name.slice.length;
-                    const s32  pad_len = std::max<s32>(symbol_table::entry_size - len, 0);
-                    for (u32 i = 0; i < std::min<u32>(len, 18); ++i) {
-                        file::write_u8(file, sym->name.slice[i]);
-                    }
-                    for (u32 i = 0; i < pad_len; ++i) {
-                        file::write_u8(file, 0);
-                    }
-                } else {
-                    u64 name = sym->name.offset;
-                    name <<= u32(32);
-                    file::write_u64(file, name);
-                    for (u32 i = 0; i < 8; ++i) {
-                        file::write_u8(file, 0);
-                    }
-                }
+                file::write_str(file, record.file.value);
                 break;
             }
             case aux_record_type_t::section:
@@ -496,17 +658,20 @@ namespace basecode::binfmt::io::coff {
 
         set_section_flags(hdr);
 
-        auto& section_rec = hdr.symbol->aux_records[0];
+        auto sym = section::get_symbol(coff, hdr);
+        auto& section_rec = sym->aux_records[0];
         section_rec.section.len = hdr.rva.size;
 
         return status_t::ok;
     }
 
     u0 write_section_header(file_t& file, coff_t& coff, section_hdr_t& hdr) {
-        if (hdr.symbol->inlined) {
-            file::write_pad8(file, hdr.symbol->name.slice);
+        auto sym = section::get_symbol(coff, hdr);
+
+        if (sym->inlined) {
+            file::write_pad8(file, sym->name.slice);
         } else {
-            file::write_u64(file, hdr.symbol->name.offset);
+            file::write_u64(file, sym->name.offset);
         }
 
         file::write_u32(file, hdr.rva.size);

@@ -83,7 +83,11 @@ namespace basecode::binfmt::io {
     };
 
     namespace file {
+        u0 pop(file_t& file);
+
         u0 free(file_t& file);
+
+        u0 push(file_t& file);
 
         u0 write_pad(file_t& file);
 
@@ -109,6 +113,8 @@ namespace basecode::binfmt::io {
 
         status_t seek_rev(file_t& file, u32 offset);
 
+        status_t read_s16(file_t& file, s16& value);
+
         status_t read_u16(file_t& file, u16& value);
 
         status_t read_u32(file_t& file, u32& value);
@@ -122,6 +128,8 @@ namespace basecode::binfmt::io {
         u0 write_cstr(file_t& file, str::slice_t slice);
 
         u0 write_pad16(file_t& file, str::slice_t slice);
+
+        status_t read_obj(file_t& file, u0* obj, u32 length);
 
         u0 write_str(file_t& file, const String_Concept auto& str) {
             buf::cursor::write_str(file.crsr, str);

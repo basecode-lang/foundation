@@ -115,6 +115,8 @@ namespace basecode {
 
             status_t read_u8(buf_crsr_t& crsr, u8& value);
 
+            status_t read_s16(buf_crsr_t& crsr, s16& value);
+
             status_t read_u16(buf_crsr_t& crsr, u16& value);
 
             status_t read_u32(buf_crsr_t& crsr, u32& value);

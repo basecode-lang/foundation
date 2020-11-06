@@ -419,7 +419,8 @@ namespace basecode::binfmt::io::pe {
         }
 
         coff::set_section_flags(hdr);
-        auto& section_rec = hdr.symbol->aux_records[0];
+        auto sym = coff::section::get_symbol(coff, hdr);
+        auto& section_rec = sym->aux_records[0];
         section_rec.section.len = hdr.rva.size;
 
         return status_t::ok;

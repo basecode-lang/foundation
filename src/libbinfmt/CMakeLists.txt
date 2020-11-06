@@ -38,23 +38,23 @@ configure_file(
 set(
     BINFMT_SOURCES
 
+    archive/ar_backend.cpp
     archive/ar.cpp ${INC_DIR}/ar.h
-    archive/backend.cpp
 
     binfmt.cpp ${INC_DIR}/binfmt.h
 
-    coff/backend.cpp
+    coff/coff_backend.cpp
     coff/coff.cpp ${INC_DIR}/coff.h
 
-    elf/backend.cpp
+    elf/elf_backend.cpp
     elf/elf.cpp ${INC_DIR}/elf.h
 
     io.cpp ${INC_DIR}/io.h
 
-    macho/backend.cpp
+    macho/macho_backend.cpp
     macho/macho.cpp ${INC_DIR}/macho.h
 
-    pe/backend.cpp
+    pe/pe_backend.cpp
     pe/pe.cpp ${INC_DIR}/pe.h
 
     ${INC_DIR}/types.h

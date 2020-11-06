@@ -130,9 +130,17 @@ namespace basecode::binfmt::io {
     }
 
     namespace file {
+        u0 pop(file_t& file) {
+            buf::cursor::pop(file.crsr);
+        }
+
         u0 free(file_t& file) {
             buf::free(file.buf);
             path::free(file.path);
+        }
+
+        u0 push(file_t& file) {
+            buf::cursor::push(file.crsr);
         }
 
         u0 write_pad(file_t& file) {
@@ -196,6 +204,12 @@ namespace basecode::binfmt::io {
             return status_t::ok;
         }
 
+        status_t read_s16(file_t& file, s16& value) {
+            if (!OK(buf::cursor::read_s16(file.crsr, value)))
+                return status_t::read_error;
+            return status_t::ok;
+        }
+
         status_t read_u16(file_t& file, u16& value) {
             if (!OK(buf::cursor::read_u16(file.crsr, value)))
                 return status_t::read_error;
@@ -247,6 +261,12 @@ namespace basecode::binfmt::io {
                        slice.data,
                        std::min<u32>(slice.length, 16));
             file.crsr.pos += 16;
+        }
+
+        status_t read_obj(file_t& file, u0* obj, u32 length) {
+            if (!OK(buf::cursor::read_obj(file.crsr, obj, length)))
+                return status_t::read_error;
+            return status_t::ok;
         }
     }
 

@@ -93,6 +93,12 @@ namespace basecode::buf {
             return status_t::ok;
         }
 
+        status_t read_s16(buf_crsr_t& crsr, s16& value) {
+            read(*crsr.buf, crsr.pos, &value, sizeof(s16));
+            crsr.pos += sizeof(s16);
+            return status_t::ok;
+        }
+
         status_t read_u16(buf_crsr_t& crsr, u16& value) {
             read(*crsr.buf, crsr.pos, &value, sizeof(u16));
             crsr.pos += sizeof(u16);
