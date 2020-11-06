@@ -170,7 +170,7 @@ namespace basecode::binfmt::io::pe {
         pe.coff.offset   = pe.start_offset = align(pe.size.dos_stub, 8);
 
         // XXX: is this size constant for x64 images?
-        pe.size.opt_hdr = 0xf0;
+        pe.coff.size.opt_hdr = 0xf0;
 
         for (u32 dir_type = 0; dir_type < max_dir_entry_count; ++dir_type) {
             auto& dir_entry = pe.dirs[dir_type];
@@ -267,7 +267,7 @@ namespace basecode::binfmt::io::pe {
         auto& coff = pe.coff;
 
         coff.size.headers = coff.offset
-                            + (pe_sig_size + coff::header_size + pe.size.opt_hdr)
+                            + (pe_sig_size + coff::header_size + pe.coff.size.opt_hdr)
                             + (coff.headers.size * coff::section::header_size);
         coff.offset       = align(coff.size.headers, coff.align.file);
         coff.rva          = align(coff.size.headers, coff.align.section);
@@ -319,8 +319,8 @@ namespace basecode::binfmt::io::pe {
     status_t build_section(file_t& file, pe_t& pe, coff::section_hdr_t& hdr) {
         auto& coff = pe.coff;
 
-        hdr.offset = coff.offset;
-        hdr.rva    = coff.rva;
+        hdr.file.offset = coff.offset;
+        hdr.rva.base    = coff.rva;
 
         switch (hdr.section->type) {
             case section::type_t::reloc: {
@@ -399,13 +399,14 @@ namespace basecode::binfmt::io::pe {
                     name_hint.rva.base += import_table.name_hints.rva.base;
                 }
 
-                hdr.size = (import_table.name_hints.rva.base + import_table.name_hints.rva.size)
+                hdr.rva.size = (import_table.name_hints.rva.base + import_table.name_hints.rva.size)
                            - import_table_entry.rva.base;
+                hdr.file.size = align(hdr.rva.size, coff.align.file);
 
-                coff.init_data.size += hdr.size;
-                coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
-                coff.offset     = align(coff.offset + hdr.size, coff.align.file);
-                coff.rva        = align(coff.rva + hdr.size, coff.align.section);
+                coff.init_data.size += hdr.rva.size;
+                coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
+                coff.offset     = align(coff.offset + hdr.rva.size, coff.align.file);
+                coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
 
                 break;
             }
@@ -417,8 +418,9 @@ namespace basecode::binfmt::io::pe {
             }
         }
 
+        coff::set_section_flags(hdr);
         auto& section_rec = hdr.symbol->aux_records[0];
-        section_rec.section.len = hdr.size;
+        section_rec.section.len = hdr.rva.size;
 
         return status_t::ok;
     }
@@ -428,7 +430,7 @@ namespace basecode::binfmt::io::pe {
         if (type == section::type_t::data && !hdr.section->flags.init)
             return status_t::ok;
 
-        file::seek(file, hdr.offset);
+        file::seek(file, hdr.file.offset);
 
         switch (type) {
             case section::type_t::reloc: {

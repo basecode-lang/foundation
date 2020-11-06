@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/binfmt/io.h>
+#include <basecode/binfmt/coff.h>
 
 namespace basecode::binfmt::io::coff {
     namespace internal {
@@ -32,8 +32,64 @@ namespace basecode::binfmt::io::coff {
         }
 
         static status_t read(file_t& file) {
-            UNUSED(file);
-            return status_t::read_error;
+            if (file.file_type != file_type_t::obj)
+                return status_t::invalid_input_type;
+
+            if (!OK(buf::map(file.buf, file.path)))
+                return status_t::read_error;
+            defer(buf::unmap(file.buf));
+
+            coff_t coff{};
+            auto status = coff::init(coff, file, g_coff_sys.alloc);
+            if (!OK(status))
+                return status;
+            defer(coff::free(coff));
+
+            status = coff::read_header(file, coff);
+            if (!OK(status))
+                return status_t::read_error;
+
+            status = coff::read_section_headers(file, coff);
+            if (!OK(status))
+                return status_t::read_error;
+
+            format::print("                                                         c i u l s e r w\n");
+            format::print("                                                         o n n i h x e r\n");
+            format::print("                                                         d i i n a e a i\n");
+            format::print("                                                         e t n k e c d t\n");
+            format::print("                                                             i   e     e\n");
+            format::print("No Name             RVA      Size     Data Off Data Size     t          \n");
+            for (u32 i = 0; i < coff.headers.size; ++i) {
+                auto& hdr = coff.headers[i];
+                format::print("{:02} ", hdr.number);
+                if (hdr.symbol && hdr.symbol->inlined) {
+                    format::print("{:<16} ", hdr.symbol->name.slice);
+                } else {
+                    format::print("{:16} ", "<STRTAB>");
+                }
+                format::print("{:08x} {:08x} {:08x} {:08x}  ",
+                              hdr.rva.base,
+                              hdr.rva.size,
+                              hdr.file.offset,
+                              hdr.file.size);
+                format::print("{} ", (hdr.flags & section::code) == section::code ? "X" : " ");
+                format::print("{} ", (hdr.flags & section::init_data) == section::init_data ? "X" : " ");
+                format::print("{} ", (hdr.flags & section::uninit_data) == section::uninit_data ? "X" : " ");
+                if ((hdr.flags & section::link_info) == section::link_info) {
+                    format::print("I ");
+                } else if ((hdr.flags & section::link_comdat) == section::link_comdat) {
+                    format::print("C ");
+                } else {
+                    format::print("  ");
+                }
+                format::print("{} ", (hdr.flags & section::memory_shared) == section::memory_shared ? "X" : " ");
+                format::print("{} ", (hdr.flags & section::memory_execute) == section::memory_execute ? "X" : " ");
+                format::print("{} ", (hdr.flags & section::memory_read) == section::memory_read ? "X" : " ");
+                format::print("{} ", (hdr.flags & section::memory_write) == section::memory_write ? "X" : " ");
+                format::print("\n");
+            }
+
+            return status_t::ok;
         }
 
         static status_t write(file_t& file) {
@@ -42,12 +98,14 @@ namespace basecode::binfmt::io::coff {
         }
 
         static status_t init(alloc_t* alloc) {
+            using type_t = basecode::binfmt::section::type_t;
+
             g_coff_sys.alloc = alloc;
 
             name_map::init(g_coff_sys.section_names, g_coff_sys.alloc);
 
             name_map::add(g_coff_sys.section_names,
-                          section::type_t::tls,
+                          type_t::tls,
                           {
                               .code = false,
                               .data = true,
@@ -61,7 +119,7 @@ namespace basecode::binfmt::io::coff {
                           ".tls"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          section::type_t::code,
+                          type_t::code,
                           {
                               .code = true,
                               .data = false,
@@ -74,7 +132,7 @@ namespace basecode::binfmt::io::coff {
                           ".text"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          section::type_t::data,
+                          type_t::data,
                           {
                               .code = false,
                               .data = true,
@@ -88,7 +146,7 @@ namespace basecode::binfmt::io::coff {
                           ".data"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          section::type_t::data,
+                          type_t::data,
                           {
                               .code = false,
                               .data = true,
@@ -102,7 +160,7 @@ namespace basecode::binfmt::io::coff {
                           ".rdata"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          section::type_t::debug,
+                          type_t::debug,
                           {
                               .code = false,
                               .data = true,
@@ -116,7 +174,7 @@ namespace basecode::binfmt::io::coff {
                           ".debug"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          section::type_t::data,
+                          type_t::data,
                           {
                               .code = false,
                               .data = true,
@@ -130,7 +188,7 @@ namespace basecode::binfmt::io::coff {
                           ".bss"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          section::type_t::import,
+                          type_t::import,
                           {
                               .code = false,
                               .data = true,
@@ -144,7 +202,7 @@ namespace basecode::binfmt::io::coff {
                           ".idata"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          section::type_t::export_,
+                          type_t::export_,
                           {
                               .code = false,
                               .data = true,
@@ -158,7 +216,7 @@ namespace basecode::binfmt::io::coff {
                           ".edata"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          section::type_t::resource,
+                          type_t::resource,
                           {
                               .code = false,
                               .data = true,
@@ -172,7 +230,7 @@ namespace basecode::binfmt::io::coff {
                           ".rsrc"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          section::type_t::exception,
+                          type_t::exception,
                           {
                               .code = false,
                               .data = true,

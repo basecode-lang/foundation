@@ -89,8 +89,6 @@ namespace basecode::binfmt::io {
 
         status_t save(file_t& file);
 
-        u0 seek(file_t& file, u32 offset);
-
         u0 write_u8(file_t& file, u8 value);
 
         u0 write_u16(file_t& file, u16 value);
@@ -102,6 +100,20 @@ namespace basecode::binfmt::io {
         u0 write_u64(file_t& file, u64 value);
 
         u0 write_s64(file_t& file, s64 value);
+
+        status_t seek(file_t& file, u32 offset);
+
+        status_t read_u8(file_t& file, u8& value);
+
+        status_t seek_fwd(file_t& file, u32 offset);
+
+        status_t seek_rev(file_t& file, u32 offset);
+
+        status_t read_u16(file_t& file, u16& value);
+
+        status_t read_u32(file_t& file, u32& value);
+
+        status_t read_u64(file_t& file, u64& value);
 
         status_t init(file_t& file, alloc_t* alloc);
 
@@ -135,6 +147,17 @@ namespace basecode::binfmt::io {
         u0 free(session_t& s);
 
         file_t* add_file(session_t& s,
+                         const s8* path,
+                         type_t bin_type,
+                         file_type_t file_type,
+                         s32 path_len = -1);
+
+        file_t* add_file(session_t& s,
+                         const path_t& path,
+                         type_t bin_type,
+                         file_type_t file_type);
+
+        file_t* add_file(session_t& s,
                          module_t* module,
                          const s8* path,
                          machine::type_t machine,
@@ -150,6 +173,13 @@ namespace basecode::binfmt::io {
                          type_t bin_type,
                          file_type_t output_type,
                          b8 save_to_disk = true);
+
+        file_t* add_file(session_t& s,
+                        const String_Concept auto& path,
+                        type_t bin_type,
+                        file_type_t file_type) {
+            return add_file(s, (const s8*) path.data, bin_type, file_type, path.length);
+        }
 
         file_t* add_file(session_t& s,
                          module_t* module,

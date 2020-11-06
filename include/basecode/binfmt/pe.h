@@ -244,7 +244,6 @@ namespace basecode::binfmt::io::pe {
             u64                 stack;
         }                       reserve;
         struct {
-            u32                 opt_hdr;
             u32                 dos_stub;
         }                       size;
         struct {

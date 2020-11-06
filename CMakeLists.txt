@@ -44,6 +44,7 @@ if (MSVC)
             -Wno-signed-enum-bitfield
             -Wno-nonportable-system-include-path
             -Wno-newline-eof
+            -Wno-deprecated-declarations
             -Wno-documentation-unknown-command
             -Wno-c99-designator
     )
@@ -61,9 +62,24 @@ if (MSVC)
             "$<$<COMPILE_LANGUAGE:C,CXX>:${CXX_DEFINES}>"
     )
 else ()
-    set(CXX_FLAGS -Wall -Wno-string-plus-int -Wno-signed-enum-bitfield -Wno-cast-qual -Wno-auto-var-id -Wno-unused-private-field -Wno-unknown-pragmas -Wno-inconsistent-missing-override -Wno-c99-designator)
+    set(
+        CXX_FLAGS
+        -Wall
+        -Wno-string-plus-int
+        -Wno-signed-enum-bitfield
+        -Wno-cast-qual
+        -Wno-auto-var-id
+        -Wno-unused-private-field
+        -Wno-unknown-pragmas
+        -Wno-inconsistent-missing-override
+        -Wno-c99-designator
+        -Wno-deprecated-declarations
+    )
+
     set(CLANG_CXX_FLAGS -fcolor-diagnostics)
+
     set(GCC_CXX_FLAGS -fdiagnostics-color=always -Wno-parentheses -Wno-sequence-point)
+
     add_compile_options(
         "$<$<COMPILE_LANGUAGE:C,CXX>:${CXX_FLAGS}>"
         "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:${GCC_CXX_FLAGS}>"

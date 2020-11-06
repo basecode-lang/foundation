@@ -58,8 +58,12 @@ namespace basecode::binfmt::io::elf {
             opts.alloc       = g_elf_sys.alloc;
             opts.entry_point = file.opts.base_addr;
 
+            status_t status{};
+
             elf_t elf{};
-            elf::init(elf, opts);
+            status = elf::init(elf, opts);
+            if (!OK(status))
+                return status;
             defer(elf::free(elf));
 
             elf.section.offset = elf::file::header_size;
@@ -266,16 +270,19 @@ namespace basecode::binfmt::io::elf {
             for (auto& block : elf.blocks)
                 block.offset += elf.data.base_offset;
 
+            // XXX: FIXME
+            file.buf.mode = buf_mode_t::alloc;
+
             elf::write_file_header(file, elf);
 
             if (file.file_type == file_type_t::exe
             || file.file_type == file_type_t::dll) {
-                auto status = elf::write_segments(file, elf);
+                status = elf::write_segments(file, elf);
                 if (!OK(status))
                     return status;
             }
 
-            auto status = elf::write_sections(file, elf);
+            status = elf::write_sections(file, elf);
             if (!OK(status))
                 return status;
 

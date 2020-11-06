@@ -68,6 +68,7 @@ namespace basecode::binfmt {
         invalid_output_type             = 2013,
         cannot_map_section_name         = 2014,
         section_not_found               = 2015,
+        invalid_input_type              = 2016,
     };
 
     enum class module_type_t : u8 {

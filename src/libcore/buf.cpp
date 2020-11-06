@@ -44,34 +44,6 @@ namespace basecode::buf {
             stack::free(crsr.stack);
         }
 
-        u8 read_u8(buf_crsr_t& crsr) {
-            u8 value;
-            read(*crsr.buf, crsr.pos, &value, sizeof(u8));
-            crsr.pos += sizeof(u8);
-            return value;
-        }
-
-        u16 read_u16(buf_crsr_t& crsr) {
-            u16 value;
-            read(*crsr.buf, crsr.pos, &value, sizeof(u16));
-            crsr.pos += sizeof(u16);
-            return value;
-        }
-
-        u32 read_u32(buf_crsr_t& crsr) {
-            u32 value;
-            read(*crsr.buf, crsr.pos, &value, sizeof(u32));
-            crsr.pos += sizeof(u32);
-            return value;
-        }
-
-        u64 read_u64(buf_crsr_t& crsr) {
-            u64 value;
-            read(*crsr.buf, crsr.pos, &value, sizeof(u64));
-            crsr.pos += sizeof(u64);
-            return value;
-        }
-
         u0 seek(buf_crsr_t& crsr, u32 offset) {
             crsr.pos = offset;
         }
@@ -115,12 +87,36 @@ namespace basecode::buf {
             crsr.pos += sizeof(u64);
         }
 
-        b8 read_obj(buf_crsr_t& crsr, u0* data, u32 length) {
+        status_t read_u8(buf_crsr_t& crsr, u8& value) {
+            read(*crsr.buf, crsr.pos, &value, sizeof(u8));
+            crsr.pos += sizeof(u8);
+            return status_t::ok;
+        }
+
+        status_t read_u16(buf_crsr_t& crsr, u16& value) {
+            read(*crsr.buf, crsr.pos, &value, sizeof(u16));
+            crsr.pos += sizeof(u16);
+            return status_t::ok;
+        }
+
+        status_t read_u32(buf_crsr_t& crsr, u32& value) {
+            read(*crsr.buf, crsr.pos, &value, sizeof(u32));
+            crsr.pos += sizeof(u32);
+            return status_t::ok;
+        }
+
+        status_t read_u64(buf_crsr_t& crsr, u64& value) {
+            read(*crsr.buf, crsr.pos, &value, sizeof(u64));
+            crsr.pos += sizeof(u64);
+            return status_t::ok;
+        }
+
+        status_t read_obj(buf_crsr_t& crsr, u0* data, u32 length) {
             if (crsr.pos + length > crsr.buf->length)
-                return false;
+                return status_t::end_of_buffer;
             read(*crsr.buf, crsr.pos, data, length);
             crsr.pos += length;
-            return true;
+            return status_t::ok;
         }
     }
 

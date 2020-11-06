@@ -62,6 +62,14 @@ namespace basecode::binfmt::io::coff {
             return aux;
         }
 
+        symbol_t* make_symbol(coff_t& coff, u64 offset) {
+            auto sym = &array::append(coff.symbol_table.list);
+            array::init(sym->aux_records, coff.alloc);
+            sym->name.offset = offset;
+            sym->inlined     = false;
+            return sym;
+        }
+
         symbol_t* make_symbol(coff_t& coff, str::slice_t name) {
             auto sym = &array::append(coff.symbol_table.list);
             array::init(sym->aux_records, coff.alloc);
@@ -89,21 +97,20 @@ namespace basecode::binfmt::io::coff {
                   alloc_t* alloc) {
         using type_t = binfmt::section::type_t;
 
-        const auto module = file.module;
-        auto& module_sc = module->subclass.object;
-
         coff.alloc = alloc;
 
         array::init(coff.headers, coff.alloc);
         string_table::init(coff, coff.alloc);
         symbol_table::init(coff, coff.alloc);
 
+        coff.timestamp     = std::time(nullptr);
         coff.align.file    = 0x200;
         coff.align.section = 0x1000;
 
         switch (file.machine) {
             case binfmt::machine::type_t::unknown:
-                return status_t::invalid_machine_type;
+                coff.machine = 0;
+                break;
             case binfmt::machine::type_t::x86_64:
                 coff.machine = machine::amd64;
                 break;
@@ -112,7 +119,13 @@ namespace basecode::binfmt::io::coff {
                 break;
         }
 
+        if (!file.module)
+            return status_t::ok;
+
         status_t status{};
+
+        const auto module = file.module;
+        auto& module_sc = module->subclass.object;
 
         for (u32 i = 0; i < module_sc.sections.size; ++i) {
             auto& hdr = array::append(coff.headers);
@@ -139,7 +152,7 @@ namespace basecode::binfmt::io::coff {
             hdr.symbol->sclass  = symbol_table::storage_class::static_;
 
             auto aux = coff::symbol_table::make_aux_record(coff, hdr.symbol,aux_record_type_t::section);
-            aux->section.len        = hdr.size;
+            aux->section.len        = hdr.rva.size;
             aux->section.sect_num   = hdr.number;
             aux->section.check_sum  = 0;
             aux->section.comdat_sel = 0;
@@ -194,6 +207,62 @@ namespace basecode::binfmt::io::coff {
     u0 update_symbol_table(coff_t& coff) {
         coff.symbol_table.file.offset = coff.offset;
         coff.string_table.file.offset = coff.symbol_table.file.offset + coff.symbol_table.file.size;
+    }
+
+    u0 set_section_flags(section_hdr_t& hdr) {
+        const auto& flags = hdr.section->flags;
+
+        if (flags.data) {
+            if (flags.init)
+                hdr.flags |= section::init_data;
+            else
+                hdr.flags |= section::uninit_data;
+        }
+        if (flags.code)     hdr.flags |= section::code;
+        if (flags.read)     hdr.flags |= section::memory_read;
+        if (flags.write)    hdr.flags |= section::memory_write;
+        if (flags.exec)     hdr.flags |= section::memory_execute;
+    }
+
+    u0 write_header(file_t& file, coff_t& coff) {
+        file::write_u16(file, coff.machine);
+        file::write_u16(file, coff.headers.size);
+        file::write_u32(file, coff.timestamp);
+        file::write_u32(file, coff.symbol_table.file.offset);
+        file::write_u32(file, coff.symbol_table.file.size / symbol_table::entry_size);
+        file::write_u16(file, coff.size.opt_hdr);
+        file::write_u16(file, coff.flags.image);
+    }
+
+    status_t read_header(file_t& file, coff_t& coff) {
+        if (!OK(file::read_u16(file, coff.machine)))
+            return status_t::read_error;
+
+        u16 num_headers{};
+        if (!OK(file::read_u16(file, num_headers)))
+            return status_t::read_error;
+        array::resize(coff.headers, num_headers);
+
+        if (!OK(file::read_u32(file, coff.timestamp)))
+            return status_t::read_error;
+
+        if (!OK(file::read_u32(file, coff.symbol_table.file.offset)))
+            return status_t::read_error;
+
+        u32 num_symbols{};
+        if (!OK(file::read_u32(file, num_symbols)))
+            return status_t::read_error;
+        array::resize(coff.symbol_table.list, num_symbols);
+        coff.symbol_table.file.size   = num_symbols * symbol_table::entry_size;
+        coff.string_table.file.offset = coff.symbol_table.file.offset + coff.symbol_table.file.size;
+
+        if (!OK(file::read_u16(file, coff.size.opt_hdr)))
+            return status_t::read_error;
+
+        if (!OK(file::read_u16(file, coff.flags.image)))
+            return status_t::read_error;
+
+        return status_t::ok;
     }
 
     u0 write_string_table(file_t& file, coff_t& coff) {
@@ -259,14 +328,62 @@ namespace basecode::binfmt::io::coff {
         return status_t::ok;
     }
 
-    u0 write_header(file_t& file, coff_t& coff, u16 opt_hdr_size) {
-        file::write_u16(file, coff.machine);
-        file::write_u16(file, coff.headers.size);
-        file::write_u32(file, std::time(nullptr));
-        file::write_u32(file, coff.symbol_table.file.offset);
-        file::write_u32(file, coff.symbol_table.file.size / symbol_table::entry_size);
-        file::write_u16(file, opt_hdr_size);
-        file::write_u16(file, coff.flags.image);
+    status_t read_section_headers(file_t& file, coff_t& coff) {
+        u32 zero{};
+        for (u32 i = 0; i < coff.headers.size; ++i) {
+            auto& hdr = coff.headers[i];
+            hdr.number = i + 1;
+
+            u64_bytes_t u64_thunk{};
+            if (!OK(file::read_u64(file, u64_thunk.value)))
+                return status_t::read_error;
+
+            if (memcmp(u64_thunk.bytes, &zero, 4) == 0) {
+                hdr.symbol = symbol_table::make_symbol(coff, u64_thunk.value);
+            } else {
+                u32 len{};
+                for (u32 j = 0; j < 8; ++j) {
+                    if (u64_thunk.bytes[j] == 0)
+                        break;
+                    ++len;
+                }
+                const auto slice = slice::make(u64_thunk.bytes, len);
+                hdr.symbol = symbol_table::make_symbol(coff, string::interned::fold(slice));
+            }
+
+            if (!OK(file::read_u32(file, hdr.rva.size)))
+                return status_t::read_error;
+
+            if (!OK(file::read_u32(file, hdr.rva.base)))
+                return status_t::read_error;
+
+            if (!OK(file::read_u32(file, hdr.file.size)))
+                return status_t::read_error;
+
+            if (!OK(file::read_u32(file, hdr.file.offset)))
+                return status_t::read_error;
+
+            if (!OK(file::read_u32(file, hdr.relocs.offset)))
+                return status_t::read_error;
+
+            if (!OK(file::read_u32(file, hdr.line_nums.offset)))
+                return status_t::read_error;
+
+            u16 num_relocs{};
+            if (!OK(file::read_u16(file, num_relocs)))
+                return status_t::read_error;
+
+            u16 num_line_nos{};
+            if (!OK(file::read_u16(file, num_line_nos)))
+                return status_t::read_error;
+
+            hdr.relocs.size    = num_relocs;
+            hdr.line_nums.size = num_line_nos;
+
+            if (!OK(file::read_u32(file, hdr.flags)))
+                return status_t::read_error;
+        }
+        return status_t::ok;
     }
 
     u0 write_aux_record(file_t& file, const aux_record_t& record) {
@@ -330,36 +447,40 @@ namespace basecode::binfmt::io::coff {
     status_t build_section(file_t& file, coff_t& coff, section_hdr_t& hdr) {
         using type_t = binfmt::section::type_t;
 
-        hdr.offset = coff.offset;
-        hdr.rva    = coff.rva;
+        hdr.file.offset = coff.offset;
+        hdr.rva.base    = coff.rva;
         const auto& sc = hdr.section->subclass;
         switch (hdr.section->type) {
             case type_t::code:
                 if (!coff.code.base)
-                    coff.code.base = hdr.rva;
-                hdr.size           = sc.data.length;
-                coff.code.size += hdr.size;
-                coff.size.image    = align(coff.size.image + hdr.size, coff.align.section);
-                coff.offset        = align(coff.offset + hdr.size, coff.align.file);
-                coff.rva           = align(coff.rva + hdr.size, coff.align.section);
+                    coff.code.base = hdr.rva.base;
+                hdr.rva.size    = sc.data.length;
+                hdr.file.size   = align(hdr.rva.size, coff.align.file);
+                coff.code.size += hdr.rva.size;
+                coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
+                coff.offset     = align(coff.offset + hdr.rva.size, coff.align.file);
+                coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
                 break;
             case type_t::data:
             case type_t::custom:
                 if (hdr.section->flags.init) {
                     if (!coff.init_data.base)
-                        coff.init_data.base = hdr.rva;
-                    hdr.size                = sc.data.length;
-                    coff.init_data.size += hdr.size;
-                    coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
-                    coff.offset     = align(coff.offset + hdr.size, coff.align.file);
-                    coff.rva        = align(coff.rva + hdr.size, coff.align.section);
+                        coff.init_data.base = hdr.rva.base;
+                    hdr.rva.size  = sc.data.length;
+                    hdr.file.size = align(hdr.rva.size, coff.align.file);
+                    coff.init_data.size += hdr.rva.size;
+                    coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
+                    coff.offset     = align(coff.offset + hdr.rva.size, coff.align.file);
+                    coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
                 } else {
                     if (!coff.uninit_data.base)
-                        coff.uninit_data.base = hdr.rva;
-                    hdr.size                  = sc.size;
-                    coff.uninit_data.size += hdr.size;
-                    coff.size.image = align(coff.size.image + hdr.size, coff.align.section);
-                    coff.rva        = align(coff.rva + hdr.size, coff.align.section);
+                        coff.uninit_data.base = hdr.rva.base;
+                    hdr.rva.size    = sc.size;
+                    hdr.file.offset = 0;
+                    hdr.file.size   = 0;
+                    coff.uninit_data.size += hdr.rva.size;
+                    coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
+                    coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
                 }
                 break;
             case type_t::reloc:
@@ -373,53 +494,30 @@ namespace basecode::binfmt::io::coff {
                 return status_t::not_implemented;
         }
 
+        set_section_flags(hdr);
+
         auto& section_rec = hdr.symbol->aux_records[0];
-        section_rec.section.len = hdr.size;
+        section_rec.section.len = hdr.rva.size;
 
         return status_t::ok;
     }
 
     u0 write_section_header(file_t& file, coff_t& coff, section_hdr_t& hdr) {
-        using type_t = binfmt::section::type_t;
-
-        const auto type = hdr.section->type;
-        const auto& flags = hdr.section->flags;
-
         if (hdr.symbol->inlined) {
             file::write_pad8(file, hdr.symbol->name.slice);
         } else {
             file::write_u64(file, hdr.symbol->name.offset);
         }
 
-        file::write_u32(file, hdr.size);
-        file::write_u32(file, hdr.rva);
-
-        if (type == type_t::data && !hdr.section->flags.init) {
-            file::write_u32(file, 0);
-            file::write_u32(file, 0);
-        } else {
-            file::write_u32(file, align(hdr.size, coff.align.file));
-            file::write_u32(file, hdr.offset);
-        }
-
+        file::write_u32(file, hdr.rva.size);
+        file::write_u32(file, hdr.rva.base);
+        file::write_u32(file, hdr.file.size);
+        file::write_u32(file, hdr.file.offset);
         file::write_u32(file, hdr.relocs.offset);
         file::write_u32(file, hdr.line_nums.offset);
         file::write_u16(file, hdr.relocs.size);
         file::write_u16(file, hdr.line_nums.size);
-
-        u32 bitmask{};
-        if (flags.code) bitmask |= section::code;
-        if (flags.data) {
-            if (flags.init)
-                bitmask |= section::init_data;
-            else
-                bitmask |= section::uninit_data;
-        }
-        if (flags.read) bitmask |= section::memory_read;
-        if (flags.write) bitmask |= section::memory_write;
-        if (flags.exec) bitmask |= section::memory_execute;
-
-        file::write_u32(file, bitmask);
+        file::write_u32(file, hdr.flags);
     }
 
     status_t write_section_data(file_t& file, coff_t& coff, section_hdr_t& hdr) {
@@ -431,7 +529,7 @@ namespace basecode::binfmt::io::coff {
             return status_t::ok;
 
         const auto& sc = hdr.section->subclass;
-        file::seek(file, hdr.offset);
+        file::seek(file, hdr.file.offset);
 
         switch (type) {
             case type_t::code:

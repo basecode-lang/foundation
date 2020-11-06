@@ -38,11 +38,14 @@ namespace basecode::binfmt::io::pe {
             opts.heap_reserve  = file.opts.heap_reserve;
             opts.stack_reserve = file.opts.stack_reserve;
 
+            status_t status;
+
             pe_t pe{};
-            pe::init(pe, opts);
+            status = pe::init(pe, opts);
+            if (!OK(status))
+                return status;
             defer(pe::free(pe));
 
-            status_t status;
             auto& coff = pe.coff;
 
             switch (file.file_type) {
@@ -62,6 +65,9 @@ namespace basecode::binfmt::io::pe {
                     break;
             }
 
+            // XXX: FIXME
+            file.buf.mode = buf_mode_t::alloc;
+
             pe.opts.include_symbol_table = true;    // XXX: temporary for testing
 
             status = pe::build_sections(file, pe);
@@ -70,7 +76,7 @@ namespace basecode::binfmt::io::pe {
 
             pe::write_dos_header(file, pe);
             pe::write_pe_header(file, pe);
-            coff::write_header(file, coff, pe.size.opt_hdr);
+            coff::write_header(file, coff);
             pe::write_optional_header(file, pe);
             coff::write_section_headers(file, coff);
             status = pe::write_sections_data(file, pe);

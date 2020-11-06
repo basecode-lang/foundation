@@ -7,8 +7,9 @@ add_executable(
     test.h
     main.cpp
     ar_tests.cpp
-    elf_tests.cpp
     pe_tests.cpp
+    elf_tests.cpp
+    coff_tests.cpp
 )
 target_link_libraries(${PROJECT_NAME} basecode-core basecode-binfmt)
 if (NOT MSVC)

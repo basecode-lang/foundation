@@ -147,10 +147,6 @@ namespace basecode::binfmt::io {
             return status_t::ok;
         }
 
-        u0 seek(file_t& file, u32 offset) {
-            file.crsr.pos = offset;
-        }
-
         u0 write_u8(file_t& file, u8 value) {
             buf::write(file.buf, file.crsr.pos, (const u8*) &value, sizeof(u8));
             file.crsr.pos += sizeof(u8);
@@ -181,11 +177,52 @@ namespace basecode::binfmt::io {
             file.crsr.pos += sizeof(s64);
         }
 
+        // FIXME
+        status_t seek(file_t& file, u32 offset) {
+            file.crsr.pos = offset;
+            return status_t::ok;
+        }
+
+        status_t read_u8(file_t& file, u8& value) {
+            if (!OK(buf::cursor::read_u8(file.crsr, value)))
+                return status_t::read_error;
+            return status_t::ok;
+        }
+
         status_t init(file_t& file, alloc_t* alloc) {
             path::init(file.path, alloc);
             buf::init(file.buf, alloc);
-            buf::reserve(file.buf, 64 * 1024);
             buf::cursor::init(file.crsr, file.buf);
+            return status_t::ok;
+        }
+
+        status_t read_u16(file_t& file, u16& value) {
+            if (!OK(buf::cursor::read_u16(file.crsr, value)))
+                return status_t::read_error;
+            return status_t::ok;
+        }
+
+        status_t read_u32(file_t& file, u32& value) {
+            if (!OK(buf::cursor::read_u32(file.crsr, value)))
+                return status_t::read_error;
+            return status_t::ok;
+        }
+
+        status_t read_u64(file_t& file, u64& value) {
+            if (!OK(buf::cursor::read_u64(file.crsr, value)))
+                return status_t::read_error;
+            return status_t::ok;
+        }
+
+        // FIXME
+        status_t seek_fwd(file_t& file, u32 offset) {
+            file.crsr.pos += offset;
+            return status_t::ok;
+        }
+
+        // FIXME
+        status_t seek_rev(file_t& file, u32 offset) {
+            file.crsr.pos -= offset;
             return status_t::ok;
         }
 
@@ -235,6 +272,33 @@ namespace basecode::binfmt::io {
                             output_type,
                             save_to_disk,
                             path.str.length);
+        }
+
+        file_t* add_file(session_t& s,
+                         const path_t& path,
+                         type_t bin_type,
+                         file_type_t file_type) {
+            return add_file(s,
+                            path::c_str(path),
+                            bin_type,
+                            file_type,
+                            path.str.length);
+        }
+
+        file_t* add_file(session_t& s,
+                         const s8* path,
+                         type_t bin_type,
+                         file_type_t file_type,
+                         s32 path_len) {
+            auto file = &array::append(s.files);
+            file::init(*file, s.alloc);
+            path::set(file->path, path, path_len);
+            file->session    = &s;
+            file->module     = {};
+            file->machine    = {};
+            file->bin_type   = bin_type;
+            file->file_type  = file_type;
+            return file;
         }
 
         file_t* add_file(session_t& s,

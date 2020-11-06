@@ -102,12 +102,12 @@ namespace basecode::binfmt::io::coff {
     struct section_hdr_t final {
         const section_t*        section;
         symbol_t*               symbol;
-        u32                     rva;
-        u32                     size;
-        u32                     number;
-        u32                     offset;
+        rva_t                   rva;
+        raw_t                   file;
         raw_t                   relocs;
         raw_t                   line_nums;
+        u32                     number;
+        u32                     flags;
     };
 
     // .debug$S (symbolic info)
@@ -120,6 +120,7 @@ namespace basecode::binfmt::io::coff {
         section_hdr_list_t      headers;
         u32                     rva;
         u32                     offset;
+        u32                     timestamp;
         struct {
             raw_t               file;
             string_list_t       list;
@@ -131,9 +132,10 @@ namespace basecode::binfmt::io::coff {
         struct {
             u32                 image;
             u32                 headers;
+            u16                 opt_hdr;
         }                       size;
         struct {
-            u32                 image;
+            u16                 image;
         }                       flags;
         struct {
             u32                 file;
@@ -163,6 +165,8 @@ namespace basecode::binfmt::io::coff {
         [[maybe_unused]] constexpr u32 code                = 0x00000020;
         [[maybe_unused]] constexpr u32 init_data           = 0x00000040;
         [[maybe_unused]] constexpr u32 uninit_data         = 0x00000080;
+        [[maybe_unused]] constexpr u32 link_info           = 0x00000200;
+        [[maybe_unused]] constexpr u32 link_comdat         = 0x00001000;
         [[maybe_unused]] constexpr u32 align_1             = 0x00100000;
         [[maybe_unused]] constexpr u32 align_2             = 0x00200000;
         [[maybe_unused]] constexpr u32 align_4             = 0x00300000;
@@ -264,12 +268,20 @@ namespace basecode::binfmt::io::coff {
                                       symbol_t* sym,
                                       aux_record_type_t type);
 
+        symbol_t* make_symbol(coff_t& coff, u64 offset);
+
         symbol_t* make_symbol(coff_t& coff, str::slice_t name);
     }
 
     u0 free(coff_t& coff);
 
     u0 update_symbol_table(coff_t& coff);
+
+    u0 set_section_flags(section_hdr_t& hdr);
+
+    u0 write_header(file_t& file, coff_t& coff);
+
+    status_t read_header(file_t& file, coff_t& coff);
 
     u0 write_string_table(file_t& file, coff_t& coff);
 
@@ -283,9 +295,9 @@ namespace basecode::binfmt::io::coff {
 
     status_t init(coff_t& coff, file_t& file, alloc_t* alloc);
 
-    u0 write_aux_record(file_t& file, const aux_record_t& record);
+    status_t read_section_headers(file_t& file, coff_t& coff);
 
-    u0 write_header(file_t& file, coff_t& coff, u16 opt_hdr_size = {});
+    u0 write_aux_record(file_t& file, const aux_record_t& record);
 
     status_t build_section(file_t& file, coff_t& coff, section_hdr_t& hdr);
 

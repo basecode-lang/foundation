@@ -73,6 +73,7 @@ namespace basecode {
             unable_to_open_file             = 100,
             mmap_error,
             munmap_error,
+            end_of_buffer,
             cannot_unmap_buf,
             buf_already_mapped,
             cannot_reset_mapped_buf,
@@ -94,14 +95,6 @@ namespace basecode {
 
             u0 free(buf_crsr_t& crsr);
 
-            u8 read_u8(buf_crsr_t& crsr);
-
-            u16 read_u16(buf_crsr_t& crsr);
-
-            u32 read_u32(buf_crsr_t& crsr);
-
-            u64 read_u64(buf_crsr_t& crsr);
-
             u0 seek(buf_crsr_t& crsr, u32 offset);
 
             u0 init(buf_crsr_t& crsr, buf_t& buf);
@@ -120,7 +113,15 @@ namespace basecode {
 
             u0 write_u64(buf_crsr_t& crsr, u64 value);
 
-            b8 read_obj(buf_crsr_t& crsr, u0* data, u32 length);
+            status_t read_u8(buf_crsr_t& crsr, u8& value);
+
+            status_t read_u16(buf_crsr_t& crsr, u16& value);
+
+            status_t read_u32(buf_crsr_t& crsr, u32& value);
+
+            status_t read_u64(buf_crsr_t& crsr, u64& value);
+
+            status_t read_obj(buf_crsr_t& crsr, u0* data, u32 length);
 
             u0 write_str(buf_crsr_t& crsr, const String_Concept auto& str) {
                 write(*crsr.buf, crsr.pos, str.data, str.length);
