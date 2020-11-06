@@ -135,6 +135,7 @@ namespace basecode::binfmt::io {
         }
 
         u0 free(file_t& file) {
+            buf::cursor::free(file.crsr);
             buf::free(file.buf);
             path::free(file.path);
         }

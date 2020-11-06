@@ -383,8 +383,8 @@ namespace basecode::binfmt::io::coff {
                 sym->inlined     = false;
             } else {
                 u32 len{};
-                for (u8 byte : u64_thunk.bytes) {
-                    if (byte == 0)
+                for (u8 ch : u64_thunk.bytes) {
+                    if (ch == 0)
                         break;
                     ++len;
                 }
@@ -487,6 +487,7 @@ namespace basecode::binfmt::io::coff {
                     --num_symbols;
                 }
             }
+
             --num_symbols;
         }
 
@@ -517,8 +518,8 @@ namespace basecode::binfmt::io::coff {
                 sym = symbol_table::make_symbol(coff, u64_thunk.value);
             } else {
                 u32 len{};
-                for (u32 j = 0; j < 8; ++j) {
-                    if (u64_thunk.bytes[j] == 0)
+                for (u8 ch : u64_thunk.bytes) {
+                    if (ch == 0)
                         break;
                     ++len;
                 }
