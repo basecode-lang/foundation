@@ -21,7 +21,9 @@
 #include <basecode/binfmt/io.h>
 
 namespace basecode::binfmt::io::coff {
+    struct reloc_t;
     struct symbol_t;
+    struct line_num_t;
     struct aux_record_t;
     struct section_hdr_t;
 
@@ -106,8 +108,14 @@ namespace basecode::binfmt::io::coff {
         u32                     symbol;
         rva_t                   rva;
         raw_t                   file;
-        raw_t                   relocs;
-        raw_t                   line_nums;
+        struct {
+            const u8*           buf;
+            raw_t               file;
+        }                       relocs;
+        struct {
+            const u8*           buf;
+            raw_t               file;
+        }                       line_nums;
         u32                     number;
         u32                     flags;
     };
@@ -115,6 +123,17 @@ namespace basecode::binfmt::io::coff {
     // .debug$S (symbolic info)
     // .debug$T (type info)
     struct debug_t final {
+    };
+
+    struct reloc_t final {
+        u32                     rva;
+        u32                     symtab_idx;
+        u16                     type;
+    };
+
+    struct line_num_t final {
+        u32                     one;
+        u32                     two;
     };
 
     struct coff_t final {
@@ -157,6 +176,10 @@ namespace basecode::binfmt::io::coff {
     namespace debug {
         [[maybe_unused]] constexpr u32 unknown   = 0;
         [[maybe_unused]] constexpr u32 code_view = 2;
+    }
+
+    namespace reloc {
+        reloc_t get(const section_hdr_t& hdr, u32 idx);
     }
 
     namespace machine {

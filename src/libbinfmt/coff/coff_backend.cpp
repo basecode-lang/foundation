@@ -91,6 +91,7 @@ namespace basecode::binfmt::io::coff {
                 format::print("{} ", (hdr.flags & section::memory_read) == section::memory_read ? "X" : " ");
                 format::print("{} ", (hdr.flags & section::memory_write) == section::memory_write ? "X" : " ");
                 format::print("\n");
+                format::print("{:04} {:04}\n\n", hdr.line_nums.file.size, hdr.relocs.file.size);
             }
 
             format::print("\nNo  Sec Value            Class  Type Name\n");

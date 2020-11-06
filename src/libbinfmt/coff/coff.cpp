@@ -28,6 +28,23 @@ namespace basecode::binfmt::io::coff {
         }
     }
 
+    namespace reloc {
+        reloc_t get(const section_hdr_t& hdr, u32 idx) {
+            reloc_t r{};
+
+            auto p = hdr.relocs.buf + (idx * 10);
+            std::memcpy(&r.rva, p, sizeof(u32));
+            p += sizeof(u32);
+
+            std::memcpy(&r.symtab_idx, p, sizeof(u32));
+            p += sizeof(u32);
+
+            std::memcpy(&r.type, p, sizeof(u16));
+
+            return r;
+        }
+    }
+
     namespace string_table {
         u0 free(coff_t& coff) {
             array::free(coff.string_table.list);
@@ -177,8 +194,8 @@ namespace basecode::binfmt::io::coff {
             aux->section.sect_num   = hdr.number;
             aux->section.check_sum  = 0;
             aux->section.comdat_sel = 0;
-            aux->section.num_relocs = hdr.relocs.size;
-            aux->section.num_lines  = hdr.line_nums.size;
+            aux->section.num_relocs = hdr.relocs.file.size;
+            aux->section.num_lines  = hdr.line_nums.file.size;
         }
 
         hashtab::for_each_pair(module->symbols,
@@ -543,10 +560,10 @@ namespace basecode::binfmt::io::coff {
             if (!OK(file::read_u32(file, hdr.file.offset)))
                 return status_t::read_error;
 
-            if (!OK(file::read_u32(file, hdr.relocs.offset)))
+            if (!OK(file::read_u32(file, hdr.relocs.file.offset)))
                 return status_t::read_error;
 
-            if (!OK(file::read_u32(file, hdr.line_nums.offset)))
+            if (!OK(file::read_u32(file, hdr.line_nums.file.offset)))
                 return status_t::read_error;
 
             u16 num_relocs{};
@@ -557,8 +574,10 @@ namespace basecode::binfmt::io::coff {
             if (!OK(file::read_u16(file, num_line_nos)))
                 return status_t::read_error;
 
-            hdr.relocs.size    = num_relocs;
-            hdr.line_nums.size = num_line_nos;
+            hdr.relocs.buf          = (const u8*) file.crsr.buf->data + hdr.relocs.file.offset;
+            hdr.relocs.file.size    = num_relocs;
+            hdr.line_nums.buf       = (const u8*) file.crsr.buf->data + hdr.line_nums.file.offset;
+            hdr.line_nums.file.size = num_line_nos;
 
             if (!OK(file::read_u32(file, hdr.flags)))
                 return status_t::read_error;
@@ -679,10 +698,10 @@ namespace basecode::binfmt::io::coff {
         file::write_u32(file, hdr.rva.base);
         file::write_u32(file, hdr.file.size);
         file::write_u32(file, hdr.file.offset);
-        file::write_u32(file, hdr.relocs.offset);
-        file::write_u32(file, hdr.line_nums.offset);
-        file::write_u16(file, hdr.relocs.size);
-        file::write_u16(file, hdr.line_nums.size);
+        file::write_u32(file, hdr.relocs.file.offset);
+        file::write_u32(file, hdr.line_nums.file.offset);
+        file::write_u16(file, hdr.relocs.file.size);
+        file::write_u16(file, hdr.line_nums.file.size);
         file::write_u32(file, hdr.flags);
     }
 
