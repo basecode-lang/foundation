@@ -40,6 +40,7 @@ namespace basecode {
         proxy,
         trace,
         stack,
+        buddy,
         dlmalloc,
     };
 
@@ -95,6 +96,12 @@ namespace basecode {
             proxy_pair_t*           pair;
             b8                      owner;
         }                           proxy;
+        struct {
+            u0*                     buf;
+            u32                     offset;
+            u32                     buf_size;
+            u32                     resv_size;
+        }                           buddy;
     };
 
     struct alloc_t final {

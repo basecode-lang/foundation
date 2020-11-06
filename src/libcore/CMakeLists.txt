@@ -135,6 +135,7 @@ set(
     memory/system/trace.cpp ${CORE_INC_DIR}/memory/system/trace.h
     memory/system/proxy.cpp ${CORE_INC_DIR}/memory/system/proxy.h
     memory/system/stack.cpp ${CORE_INC_DIR}/memory/system/stack.h
+    memory/system/buddy.cpp ${CORE_INC_DIR}/memory/system/buddy.h
     memory/system/default.cpp ${CORE_INC_DIR}/memory/system/default.h
     memory/system/dlmalloc.c ${CORE_INC_DIR}/memory/system/dlmalloc.h ${CORE_INC_DIR}/memory/system/dlmalloc_config.h
 

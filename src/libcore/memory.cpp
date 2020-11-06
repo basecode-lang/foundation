@@ -28,6 +28,7 @@
 #include <basecode/core/memory/system/proxy.h>
 #include <basecode/core/memory/system/trace.h>
 #include <basecode/core/memory/system/stack.h>
+#include <basecode/core/memory/system/buddy.h>
 #include <basecode/core/memory/system/default.h>
 
 namespace basecode::memory {
@@ -53,6 +54,7 @@ namespace basecode::memory {
         "proxy"_ss,
         "trace"_ss,
         "stack"_ss,
+        "buddy"_ss,
         "dlmalloc"_ss,
     };
 
@@ -213,6 +215,7 @@ namespace basecode::memory {
             case alloc_type_t::proxy:       alloc->system = proxy::system();    break;
             case alloc_type_t::trace:       alloc->system = trace::system();    break;
             case alloc_type_t::stack:       alloc->system = stack::system();    break;
+            case alloc_type_t::buddy:       alloc->system = buddy::system();    break;
             case alloc_type_t::default_:    alloc->system = default_::system(); break;
             case alloc_type_t::dlmalloc:    alloc->system = dl::system();       break;
         }
