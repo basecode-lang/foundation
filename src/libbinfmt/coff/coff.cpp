@@ -23,7 +23,7 @@
 
 namespace basecode::binfmt::io::coff {
     namespace section {
-        sym_t* get_symbol(coff_t& coff, section_hdr_t& hdr) {
+        sym_t* get_symbol(coff_t& coff, header_t& hdr) {
             if (!hdr.symbol) return nullptr;
             return &coff.symtab.list[hdr.symbol - 1];
         }
@@ -81,8 +81,11 @@ namespace basecode::binfmt::io::coff {
             }
         }
 
-        reloc_t get(const coff_t& coff, const section_hdr_t& hdr, u32 idx) {
+        reloc_t get(const coff_t& coff, const header_t& hdr, u32 idx) {
             reloc_t r{};
+
+            if (idx > hdr.relocs.file.size)
+                return r;
 
             auto p = coff.buf + hdr.relocs.file.offset + (idx * reloc::entry_size);
             std::memcpy(&r.rva, p, sizeof(u32));
@@ -119,30 +122,14 @@ namespace basecode::binfmt::io::coff {
             return (const s8*) coff.buf + coff.strtab.file.offset + (offset >> u32(32));
         }
 
-        u32 thunk_len(const u64_bytes_t& thunk) {
-            u32 len{};
-            for (u8 ch : thunk.bytes) {
-                if (ch == 0)
-                    break;
-                ++len;
-            }
-            return len;
-        }
     }
 
     namespace symtab {
-        static status_t parse_ar_long_name(coff_t& coff, sym_t* sym) {
-            auto sc = &sym->subclass.sym;
-            if (sc->name.length >= 2
-            && (sc->name[0] == '/' && isdigit(sc->name[1]))) {
-                const auto os = slice::make(sc->name.data + 1, 7);
-                if (OK(numbers::integer::parse(os, 10, sc->strtab_offset))) {
-                    const s8* p = (const s8*) coff.buf
-                        + coff.strtab.file.offset
-                        + sizeof(u32)
-                        + sc->strtab_offset;
-                    sc->name = slice::make(p);
-                    sc->strtab_offset <<= u32(32);
+        static status_t parse_ar_long_name(coff_t& coff, str::slice_t name, u32& offset) {
+            if (name.length >= 2
+            && (name[0] == '/' && isdigit(name[1]))) {
+                const auto os = slice::make(name.data + 1, 7);
+                if (OK(numbers::integer::parse(os, 10, offset))) {
                     return status_t::ok;
                 }
             }
@@ -189,7 +176,8 @@ namespace basecode::binfmt::io::coff {
             sym->type = sym_type_t::sym;
             auto sc = &sym->subclass.sym;
             sc->name = name;
-            if (!OK(parse_ar_long_name(coff, sym))) {
+            u32 offset{};
+            if (!OK(parse_ar_long_name(coff, sc->name, offset))) {
                 if (name.length > 8) {
                     sc->strtab_offset = strtab::add(coff, name);
                     sc->strtab_offset <<= u32(32);
@@ -198,6 +186,14 @@ namespace basecode::binfmt::io::coff {
                     std::memcpy(thunk.bytes, name.data, sizeof(u64));
                     sc->strtab_offset = thunk.value;
                 }
+            } else {
+                sc->strtab_offset = offset;
+                const s8* p = (const s8*) coff.buf
+                              + coff.strtab.file.offset
+                              + sizeof(u32)
+                              + sc->strtab_offset;
+                sc->name = slice::make(p);
+                sc->strtab_offset <<= u32(32);
             }
             coff.symtab.file.size += entry_size;
             return sym;
@@ -219,7 +215,16 @@ namespace basecode::binfmt::io::coff {
                 while (len < 8 && *e != 0)
                     ++e, ++len;
                 sc->name = slice::make(p, len);
-                parse_ar_long_name(coff, sym);
+                u32 strtab_offset{};
+                if (OK(parse_ar_long_name(coff, sc->name, strtab_offset))) {
+                    sc->strtab_offset = strtab_offset;
+                    const s8* pp = (const s8*) coff.buf
+                                   + coff.strtab.file.offset
+                                   + sizeof(u32)
+                                   + sc->strtab_offset;
+                    sc->name = slice::make(pp);
+                    sc->strtab_offset <<= u32(32);
+                }
             }
             return sym;
         }
@@ -244,6 +249,9 @@ namespace basecode::binfmt::io::coff {
                 case sym_type_t::aux_func_def:
                     aux->subclass.aux_func_def = {};
                     break;
+                case sym_type_t::aux_token_def:
+                    aux->subclass.aux_token_def = {};
+                    break;
                 case sym_type_t::aux_weak_extern:
                     aux->subclass.aux_weak_extern = {};
                     break;
@@ -252,6 +260,23 @@ namespace basecode::binfmt::io::coff {
             }
             coff.symtab.file.size += entry_size;
             return aux;
+        }
+    }
+
+    namespace line_num {
+        line_num_t get(const coff_t& coff, const header_t& hdr, u32 idx) {
+            line_num_t num{};
+
+            if (idx > hdr.line_nums.file.size)
+                return num;
+
+            auto p = coff.buf + hdr.line_nums.file.offset + (idx * line_num::entry_size);
+            std::memcpy(&num.rva, p, sizeof(u32));
+            p += sizeof(u32);
+
+            std::memcpy(&num.number, p, sizeof(u16));
+
+            return num;
         }
     }
 
@@ -266,7 +291,7 @@ namespace basecode::binfmt::io::coff {
         coff.strtab.file.offset = coff.symtab.file.offset + coff.symtab.file.size;
     }
 
-    u0 set_section_flags(file_t& file, section_hdr_t& hdr) {
+    u0 set_section_flags(file_t& file, header_t& hdr) {
         const auto section = hdr.section;
         const auto& flags = section->flags;
 
@@ -423,6 +448,15 @@ namespace basecode::binfmt::io::coff {
                     file::write_u32(file, sc->ptr_line_num);
                     file::write_u32(file, sc->ptr_next_func);
                     file::write_u16(file, 0);
+                    break;
+                }
+                case sym_type_t::aux_token_def: {
+                    auto sc = &sym.subclass.aux_token_def;
+                    file::write_u8(file, sc->aux_type);
+                    file::write_u8(file, 0);
+                    file::write_u32(file, sc->symtab_idx);
+                    file::write_u64(file, 0);
+                    file::write_u32(file, 0);
                     break;
                 }
                 case sym_type_t::aux_weak_extern: {
@@ -588,6 +622,19 @@ namespace basecode::binfmt::io::coff {
                         }
                         break;
                     }
+                    case symtab::sclass::clr_token: {
+                        auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_token_def);
+                        auto asc = &aux->subclass.aux_token_def;
+                        if (!OK(file::read_u8(file, asc->aux_type)))
+                            return status_t::read_error;
+                        if (!OK(file::seek_fwd(file, 1)))
+                            return status_t::read_error;
+                        if (!OK(file::read_u32(file, asc->symtab_idx)))
+                            return status_t::read_error;
+                        if (!OK(file::seek_fwd(file, 12)))
+                            return status_t::read_error;
+                        break;
+                    }
                     default: {
                         if (!OK(file::seek_fwd(file, 18)))
                             return status_t::read_error;
@@ -613,7 +660,6 @@ namespace basecode::binfmt::io::coff {
     }
 
     status_t read_section_headers(file_t& file, coff_t& coff) {
-        u64 strtab_offset;
         u32 hdr_offset;
         for (u32 i = 0; i < coff.headers.size; ++i) {
             auto& hdr = coff.headers[i];
@@ -621,24 +667,33 @@ namespace basecode::binfmt::io::coff {
 
             hdr_offset = CRSR_POS(file.crsr);
 
-            if (!OK(file::read_u64(file, strtab_offset)))
+            if (!OK(file::read_u64(file, hdr.short_name)))
                 return status_t::read_error;
+
+            {
+                s8* p = (s8*) coff.buf + hdr_offset;
+                s8* e = p;
+                u32 len{};
+                while (len < 8 && *e != '\0')
+                    ++e, ++len;
+                hdr.name = slice::make(p, len);
+                u32 offset{};
+                if (OK(symtab::parse_ar_long_name(coff, hdr.name, offset))) {
+                    const s8* pp = (const s8*) coff.buf
+                                   + coff.strtab.file.offset
+                                   + offset;
+                    hdr.name = slice::make(pp);
+                }
+            }
 
             for (const auto& sym : coff.symtab.list) {
                 if (sym.type == sym_type_t::sym
-                &&  sym.subclass.sym.strtab_offset == strtab_offset
+                &&  sym.subclass.sym.name == hdr.name
                 &&  sym.subclass.sym.section == hdr.number
                 &&  sym.subclass.sym.sclass == symtab::sclass::static_) {
                     hdr.symbol = sym.id;
                     break;
                 }
-            }
-
-            if (!hdr.symbol) {
-//                auto sym = symtab::make_symbol(coff, strtab_offset, hdr_offset);
-//                sym->section = hdr.number;
-//                sym->sclass  = symtab::sclass::static_;
-//                hdr.symbol   = sym->id;
             }
 
             if (!OK(file::read_u32(file, hdr.rva.size)))
@@ -797,7 +852,7 @@ namespace basecode::binfmt::io::coff {
         return status;
     }
 
-    status_t build_section(file_t& file, coff_t& coff, section_hdr_t& hdr) {
+    status_t build_section(file_t& file, coff_t& coff, header_t& hdr) {
         using type_t = binfmt::section::type_t;
 
         hdr.file.offset = coff.offset;
@@ -857,7 +912,7 @@ namespace basecode::binfmt::io::coff {
         return status_t::ok;
     }
 
-    u0 write_section_header(file_t& file, coff_t& coff, section_hdr_t& hdr) {
+    u0 write_section_header(file_t& file, coff_t& coff, header_t& hdr) {
         auto sym = section::get_symbol(coff, hdr);
         file::write_u64(file, sym->subclass.sym.strtab_offset);
         file::write_u32(file, hdr.rva.size);
@@ -871,7 +926,7 @@ namespace basecode::binfmt::io::coff {
         file::write_u32(file, hdr.flags);
     }
 
-    status_t write_section_data(file_t& file, coff_t& coff, section_hdr_t& hdr) {
+    status_t write_section_data(file_t& file, coff_t& coff, header_t& hdr) {
         using type_t = binfmt::section::type_t;
 
         const auto type = hdr.section->type;

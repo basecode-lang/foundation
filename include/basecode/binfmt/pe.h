@@ -292,7 +292,7 @@ namespace basecode::binfmt::io::pe {
 
     status_t write_sections_data(file_t& file, pe_t& pe);
 
-    status_t build_section(file_t& file, pe_t& pe, coff::section_hdr_t& hdr);
+    status_t build_section(file_t& file, pe_t& pe, coff::header_t& hdr);
 
-    status_t write_section_data(file_t& file, pe_t& pe, coff::section_hdr_t& hdr);
+    status_t write_section_data(file_t& file, pe_t& pe, coff::header_t& hdr);
 }

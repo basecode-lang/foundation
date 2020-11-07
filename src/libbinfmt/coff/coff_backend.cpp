@@ -71,73 +71,112 @@ namespace basecode::binfmt::io::coff {
 //                format::print("{} ", (hdr.flags & section::memory_execute) == section::memory_execute ? "X" : " ");
 //                format::print("{} ", (hdr.flags & section::memory_read) == section::memory_read ? "X" : " ");
 //                format::print("{} ", (hdr.flags & section::memory_write) == section::memory_write ? "X" : " ");
-//            format::print("No Name             RVA      Size     Raw Off  Raw Size   Align\n");
-//            for (auto& hdr : coff.headers) {
-//                const auto sym = coff::section::get_symbol(coff, hdr);
-//                format::print("{:02} ", hdr.number);
-//                format::print("{:<16} ", sym ? sym->subclass.sym.name : "<NO NAME>"_ss);
-//                format::print("{:08x} {:08x} {:08x} {:08x} {:04x}",
-//                              hdr.rva.base,
-//                              hdr.rva.size,
-//                              hdr.file.offset,
-//                              hdr.file.size,
-//                              16);
-//                format::print("\n");
-//                if (hdr.relocs.file.size > 0) {
-//                    for (u32 i = 0; i < hdr.relocs.file.size; ++i) {
-//                        auto reloc = coff::reloc::get(coff, hdr, i);
-//                        format::print("{:<32} {:08x} ",
-//                                      coff.machine == coff::machine::amd64 ? coff::reloc::type::x86_64::name(reloc.type) :
-//                                                                                  coff::reloc::type::aarch64::name(reloc.type),
-//                                      reloc.rva);
-//                        const auto& reloc_sym = coff.symtab.list[reloc.symtab_idx];
-//                        format::print("{} ", reloc_sym.subclass.sym.name);
-//                        format::print("\n");
-//                    }
-//                    format::print("\n");
-//                }
-//            }
-//
-//            format::print("\nNo  Sec Value            Class  Type Name\n");
-//            u32 i{};
-//            for (const auto& sym : coff.symtab.list) {
-//                auto sc = &sym.subclass.sym;
-//                format::print("{:>03} ", i++);
-//                format::print("{:>03} ", sc->section);
-//                format::print("{:016x} ", sc->value);
-//                switch (sc->sclass) {
-//                    case symtab::sclass::file: {
-//                        format::print("FILE   ");
-//                        break;
-//                    }
-//                    case symtab::sclass::static_: {
-//                        format::print("STATIC ");
-//                        break;
-//                    }
-//                    case symtab::sclass::function: {
-//                        format::print("FUNC   ");
-//                        break;
-//                    }
-//                    case symtab::sclass::external_: {
-//                        format::print("EXTERN ");
-//                        break;
-//                    }
-//                    default:
-//                        format::print("NONE   ");
-//                        break;
-//                }
-//                switch (sc->type) {
-//                    case symtab::type::function: {
-//                        format::print("FUNC ");
-//                        break;
-//                    }
-//                    default:
-//                        format::print("NONE ");
-//                        break;
-//                }
-//                format::print("{} ", sc->name);
-//                format::print("\n");
-//            }
+            format::print("No Name             RVA      Size     Raw Off  Raw Size Align Symbol\n");
+            for (auto& hdr : coff.headers) {
+                format::print("{:02} ", hdr.number);
+                format::print("{:<16} ", hdr.name);
+                format::print("{:08x} {:08x} {:08x} {:08x} {:04x}",
+                              hdr.rva.base,
+                              hdr.rva.size,
+                              hdr.file.offset,
+                              hdr.file.size,
+                              16);
+                format::print("\n");
+                if (hdr.line_nums.file.size > 0) {
+                    for (u32 i = 0; i < hdr.line_nums.file.size; ++i) {
+                        auto line_num = coff::line_num::get(coff, hdr, i);
+                        format::print("   {:<16} {:08x} {:<32} ",
+                                      "COFF line_num",
+                                      0,
+                                      line_num.number == 0 ? "SYMBOL_TABLE_REF" : "FUNC_LINE_NUM");
+                        format::print("\n");
+                    }
+                }
+                if (hdr.relocs.file.size > 0) {
+                    for (u32 i = 0; i < hdr.relocs.file.size; ++i) {
+                        auto reloc = coff::reloc::get(coff, hdr, i);
+                        auto reloc_name = coff.machine == coff::machine::amd64 ? coff::reloc::type::x86_64::name(reloc.type) :
+                                          coff::reloc::type::aarch64::name(reloc.type);
+                        format::print("   {:<16} {:08x} {:<32} ",
+                                      "COFF reloc",
+                                      reloc.rva,
+                                      reloc_name);
+                        const auto& reloc_sym = coff.symtab.list[reloc.symtab_idx];
+                        format::print("{} ", reloc_sym.subclass.sym.name);
+                        format::print("\n");
+                    }
+                    format::print("\n");
+                }
+            }
+
+            format::print("\nNo  Sec Value            Class  Type Name\n");
+            u32 idx{};
+            for (const auto& sym : coff.symtab.list) {
+                switch (sym.type) {
+                    case sym_type_t::sym: {
+                        auto sc = &sym.subclass.sym;
+                        format::print("{:>03} {:>03} {:016x} ", idx, sc->section, sc->value);
+                        switch (sc->sclass) {
+                            case symtab::sclass::file: {
+                                format::print("FILE   ");
+                                break;
+                            }
+                            case symtab::sclass::static_: {
+                                format::print("STATIC ");
+                                break;
+                            }
+                            case symtab::sclass::function: {
+                                format::print("FUNC   ");
+                                break;
+                            }
+                            case symtab::sclass::external_: {
+                                format::print("EXTERN ");
+                                break;
+                            }
+                            default:
+                                format::print("NONE   ");
+                                break;
+                        }
+                        switch (sc->type) {
+                            case symtab::type::function: {
+                                format::print("FUNC ");
+                                break;
+                            }
+                            default:
+                                format::print("NONE ");
+                                break;
+                        }
+                        format::print("{} \n", sc->name);
+                        break;
+                    }
+                    case sym_type_t::aux_xf: {
+                        auto sc = &sym.subclass.aux_xf;
+                        break;
+                    }
+                    case sym_type_t::aux_file: {
+                        auto sc = &sym.subclass.aux_file;
+                        format::print("                         AUX    FILE {}\n", slice::make(*sc, 18));
+                        break;
+                    }
+                    case sym_type_t::aux_section: {
+                        auto sc = &sym.subclass.aux_section;
+                        break;
+                    }
+                    case sym_type_t::aux_func_def: {
+                        auto sc = &sym.subclass.aux_func_def;
+                        break;
+                    }
+                    case sym_type_t::aux_token_def: {
+                        auto sc = &sym.subclass.aux_token_def;
+                        break;
+                    }
+                    case sym_type_t::aux_weak_extern: {
+                        auto sc = &sym.subclass.aux_weak_extern;
+                        break;
+                    }
+                }
+                ++idx;
+            }
 
             return status_t::ok;
         }

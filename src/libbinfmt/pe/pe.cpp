@@ -316,7 +316,7 @@ namespace basecode::binfmt::io::pe {
     // 0x.....3055: import address table
     //      1...n 8-byte rva
     //      0     8-byte null marker
-    status_t build_section(file_t& file, pe_t& pe, coff::section_hdr_t& hdr) {
+    status_t build_section(file_t& file, pe_t& pe, coff::header_t& hdr) {
         auto& coff = pe.coff;
 
         hdr.file.offset = coff.offset;
@@ -428,7 +428,7 @@ namespace basecode::binfmt::io::pe {
         return status_t::ok;
     }
 
-    status_t write_section_data(file_t& file, pe_t& pe, coff::section_hdr_t& hdr) {
+    status_t write_section_data(file_t& file, pe_t& pe, coff::header_t& hdr) {
         const auto type = hdr.section->type;
         if (type == section::type_t::data && !hdr.section->flags.init)
             return status_t::ok;

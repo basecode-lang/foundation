@@ -25,12 +25,12 @@
 namespace basecode::binfmt::io::coff {
     struct sym_t;
     struct reloc_t;
+    struct header_t;
     struct line_num_t;
-    struct section_hdr_t;
 
     using sym_list_t            = array_t<sym_t>;
     using str_list_t            = array_t<str::slice_t>;
-    using section_hdr_list_t    = array_t<section_hdr_t>;
+    using header_list_t         = array_t<header_t>;
 
     struct rva_t final {
         u32                     base;
@@ -54,8 +54,11 @@ namespace basecode::binfmt::io::coff {
     };
 
     struct line_num_t final {
-        u32                     one;
-        u32                     two;
+        union {
+            u32                 rva;
+            u32                 symtab_idx;
+        };
+        u16                     number;
     };
 
     // .pdata
@@ -71,6 +74,7 @@ namespace basecode::binfmt::io::coff {
         aux_file,
         aux_section,
         aux_func_def,
+        aux_token_def,
         aux_weak_extern,
     };
 
@@ -100,6 +104,10 @@ namespace basecode::binfmt::io::coff {
                 u8              comdat_sel;
             }                   aux_section;
             struct {
+                u32             symtab_idx;
+                u8              aux_type;
+            }                   aux_token_def;
+            struct {
                 u64             strtab_offset;
                 str::slice_t    name;
                 struct {
@@ -116,8 +124,10 @@ namespace basecode::binfmt::io::coff {
         sym_type_t              type;
     };
 
-    struct section_hdr_t final {
+    struct header_t final {
         const section_t*        section;
+        u64                     short_name;
+        str::slice_t            name;
         u32                     symbol;
         rva_t                   rva;
         raw_t                   file;
@@ -134,7 +144,7 @@ namespace basecode::binfmt::io::coff {
     struct coff_t final {
         alloc_t*                alloc;
         u8*                     buf;
-        section_hdr_list_t      headers;
+        header_list_t           headers;
         u32                     rva;
         u32                     offset;
         u32                     timestamp;
@@ -167,6 +177,9 @@ namespace basecode::binfmt::io::coff {
     };
 
     [[maybe_unused]] constexpr u32 header_size = 0x14;
+
+    namespace clr {
+    }
 
     namespace debug {
         [[maybe_unused]] constexpr u32 unknown   = 0;
@@ -221,7 +234,7 @@ namespace basecode::binfmt::io::coff {
             str::slice_t name(u16 type);
         }
 
-        reloc_t get(const coff_t& coff, const section_hdr_t& hdr, u32 idx);
+        reloc_t get(const coff_t& coff, const header_t& hdr, u32 idx);
     }
 
     namespace machine {
@@ -265,7 +278,7 @@ namespace basecode::binfmt::io::coff {
         [[maybe_unused]] constexpr u32 memory_read         = 0x40000000;
         [[maybe_unused]] constexpr u32 memory_write        = 0x80000000;
 
-        sym_t* get_symbol(coff_t& coff, section_hdr_t& hdr);
+        sym_t* get_symbol(coff_t& coff, header_t& hdr);
     }
 
     namespace flags {
@@ -287,6 +300,15 @@ namespace basecode::binfmt::io::coff {
         [[maybe_unused]] constexpr u32 bytes_reversed_hi       = 0x8000;
     }
 
+    namespace comdat {
+        [[maybe_unused]] constexpr u32 select_no_duplicates     = 1;
+        [[maybe_unused]] constexpr u32 select_any               = 2;
+        [[maybe_unused]] constexpr u32 select_same_as           = 3;
+        [[maybe_unused]] constexpr u32 select_exact_match       = 4;
+        [[maybe_unused]] constexpr u32 select_associative       = 5;
+        [[maybe_unused]] constexpr u32 select_largest           = 6;
+    }
+
     namespace strtab {
         u0 free(coff_t& coff);
 
@@ -294,13 +316,15 @@ namespace basecode::binfmt::io::coff {
 
         u32 add(coff_t& coff, str::slice_t str);
 
-        u32 thunk_len(const u64_bytes_t& thunk);
-
         const s8* get(coff_t& coff, u64 offset);
     }
 
     namespace symtab {
         [[maybe_unused]] constexpr u32 entry_size = 0x12;
+
+        namespace aux {
+            [[maybe_unused]] constexpr u8 clr_token_def    = 1;
+        }
 
         namespace type {
             [[maybe_unused]] constexpr u8 none             = 0;
@@ -354,6 +378,12 @@ namespace basecode::binfmt::io::coff {
         sym_t* make_aux(coff_t& coff, sym_t* sym, sym_type_t type);
     }
 
+    namespace line_num {
+        [[maybe_unused]] constexpr u32 entry_size = 6;
+
+        line_num_t get(const coff_t& coff, const header_t& hdr, u32 idx);
+    }
+
     u0 free(coff_t& coff);
 
     u0 update_symbol_table(coff_t& coff);
@@ -366,11 +396,11 @@ namespace basecode::binfmt::io::coff {
 
     u0 write_symbol_table(file_t& file, coff_t& coff);
 
+    u0 set_section_flags(file_t& file, header_t& hdr);
+
     status_t build_sections(file_t& file, coff_t& coff);
 
     u0 write_section_headers(file_t& file, coff_t& coff);
-
-    u0 set_section_flags(file_t& file, section_hdr_t& hdr);
 
     status_t read_string_table(file_t& file, coff_t& coff);
 
@@ -382,11 +412,11 @@ namespace basecode::binfmt::io::coff {
 
     status_t read_section_headers(file_t& file, coff_t& coff);
 
-    status_t build_section(file_t& file, coff_t& coff, section_hdr_t& hdr);
+    status_t build_section(file_t& file, coff_t& coff, header_t& hdr);
 
-    u0 write_section_header(file_t& file, coff_t& coff, section_hdr_t& hdr);
+    u0 write_section_header(file_t& file, coff_t& coff, header_t& hdr);
 
-    status_t write_section_data(file_t& file, coff_t& coff, section_hdr_t& hdr);
+    status_t write_section_data(file_t& file, coff_t& coff, header_t& hdr);
 
     status_t get_section_name(const binfmt::section_t* section, str::slice_t& name);
 }
