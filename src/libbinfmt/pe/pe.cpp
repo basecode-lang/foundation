@@ -418,10 +418,12 @@ namespace basecode::binfmt::io::pe {
             }
         }
 
-        coff::set_section_flags(hdr);
+        coff::set_section_flags(file, hdr);
+
         auto sym = coff::section::get_symbol(coff, hdr);
-        auto& section_rec = sym->aux_records[0];
-        section_rec.section.len = hdr.rva.size;
+        auto aux_sec = coff::symtab::get_aux(coff, sym, 0);
+        if (aux_sec)
+            aux_sec->subclass.aux_section.len = hdr.rva.size;
 
         return status_t::ok;
     }

@@ -49,94 +49,95 @@ namespace basecode::binfmt::io::coff {
             if (!OK(status))
                 return status_t::read_error;
 
-            status = coff::read_section_headers(file, coff);
-            if (!OK(status))
-                return status_t::read_error;
-
             status = coff::read_symbol_table(file, coff);
             if (!OK(status))
                 return status_t::read_error;
 
-            format::print("                                                         c i u l s e r w\n");
-            format::print("                                                         o n n i h x e r\n");
-            format::print("                                                         d i i n a e a i\n");
-            format::print("                                                         e t n k e c d t\n");
-            format::print("                                                             i   e     e\n");
-            format::print("No Name             RVA      Size     Data Off Data Size     t          \n");
-            for (auto& hdr : coff.headers) {
-                auto sym = coff::section::get_symbol(coff, hdr);
-                format::print("{:02} ", hdr.number);
-                if (sym && sym->inlined) {
-                    format::print("{:<16} ", sym->name.slice);
-                } else {
-                    format::print("{:16} ", coff::string_table::get(coff, sym->name.offset));
-                }
-                format::print("{:08x} {:08x} {:08x} {:08x}  ",
-                              hdr.rva.base,
-                              hdr.rva.size,
-                              hdr.file.offset,
-                              hdr.file.size);
-                format::print("{} ", (hdr.flags & section::code) == section::code ? "X" : " ");
-                format::print("{} ", (hdr.flags & section::init_data) == section::init_data ? "X" : " ");
-                format::print("{} ", (hdr.flags & section::uninit_data) == section::uninit_data ? "X" : " ");
-                if ((hdr.flags & section::link_info) == section::link_info) {
-                    format::print("I ");
-                } else if ((hdr.flags & section::link_comdat) == section::link_comdat) {
-                    format::print("C ");
-                } else {
-                    format::print("  ");
-                }
-                format::print("{} ", (hdr.flags & section::memory_shared) == section::memory_shared ? "X" : " ");
-                format::print("{} ", (hdr.flags & section::memory_execute) == section::memory_execute ? "X" : " ");
-                format::print("{} ", (hdr.flags & section::memory_read) == section::memory_read ? "X" : " ");
-                format::print("{} ", (hdr.flags & section::memory_write) == section::memory_write ? "X" : " ");
-                format::print("\n");
-                format::print("{:04} {:04}\n\n", hdr.line_nums.file.size, hdr.relocs.file.size);
-            }
+            status = coff::read_section_headers(file, coff);
+            if (!OK(status))
+                return status_t::read_error;
 
-            format::print("\nNo  Sec Value            Class  Type Name\n");
-            u32 i{};
-            for (const auto& sym : coff.symbol_table.list) {
-                format::print("{:>03} ", i++);
-                format::print("{:>03} ", sym.section);
-                format::print("{:016x} ", sym.value);
-                switch (sym.sclass) {
-                    case symbol_table::storage_class::file: {
-                        format::print("FILE   ");
-                        break;
-                    }
-                    case symbol_table::storage_class::static_: {
-                        format::print("STATIC ");
-                        break;
-                    }
-                    case symbol_table::storage_class::function: {
-                        format::print("FUNC   ");
-                        break;
-                    }
-                    case symbol_table::storage_class::external_: {
-                        format::print("EXTERN ");
-                        break;
-                    }
-                    default:
-                        format::print("NONE   ");
-                        break;
-                }
-                switch (sym.type) {
-                    case symbol_table::type::function: {
-                        format::print("FUNC ");
-                        break;
-                    }
-                    default:
-                        format::print("NONE ");
-                        break;
-                }
-                if (sym.inlined) {
-                    format::print("{} ", sym.name.slice);
-                } else {
-                    format::print("{} ", coff::string_table::get(coff, sym.name.offset));
-                }
-                format::print("\n");
-            }
+//                format::print("{} ", FLAG_CHK(hdr.flags, section::content_code) ? "X" : " ");
+//                format::print("{} ", FLAG_CHK(hdr.flags, section::data_init) ? "X" : " ");
+//                format::print("{} ", FLAG_CHK(hdr.flags, section::data_uninit) ? "X" : " ");
+//                if (FLAG_CHK(hdr.flags, section::link_info)) {
+//                    format::print("I ");
+//                } else if (FLAG_CHK(hdr.flags, section::link_comdat)) {
+//                    format::print("C ");
+//                } else {
+//                    format::print("  ");
+//                }
+//                format::print("{} ", (hdr.flags & section::memory_shared) == section::memory_shared ? "X" : " ");
+//                format::print("{} ", (hdr.flags & section::memory_execute) == section::memory_execute ? "X" : " ");
+//                format::print("{} ", (hdr.flags & section::memory_read) == section::memory_read ? "X" : " ");
+//                format::print("{} ", (hdr.flags & section::memory_write) == section::memory_write ? "X" : " ");
+//            format::print("No Name             RVA      Size     Raw Off  Raw Size   Align\n");
+//            for (auto& hdr : coff.headers) {
+//                const auto sym = coff::section::get_symbol(coff, hdr);
+//                format::print("{:02} ", hdr.number);
+//                format::print("{:<16} ", sym ? sym->subclass.sym.name : "<NO NAME>"_ss);
+//                format::print("{:08x} {:08x} {:08x} {:08x} {:04x}",
+//                              hdr.rva.base,
+//                              hdr.rva.size,
+//                              hdr.file.offset,
+//                              hdr.file.size,
+//                              16);
+//                format::print("\n");
+//                if (hdr.relocs.file.size > 0) {
+//                    for (u32 i = 0; i < hdr.relocs.file.size; ++i) {
+//                        auto reloc = coff::reloc::get(coff, hdr, i);
+//                        format::print("{:<32} {:08x} ",
+//                                      coff.machine == coff::machine::amd64 ? coff::reloc::type::x86_64::name(reloc.type) :
+//                                                                                  coff::reloc::type::aarch64::name(reloc.type),
+//                                      reloc.rva);
+//                        const auto& reloc_sym = coff.symtab.list[reloc.symtab_idx];
+//                        format::print("{} ", reloc_sym.subclass.sym.name);
+//                        format::print("\n");
+//                    }
+//                    format::print("\n");
+//                }
+//            }
+//
+//            format::print("\nNo  Sec Value            Class  Type Name\n");
+//            u32 i{};
+//            for (const auto& sym : coff.symtab.list) {
+//                auto sc = &sym.subclass.sym;
+//                format::print("{:>03} ", i++);
+//                format::print("{:>03} ", sc->section);
+//                format::print("{:016x} ", sc->value);
+//                switch (sc->sclass) {
+//                    case symtab::sclass::file: {
+//                        format::print("FILE   ");
+//                        break;
+//                    }
+//                    case symtab::sclass::static_: {
+//                        format::print("STATIC ");
+//                        break;
+//                    }
+//                    case symtab::sclass::function: {
+//                        format::print("FUNC   ");
+//                        break;
+//                    }
+//                    case symtab::sclass::external_: {
+//                        format::print("EXTERN ");
+//                        break;
+//                    }
+//                    default:
+//                        format::print("NONE   ");
+//                        break;
+//                }
+//                switch (sc->type) {
+//                    case symtab::type::function: {
+//                        format::print("FUNC ");
+//                        break;
+//                    }
+//                    default:
+//                        format::print("NONE ");
+//                        break;
+//                }
+//                format::print("{} ", sc->name);
+//                format::print("\n");
+//            }
 
             return status_t::ok;
         }
