@@ -66,7 +66,7 @@ TEST_CASE("basecode::binfmt ar read test") {
             format::format_to(buf, "user id  . . . . . {}\n", member.uid);
             format::format_to(buf, "group id . . . . . {}\n", member.gid);
             format::format_to(buf, "mode . . . . . . . {}\n\n", member.mode);
-            format::hex_dump(buf, member.content.data, 128, false);
+            format::format_hex_dump(buf, member.content.data, 128, false);
             format::format_to(buf, "\n----\n\n");
         }
 

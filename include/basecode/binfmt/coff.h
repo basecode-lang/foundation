@@ -25,6 +25,7 @@
 namespace basecode::binfmt::io::coff {
     struct sym_t;
     struct reloc_t;
+    struct unwind_t;
     struct header_t;
     struct line_num_t;
 
@@ -53,19 +54,18 @@ namespace basecode::binfmt::io::coff {
         u16                     type;
     };
 
+    struct unwind_t final {
+        u32                     begin_rva;
+        u32                     end_rva;
+        u32                     info;
+    };
+
     struct line_num_t final {
         union {
             u32                 rva;
             u32                 symtab_idx;
         };
         u16                     number;
-    };
-
-    // .pdata
-    struct exception_t final {
-        u32                     begin_rva;
-        u32                     end_rva;
-        u32                     unwind_info;
     };
 
     enum class sym_type_t : u8 {
@@ -184,6 +184,12 @@ namespace basecode::binfmt::io::coff {
     namespace debug {
         [[maybe_unused]] constexpr u32 unknown   = 0;
         [[maybe_unused]] constexpr u32 code_view = 2;
+    }
+
+    namespace unwind {
+        [[maybe_unused]] constexpr u32 entry_size = 12;
+
+        status_t get(const coff_t& coff, const header_t& hdr, u32 idx, unwind_t& u);
     }
 
     namespace reloc {
@@ -329,6 +335,12 @@ namespace basecode::binfmt::io::coff {
         namespace type {
             [[maybe_unused]] constexpr u8 none             = 0;
             [[maybe_unused]] constexpr u8 function         = 0x20;
+        }
+
+        namespace section {
+            [[maybe_unused]] constexpr s32 undef           = 0;
+            [[maybe_unused]] constexpr s32 absolute        = -1;
+            [[maybe_unused]] constexpr s32 debug           = -2;
         }
 
         namespace sclass {

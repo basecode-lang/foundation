@@ -19,9 +19,52 @@
 #include <basecode/core/format.h>
 
 namespace basecode::format {
-    u0 hex_dump(str_buf_t& buf, const u0* data, u32 size, b8 show_address) {
+    u0 print_hex_dump(const u0* data, u32 size, b8 show_address, u32 indent) {
         const u8* bytes = (const u8*) data;
         for (u32 i = 0; i < size; i += 16) {
+            if (indent > 0)
+                format::print("{:<{}}", " ", indent);
+            if (show_address)
+                format::print("${:016x}: ", (u64) (bytes + i));
+            else
+                format::print("{:08x}: ", i);
+            for (u32 j = 0; j < 16; j++) {
+                if (i + j < size)
+                    format::print("{:02x} ", bytes[i + j]);
+                else
+                    format::print("   ");
+            }
+            format::print(" ");
+            for (u32 j = 0; j < 16; j++) {
+                if (i + j < size) {
+                    format::print(
+                        "{}",
+                        (s8) (isprint(bytes[i + j]) ? bytes[i + j] : '.'));
+                }
+            }
+            format::print("\n");
+        }
+    }
+
+    str_t vformat(alloc_t* alloc, fmt::string_view format_str, fmt::format_args args) {
+        fmt_alloc_t fmt_alloc(alloc);
+        fmt_buf_t buf(fmt_alloc);
+        fmt::vformat_to(buf, format_str, args);
+        return to_string(buf);
+    }
+
+    u0 vprint(alloc_t* alloc, FILE* file, fmt::string_view format_str, fmt::format_args args) {
+        fmt_alloc_t fmt_alloc(alloc);
+        fmt_buf_t buf(fmt_alloc);
+        fmt::vformat_to(buf, format_str, args);
+        std::fwrite(buf.data(), 1, buf.size(), file);
+    }
+
+    u0 format_hex_dump(str_buf_t& buf, const u0* data, u32 size, b8 show_address, u32 indent) {
+        const u8* bytes = (const u8*) data;
+        for (u32 i = 0; i < size; i += 16) {
+            if (indent > 0)
+                format::print("{:<{}}", " ", indent);
             if (show_address)
                 format::format_to(buf, "${:016x}: ", (u64) (bytes + i));
             else
@@ -43,19 +86,5 @@ namespace basecode::format {
             }
             format::format_to(buf, "\n");
         }
-    }
-
-    str_t vformat(alloc_t* alloc, fmt::string_view format_str, fmt::format_args args) {
-        fmt_alloc_t fmt_alloc(alloc);
-        fmt_buf_t buf(fmt_alloc);
-        fmt::vformat_to(buf, format_str, args);
-        return to_string(buf);
-    }
-
-    u0 vprint(alloc_t* alloc, FILE* file, fmt::string_view format_str, fmt::format_args args) {
-        fmt_alloc_t fmt_alloc(alloc);
-        fmt_buf_t buf(fmt_alloc);
-        fmt::vformat_to(buf, format_str, args);
-        std::fwrite(buf.data(), 1, buf.size(), file);
     }
 }

@@ -19,16 +19,11 @@
 #include <catch2/catch.hpp>
 #include <basecode/binfmt/io.h>
 #include <basecode/binfmt/binfmt.h>
-#include <basecode/core/stopwatch.h>
-#include "test.h"
 
 using namespace basecode;
 
 TEST_CASE("basecode::binfmt read COFF obj file") {
     using namespace binfmt;
-
-    stopwatch_t timer{};
-    stopwatch::start(timer);
 
     io::session_t s{};
     io::session::init(s);
@@ -41,8 +36,6 @@ TEST_CASE("basecode::binfmt read COFF obj file") {
                                              backend_obj_path,
                                              io::type_t::coff,
                                              io::file_type_t::obj);
+    REQUIRE(backend_obj);
     REQUIRE(OK(io::read(s)));
-
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("binfmt read COFF obj time"_ss, 40, timer);
 }

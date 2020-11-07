@@ -22,13 +22,6 @@
 #include <basecode/core/numbers.h>
 
 namespace basecode::binfmt::io::coff {
-    namespace section {
-        sym_t* get_symbol(coff_t& coff, header_t& hdr) {
-            if (!hdr.symbol) return nullptr;
-            return &coff.symtab.list[hdr.symbol - 1];
-        }
-    }
-
     namespace reloc {
         namespace type::x86_64 {
             static str::slice_t s_names[] = {
@@ -97,6 +90,25 @@ namespace basecode::binfmt::io::coff {
             std::memcpy(&r.type, p, sizeof(u16));
 
             return r;
+        }
+    }
+
+    namespace unwind {
+        status_t get(const coff_t& coff, const header_t& hdr, u32 idx, unwind_t& u) {
+            const auto num_unwinds = hdr.file.size / unwind::entry_size;
+            if (idx >= num_unwinds)
+                return status_t::section_entry_out_of_bounds;
+
+            auto p = coff.buf + hdr.file.offset + (idx * reloc::entry_size);
+            std::memcpy(&u.begin_rva, p, sizeof(u32));
+            p += sizeof(u32);
+
+            std::memcpy(&u.end_rva, p, sizeof(u32));
+            p += sizeof(u32);
+
+            std::memcpy(&u.info, p, sizeof(u32));
+
+            return status_t::ok;
         }
     }
 
@@ -260,6 +272,13 @@ namespace basecode::binfmt::io::coff {
             }
             coff.symtab.file.size += entry_size;
             return aux;
+        }
+    }
+
+    namespace section {
+        sym_t* get_symbol(coff_t& coff, header_t& hdr) {
+            if (!hdr.symbol) return nullptr;
+            return &coff.symtab.list[hdr.symbol - 1];
         }
     }
 
