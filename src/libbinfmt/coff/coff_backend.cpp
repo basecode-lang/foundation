@@ -183,11 +183,12 @@ namespace basecode::binfmt::io::coff {
                     }
                     case sym_type_t::aux_section: {
                         auto sc = &sym.subclass.aux_section;
-                        format::print("                           AUX    SECT NUM: {:>03} LEN: {:08x} CHKSUM: {:08x} SEL: {}\n",
-                                      sc->sect_num,
+                        format::print("                           AUX    SECT LEN: {:08x} CHKSUM: {:08x} {}: {:03} SEL: {}\n",
                                       sc->len,
                                       sc->check_sum,
-                                      sc->comdat_sel);
+                                      sc->comdat_sel == 0 ? "NUM" : "ASSOC",
+                                      sc->sect_num,
+                                      coff::comdat::name(sc->comdat_sel));
                         break;
                     }
                     case sym_type_t::aux_func_def: {

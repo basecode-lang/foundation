@@ -93,6 +93,22 @@ namespace basecode::binfmt::io::coff {
         }
     }
 
+    namespace comdat {
+        static str::slice_t s_names[] = {
+            "NONE"_ss,
+            "IMAGE_COMDAT_SELECT_NODUPLICATES"_ss,
+            "IMAGE_COMDAT_SELECT_ANY"_ss,
+            "IMAGE_COMDAT_SELECT_SAME_SIZE"_ss,
+            "IMAGE_COMDAT_SELECT_EXACT_MATCH"_ss,
+            "IMAGE_COMDAT_SELECT_ASSOCIATIVE"_ss,
+            "IMAGE_COMDAT_SELECT_LARGEST"_ss,
+        };
+
+        str::slice_t name(u32 sel) {
+            return s_names[sel];
+        }
+    }
+
     namespace unwind {
         status_t get(const coff_t& coff, const header_t& hdr, u32 idx, unwind_t& u) {
             const auto num_unwinds = hdr.file.size / unwind::entry_size;
@@ -512,27 +528,6 @@ namespace basecode::binfmt::io::coff {
         for (auto& hdr : coff.headers) {
             write_section_header(file, coff, hdr);
         }
-    }
-
-    status_t read_string_table(file_t& file, coff_t& coff) {
-        if (!OK(file::read_u32(file, coff.strtab.file.size)))
-            return status_t::read_error;
-
-        auto size = coff.strtab.file.size;
-        u8* start = CRSR_PTR(file.crsr);
-        u8* end   = start;
-        while (size) {
-            while (*end != '\0')
-                ++end;
-            const auto len = end - start;
-            const auto slice = slice::make(start, len);
-            strtab::add(coff, slice);
-            size -= len + 1;
-            start += len + 1;
-            end = start;
-        }
-
-        return status_t::ok;
     }
 
     status_t read_symbol_table(file_t& file, coff_t& coff) {

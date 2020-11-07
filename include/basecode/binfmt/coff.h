@@ -313,6 +313,8 @@ namespace basecode::binfmt::io::coff {
         [[maybe_unused]] constexpr u32 select_exact_match       = 4;
         [[maybe_unused]] constexpr u32 select_associative       = 5;
         [[maybe_unused]] constexpr u32 select_largest           = 6;
+
+        str::slice_t name(u32 sel);
     }
 
     namespace strtab {
@@ -413,8 +415,6 @@ namespace basecode::binfmt::io::coff {
     status_t build_sections(file_t& file, coff_t& coff);
 
     u0 write_section_headers(file_t& file, coff_t& coff);
-
-    status_t read_string_table(file_t& file, coff_t& coff);
 
     status_t read_symbol_table(file_t& file, coff_t& coff);
 
