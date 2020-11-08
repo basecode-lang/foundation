@@ -103,15 +103,15 @@ namespace basecode::binfmt::io::coff {
                     format::print("\n");
                 } else if (hdr.name == ".xdata"_ss) {
                     format::print("    FREE FORMAT EXCEPTION DATA:\n");
-                    format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, 6);
+                    format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, true, 6);
                     format::print("\n");
                 } else if (hdr.name == ".debug$S"_ss) {
                     format::print("    SYMBOLIC DEBUG DATA:\n");
-                    format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, 6);
+                    format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, true, 6);
                     format::print("\n");
                 } else if (hdr.name == ".debug$T"_ss) {
                     format::print("    TYPE INFO DEBUG DATA:\n");
-                    format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, 6);
+                    format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, true, 6);
                     format::print("\n");
                 }
             }

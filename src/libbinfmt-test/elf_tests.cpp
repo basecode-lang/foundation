@@ -71,6 +71,24 @@ static const u8 s_rot13_code[] = {
     0xc3,                                           //0000000004010AC: C3                      ret
 };
 
+TEST_CASE("basecode::binfmt ELF read obj") {
+    using namespace binfmt;
+
+    io::session_t s{};
+    io::session::init(s);
+    defer(io::session::free(s));
+
+    auto backend_obj_path = R"(C:\temp\test\elf\backend.cpp.o)"_path;
+    defer(path::free(backend_obj_path));
+
+    auto backend_obj = io::session::add_file(s,
+                                             backend_obj_path,
+                                             io::type_t::elf,
+                                             io::file_type_t::obj);
+    REQUIRE(backend_obj);
+    REQUIRE(OK(io::read(s)));
+}
+
 TEST_CASE("basecode::binfmt ELF test") {
     using namespace binfmt;
 

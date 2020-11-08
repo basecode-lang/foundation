@@ -323,35 +323,37 @@ namespace basecode::binfmt::io::elf {
         strtab::init(elf.section_names, elf.alloc);
         symtab::init(elf.symbols, &elf.strings, elf.alloc);
 
-        elf.entry_point = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
-        ++elf.section.count;
+        if (file.file_type == file_type_t::obj) {
+            elf.file_type = elf::file::type::rel;
+        } else {
+            elf.entry_point = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
+            ++elf.section.count;
 
-        auto& null_section = array::append(elf.headers);
-        ZERO_MEM(&null_section, header_t);
-        null_section.type = header_type_t::section;
+            auto& null_section = array::append(elf.headers);
+            ZERO_MEM(&null_section, header_t);
+            null_section.type = header_type_t::section;
 
-        switch (file.machine) {
-            case type_t::unknown:
-                return status_t::invalid_machine_type;
-            case type_t::x86_64:
-                elf.machine = elf::machine::x86_64;
-                break;
-            case type_t::aarch64:
-                elf.machine = elf::machine::aarch64;
-                break;
-        }
+            switch (file.machine) {
+                case type_t::unknown:
+                    return status_t::invalid_machine_type;
+                case type_t::x86_64:
+                    elf.machine = elf::machine::x86_64;
+                    break;
+                case type_t::aarch64:
+                    elf.machine = elf::machine::aarch64;
+                    break;
+            }
 
-        switch (file.file_type) {
-            case file_type_t::none:
-            case file_type_t::obj:
-                elf.file_type = elf::file::type::rel;
-                break;
-            case file_type_t::exe:
-                elf.file_type = elf::file::type::exec;
-                break;
-            case file_type_t::dll:
-                elf.file_type = elf::file::type::dyn;
-                break;
+            switch (file.file_type) {
+                case file_type_t::exe:
+                    elf.file_type = elf::file::type::exec;
+                    break;
+                case file_type_t::dll:
+                    elf.file_type = elf::file::type::dyn;
+                    break;
+                default:
+                    break;
+            }
         }
 
         return status_t::ok;
@@ -387,6 +389,50 @@ namespace basecode::binfmt::io::elf {
         return status_t::ok;
     }
 
+    status_t read_sections(file_t& file, elf_t& elf) {
+        if (elf.segment.count > 0) {
+            FILE_SEEK(elf.segment.offset);
+            for (u32 i = 0; i < elf.segment.count; ++i) {
+                auto& hdr = array::append(elf.headers);
+                hdr.type   = header_type_t::segment;
+                hdr.number = i;
+
+                auto& sc = hdr.subclass.segment;
+                FILE_READ(u32, sc.type);
+                FILE_READ(u32, sc.flags);
+                FILE_READ(u64, sc.file.offset);
+                FILE_READ(u64, sc.addr.virt);
+                FILE_READ(u64, sc.addr.phys);
+                FILE_READ(u64, sc.file.size);
+                FILE_READ(u64, sc.addr.size);
+                FILE_READ(u64, sc.align);
+            }
+        }
+
+        if (elf.section.count > 0) {
+            FILE_SEEK(elf.section.offset);
+            for (u32 i = 0; i < elf.section.count; ++i) {
+                auto& hdr = array::append(elf.headers);
+                hdr.type   = header_type_t::section;
+                hdr.number = i;
+
+                auto& sc = hdr.subclass.section;
+                FILE_READ(u32, sc.name_index);
+                FILE_READ(u32, sc.type);
+                FILE_READ(u64, sc.flags);
+                FILE_READ(u64, sc.addr.base);
+                FILE_READ(u64, sc.offset);
+                FILE_READ(u64, sc.size);
+                FILE_READ(u32, sc.link);
+                FILE_READ(u32, sc.info);
+                FILE_READ(u64, sc.addr.align);
+                FILE_READ(u64, sc.entry_size);
+            }
+        }
+
+        return status_t::ok;
+    }
+
     status_t write_segments(file_t& file, elf_t& elf) {
         for (const auto& hdr : elf.headers) {
             if (hdr.type != header_type_t::segment)
@@ -406,6 +452,24 @@ namespace basecode::binfmt::io::elf {
             if (!OK(status))
                 return status;
         }
+        return status_t::ok;
+    }
+
+    status_t read_file_header(file_t& file, elf_t& elf) {
+        u32 version{};
+        FILE_READ(u8[16], elf.magic);
+        FILE_READ(u16, elf.file_type);
+        FILE_READ(u16, elf.machine);
+        FILE_READ(u32, version);
+        FILE_READ(u64, elf.entry_point);
+        FILE_READ(u64, elf.segment.offset);
+        FILE_READ(u64, elf.section.offset);
+        FILE_READ(u32, elf.proc_flags);
+        FILE_SEEK_FWD(sizeof(u32));
+        FILE_READ(u16, elf.segment.count);
+        FILE_SEEK_FWD(sizeof(u16));
+        FILE_READ(u16, elf.section.count);
+        FILE_READ(u16, elf.str_ndx);
         return status_t::ok;
     }
 

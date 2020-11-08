@@ -217,10 +217,11 @@ namespace basecode::binfmt::io::elf {
         strtab_t                strings;
         strtab_t                section_names;
         symtab_t                symbols;
+        u8                      magic[16];
         u64                     entry_point;
         struct {
             u64                 offset;
-            u32                 count;
+            u16                 count;
         }                       segment;
         struct {
             u64                 base_offset;
@@ -228,7 +229,7 @@ namespace basecode::binfmt::io::elf {
         }                       data;
         struct {
             u64                 offset;
-            u32                 count;
+            u16                 count;
         }                       section;
         u32                     proc_flags;
         u16                     file_type;
@@ -654,9 +655,13 @@ namespace basecode::binfmt::io::elf {
 
     status_t write_blocks(file_t& file, elf_t& elf);
 
+    status_t read_sections(file_t& file, elf_t& elf);
+
     status_t write_sections(file_t& file, elf_t& elf);
 
     status_t write_segments(file_t& file, elf_t& elf);
+
+    status_t read_file_header(file_t& file, elf_t& elf);
 
     status_t write_file_header(file_t& file, elf_t& elf);
 

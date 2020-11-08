@@ -18,6 +18,7 @@
 
 #include <basecode/core/bits.h>
 #include <basecode/binfmt/elf.h>
+#include <basecode/core/stopwatch.h>
 
 namespace basecode::binfmt::io::elf {
     namespace internal {
@@ -29,20 +30,82 @@ namespace basecode::binfmt::io::elf {
 
         elf_system_t                g_elf_sys{};
 
+        static u0 format_elf(const elf_t& elf) {
+            format::print("ELF Header:\n");
+            format::print("  Magic:    ");
+            format::print_hex_dump(elf.magic, 16, false, false);
+            format::print("  Class:                             {}\n", elf.magic[4]);
+            format::print("  Data:                              {}\n", elf.magic[5]);
+            format::print("  Version:                           {}\n", elf.magic[6]);
+            format::print("  OS/ABI:                            {}\n", elf.magic[7]);
+            format::print("  ABI Version:                       {}\n", elf.magic[8]);
+            format::print("  Type:                              {}\n", elf.file_type);
+            format::print("  Machine:                           {}\n", elf.machine);
+            format::print("  Version:                           {}\n", 1);
+            format::print("  Entry point address:               {}\n", elf.entry_point);
+            format::print("  Start of program headers:          {} (bytes into file)\n", elf.segment.offset);
+            format::print("  Start of section headers:          {} (bytes into file)\n", elf.section.offset);
+            format::print("  Flags:                             0x{:x}\n", elf.proc_flags);
+            format::print("  Size of this header:               {} (bytes)\n", file::header_size);
+            format::print("  Size of program headers:           {} (bytes)\n", elf.segment.count > 0 ? segment::header_size : 0);
+            format::print("  Number of program headers:         {}\n", elf.segment.count);
+            format::print("  Size of section headers:           {} (bytes)\n", elf.section.count > 0 ? section::header_size : 0);
+            format::print("  Number of section headers:         {}\n", elf.section.count);
+            format::print("  Section header string table index: {}\n\n", elf.str_ndx);
+            format::print("Section Headers:\n");
+            format::print("  [Nr] Name              Type             Address           Offset\n");
+            format::print("       Size              EntSize          Flags  Link  Info  Align\n");
+
+            for (const auto& hdr : elf.headers) {
+                if (hdr.type != header_type_t::section)
+                    continue;
+                const auto& sc = hdr.subclass.section;
+                format::print("  [{:>}]\n", hdr.number);
+                format::print("       {:016x}  {:016x}\n", sc.size, sc.entry_size);
+            }
+        }
+
         static u0 fini() {
             name_map::free(g_elf_sys.section_names);
             name_map::free(g_elf_sys.segment_names);
         }
 
         static status_t read(file_t& file) {
-            switch (file.file_type) {
-                case file_type_t::none:
-                case file_type_t::obj:
-                    break;
-                case file_type_t::exe:
-                case file_type_t::dll:
-                    break;
-            }
+            stopwatch_t timer{};
+            stopwatch::start(timer);
+
+            if (file.file_type != file_type_t::obj)
+                return status_t::invalid_input_type;
+
+            if (!OK(buf::map(file.buf, file.path)))
+                return status_t::read_error;
+            defer(buf::unmap(file.buf));
+
+            status_t status;
+
+            opts_t opts{};
+            opts.file        = &file;
+            opts.alloc       = g_elf_sys.alloc;
+            opts.entry_point = {};
+
+            elf_t elf{};
+            status = elf::init(elf, opts);
+            if (!OK(status))
+                return status;
+            defer(elf::free(elf));
+
+            status = read_file_header(file, elf);
+            if (!OK(status))
+                return status;
+
+            status = read_sections(file, elf);
+            if (!OK(status))
+                return status;
+
+            stopwatch::stop(timer);
+            stopwatch::print_elapsed("binfmt read ELF obj time"_ss, 40, timer);
+
+            format_elf(elf);
 
             return status_t::ok;
         }
