@@ -46,6 +46,8 @@ set(
     coff/coff_backend.cpp
     coff/coff.cpp ${INC_DIR}/coff.h
 
+    ${INC_DIR}/cv.h
+
     elf/elf_backend.cpp
     elf/elf.cpp ${INC_DIR}/elf.h
 
@@ -53,6 +55,8 @@ set(
 
     macho/macho_backend.cpp
     macho/macho.cpp ${INC_DIR}/macho.h
+
+    ${INC_DIR}/pdb.h
 
     pe/pe_backend.cpp
     pe/pe.cpp ${INC_DIR}/pe.h
