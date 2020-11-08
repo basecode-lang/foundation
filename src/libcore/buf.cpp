@@ -33,7 +33,8 @@ namespace basecode::buf {
 
     namespace cursor {
         u0 pop(buf_crsr_t& crsr) {
-            crsr.pos = stack::pop(crsr.stack);
+            if (!stack::empty(crsr.stack))
+                crsr.pos = stack::pop(crsr.stack);
         }
 
         u0 push(buf_crsr_t& crsr) {
@@ -44,84 +45,45 @@ namespace basecode::buf {
             stack::free(crsr.stack);
         }
 
-        u0 seek(buf_crsr_t& crsr, u32 offset) {
-            crsr.pos = offset;
-        }
-
         u0 init(buf_crsr_t& crsr, buf_t& buf) {
             crsr.buf = &buf;
             crsr.pos = crsr.line = crsr.column = {};
             stack::init(crsr.stack, buf.alloc);
         }
 
-        u0 write_u8(buf_crsr_t& crsr, u8 value) {
-            write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u8));
-            crsr.pos += sizeof(u8);
+        status_t seek(buf_crsr_t& crsr, u32 offset) {
+            crsr.pos = offset;
+            return status_t::ok;
         }
 
-        u0 write_u16(buf_crsr_t& crsr, u16 value) {
-            write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u16));
-            crsr.pos += sizeof(u16);
-        }
-
-        u0 write_s16(buf_crsr_t& crsr, s16 value) {
-            write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(s16));
-            crsr.pos += sizeof(s16);
-        }
-
-        u0 write_u32(buf_crsr_t& crsr, u32 value) {
-            write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u32));
-            crsr.pos += sizeof(u32);
-        }
-
-        u0 seek_fwd(buf_crsr_t& crsr, u32 offset) {
+        status_t seek_fwd(buf_crsr_t& crsr, u32 offset) {
             crsr.pos += offset;
+            return status_t::ok;
         }
 
-        u0 seek_rev(buf_crsr_t& crsr, u32 offset) {
+        status_t seek_rwd(buf_crsr_t& crsr, u32 offset) {
             crsr.pos -= offset;
-        }
-
-        u0 write_u64(buf_crsr_t& crsr, u64 value) {
-            write(*crsr.buf, crsr.pos, (const u8*) &value, sizeof(u64));
-            crsr.pos += sizeof(u64);
-        }
-
-        status_t read_u8(buf_crsr_t& crsr, u8& value) {
-            read(*crsr.buf, crsr.pos, &value, sizeof(u8));
-            crsr.pos += sizeof(u8);
             return status_t::ok;
         }
 
-        status_t read_s16(buf_crsr_t& crsr, s16& value) {
-            read(*crsr.buf, crsr.pos, &value, sizeof(s16));
-            crsr.pos += sizeof(s16);
-            return status_t::ok;
-        }
-
-        status_t read_u16(buf_crsr_t& crsr, u16& value) {
-            read(*crsr.buf, crsr.pos, &value, sizeof(u16));
-            crsr.pos += sizeof(u16);
-            return status_t::ok;
-        }
-
-        status_t read_u32(buf_crsr_t& crsr, u32& value) {
-            read(*crsr.buf, crsr.pos, &value, sizeof(u32));
-            crsr.pos += sizeof(u32);
-            return status_t::ok;
-        }
-
-        status_t read_u64(buf_crsr_t& crsr, u64& value) {
-            read(*crsr.buf, crsr.pos, &value, sizeof(u64));
-            crsr.pos += sizeof(u64);
-            return status_t::ok;
-        }
-
-        status_t read_obj(buf_crsr_t& crsr, u0* data, u32 length) {
-            if (crsr.pos + length > crsr.buf->length)
-                return status_t::end_of_buffer;
-            read(*crsr.buf, crsr.pos, data, length);
+        status_t zero_fill(buf_crsr_t& crsr, u32 length) {
+            auto status = buf::zero_fill(*crsr.buf, crsr.pos, length);
+            if (!OK(status))
+                return status;
             crsr.pos += length;
+            return status_t::ok;
+        }
+
+        status_t write_cstr(buf_crsr_t& crsr, str::slice_t slice) {
+            auto status = buf::write(*crsr.buf, crsr.pos, slice.data, slice.length);
+            if (!OK(status))
+                return status;
+            crsr.pos += slice.length;
+            const u8 zero{};
+            status = buf::write(*crsr.buf, crsr.pos, (const u8*) &zero, sizeof(u8));
+            if (!OK(status))
+                return status;
+            crsr.pos += sizeof(u8);
             return status_t::ok;
         }
     }
@@ -308,30 +270,34 @@ namespace basecode::buf {
         return status_t::ok;
     }
 
-    u0 zero_fill(buf_t& buf, u32 offset, u32 length) {
+    status_t zero_fill(buf_t& buf, u32 offset, u32 length) {
         std::memset(buf.data + offset, 0, length);
+        return status_t::ok;
     }
 
-    u0 read(buf_t& buf, u32 offset, u0* data, u32 length) {
+    status_t read(buf_t& buf, u32 offset, u0* data, u32 length) {
         std::memcpy(data, buf.data + offset, length);
+        return status_t::ok;
     }
 
-    u0 write(buf_t& buf, u32 offset, FILE* file, u32 length) {
+    status_t write(buf_t& buf, u32 offset, FILE* file, u32 length) {
         if (buf.mode == buf_mode_t::alloc
         && (offset + length + 1 > buf.capacity)) {
             grow(buf, offset + length + 1);
         }
         fread(buf.data + offset, 1, length, file);
         buf.length += offset + length > buf.length ? offset + length : length;
+        return status_t::ok;
     }
 
-    u0 write(buf_t& buf, u32 offset, const u8* data, u32 length) {
+    status_t write(buf_t& buf, u32 offset, const u8* data, u32 length) {
         if (buf.mode == buf_mode_t::alloc
         && (offset + length + 1 > buf.capacity)) {
             grow(buf, offset + length + 1);
         }
         std::memcpy(buf.data + offset, data, length);
         buf.length += offset + length > buf.length ? offset + length : length;
+        return status_t::ok;
     }
 
     status_t save(buf_t& buf, const path_t& path, u32 offset, u32 length) {

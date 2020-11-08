@@ -21,6 +21,40 @@
 #include <basecode/core/buf.h>
 #include <basecode/binfmt/types.h>
 
+#define FILE_POS()          CRSR_POS(file.crsr)
+#define FILE_POP_POS()      SAFE_SCOPE(buf::cursor::pop(file.crsr);)
+#define FILE_PUSH_POS()     SAFE_SCOPE(buf::cursor::push(file.crsr);)
+#define FILE_SEEK(p)        SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::seek(file.crsr, (p))))         \
+        return status_t::read_error;)
+#define FILE_SEEK_FWD(p)    SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::seek_fwd(file.crsr, (p))))     \
+        return status_t::read_error;)
+#define FILE_SEEK_RWD(p)    SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::seek_rwd(file.crsr, (p))))     \
+        return status_t::read_error;)
+#define FILE_WRITE(t, v)    SAFE_SCOPE(                 \
+    static_assert(std::is_same_v<decltype(v), t>);      \
+    if (!OK(buf::cursor::write(file.crsr, (v))))        \
+        return status_t::write_error;)
+#define FILE_READ(t, v)     SAFE_SCOPE(                 \
+    static_assert(std::is_same_v<decltype(v), t>);      \
+    if (!OK(buf::cursor::read(file.crsr, (v))))         \
+        return status_t::read_error;)
+#define FILE_WRITE_STR(v)   SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::write_str(file.crsr, (v))))    \
+        return status_t::write_error;)
+#define FILE_WRITE_CSTR(v)  SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::write_cstr(file.crsr, (v))))   \
+        return status_t::write_error;)
+#define FILE_WRITE_PAD(l)   SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::zero_fill(file.crsr, (l))))    \
+        return status_t::write_error;)
+#define FILE_WRITE0(T)      SAFE_SCOPE(                 \
+    T zero{};                                           \
+    if (!OK(buf::cursor::write(file.crsr, zero)))       \
+        return status_t::write_error;)
+
 namespace basecode::binfmt::io {
     struct file_t;
     struct session_t;
@@ -83,57 +117,11 @@ namespace basecode::binfmt::io {
     };
 
     namespace file {
-        u0 pop(file_t& file);
-
         u0 free(file_t& file);
-
-        u0 push(file_t& file);
-
-        u0 write_pad(file_t& file);
 
         status_t save(file_t& file);
 
-        u0 write_u8(file_t& file, u8 value);
-
-        u0 write_u16(file_t& file, u16 value);
-
-        u0 write_s16(file_t& file, s16 value);
-
-        u0 write_u32(file_t& file, u32 value);
-
-        u0 write_u64(file_t& file, u64 value);
-
-        u0 write_s64(file_t& file, s64 value);
-
-        status_t seek(file_t& file, u32 offset);
-
-        status_t read_u8(file_t& file, u8& value);
-
-        status_t seek_fwd(file_t& file, u32 offset);
-
-        status_t seek_rev(file_t& file, u32 offset);
-
-        status_t read_s16(file_t& file, s16& value);
-
-        status_t read_u16(file_t& file, u16& value);
-
-        status_t read_u32(file_t& file, u32& value);
-
-        status_t read_u64(file_t& file, u64& value);
-
         status_t init(file_t& file, alloc_t* alloc);
-
-        u0 write_pad8(file_t& file, str::slice_t slice);
-
-        u0 write_cstr(file_t& file, str::slice_t slice);
-
-        u0 write_pad16(file_t& file, str::slice_t slice);
-
-        status_t read_obj(file_t& file, u0* obj, u32 length);
-
-        u0 write_str(file_t& file, const String_Concept auto& str) {
-            buf::cursor::write_str(file.crsr, str);
-        }
     }
 
     namespace name_map {

@@ -269,7 +269,9 @@ namespace basecode::binfmt::io::coff {
                     aux->subclass.aux_xf = {};
                     break;
                 case sym_type_t::aux_file:
-                    std::memset(aux->subclass.aux_file, 0, sizeof(aux->subclass.aux_file));
+                    std::memset(aux->subclass.aux_file.bytes,
+                                0,
+                                sizeof(aux->subclass.aux_file.bytes));
                     break;
                 case sym_type_t::aux_section:
                     aux->subclass.aux_section = {};
@@ -389,124 +391,110 @@ namespace basecode::binfmt::io::coff {
         }
     }
 
-    u0 write_header(file_t& file, coff_t& coff) {
-        file::write_u16(file, coff.machine);
-        file::write_u16(file, coff.headers.size);
-        file::write_u32(file, coff.timestamp);
-        file::write_u32(file, coff.symtab.file.offset);
-        file::write_u32(file, coff.symtab.file.size / symtab::entry_size);
-        file::write_u16(file, coff.size.opt_hdr);
-        file::write_u16(file, coff.flags.image);
+    status_t write_header(file_t& file, coff_t& coff) {
+        FILE_WRITE(u16, coff.machine);
+        FILE_WRITE(u16, u16(coff.headers.size));
+        FILE_WRITE(u32, coff.timestamp);
+        FILE_WRITE(u32, coff.symtab.file.offset);
+        FILE_WRITE(u32, coff.symtab.file.size / symtab::entry_size);
+        FILE_WRITE(u16, coff.size.opt_hdr);
+        FILE_WRITE(u16, coff.flags.image);
+        return status_t::ok;
     }
 
     status_t read_header(file_t& file, coff_t& coff) {
-        if (!OK(file::read_u16(file, coff.machine)))
-            return status_t::read_error;
-
         u16 num_headers{};
-        if (!OK(file::read_u16(file, num_headers)))
-            return status_t::read_error;
+
+        FILE_READ(u16, coff.machine);
+        FILE_READ(u16, num_headers);
+        FILE_READ(u32, coff.timestamp);
+        FILE_READ(u32, coff.symtab.file.offset);
+        FILE_READ(u32, coff.symtab.num_symbols);
+        FILE_READ(u16, coff.size.opt_hdr);
+        FILE_READ(u16, coff.flags.image);
+
         array::resize(coff.headers, num_headers);
-
-        if (!OK(file::read_u32(file, coff.timestamp)))
-            return status_t::read_error;
-
-        if (!OK(file::read_u32(file, coff.symtab.file.offset)))
-            return status_t::read_error;
-
-        if (!OK(file::read_u32(file, coff.symtab.num_symbols)))
-            return status_t::read_error;
         coff.symtab.file.size   = coff.symtab.num_symbols * symtab::entry_size;
         coff.strtab.file.offset = coff.symtab.file.offset + coff.symtab.file.size;
-
-        if (!OK(file::read_u16(file, coff.size.opt_hdr)))
-            return status_t::read_error;
-
-        if (!OK(file::read_u16(file, coff.flags.image)))
-            return status_t::read_error;
 
         return status_t::ok;
     }
 
-    u0 write_string_table(file_t& file, coff_t& coff) {
-        file::write_u32(file, coff.strtab.file.size);
-        for (auto str : coff.strtab.list) {
-            file::write_cstr(file, str);
-        }
+    status_t write_string_table(file_t& file, coff_t& coff) {
+        FILE_WRITE(u32, coff.strtab.file.size);
+        for (auto str : coff.strtab.list)
+            FILE_WRITE_CSTR(str);
+        return status_t::ok;
     }
 
-    u0 write_symbol_table(file_t& file, coff_t& coff) {
-        file::seek(file, coff.symtab.file.offset);
+    status_t write_symbol_table(file_t& file, coff_t& coff) {
+        FILE_SEEK(coff.symtab.file.offset);
         for (const auto& sym : coff.symtab.list) {
             switch (sym.type) {
                 case sym_type_t::sym: {
                     auto sc = &sym.subclass.sym;
-                    file::write_u64(file, sc->strtab_offset);
-                    file::write_u32(file, sc->value);
-                    file::write_s16(file, sc->section);
-                    file::write_u16(file, sc->type);
-                    file::write_u8(file, sc->sclass);
-                    file::write_u8(file, sc->aux.len);
+                    FILE_WRITE(u64, sc->strtab_offset);
+                    FILE_WRITE(u32, sc->value);
+                    FILE_WRITE(s16, sc->section);
+                    FILE_WRITE(u16, sc->type);
+                    FILE_WRITE(u8, sc->sclass);
+                    FILE_WRITE(u8, u8(sc->aux.len));
                     break;
                 }
                 case sym_type_t::aux_xf: {
                     auto sc = &sym.subclass.aux_xf;
-                    file::write_u32(file, 0);
-                    file::write_u16(file, sc->line_num);
-                    file::write_u32(file, 0);
-                    file::write_u16(file, 0);
-                    file::write_u32(file, sc->ptr_next_func);
-                    file::write_u16(file, 0);
+                    FILE_WRITE0(u32);
+                    FILE_WRITE(u16, sc->line_num);
+                    FILE_WRITE_PAD(6);
+                    FILE_WRITE(u32, sc->ptr_next_func);
+                    FILE_WRITE0(u16);
                     break;
                 }
                 case sym_type_t::aux_file: {
-                    file::write_str(file, slice::make(sym.subclass.aux_file, sizeof(sym.subclass.aux_file)));
+                    auto sc = &sym.subclass.aux_file;
+                    FILE_WRITE_STR(slice::make(sc->bytes, sizeof(sc->bytes)));
                     break;
                 }
                 case sym_type_t::aux_section: {
                     auto sc = &sym.subclass.aux_section;
-                    file::write_u32(file, sc->len);
-                    file::write_u16(file, sc->num_relocs);
-                    file::write_u16(file, sc->num_lines);
-                    file::write_u32(file, sc->check_sum);
-                    file::write_u16(file, sc->sect_num);
-                    file::write_u8(file, sc->comdat_sel);
-                    file::write_u8(file, 0);    // XXX: unused
-                    file::write_u8(file, 0);    //      "
-                    file::write_u8(file, 0);    //      "
+                    FILE_WRITE(u32, sc->len);
+                    FILE_WRITE(u16, sc->num_relocs);
+                    FILE_WRITE(u16, sc->num_lines);
+                    FILE_WRITE(u32, sc->check_sum);
+                    FILE_WRITE(u16, sc->sect_num);
+                    FILE_WRITE(u8, sc->comdat_sel);
+                    FILE_WRITE_PAD(3);
                     break;
                 }
                 case sym_type_t::aux_func_def: {
                     auto sc = &sym.subclass.aux_func_def;
-                    file::write_u32(file, sc->tag_idx);
-                    file::write_u32(file, sc->total_size);
-                    file::write_u32(file, sc->ptr_line_num);
-                    file::write_u32(file, sc->ptr_next_func);
-                    file::write_u16(file, 0);
+                    FILE_WRITE(u32, sc->tag_idx);
+                    FILE_WRITE(u32, sc->total_size);
+                    FILE_WRITE(u32, sc->ptr_line_num);
+                    FILE_WRITE(u32, sc->ptr_next_func);
+                    FILE_WRITE0(u16);
                     break;
                 }
                 case sym_type_t::aux_token_def: {
                     auto sc = &sym.subclass.aux_token_def;
-                    file::write_u8(file, sc->aux_type);
-                    file::write_u8(file, 0);
-                    file::write_u32(file, sc->symtab_idx);
-                    file::write_u64(file, 0);
-                    file::write_u32(file, 0);
+                    FILE_WRITE(u8, sc->aux_type);
+                    FILE_WRITE0(u8);
+                    FILE_WRITE(u32, sc->symtab_idx);
+                    FILE_WRITE_PAD(12);
                     break;
                 }
                 case sym_type_t::aux_weak_extern: {
                     auto sc = &sym.subclass.aux_weak_extern;
-                    file::write_u32(file, sc->tag_idx);
-                    file::write_u32(file, sc->flags);
-                    file::write_u64(file, 0);
-                    file::write_u16(file, 0);
+                    FILE_WRITE(u32, sc->tag_idx);
+                    FILE_WRITE(u32, sc->flags);
+                    FILE_WRITE_PAD(10);
                     break;
                 }
                 default:
                     break;
             }
         }
-        write_string_table(file, coff);
+        return write_string_table(file, coff);
     }
 
     status_t build_sections(file_t& file, coff_t& coff) {
@@ -524,90 +512,61 @@ namespace basecode::binfmt::io::coff {
         return status_t::ok;
     }
 
-    u0 write_section_headers(file_t& file, coff_t& coff) {
-        for (auto& hdr : coff.headers) {
-            write_section_header(file, coff, hdr);
-        }
-    }
-
     status_t read_symbol_table(file_t& file, coff_t& coff) {
-        file::push(file);
-        defer(file::pop(file));
+        FILE_PUSH_POS();
+        defer(FILE_POP_POS());
 
-        file::seek(file, coff.symtab.file.offset);
+        FILE_SEEK(coff.symtab.file.offset);
 
         u64 strtab_offset{};
-        u32 sym_offset{};
         u32 num_symbols = coff.symtab.num_symbols;
+        u32 sym_offset;
+        u8  num_aux_recs{};
 
         while (num_symbols) {
-            sym_offset = CRSR_POS(file.crsr);
+            sym_offset = FILE_POS();
 
-            if (!OK(file::read_u64(file, strtab_offset)))
-                return status_t::read_error;
+            FILE_READ(u64, strtab_offset);
 
             auto sym = symtab::make_symbol(coff, strtab_offset, sym_offset);
             auto sc = &sym->subclass.sym;
 
-            if (!OK(file::read_u32(file, sc->value)))
-                return status_t::read_error;
-
-            if (!OK(file::read_s16(file, sc->section)))
-                return status_t::read_error;
-
-            if (!OK(file::read_u16(file, sc->type)))
-                return status_t::read_error;
-
-            if (!OK(file::read_u8(file, sc->sclass)))
-                return status_t::read_error;
-
-            u8 num_aux_recs{};
-            if (!OK(file::read_u8(file, num_aux_recs)))
-                return status_t::read_error;
+            FILE_READ(u32, sc->value);
+            FILE_READ(s16, sc->section);
+            FILE_READ(u16, sc->type);
+            FILE_READ(u8, sc->sclass);
+            FILE_READ(u8, num_aux_recs);
 
             for (u32 i = 0; i < num_aux_recs; ++i) {
                 switch (sc->sclass) {
                     case symtab::sclass::file: {
                         auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_file);
                         auto asc = &aux->subclass.aux_file;
-                        if (!OK(file::read_obj(file, asc, 18)))
-                            return status_t::read_error;
+                        FILE_READ(s8[18], asc->bytes);
                         break;
                     }
                     case symtab::sclass::static_: {
                         if (sc->type == 0) {
                             auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_section);
                             auto asc = &aux->subclass.aux_section;
-                            if (!OK(file::read_u32(file, asc->len)))
-                                return status_t::read_error;
-                            if (!OK(file::read_u16(file, asc->num_relocs)))
-                                return status_t::read_error;
-                            if (!OK(file::read_u16(file, asc->num_lines)))
-                                return status_t::read_error;
-                            if (!OK(file::read_u32(file, asc->check_sum)))
-                                return status_t::read_error;
-                            if (!OK(file::read_u16(file, asc->sect_num)))
-                                return status_t::read_error;
-                            if (!OK(file::read_u8(file, asc->comdat_sel)))
-                                return status_t::read_error;
-                            if (!OK(file::seek_fwd(file, 3)))
-                                return status_t::read_error;
+                            FILE_READ(u32, asc->len);
+                            FILE_READ(u16, asc->num_relocs);
+                            FILE_READ(u16, asc->num_lines);
+                            FILE_READ(u32, asc->check_sum);
+                            FILE_READ(u16, asc->sect_num);
+                            FILE_READ(u8, asc->comdat_sel);
+                            FILE_SEEK_FWD(3);
                         }
                         break;
                     }
                     case symtab::sclass::function: {
                         auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_xf);
                         auto asc = &aux->subclass.aux_xf;
-                        if (!OK(file::seek_fwd(file, 4)))
-                            return status_t::read_error;
-                        if (!OK(file::read_u16(file, asc->line_num)))
-                            return status_t::read_error;
-                        if (!OK(file::seek_fwd(file, 6)))
-                            return status_t::read_error;
-                        if (!OK(file::read_u32(file, asc->ptr_next_func)))
-                            return status_t::read_error;
-                        if (!OK(file::seek_fwd(file, 2)))
-                            return status_t::read_error;
+                        FILE_SEEK_FWD(4);
+                        FILE_READ(u16, asc->line_num);
+                        FILE_SEEK_FWD(6);
+                        FILE_READ(u32, asc->ptr_next_func);
+                        FILE_SEEK_FWD(2);
                         break;
                     }
                     case symtab::sclass::external_: {
@@ -615,23 +574,16 @@ namespace basecode::binfmt::io::coff {
                             if (sc->value == 0 && sc->section == 0) {
                                 auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_weak_extern);
                                 auto asc = &aux->subclass.aux_weak_extern;
-                                if (!OK(file::read_u32(file, asc->tag_idx)))
-                                    return status_t::read_error;
-                                if (!OK(file::read_u32(file, asc->flags)))
-                                    return status_t::read_error;
-                                if (!OK(file::seek_fwd(file, 10)))
-                                    return status_t::read_error;
+                                FILE_READ(u32, asc->tag_idx);
+                                FILE_READ(u32, asc->flags);
+                                FILE_SEEK_FWD(10);
                             } else if (sc->type == symtab::type::function) {
                                 auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_func_def);
                                 auto asc = &aux->subclass.aux_func_def;
-                                if (!OK(file::read_u32(file, asc->tag_idx)))
-                                    return status_t::read_error;
-                                if (!OK(file::read_u32(file, asc->total_size)))
-                                    return status_t::read_error;
-                                if (!OK(file::read_u32(file, asc->ptr_next_func)))
-                                    return status_t::read_error;
-                                if (!OK(file::seek_fwd(file, 2)))
-                                    return status_t::read_error;
+                                FILE_READ(u32, asc->tag_idx);
+                                FILE_READ(u32, asc->total_size);
+                                FILE_READ(u32, asc->ptr_next_func);
+                                FILE_SEEK_FWD(2);
                             }
                         }
                         break;
@@ -639,19 +591,15 @@ namespace basecode::binfmt::io::coff {
                     case symtab::sclass::clr_token: {
                         auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_token_def);
                         auto asc = &aux->subclass.aux_token_def;
-                        if (!OK(file::read_u8(file, asc->aux_type)))
-                            return status_t::read_error;
-                        if (!OK(file::seek_fwd(file, 1)))
-                            return status_t::read_error;
-                        if (!OK(file::read_u32(file, asc->symtab_idx)))
-                            return status_t::read_error;
-                        if (!OK(file::seek_fwd(file, 12)))
-                            return status_t::read_error;
+                        FILE_READ(u8, asc->aux_type);
+                        FILE_SEEK_FWD(1);
+                        FILE_READ(u32, asc->symtab_idx);
+                        FILE_SEEK_FWD(12);
                         break;
                     }
                     default: {
-                        if (!OK(file::seek_fwd(file, 18)))
-                            return status_t::read_error;
+                        // XXX: this shouldn't happen!
+                        FILE_SEEK_FWD(18);
                         break;
                     }
                 }
@@ -675,14 +623,15 @@ namespace basecode::binfmt::io::coff {
 
     status_t read_section_headers(file_t& file, coff_t& coff) {
         u32 hdr_offset;
+        u16 num_relocs  {};
+        u16 num_line_nos{};
         for (u32 i = 0; i < coff.headers.size; ++i) {
             auto& hdr = coff.headers[i];
             hdr.number = i + 1;
 
-            hdr_offset = CRSR_POS(file.crsr);
+            hdr_offset = FILE_POS();
 
-            if (!OK(file::read_u64(file, hdr.short_name)))
-                return status_t::read_error;
+            FILE_READ(u64, hdr.short_name);
 
             {
                 s8* p = (s8*) coff.buf + hdr_offset;
@@ -710,37 +659,18 @@ namespace basecode::binfmt::io::coff {
                 }
             }
 
-            if (!OK(file::read_u32(file, hdr.rva.size)))
-                return status_t::read_error;
-
-            if (!OK(file::read_u32(file, hdr.rva.base)))
-                return status_t::read_error;
-
-            if (!OK(file::read_u32(file, hdr.file.size)))
-                return status_t::read_error;
-
-            if (!OK(file::read_u32(file, hdr.file.offset)))
-                return status_t::read_error;
-
-            if (!OK(file::read_u32(file, hdr.relocs.file.offset)))
-                return status_t::read_error;
-
-            if (!OK(file::read_u32(file, hdr.line_nums.file.offset)))
-                return status_t::read_error;
-
-            u16 num_relocs{};
-            if (!OK(file::read_u16(file, num_relocs)))
-                return status_t::read_error;
-
-            u16 num_line_nos{};
-            if (!OK(file::read_u16(file, num_line_nos)))
-                return status_t::read_error;
+            FILE_READ(u32, hdr.rva.size);
+            FILE_READ(u32, hdr.rva.base);
+            FILE_READ(u32, hdr.file.size);
+            FILE_READ(u32, hdr.file.offset);
+            FILE_READ(u32, hdr.relocs.file.offset);
+            FILE_READ(u32, hdr.line_nums.file.offset);
+            FILE_READ(u16, num_relocs);
+            FILE_READ(u16, num_line_nos);
+            FILE_READ(u32, hdr.flags);
 
             hdr.relocs.file.size    = num_relocs;
             hdr.line_nums.file.size = num_line_nos;
-
-            if (!OK(file::read_u32(file, hdr.flags)))
-                return status_t::read_error;
         }
         return status_t::ok;
     }
@@ -866,6 +796,15 @@ namespace basecode::binfmt::io::coff {
         return status;
     }
 
+    status_t write_section_headers(file_t& file, coff_t& coff) {
+        for (auto& hdr : coff.headers) {
+            auto status = write_section_header(file, coff, hdr);
+            if (!OK(status))
+                return status;
+        }
+        return status_t::ok;
+    }
+
     status_t build_section(file_t& file, coff_t& coff, header_t& hdr) {
         using type_t = binfmt::section::type_t;
 
@@ -926,20 +865,6 @@ namespace basecode::binfmt::io::coff {
         return status_t::ok;
     }
 
-    u0 write_section_header(file_t& file, coff_t& coff, header_t& hdr) {
-        auto sym = section::get_symbol(coff, hdr);
-        file::write_u64(file, sym->subclass.sym.strtab_offset);
-        file::write_u32(file, hdr.rva.size);
-        file::write_u32(file, hdr.rva.base);
-        file::write_u32(file, hdr.file.size);
-        file::write_u32(file, hdr.file.offset);
-        file::write_u32(file, hdr.relocs.file.offset);
-        file::write_u32(file, hdr.line_nums.file.offset);
-        file::write_u16(file, hdr.relocs.file.size);
-        file::write_u16(file, hdr.line_nums.file.size);
-        file::write_u32(file, hdr.flags);
-    }
-
     status_t write_section_data(file_t& file, coff_t& coff, header_t& hdr) {
         using type_t = binfmt::section::type_t;
 
@@ -949,13 +874,13 @@ namespace basecode::binfmt::io::coff {
             return status_t::ok;
 
         const auto& sc = hdr.section->subclass;
-        file::seek(file, hdr.file.offset);
+        FILE_SEEK(hdr.file.offset);
 
         switch (type) {
             case type_t::code:
             case type_t::data:
             case type_t::custom:
-                file::write_str(file, sc.data);
+                FILE_WRITE_STR(sc.data);
                 break;
             case type_t::import:
             case type_t::export_:
@@ -969,6 +894,21 @@ namespace basecode::binfmt::io::coff {
                 break;
         }
 
+        return status_t::ok;
+    }
+
+    status_t write_section_header(file_t& file, coff_t& coff, header_t& hdr) {
+        auto sym = section::get_symbol(coff, hdr);
+        FILE_WRITE(u64, sym->subclass.sym.strtab_offset);
+        FILE_WRITE(u32, hdr.rva.size);
+        FILE_WRITE(u32, hdr.rva.base);
+        FILE_WRITE(u32, hdr.file.size);
+        FILE_WRITE(u32, hdr.file.offset);
+        FILE_WRITE(u32, hdr.relocs.file.offset);
+        FILE_WRITE(u32, hdr.line_nums.file.offset);
+        FILE_WRITE(u16, u16(hdr.relocs.file.size));
+        FILE_WRITE(u16, u16(hdr.line_nums.file.size));
+        FILE_WRITE(u32, hdr.flags);
         return status_t::ok;
     }
 }

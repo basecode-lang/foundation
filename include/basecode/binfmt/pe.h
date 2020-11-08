@@ -247,7 +247,7 @@ namespace basecode::binfmt::io::pe {
             u32                 dos_stub;
         }                       size;
         struct {
-            u32                 dll;
+            u16                 dll;
             u32                 load;
         }                       flags;
         struct {
@@ -280,17 +280,17 @@ namespace basecode::binfmt::io::pe {
 
     u0 free(pe_t& pe);
 
-    u0 write_pe_header(file_t& file, pe_t& pe);
-
-    u0 write_dos_header(file_t& file, pe_t& pe);
-
     status_t init(pe_t& pe, const opts_t& opts);
 
     status_t build_sections(file_t& file, pe_t& pe);
 
-    u0 write_optional_header(file_t& file, pe_t& pe);
+    status_t write_pe_header(file_t& file, pe_t& pe);
+
+    status_t write_dos_header(file_t& file, pe_t& pe);
 
     status_t write_sections_data(file_t& file, pe_t& pe);
+
+    status_t write_optional_header(file_t& file, pe_t& pe);
 
     status_t build_section(file_t& file, pe_t& pe, coff::header_t& hdr);
 

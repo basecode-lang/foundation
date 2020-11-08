@@ -80,7 +80,9 @@ namespace basecode::binfmt::io::coff {
 
     struct sym_t final {
         union {
-            s8                  aux_file[18];
+            struct {
+                s8              bytes[18];
+            }                   aux_file;
             struct {
                 u32             ptr_next_func;
                 u16             line_num;
@@ -159,7 +161,7 @@ namespace basecode::binfmt::io::coff {
         }                       symtab;
         struct {
             u32                 image;
-            u32                 headers;
+            u16                 headers;
             u16                 opt_hdr;
         }                       size;
         struct {
@@ -402,21 +404,19 @@ namespace basecode::binfmt::io::coff {
 
     u0 update_symbol_table(coff_t& coff);
 
-    u0 write_header(file_t& file, coff_t& coff);
-
     status_t read_header(file_t& file, coff_t& coff);
 
-    u0 write_string_table(file_t& file, coff_t& coff);
-
-    u0 write_symbol_table(file_t& file, coff_t& coff);
+    status_t write_header(file_t& file, coff_t& coff);
 
     u0 set_section_flags(file_t& file, header_t& hdr);
 
     status_t build_sections(file_t& file, coff_t& coff);
 
-    u0 write_section_headers(file_t& file, coff_t& coff);
-
     status_t read_symbol_table(file_t& file, coff_t& coff);
+
+    status_t write_string_table(file_t& file, coff_t& coff);
+
+    status_t write_symbol_table(file_t& file, coff_t& coff);
 
     status_t write_sections_data(file_t& file, coff_t& coff);
 
@@ -424,11 +424,13 @@ namespace basecode::binfmt::io::coff {
 
     status_t read_section_headers(file_t& file, coff_t& coff);
 
+    status_t write_section_headers(file_t& file, coff_t& coff);
+
     status_t build_section(file_t& file, coff_t& coff, header_t& hdr);
 
-    u0 write_section_header(file_t& file, coff_t& coff, header_t& hdr);
-
     status_t write_section_data(file_t& file, coff_t& coff, header_t& hdr);
+
+    status_t write_section_header(file_t& file, coff_t& coff, header_t& hdr);
 
     status_t get_section_name(const binfmt::section_t* section, str::slice_t& name);
 }

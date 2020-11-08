@@ -130,23 +130,10 @@ namespace basecode::binfmt::io {
     }
 
     namespace file {
-        u0 pop(file_t& file) {
-            buf::cursor::pop(file.crsr);
-        }
-
         u0 free(file_t& file) {
             buf::cursor::free(file.crsr);
             buf::free(file.buf);
             path::free(file.path);
-        }
-
-        u0 push(file_t& file) {
-            buf::cursor::push(file.crsr);
-        }
-
-        u0 write_pad(file_t& file) {
-            if ((file.crsr.pos % 2) == 0) return;
-            file.buf.data[file.crsr.pos++] = 0;
         }
 
         status_t save(file_t& file) {
@@ -156,117 +143,10 @@ namespace basecode::binfmt::io {
             return status_t::ok;
         }
 
-        u0 write_u8(file_t& file, u8 value) {
-            buf::write(file.buf, file.crsr.pos, (const u8*) &value, sizeof(u8));
-            file.crsr.pos += sizeof(u8);
-        }
-
-        u0 write_u16(file_t& file, u16 value) {
-            buf::write(file.buf, file.crsr.pos, (const u8*) &value, sizeof(u16));
-            file.crsr.pos += sizeof(u16);
-        }
-
-        u0 write_s16(file_t& file, s16 value) {
-            buf::write(file.buf, file.crsr.pos, (const u8*) &value, sizeof(s16));
-            file.crsr.pos += sizeof(s16);
-        }
-
-        u0 write_u32(file_t& file, u32 value) {
-            buf::write(file.buf, file.crsr.pos, (const u8*) &value, sizeof(u32));
-            file.crsr.pos += sizeof(u32);
-        }
-
-        u0 write_u64(file_t& file, u64 value) {
-            buf::write(file.buf, file.crsr.pos, (const u8*) &value, sizeof(u64));
-            file.crsr.pos += sizeof(u64);
-        }
-
-        u0 write_s64(file_t& file, s64 value) {
-            buf::write(file.buf, file.crsr.pos, (const u8*) &value, sizeof(s64));
-            file.crsr.pos += sizeof(s64);
-        }
-
-        // FIXME
-        status_t seek(file_t& file, u32 offset) {
-            file.crsr.pos = offset;
-            return status_t::ok;
-        }
-
-        status_t read_u8(file_t& file, u8& value) {
-            if (!OK(buf::cursor::read_u8(file.crsr, value)))
-                return status_t::read_error;
-            return status_t::ok;
-        }
-
         status_t init(file_t& file, alloc_t* alloc) {
             path::init(file.path, alloc);
             buf::init(file.buf, alloc);
             buf::cursor::init(file.crsr, file.buf);
-            return status_t::ok;
-        }
-
-        status_t read_s16(file_t& file, s16& value) {
-            if (!OK(buf::cursor::read_s16(file.crsr, value)))
-                return status_t::read_error;
-            return status_t::ok;
-        }
-
-        status_t read_u16(file_t& file, u16& value) {
-            if (!OK(buf::cursor::read_u16(file.crsr, value)))
-                return status_t::read_error;
-            return status_t::ok;
-        }
-
-        status_t read_u32(file_t& file, u32& value) {
-            if (!OK(buf::cursor::read_u32(file.crsr, value)))
-                return status_t::read_error;
-            return status_t::ok;
-        }
-
-        status_t read_u64(file_t& file, u64& value) {
-            if (!OK(buf::cursor::read_u64(file.crsr, value)))
-                return status_t::read_error;
-            return status_t::ok;
-        }
-
-        // FIXME
-        status_t seek_fwd(file_t& file, u32 offset) {
-            file.crsr.pos += offset;
-            return status_t::ok;
-        }
-
-        // FIXME
-        status_t seek_rev(file_t& file, u32 offset) {
-            file.crsr.pos -= offset;
-            return status_t::ok;
-        }
-
-        u0 write_cstr(file_t& file, str::slice_t slice) {
-            buf::write(file.buf, file.crsr.pos, slice.data, slice.length + 1);
-            file.crsr.pos += slice.length + 1;
-        }
-
-        u0 write_pad8(file_t& file, str::slice_t slice) {
-            buf::zero_fill(file.buf, file.crsr.pos, 8);
-            buf::write(file.buf,
-                       file.crsr.pos,
-                       slice.data,
-                       std::min<u32>(slice.length, 8));
-            file.crsr.pos += 8;
-        }
-
-        u0 write_pad16(file_t& file, str::slice_t slice) {
-            buf::zero_fill(file.buf, file.crsr.pos, 16);
-            buf::write(file.buf,
-                       file.crsr.pos,
-                       slice.data,
-                       std::min<u32>(slice.length, 16));
-            file.crsr.pos += 16;
-        }
-
-        status_t read_obj(file_t& file, u0* obj, u32 length) {
-            if (!OK(buf::cursor::read_obj(file.crsr, obj, length)))
-                return status_t::read_error;
             return status_t::ok;
         }
     }

@@ -182,85 +182,30 @@ namespace basecode::binfmt::io::pe {
         return status_t::ok;
     }
 
-    u0 write_pe_header(file_t& file, pe_t& pe) {
-        file::seek(file, pe.start_offset);
-        file::write_u8(file, 'P');
-        file::write_u8(file, 'E');
-        file::write_u8(file, 0);
-        file::write_u8(file, 0);
+    status_t write_pe_header(file_t& file, pe_t& pe) {
+        FILE_SEEK(pe.start_offset);
+        FILE_WRITE(s8, 'P');
+        FILE_WRITE(s8, 'E');
+        FILE_WRITE0(u16);
+        return status_t::ok;
     }
 
-    u0 write_dos_header(file_t& file, pe_t& pe) {
-        file::write_u8(file, 'M');
-        file::write_u8(file, 'Z');
-        file::write_u16(file, pe.size.dos_stub % 512);
-        file::write_u16(file, align(pe.size.dos_stub, 512) / 512);
-        file::write_u16(file, 0);
-        file::write_u16(file, dos_header_size / 16);
-        file::write_u16(file, 0);
-        file::write_u16(file, 1);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        file::write_u16(file, dos_header_size);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        for (u32 i = 0; i < 10; ++i) {
-            file::write_u16(file, 0);
-        }
-        file::write_u32(file, pe.start_offset);
-        for (u8 code_byte : s_dos_stub) {
-            file::write_u8(file, code_byte);
-        }
-    }
-
-    u0 write_optional_header(file_t& file, pe_t& pe) {
-        const auto& coff = pe.coff;
-        file::write_u16(file, pe64);
-        file::write_u8(file, file.versions.linker.major);
-        file::write_u8(file, file.versions.linker.minor);
-        file::write_u32(file, coff.code.size);
-        file::write_u32(file, coff.init_data.size);
-        file::write_u32(file, coff.uninit_data.size);
-        file::write_u32(file, coff.code.base);
-        file::write_u32(file, coff.code.base);
-        file::write_u64(file, pe.base_addr);
-        file::write_u32(file, coff.align.section);
-        file::write_u32(file, coff.align.file);
-        file::write_u16(file, file.versions.min_os.major);
-        file::write_u16(file, file.versions.min_os.minor);
-        file::write_u16(file, 0);
-        file::write_u16(file, 0);
-        file::write_u16(file, file.versions.min_os.major);
-        file::write_u16(file, file.versions.min_os.minor);
-        file::write_u32(file, 0);
-        file::write_u32(file, align(coff.rva + coff.size.image, coff.align.section));
-        file::write_u32(file, align(coff.size.headers, pe.coff.align.file));
-        file::write_u32(file, 0);
-        if (file.flags.console) {
-            file::write_u16(file, subsystem::win_cui);
-        } else {
-            file::write_u16(file, subsystem::win_gui);
-        }
-        file::write_u16(file, pe.flags.dll);
-        file::write_u64(file, pe.reserve.stack);
-        file::write_u64(file, 0x1000);
-        file::write_u64(file, pe.reserve.heap);
-        file::write_u64(file, 0x1000);
-        file::write_u32(file, pe.flags.load);
-        file::write_u32(file, max_dir_entry_count);
-
-        for (const auto& dir : pe.dirs) {
-            file::write_u32(file, dir.rva.base);
-            file::write_u32(file, dir.rva.size);
-        }
+    status_t write_dos_header(file_t& file, pe_t& pe) {
+        FILE_WRITE(s8, 'M');
+        FILE_WRITE(s8, 'Z');
+        FILE_WRITE(u16, u16(pe.size.dos_stub % 512));
+        FILE_WRITE(u16, u16(align(pe.size.dos_stub, 512) / 512));
+        FILE_WRITE0(u16);
+        FILE_WRITE(u16, u16(dos_header_size / 16));
+        FILE_WRITE0(u16);
+        FILE_WRITE(u16, u16(1));
+        FILE_WRITE_PAD(sizeof(u16) * 5);
+        FILE_WRITE(u16, u16(dos_header_size));
+        FILE_WRITE_PAD(sizeof(u16) * 7);
+        FILE_WRITE_PAD(sizeof(u16) * 10);
+        FILE_WRITE(u32, pe.start_offset);
+        FILE_WRITE_STR(slice::make(s_dos_stub, sizeof(s_dos_stub)));
+        return status_t::ok;
     }
 
     status_t build_sections(file_t& file, pe_t& pe) {
@@ -295,6 +240,45 @@ namespace basecode::binfmt::io::pe {
         return status_t::ok;
     }
 
+    status_t write_optional_header(file_t& file, pe_t& pe) {
+        const auto& coff = pe.coff;
+        FILE_WRITE(const u16, pe64);
+        FILE_WRITE(u8, u8(file.versions.linker.major));
+        FILE_WRITE(u8, u8(file.versions.linker.minor));
+        FILE_WRITE(u32, coff.code.size);
+        FILE_WRITE(u32, coff.init_data.size);
+        FILE_WRITE(u32, coff.uninit_data.size);
+        FILE_WRITE(u32, coff.code.base);
+        FILE_WRITE(u32, coff.code.base);
+        FILE_WRITE(u64, pe.base_addr);
+        FILE_WRITE(u32, coff.align.section);
+        FILE_WRITE(u32, coff.align.file);
+        FILE_WRITE(u16, file.versions.min_os.major);
+        FILE_WRITE(u16, file.versions.min_os.minor);
+        FILE_WRITE0(u32);
+        FILE_WRITE(u16, file.versions.min_os.major);
+        FILE_WRITE(u16, file.versions.min_os.minor);
+        FILE_WRITE0(u32);
+        FILE_WRITE(u32, u32(align(coff.rva + coff.size.image, coff.align.section)));
+        FILE_WRITE(u32, u32(align(coff.size.headers, pe.coff.align.file)));
+        FILE_WRITE0(u32);
+        FILE_WRITE(u16, u16(file.flags.console ? subsystem::win_cui : subsystem::win_gui));
+        FILE_WRITE(u16, pe.flags.dll);
+        FILE_WRITE(u64, pe.reserve.stack);
+        FILE_WRITE(u64, 0x1000ULL);
+        FILE_WRITE(u64, pe.reserve.heap);
+        FILE_WRITE(u64, 0x1000ULL);
+        FILE_WRITE(u32, pe.flags.load);
+        FILE_WRITE(const u32, max_dir_entry_count);
+
+        for (const auto& dir : pe.dirs) {
+            FILE_WRITE(u32, dir.rva.base);
+            FILE_WRITE(u32, dir.rva.size);
+        }
+
+        return status_t::ok;
+    }
+
     //
     // 0x....3000: import directory table
     //      import lookup table rva:    0x.....301c
@@ -323,9 +307,7 @@ namespace basecode::binfmt::io::pe {
         hdr.rva.base    = coff.rva;
 
         switch (hdr.section->type) {
-            case section::type_t::reloc: {
-                return status_t::not_implemented;
-            }
+            case section::type_t::reloc:
             case section::type_t::export_: {
                 return status_t::not_implemented;
             }
@@ -433,7 +415,7 @@ namespace basecode::binfmt::io::pe {
         if (type == section::type_t::data && !hdr.section->flags.init)
             return status_t::ok;
 
-        file::seek(file, hdr.file.offset);
+        FILE_SEEK(hdr.file.offset);
 
         switch (type) {
             case section::type_t::reloc: {
@@ -444,39 +426,34 @@ namespace basecode::binfmt::io::pe {
                 const auto     & import_table_entry = pe.dirs[dir_type_t::import_table];
                 const auto     & import_table       = import_table_entry.subclass.import;
                 for (const auto& module : import_table.modules) {
-                    file::write_u32(file, module.lookup_rva);
-                    file::write_u32(file, 0);
-                    file::write_u32(file, 0);
-                    file::write_u32(file, module.name.rva);
-                    file::write_u32(file, iat_entry.rva.base);
+                    FILE_WRITE(u32, module.lookup_rva);
+                    FILE_WRITE0(u64);
+                    FILE_WRITE(u32, module.name.rva);
+                    FILE_WRITE(u32, iat_entry.rva.base);
                 }
-                file::write_u32(file, 0);
-                file::write_u32(file, 0);
-                file::write_u32(file, 0);
-                file::write_u32(file, 0);
-                file::write_u32(file, 0);
+                FILE_WRITE_PAD(sizeof(u32) * 5);
                 for (const auto& module : import_table.modules) {
-                    file::write_cstr(file, module.name.slice);
+                    FILE_WRITE_CSTR(module.name.slice);
                     for (const auto& name_hint : import_table.name_hints.list) {
                         thunk_t data{};
                         data.thunk.by_ordinal = false;
                         data.thunk.value      = name_hint.rva.base;
-                        file::write_u64(file, data.bits);
+                        FILE_WRITE(u64, data.bits);
                     }
-                    file::write_u64(file, 0);
+                    FILE_WRITE0(u64);
                 }
                 for (const auto& name_hint : import_table.name_hints.list) {
                     thunk_t data{};
                     data.thunk.by_ordinal = false;
                     data.thunk.value      = name_hint.rva.base;
-                    file::write_u64(file, data.bits);
+                    FILE_WRITE(u64, data.bits);
                 }
-                file::write_u64(file, 0);
+                FILE_WRITE0(u64);
                 for (const auto& name_hint : import_table.name_hints.list) {
-                    file::write_u16(file, name_hint.hint);
-                    file::write_cstr(file, name_hint.name);
+                    FILE_WRITE(u16, name_hint.hint);
+                    FILE_WRITE_CSTR(name_hint.name);
                     if (name_hint.pad)
-                        file::write_u8(file, 0);
+                        FILE_WRITE0(u8);
                 }
                 break;
             }

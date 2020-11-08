@@ -80,13 +80,13 @@ namespace basecode {
             cannot_save_over_mapped_path,
         };
 
-        u0 zero_fill(buf_t& buf, u32 offset, u32 length);
+        status_t zero_fill(buf_t& buf, u32 offset, u32 length);
 
-        u0 read(buf_t& buf, u32 offset, u0* data, u32 length);
+        status_t read(buf_t& buf, u32 offset, u0* data, u32 length);
 
-        u0 write(buf_t& buf, u32 offset, FILE* file, u32 length);
+        status_t write(buf_t& buf, u32 offset, FILE* file, u32 length);
 
-        u0 write(buf_t& buf, u32 offset, const u8* data, u32 length);
+        status_t write(buf_t& buf, u32 offset, const u8* data, u32 length);
 
         namespace cursor {
             u0 pop(buf_crsr_t& crsr);
@@ -95,39 +95,48 @@ namespace basecode {
 
             u0 free(buf_crsr_t& crsr);
 
-            u0 seek(buf_crsr_t& crsr, u32 offset);
-
             u0 init(buf_crsr_t& crsr, buf_t& buf);
 
-            u0 write_u8(buf_crsr_t& crsr, u8 value);
+            template <typename T> requires std::is_trivial_v<T>
+            status_t read(buf_crsr_t& crsr, T& value) {
+                auto status = buf::read(*crsr.buf,
+                                        crsr.pos,
+                                        (u0*) &value,
+                                        sizeof(value));
+                if (!OK(status))
+                    return status;
+                crsr.pos += sizeof(value);
+                return status_t::ok;
+            }
 
-            u0 seek_fwd(buf_crsr_t& crsr, u32 offset);
+            template <typename T> requires std::is_trivial_v<T>
+            status_t write(buf_crsr_t& crsr, T value) {
+                auto status = buf::write(*crsr.buf,
+                                         crsr.pos,
+                                         (u8*) &value,
+                                         sizeof(value));
+                if (!OK(status))
+                    return status;
+                crsr.pos += sizeof(value);
+                return status_t::ok;
+            }
 
-            u0 seek_rev(buf_crsr_t& crsr, u32 offset);
+            status_t seek(buf_crsr_t& crsr, u32 offset);
 
-            u0 write_u16(buf_crsr_t& crsr, u16 value);
+            status_t seek_fwd(buf_crsr_t& crsr, u32 offset);
 
-            u0 write_s16(buf_crsr_t& crsr, s16 value);
+            status_t seek_rwd(buf_crsr_t& crsr, u32 offset);
 
-            u0 write_u32(buf_crsr_t& crsr, u32 value);
+            status_t zero_fill(buf_crsr_t& crsr, u32 length);
 
-            u0 write_u64(buf_crsr_t& crsr, u64 value);
+            status_t write_cstr(buf_crsr_t& crsr, str::slice_t slice);
 
-            status_t read_u8(buf_crsr_t& crsr, u8& value);
-
-            status_t read_s16(buf_crsr_t& crsr, s16& value);
-
-            status_t read_u16(buf_crsr_t& crsr, u16& value);
-
-            status_t read_u32(buf_crsr_t& crsr, u32& value);
-
-            status_t read_u64(buf_crsr_t& crsr, u64& value);
-
-            status_t read_obj(buf_crsr_t& crsr, u0* data, u32 length);
-
-            u0 write_str(buf_crsr_t& crsr, const String_Concept auto& str) {
-                write(*crsr.buf, crsr.pos, str.data, str.length);
+            status_t write_str(buf_crsr_t& crsr, const String_Concept auto& str) {
+                auto status = buf::write(*crsr.buf, crsr.pos, str.data, str.length);
+                if (!OK(status))
+                    return status;
                 crsr.pos += str.length;
+                return status_t::ok;
             }
         }
 

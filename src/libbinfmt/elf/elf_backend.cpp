@@ -166,7 +166,7 @@ namespace basecode::binfmt::io::elf {
                         auto& sc = hdr.subclass.section;
                         sc.flags = flags;
                         sc.type  = section_type;
-                        auto status = elf::get_section_name(section, name);
+                        status = elf::get_section_name(section, name);
                         if (!OK(status))
                             return status;
                         sc.addr.base  = rva;
@@ -273,7 +273,9 @@ namespace basecode::binfmt::io::elf {
             // XXX: FIXME
             file.buf.mode = buf_mode_t::alloc;
 
-            elf::write_file_header(file, elf);
+            status = elf::write_file_header(file, elf);
+            if (!OK(status))
+                return status;
 
             if (file.file_type == file_type_t::exe
             || file.file_type == file_type_t::dll) {
@@ -286,9 +288,7 @@ namespace basecode::binfmt::io::elf {
             if (!OK(status))
                 return status;
 
-            elf::write_blocks(file, elf);
-
-            return status_t::ok;
+            return elf::write_blocks(file, elf);
         }
 
         static status_t init(alloc_t* alloc) {

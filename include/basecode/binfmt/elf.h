@@ -572,20 +572,6 @@ namespace basecode::binfmt::io::elf {
         }
     }
 
-    namespace strtab {
-        u0 free(strtab_t& strtab);
-
-        header_t& make_section(elf_t& elf,
-                              str::slice_t name,
-                              const strtab_t* strtab);
-
-        u0 init(strtab_t& strtab, alloc_t* alloc);
-
-        u0 write(const strtab_t& strtab, file_t& file);
-
-        u32 add_str(strtab_t& strtab, str::slice_t str);
-    }
-
     namespace hash {
         [[maybe_unused]] constexpr u32 entity_size          = sizeof(u32);
 
@@ -599,7 +585,21 @@ namespace basecode::binfmt::io::elf {
 
         u0 init(hash_t& hash, alloc_t* alloc);
 
-        u0 write(const hash_t& hash, file_t& file);
+        status_t write(const hash_t& hash, file_t& file);
+    }
+
+    namespace strtab {
+        u0 free(strtab_t& strtab);
+
+        header_t& make_section(elf_t& elf,
+                              str::slice_t name,
+                              const strtab_t* strtab);
+
+        u0 init(strtab_t& strtab, alloc_t* alloc);
+
+        u32 add_str(strtab_t& strtab, str::slice_t str);
+
+        status_t write(const strtab_t& strtab, file_t& file);
     }
 
     namespace symtab {
@@ -639,7 +639,7 @@ namespace basecode::binfmt::io::elf {
 
         u0 rehash(symtab_t& symtab, u32 size);
 
-        u0 write(const symtab_t& symtab, file_t& file);
+        status_t write(const symtab_t& symtab, file_t& file);
 
         status_t add_sym(symtab_t& symtab, const symbol_t* symbol);
 
@@ -650,23 +650,23 @@ namespace basecode::binfmt::io::elf {
 
     u0 free(elf_t& elf);
 
-    u0 write_blocks(file_t& file, elf_t& elf);
-
     status_t init(elf_t& elf, const opts_t& opts);
 
-    u0 write_file_header(file_t& file, elf_t& elf);
+    status_t write_blocks(file_t& file, elf_t& elf);
 
     status_t write_sections(file_t& file, elf_t& elf);
 
     status_t write_segments(file_t& file, elf_t& elf);
 
-    u0 write_dyn(file_t& file, elf_t& elf, const dyn_t& dyn);
+    status_t write_file_header(file_t& file, elf_t& elf);
 
-    u0 write_rel(file_t& file, elf_t& elf, const rel_t& rel);
+    status_t write_dyn(file_t& file, elf_t& elf, const dyn_t& dyn);
 
-    u0 write_rela(file_t& file, elf_t& elf, const rela_t& rela);
+    status_t write_rel(file_t& file, elf_t& elf, const rel_t& rel);
 
-    u0 write_note(file_t& file, elf_t& elf, const note_t& note);
+    status_t write_rela(file_t& file, elf_t& elf, const rela_t& rela);
+
+    status_t write_note(file_t& file, elf_t& elf, const note_t& note);
 
     status_t write_header(file_t& file, elf_t& elf, const header_t& hdr);
 

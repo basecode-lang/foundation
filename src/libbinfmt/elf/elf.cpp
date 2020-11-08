@@ -65,15 +65,14 @@ namespace basecode::binfmt::io::elf {
             array::init(hash.chains, alloc);
         }
 
-        u0 write(const hash_t& hash, file_t& file) {
-            io::file::write_u32(file, hash.buckets.size);
-            io::file::write_u32(file, hash.chains.size);
-            for (auto sym_idx : hash.buckets) {
-                io::file::write_u32(file, sym_idx);
-            }
-            for (auto sym_idx : hash.chains) {
-                io::file::write_u32(file, sym_idx);
-            }
+        status_t write(const hash_t& hash, file_t& file) {
+            FILE_WRITE(u32, hash.buckets.size);
+            FILE_WRITE(u32, hash.chains.size);
+            for (auto sym_idx : hash.buckets)
+                FILE_WRITE(u32, sym_idx);
+            for (auto sym_idx : hash.chains)
+                FILE_WRITE(u32, sym_idx);
+            return status_t::ok;
         }
     }
 
@@ -114,11 +113,12 @@ namespace basecode::binfmt::io::elf {
             str_array::init(strtab.strings, alloc);
         }
 
-        u0 write(const strtab_t& strtab, file_t& file) {
-            io::file::write_u8(file, 0);
+        status_t write(const strtab_t& strtab, file_t& file) {
+            FILE_WRITE0(u8);
             const auto slice = slice::make(strtab.strings.buf.data,
                                            strtab.strings.buf.size);
-            io::file::write_str(file, slice);
+            FILE_WRITE_STR(slice);
+            return status_t::ok;
         }
 
         u32 add_str(strtab_t& strtab, str::slice_t str) {
@@ -179,15 +179,16 @@ namespace basecode::binfmt::io::elf {
             hash::rehash(symtab.hash, size);
         }
 
-        u0 write(const symtab_t& symtab, file_t& file) {
+        status_t write(const symtab_t& symtab, file_t& file) {
             for (const auto& sym : symtab.symbols) {
-                io::file::write_u32(file, sym.name_index);
-                io::file::write_u8(file, sym.info);
-                io::file::write_u8(file, sym.other);
-                io::file::write_u16(file, sym.index);
-                io::file::write_u64(file, sym.value);
-                io::file::write_u64(file, sym.size);
+                FILE_WRITE(u32, sym.name_index);
+                FILE_WRITE(u8, sym.info);
+                FILE_WRITE(u8, sym.other);
+                FILE_WRITE(u16, sym.index);
+                FILE_WRITE(u64, sym.value);
+                FILE_WRITE(u64, sym.size);
             }
+            return status_t::ok;
         }
 
         status_t add_sym(symtab_t& symtab, const symbol_t* symbol) {
@@ -310,26 +311,6 @@ namespace basecode::binfmt::io::elf {
         strtab::free(elf.section_names);
     }
 
-    u0 write_blocks(file_t& file, elf_t& elf) {
-        for (const auto& block : elf.blocks) {
-            io::file::seek(file, block.offset);
-            switch (block.type) {
-                case block_type_t::slice:
-                    io::file::write_str(file, *block.data.slice);
-                    break;
-                case block_type_t::strtab:
-                    strtab::write(*block.data.strtab, file);
-                    break;
-                case block_type_t::hash:
-                    hash::write(*block.data.hash, file);
-                    break;
-                case block_type_t::symtab:
-                    symtab::write(*block.data.symtab, file);
-                    break;
-            }
-        }
-    }
-
     status_t init(elf_t& elf, const opts_t& opts) {
         using type_t = binfmt::machine::type_t;
 
@@ -376,31 +357,34 @@ namespace basecode::binfmt::io::elf {
         return status_t::ok;
     }
 
-    u0 write_file_header(file_t& file, elf_t& elf) {
-        io::file::write_u8(file, 0x7f);
-        io::file::write_u8(file, 'E');
-        io::file::write_u8(file, 'L');
-        io::file::write_u8(file, 'F');
-        io::file::write_u8(file, class_64);
-        io::file::write_u8(file, data_2lsb);
-        io::file::write_u8(file, version_current);
-        io::file::write_u8(file, os_abi_linux);
-        for (u32 i = 0; i < 8; ++i) {
-            io::file::write_u8(file, 0);
+    status_t write_blocks(file_t& file, elf_t& elf) {
+        for (const auto& block : elf.blocks) {
+            FILE_SEEK(block.offset);
+            switch (block.type) {
+                case block_type_t::slice:
+                    FILE_WRITE_STR(*block.data.slice);
+                    break;
+                case block_type_t::strtab: {
+                    auto status = strtab::write(*block.data.strtab, file);
+                    if (!OK(status))
+                        return status;
+                    break;
+                }
+                case block_type_t::hash: {
+                    auto status = hash::write(*block.data.hash, file);
+                    if (!OK(status))
+                        return status;
+                    break;
+                }
+                case block_type_t::symtab: {
+                    auto status = symtab::write(*block.data.symtab, file);
+                    if (!OK(status))
+                        return status;
+                    break;
+                }
+            }
         }
-        io::file::write_u16(file, elf.file_type);
-        io::file::write_u16(file, elf.machine);
-        io::file::write_u32(file, version_current);
-        io::file::write_u64(file, elf.entry_point);
-        io::file::write_u64(file, elf.segment.offset);
-        io::file::write_u64(file, elf.section.offset);
-        io::file::write_u32(file, elf.proc_flags);
-        io::file::write_u16(file, elf::file::header_size);
-        io::file::write_u16(file, elf.segment.count > 0 ? elf::segment::header_size : 0);
-        io::file::write_u16(file, elf.segment.count);
-        io::file::write_u16(file, elf.section.count > 0 ? elf::section::header_size : 0);
-        io::file::write_u16(file, elf.section.count);
-        io::file::write_u16(file, elf.str_ndx);
+        return status_t::ok;
     }
 
     status_t write_segments(file_t& file, elf_t& elf) {
@@ -425,66 +409,92 @@ namespace basecode::binfmt::io::elf {
         return status_t::ok;
     }
 
-    u0 write_dyn(file_t& file, elf_t& elf, const dyn_t& dyn) {
-        io::file::write_s64(file, dyn.tag);
-        io::file::write_u64(file, dyn.value);
+    status_t write_file_header(file_t& file, elf_t& elf) {
+        FILE_WRITE(u8, u8(0x7f));
+        FILE_WRITE(u8, u8('E'));
+        FILE_WRITE(u8, u8('L'));
+        FILE_WRITE(u8, u8('F'));
+        FILE_WRITE(u8, u8(class_64));
+        FILE_WRITE(u8, u8(data_2lsb));
+        FILE_WRITE(u8, u8(version_current));
+        FILE_WRITE(u8, u8(os_abi_linux));
+        FILE_WRITE0(u64);
+        FILE_WRITE(u16, elf.file_type);
+        FILE_WRITE(u16, elf.machine);
+        FILE_WRITE(const u32, version_current);
+        FILE_WRITE(u64, elf.entry_point);
+        FILE_WRITE(u64, elf.segment.offset);
+        FILE_WRITE(u64, elf.section.offset);
+        FILE_WRITE(u32, elf.proc_flags);
+        FILE_WRITE(const u16, elf::file::header_size);
+        FILE_WRITE(u16, u16(elf.segment.count > 0 ? elf::segment::header_size : 0));
+        FILE_WRITE(u16, u16(elf.segment.count));
+        FILE_WRITE(u16, u16(elf.section.count > 0 ? elf::section::header_size : 0));
+        FILE_WRITE(u16, u16(elf.section.count));
+        FILE_WRITE(u16, elf.str_ndx);
+        return status_t::ok;
     }
 
-    u0 write_rel(file_t& file, elf_t& elf, const rel_t& rel) {
-        io::file::write_u64(file, rel.offset);
-        io::file::write_u64(file, rel.info);
+    status_t write_dyn(file_t& file, elf_t& elf, const dyn_t& dyn) {
+        FILE_WRITE(s64, dyn.tag);
+        FILE_WRITE(u64, dyn.value);
+        return status_t::ok;
     }
 
-    u0 write_note(file_t& file, elf_t& elf, const note_t& note) {
+    status_t write_rel(file_t& file, elf_t& elf, const rel_t& rel) {
+        FILE_WRITE(u64, rel.offset);
+        FILE_WRITE(u64, rel.info);
+        return status_t::ok;
+    }
+
+    status_t write_note(file_t& file, elf_t& elf, const note_t& note) {
         const auto name_aligned_len = align(note.name.length, sizeof(u64));
         const auto desc_aligned_len = align(note.descriptor.length, sizeof(u64));
-        io::file::write_u64(file, note.name.length);
-        io::file::write_u64(file, note.descriptor.length);
-        io::file::write_str(file, note.name);
-        io::file::write_u8(file, 0);
-        for (u32 i = 0; i < std::min<s32>(0, (name_aligned_len - note.name.length) + 1); ++i) {
-            io::file::write_u8(file, 0);
-        }
-        io::file::write_str(file, note.descriptor);
-        for (u32 i = 0; i < std::min<s32>(0, (desc_aligned_len - note.descriptor.length) + 1); ++i) {
-            io::file::write_u8(file, 0);
-        }
-        io::file::write_u8(file, 0);
-        io::file::write_u64(file, note.type);
+        FILE_WRITE(u64, u64(note.name.length));
+        FILE_WRITE(u64, u64(note.descriptor.length));
+        FILE_WRITE_STR(note.name);
+        FILE_WRITE0(u8);
+        FILE_WRITE_PAD(std::min<s32>(0, (name_aligned_len - note.name.length) + 1));
+        FILE_WRITE_STR(note.descriptor);
+        FILE_WRITE_PAD(std::min<s32>(0, (desc_aligned_len - note.descriptor.length) + 1));
+        FILE_WRITE0(u8);
+        FILE_WRITE(u64, note.type);
+        return status_t::ok;
     }
 
-    u0 write_rela(file_t& file, elf_t& elf, const rela_t& rela) {
-        io::file::write_u64(file, rela.offset);
-        io::file::write_u64(file, rela.info);
-        io::file::write_s64(file, rela.addend);
+    status_t write_rela(file_t& file, elf_t& elf, const rela_t& rela) {
+        FILE_WRITE(u64, rela.offset);
+        FILE_WRITE(u64, rela.info);
+        FILE_WRITE(s64, rela.addend);
+        return status_t::ok;
     }
 
     status_t write_header(file_t& file, elf_t& elf, const header_t& hdr) {
         switch (hdr.type) {
             case header_type_t::section: {
                 auto& sc = hdr.subclass.section;
-                io::file::write_u32(file, sc.name_index);
-                io::file::write_u32(file, sc.type);
-                io::file::write_u64(file, sc.flags);
-                io::file::write_u64(file, sc.addr.base);
-                io::file::write_u64(file, sc.offset);
-                io::file::write_u64(file, sc.size);
-                io::file::write_u32(file, sc.link);
-                io::file::write_u32(file, sc.info);
-                io::file::write_u64(file, sc.addr.align);
-                io::file::write_u64(file, sc.entry_size);
+                FILE_WRITE(u32, sc.name_index);
+                FILE_WRITE(u32, sc.type);
+                FILE_WRITE(u64, sc.flags);
+                FILE_WRITE(u64, sc.addr.base);
+                FILE_WRITE(u64, sc.offset);
+                FILE_WRITE(u64, sc.size);
+                FILE_WRITE(u32, sc.link);
+                FILE_WRITE(u32, sc.info);
+                FILE_WRITE(u64, sc.addr.align);
+                FILE_WRITE(u64, sc.entry_size);
                 break;
             }
             case header_type_t::segment: {
                 auto& sc = hdr.subclass.segment;
-                io::file::write_u32(file, sc.type);
-                io::file::write_u32(file, sc.flags);
-                io::file::write_u64(file, sc.file.offset);
-                io::file::write_u64(file, sc.addr.virt);
-                io::file::write_u64(file, sc.addr.phys);
-                io::file::write_u64(file, sc.file.size);
-                io::file::write_u64(file, sc.addr.size);
-                io::file::write_u64(file, sc.align);
+                FILE_WRITE(u32, sc.type);
+                FILE_WRITE(u32, sc.flags);
+                FILE_WRITE(u64, sc.file.offset);
+                FILE_WRITE(u64, sc.addr.virt);
+                FILE_WRITE(u64, sc.addr.phys);
+                FILE_WRITE(u64, sc.file.size);
+                FILE_WRITE(u64, sc.addr.size);
+                FILE_WRITE(u64, sc.align);
                 break;
             }
             default:

@@ -178,7 +178,7 @@ namespace basecode::binfmt::io::coff {
                     }
                     case sym_type_t::aux_file: {
                         auto sc = &sym.subclass.aux_file;
-                        format::print("                           AUX    FILE {}\n", slice::make(*sc, 18));
+                        format::print("                           AUX    FILE {}\n", slice::make(sc->bytes, sizeof(sc->bytes)));
                         break;
                     }
                     case sym_type_t::aux_section: {

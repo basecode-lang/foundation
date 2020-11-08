@@ -74,16 +74,34 @@ namespace basecode::binfmt::io::pe {
             if (!OK(status))
                 return status;
 
-            pe::write_dos_header(file, pe);
-            pe::write_pe_header(file, pe);
-            coff::write_header(file, coff);
-            pe::write_optional_header(file, pe);
-            coff::write_section_headers(file, coff);
+            status = pe::write_dos_header(file, pe);
+            if (!OK(status))
+                return status;
+
+            status = pe::write_pe_header(file, pe);
+            if (!OK(status))
+                return status;
+
+            status = coff::write_header(file, coff);
+            if (!OK(status))
+                return status;
+
+            status = pe::write_optional_header(file, pe);
+            if (!OK(status))
+                return status;
+
+            status = coff::write_section_headers(file, coff);
+            if (!OK(status))
+                return status;
+
             status = pe::write_sections_data(file, pe);
             if (!OK(status))
                 return status;
+
             if (pe.opts.include_symbol_table) {
-                coff::write_symbol_table(file, coff);
+                status = coff::write_symbol_table(file, coff);
+                if (!OK(status))
+                    return status;
             }
 
             return status_t::ok;

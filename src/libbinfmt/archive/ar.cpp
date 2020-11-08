@@ -41,7 +41,7 @@ namespace basecode::binfmt::ar {
         header_t    hdr{};
         u64_bytes_t thunk_u64{};
 
-        if (!OK(buf::cursor::read_u64(c, thunk_u64.value)))
+        if (!OK(buf::cursor::read<u64>(c, thunk_u64.value)))
             return status_t::read_error;
 
         if (memcmp(thunk_u64.bytes, "!<arch>\n", 8) != 0)
@@ -50,7 +50,7 @@ namespace basecode::binfmt::ar {
         while (CRSR_MORE(c)) {
             const auto hdr_offset = CRSR_POS(c);
 
-            if (!OK(buf::cursor::read_obj(c, &hdr, sizeof(header_t))))
+            if (!OK(buf::cursor::read<header_t>(c, hdr)))
                 break;
 
             hdr.name[15] = 0;
@@ -60,7 +60,7 @@ namespace basecode::binfmt::ar {
             hdr.mode[7]  = 0;
             hdr.size[9]  = 0;
 
-            if (!OK(buf::cursor::read_obj(c, marker, 2)))
+            if (!OK(buf::cursor::read<s8[2]>(c, marker)))
                 break;
 
             if (marker[0] != 0x60 || marker[1] != 0x0a)
@@ -120,27 +120,27 @@ namespace basecode::binfmt::ar {
         buf::cursor::seek(c, symbol_table.offset.data);
 
         u32 num_members{};
-        if (!OK(buf::cursor::read_u32(c, num_members)))
+        if (!OK(buf::cursor::read<u32>(c, num_members)))
             return status_t::read_error;
 
         u32 mem_offsets[num_members];
         for (u32 i = 0; i < num_members; ++i) {
-            if (!OK(buf::cursor::read_u32(c, mem_offsets[i])))
+            if (!OK(buf::cursor::read<u32>(c, mem_offsets[i])))
                 return status_t::read_error;
         }
         u32 num_symbols{};
 
-        if (!OK(buf::cursor::read_u32(c, num_symbols)))
+        if (!OK(buf::cursor::read<u32>(c, num_symbols)))
             return status_t::read_error;
 
         u16 sym_indexes[num_symbols];
         for (u32 i = 0; i < num_symbols; ++i) {
-            if (!OK(buf::cursor::read_u16(c, sym_indexes[i])))
+            if (!OK(buf::cursor::read<u16>(c, sym_indexes[i])))
                 return status_t::read_error;
         }
         u8 ch{};
         while (num_symbols) {
-            if (!OK(buf::cursor::read_u8(c, ch)))
+            if (!OK(buf::cursor::read<u8>(c, ch)))
                 return status_t::read_error;
             if (ch == 0)
                 --num_symbols;
@@ -181,14 +181,14 @@ namespace basecode::binfmt::ar {
         u32 num_symbols{};
         u8 ch{};
 
-        if (!OK(buf::cursor::read_u32(c, num_symbols)))
+        if (!OK(buf::cursor::read<u32>(c, num_symbols)))
             return status_t::read_error;
         num_symbols = endian_swap_dword(num_symbols);
         array::resize(sym_offsets, num_symbols);
 
         for (u32 i = 0; i < num_symbols; ++i) {
             auto& sym = sym_offsets[i];
-            if (!OK(buf::cursor::read_u32(c, sym.offset)))
+            if (!OK(buf::cursor::read<u32>(c, sym.offset)))
                 return status_t::read_error;
             sym.offset = endian_swap_dword(sym.offset);
         }
@@ -196,7 +196,7 @@ namespace basecode::binfmt::ar {
         u32  idx{};
         auto symbol_offset = CRSR_POS(c);
         while (num_symbols) {
-            if (!OK(buf::cursor::read_u8(c, ch)))
+            if (!OK(buf::cursor::read<u8>(c, ch)))
                 return status_t::read_error;
             if (ch == 0) {
                 auto& sym = sym_offsets[idx++];
