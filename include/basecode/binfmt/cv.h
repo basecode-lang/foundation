@@ -115,6 +115,40 @@ namespace basecode::binfmt::cv {
         u8                      data4[8];
     };
 
+    struct subsection_header_t final {
+        debug_subsection_type_t type;
+        s32                     len;
+    };
+
+    constexpr u32 CV_LINES_HAVE_COLUMNS = 0x0001;
+
+    struct line_t final {
+        u32                     offset;
+        u32                     line_num_start:     24;
+        u32                     delta_line_end:     7;
+        u32                     is_statement:       1;
+    };
+
+    struct column_t final {
+        u16                     offset_col_start;
+        u16                     offset_col_end;
+    };
+
+    struct c13_lines_hdr_t final {
+        u32                     offset;
+        u16                     seg;
+        u16                     flags;
+        u32                     len;
+    };
+
+    struct c13_file_block_t final {
+        u32                     file_id;
+        u32                     num_lines;
+        u32                     len;
+        line_t                  lines[1];
+        column_t                columns[0];
+    };
+
     struct rec_header_t final {
         u16                     len;
         u16                     kind;
@@ -238,6 +272,7 @@ namespace basecode::binfmt::cv {
         };
     };
 
+    constexpr u32 LF_ALIAS              = 0x150a;   // ok
     constexpr u32 LF_BCLASS             = 0x1400;   // ok
     constexpr u32 LF_BINTERFACE         = 0x151a;   // ok
     constexpr u32 LF_VBCLASS            = 0x1401;   // ok
@@ -1354,8 +1389,6 @@ namespace basecode::binfmt::cv {
 
     struct cv_t final {
         alloc_t*                alloc;
-        u32                     offset;
-        u32                     size;
         u32                     signature;
         struct {
             u32                 utf8_symbols:       1;
@@ -1367,9 +1400,15 @@ namespace basecode::binfmt::cv {
 
     str::slice_t sig_name(u32 sig);
 
-    status_t read(cv_t& cv, io::file_t& file);
+    str::slice_t machine_name(u16 machine);
+
+    str::slice_t language_name(u8 language);
+
+    status_t init(cv_t& cv, alloc_t* alloc = context::top()->alloc);
 
     str::slice_t debug_subsection_name(debug_subsection_type_t type);
 
-    status_t init(cv_t& cv, u32 offset, u32 size, alloc_t* alloc = context::top()->alloc);
+    status_t read_type_data(cv_t& cv, io::file_t& file, u32 offset, u32 size);
+
+    status_t read_symbol_data(cv_t& cv, io::file_t& file, u32 offset, u32 size);
 }

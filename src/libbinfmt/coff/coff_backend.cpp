@@ -112,17 +112,24 @@ namespace basecode::binfmt::io::coff {
                     format::print("\n");
 
                     cv::cv_t cv{};
-                    cv::init(cv, hdr.file.offset, hdr.file.size, coff.alloc);
+                    cv::init(cv, coff.alloc);
                     defer(cv::free(cv));
 
-                    if (!OK(cv::read(cv, file))) {
-                        format::print("crap!\n");
+                    if (!OK(cv::read_symbol_data(cv, file, hdr.file.offset, hdr.file.size))) {
+                        format::print("crap! reading symbols sucks\n");
                     }
-
-                } else if (hdr.name == ".debug$T"_ss) {
+                } else if (hdr.name == ".debug$T"_ss || hdr.name == ".debug$P"_ss) {
                     format::print("    TYPE INFO DEBUG DATA:\n");
                     format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, true, 6);
                     format::print("\n");
+
+                    cv::cv_t cv{};
+                    cv::init(cv, coff.alloc);
+                    defer(cv::free(cv));
+
+                    if (!OK(cv::read_type_data(cv, file, hdr.file.offset, hdr.file.size))) {
+                        format::print("crap! reading types sucks\n");
+                    }
                 }
             }
 
