@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/binfmt/cv.h>
 #include <basecode/binfmt/coff.h>
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/slice_utils.h>
@@ -29,7 +30,7 @@ namespace basecode::binfmt::io::coff {
 
         coff_system_t               g_coff_sys{};
 
-        static u0 format_coff(coff_t& coff) {
+        static u0 format_coff(coff_t& coff, file_t& file) {
 //                format::print("{} ", FLAG_CHK(hdr.flags, section::content_code) ? "X" : " ");
 //                format::print("{} ", FLAG_CHK(hdr.flags, section::data_init) ? "X" : " ");
 //                format::print("{} ", FLAG_CHK(hdr.flags, section::data_uninit) ? "X" : " ");
@@ -109,6 +110,15 @@ namespace basecode::binfmt::io::coff {
                     format::print("    SYMBOLIC DEBUG DATA:\n");
                     format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, true, 6);
                     format::print("\n");
+
+                    cv::cv_t cv{};
+                    cv::init(cv, hdr.file.offset, hdr.file.size, coff.alloc);
+                    defer(cv::free(cv));
+
+                    if (!OK(cv::read(cv, file))) {
+                        format::print("crap!\n");
+                    }
+
                 } else if (hdr.name == ".debug$T"_ss) {
                     format::print("    TYPE INFO DEBUG DATA:\n");
                     format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, true, 6);
@@ -247,7 +257,7 @@ namespace basecode::binfmt::io::coff {
             stopwatch::stop(timer);
             stopwatch::print_elapsed("binfmt read COFF obj time"_ss, 40, timer);
 
-            format_coff(coff);
+            format_coff(coff, file);
 
             return status_t::ok;
         }

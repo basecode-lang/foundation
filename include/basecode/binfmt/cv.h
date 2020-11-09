@@ -18,13 +18,36 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/binfmt/io.h>
 
 #define LF_PAD(n) (0xf0 + (n))
 
 namespace basecode::binfmt::cv {
     using type_t                = u32;
     using item_id_t             = u32;
+
+    constexpr u32 CV_SIGNATURE_C6         = 0L;  // Actual signature is >64K
+    constexpr u32 CV_SIGNATURE_C7         = 1L;  // First explicit signature
+    constexpr u32 CV_SIGNATURE_C11        = 2L;  // C11 (vc5.x) 32-bit types
+    constexpr u32 CV_SIGNATURE_C13        = 4L;  // C13 (vc7.x) zero terminated names
+    constexpr u32 CV_SIGNATURE_RESERVED   = 5L;  // All signatures from 5 to 64K are reserved
+
+    enum class debug_subsection_type_t : u32 {
+        ignore                  = 0x80000000,
+        symbols                 = 0xf1,
+        lines,
+        string_table,
+        file_chksms,
+        frame_data,
+        inlinee_lines,
+        cross_scope_imports,
+        cross_scope_exports,
+        il_lines,
+        func_mdtoken_map,
+        type_mdtoken_map,
+        merged_assembly_input,
+        coff_symbol_rva,
+    };
 
     enum class ptr_kind_t : u8 {
         near_16                 = 0x00,
@@ -317,6 +340,10 @@ namespace basecode::binfmt::cv {
         type_t                  index;
         u32                     vbase_offset[0];
     };
+
+    namespace machine {
+        constexpr u32 x86_64        = 0xd0;
+    }
 
     namespace leaf {
         struct modifier_t final {
@@ -1321,9 +1348,28 @@ namespace basecode::binfmt::cv {
             u16                     type;
             s32                     offset;
         };
+
+        str::slice_t name(u16 type);
     }
 
-    namespace machine {
-        constexpr u32 x86_64        = 0xd0;
-    }
+    struct cv_t final {
+        alloc_t*                alloc;
+        u32                     offset;
+        u32                     size;
+        u32                     signature;
+        struct {
+            u32                 utf8_symbols:       1;
+            u32                 pad:                31;
+        }                       flags;
+    };
+
+    status_t free(cv_t& cv);
+
+    str::slice_t sig_name(u32 sig);
+
+    status_t read(cv_t& cv, io::file_t& file);
+
+    str::slice_t debug_subsection_name(debug_subsection_type_t type);
+
+    status_t init(cv_t& cv, u32 offset, u32 size, alloc_t* alloc = context::top()->alloc);
 }

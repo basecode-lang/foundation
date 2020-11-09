@@ -46,7 +46,7 @@ set(
     coff/coff_backend.cpp
     coff/coff.cpp ${INC_DIR}/coff.h
 
-    ${INC_DIR}/cv.h
+    cv.cpp ${INC_DIR}/cv.h
 
     elf/elf_backend.cpp
     elf/elf.cpp ${INC_DIR}/elf.h

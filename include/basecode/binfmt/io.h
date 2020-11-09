@@ -22,6 +22,7 @@
 #include <basecode/binfmt/types.h>
 
 #define FILE_POS()          CRSR_POS(file.crsr)
+#define FILE_PTR()          CRSR_PTR(file.crsr)
 #define FILE_POP_POS()      SAFE_SCOPE(buf::cursor::pop(file.crsr);)
 #define FILE_PUSH_POS()     SAFE_SCOPE(buf::cursor::push(file.crsr);)
 #define FILE_SEEK(p)        SAFE_SCOPE(                 \
@@ -40,6 +41,9 @@
 #define FILE_READ(t, v)     SAFE_SCOPE(                 \
     static_assert(std::is_same_v<decltype(v), t>);      \
     if (!OK(buf::cursor::read(file.crsr, (v))))         \
+        return status_t::read_error;)
+#define FILE_READ_STR(d, l)     SAFE_SCOPE(             \
+    if (!OK(buf::cursor::read_str(file.crsr, (d), (l))))\
         return status_t::read_error;)
 #define FILE_WRITE_STR(v)   SAFE_SCOPE(                 \
     if (!OK(buf::cursor::write_str(file.crsr, (v))))    \

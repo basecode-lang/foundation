@@ -131,6 +131,8 @@ namespace basecode {
 
             status_t write_cstr(buf_crsr_t& crsr, str::slice_t slice);
 
+            status_t read_str(buf_crsr_t& crsr, u0* dest, u32 length);
+
             status_t write_str(buf_crsr_t& crsr, const String_Concept auto& str) {
                 auto status = buf::write(*crsr.buf, crsr.pos, str.data, str.length);
                 if (!OK(status))

@@ -74,6 +74,14 @@ namespace basecode::buf {
             return status_t::ok;
         }
 
+        status_t read_str(buf_crsr_t& crsr, u0* dest, u32 length) {
+            auto status = buf::read(*crsr.buf, crsr.pos, dest, length);
+            if (!OK(status))
+                return status;
+            crsr.pos += length;
+            return status_t::ok;
+        }
+
         status_t write_cstr(buf_crsr_t& crsr, str::slice_t slice) {
             auto status = buf::write(*crsr.buf, crsr.pos, slice.data, slice.length);
             if (!OK(status))

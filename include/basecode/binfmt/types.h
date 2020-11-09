@@ -71,6 +71,7 @@ namespace basecode::binfmt {
         invalid_input_type              = 2016,
         not_ar_long_name                = 2017,
         section_entry_out_of_bounds     = 2018,
+        bad_cv_signature                = 2019,
     };
 
     enum class module_type_t : u8 {
