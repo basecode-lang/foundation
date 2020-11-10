@@ -47,6 +47,7 @@ FILE* fmemopen(void* buf, size_t len, const char* type);
 #include <sys/sys_types.h>
 #include <sys/stat.h>
 #include <sys/utime.h>
+#include <combaseapi.h>
 
 #define PATH_MAX            260
 

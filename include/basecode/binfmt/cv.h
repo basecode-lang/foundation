@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <basecode/core/uuid.h>
 #include <basecode/binfmt/io.h>
 
 #define LF_PAD(n) (0xf0 + (n))
@@ -106,13 +107,6 @@ namespace basecode::binfmt::cv {
         xor_sp,
         xor_bp,
         xor_r13
-    };
-
-    struct guid_t final {
-        u32                     data1;
-        u16                     data2;
-        u16                     data3;
-        u8                      data4[8];
     };
 
     struct subsection_header_t final {
@@ -814,7 +808,7 @@ namespace basecode::binfmt::cv {
 
         struct type_server2_t final {
             u16                     leaf;
-            guid_t                  sig70;
+            uuid_t                  sig70;
             u32                     age;
             u8                      name[0];
         };

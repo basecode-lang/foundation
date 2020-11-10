@@ -18,6 +18,7 @@ add_executable(
     eav_tests.cpp
     path_tests.cpp
     list_tests.cpp
+    uuid_tests.cpp
     error_tests.cpp
     array_tests.cpp
     stack_tests.cpp
