@@ -22,7 +22,7 @@
 
 using namespace basecode;
 
-TEST_CASE("basecode::binfmt read COFF obj file") {
+TEST_CASE("basecode::binfmt COFF read obj file") {
     using namespace binfmt;
 
     io::session_t s{};

@@ -60,11 +60,28 @@ namespace basecode::binfmt::io::elf {
     using header_list_t         = array_t<header_t>;
     using sym_idx_list_t        = array_t<u32>;
 
+    enum class access_mode_t : u8 {
+        read,
+        write,
+    };
+
     enum class block_type_t : u8 {
         hash,
         slice,
         strtab,
         symtab,
+    };
+
+    enum class strtab_type_t : u8 {
+        none,
+        no_copy,
+        owned,
+    };
+
+    enum class symtab_type_t : u8 {
+        none,
+        no_copy,
+        owned,
     };
 
     enum class header_type_t : u8 {
@@ -105,12 +122,12 @@ namespace basecode::binfmt::io::elf {
     };
 
     struct sym_t final {
-        u64                     value;
-        u64                     size;
         u32                     name_index;
-        u16                     index;
         u8                      info;
         u8                      other;
+        u16                     index;
+        u64                     value;
+        u64                     size;
     };
 
     struct sym_bind_t final {
@@ -141,7 +158,11 @@ namespace basecode::binfmt::io::elf {
     };
 
     struct strtab_t final {
-        str_array_t             strings;
+        union {
+            str_array_t         strings;
+            const s8*           buf;
+        };
+        strtab_type_t           type;
     };
 
     struct hash_t final {
@@ -151,10 +172,19 @@ namespace basecode::binfmt::io::elf {
     };
 
     struct symtab_t final {
-        strtab_t*               strtab;
-        sym_list_t              symbols;
-        hash_t                  hash;
+        union {
+            struct {
+                sym_t*          buf;
+                u32             size;
+            }                   no_copy;
+            struct {
+                strtab_t*       strtab;
+                sym_list_t      symbols;
+                hash_t          hash;
+            }                   owned;
+        };
         u32                     link;
+        symtab_type_t           type;
     };
 
     struct block_t final {
@@ -208,6 +238,12 @@ namespace basecode::binfmt::io::elf {
         alloc_t*                alloc;
         file_t*                 file;
         u64                     entry_point;
+        u8                      clazz;
+        u8                      os_abi;
+        u8                      version;
+        u8                      endianess;
+        u8                      abi_version;
+        access_mode_t           access_mode;
     };
 
     struct elf_t final {
@@ -240,7 +276,8 @@ namespace basecode::binfmt::io::elf {
     [[maybe_unused]] constexpr u32 class_64         = 2;
     [[maybe_unused]] constexpr u32 data_2lsb        = 1;
     [[maybe_unused]] constexpr u32 data_2msb        = 2;
-    [[maybe_unused]] constexpr u32 os_abi_linux     = 3;
+    [[maybe_unused]] constexpr u32 os_abi_sysv      = 0;
+    [[maybe_unused]] constexpr u32 os_abi_gnu       = 3;
     [[maybe_unused]] constexpr u32 version_current  = 1;
 
     namespace note {
@@ -259,15 +296,30 @@ namespace basecode::binfmt::io::elf {
     }
 
     namespace file {
-        [[maybe_unused]] constexpr u16 header_size  = 64;
+        [[maybe_unused]] constexpr u16 header_size          = 64;
+        [[maybe_unused]] constexpr u16 magic_class          = 4;
+        [[maybe_unused]] constexpr u16 magic_data           = 5;
+        [[maybe_unused]] constexpr u16 magic_version        = 6;
+        [[maybe_unused]] constexpr u16 magic_os_abi         = 7;
+        [[maybe_unused]] constexpr u16 magic_abi_version    = 8;
 
         namespace type {
-            [[maybe_unused]] constexpr u8 none      = 0;
-            [[maybe_unused]] constexpr u8 rel       = 1;
-            [[maybe_unused]] constexpr u8 exec      = 2;
-            [[maybe_unused]] constexpr u8 dyn       = 3;
-            [[maybe_unused]] constexpr u8 core      = 4;
+            [[maybe_unused]] constexpr u8 none              = 0;
+            [[maybe_unused]] constexpr u8 rel               = 1;
+            [[maybe_unused]] constexpr u8 exec              = 2;
+            [[maybe_unused]] constexpr u8 dyn               = 3;
+            [[maybe_unused]] constexpr u8 core              = 4;
         }
+
+        str::slice_t class_name(u8 cls);
+
+        str::slice_t os_abi_name(u8 os_abi);
+
+        str::slice_t version_name(u8 version);
+
+        str::slice_t file_type_name(u16 type);
+
+        str::slice_t endianess_name(u8 endianess);
     }
 
     namespace relocs {
@@ -463,6 +515,8 @@ namespace basecode::binfmt::io::elf {
     namespace machine {
         [[maybe_unused]] constexpr u16 x86_64       = 62;
         [[maybe_unused]] constexpr u16 aarch64      = 183;
+
+        str::slice_t name(u16 type);
     }
 
     namespace dynamic {
@@ -516,6 +570,25 @@ namespace basecode::binfmt::io::elf {
             [[maybe_unused]] constexpr u32 pre_init_array   = 16;
             [[maybe_unused]] constexpr u32 group            = 17;
             [[maybe_unused]] constexpr u32 symtab_shndx     = 18;
+            [[maybe_unused]] constexpr u32 low_os           = 0x60000000;
+            [[maybe_unused]] constexpr u32 gnu_eh_frame     = 0x6474e550;
+            [[maybe_unused]] constexpr u32 gnu_stack        = 0x6474e551;
+            [[maybe_unused]] constexpr u32 gnu_rel_ro       = 0x6474e552;
+            [[maybe_unused]] constexpr u32 gnu_attributes   = 0x6ffffff5;
+            [[maybe_unused]] constexpr u32 gnu_hash         = 0x6ffffff6;
+            [[maybe_unused]] constexpr u32 gnu_lib_list     = 0x6ffffff7;
+            [[maybe_unused]] constexpr u32 checksum         = 0x6ffffff8;
+            [[maybe_unused]] constexpr u32 gnu_ver_def      = 0x6ffffffd;
+            [[maybe_unused]] constexpr u32 gnu_ver_need     = 0x6ffffffe;
+            [[maybe_unused]] constexpr u32 gnu_ver_sym      = 0x6fffffff;
+            [[maybe_unused]] constexpr u32 high_os          = 0x6fffffff;
+            [[maybe_unused]] constexpr u32 low_proc         = 0x70000000;
+            [[maybe_unused]] constexpr u32 x86_64_unwind    = 0x70000001;
+            [[maybe_unused]] constexpr u32 high_proc        = 0x7fffffff;
+            [[maybe_unused]] constexpr u32 low_user         = 0x80000000;
+            [[maybe_unused]] constexpr u32 high_user        = 0x8fffffff;
+
+            str::slice_t name(u32 type);
         }
 
         namespace flags {
@@ -534,6 +607,12 @@ namespace basecode::binfmt::io::elf {
             [[maybe_unused]] constexpr u32 mask_proc        = 0xf0000000;
             [[maybe_unused]] constexpr u32 ordered          = 0x40000000;
             [[maybe_unused]] constexpr u32 exclude          = 0x80000000;
+
+            const s8* name(u32 flag);
+
+            u0 chars(u32 flags, s8* chars);
+
+            u0 names(u32 flags, const s8* names[13]);
         }
 
         namespace info {
@@ -590,6 +669,8 @@ namespace basecode::binfmt::io::elf {
     }
 
     namespace strtab {
+        u0 init(strtab_t& strtab);
+
         u0 free(strtab_t& strtab);
 
         header_t& make_section(elf_t& elf,
@@ -599,6 +680,8 @@ namespace basecode::binfmt::io::elf {
         u0 init(strtab_t& strtab, alloc_t* alloc);
 
         u32 add_str(strtab_t& strtab, str::slice_t str);
+
+        const s8* get(const strtab_t& strtab, u32 offset);
 
         status_t write(const strtab_t& strtab, file_t& file);
     }
@@ -631,6 +714,8 @@ namespace basecode::binfmt::io::elf {
 
         u0 free(symtab_t& symtab);
 
+        u0 init(symtab_t& symtab);
+
         u64 hash_name(str::slice_t str);
 
         header_t& make_section(elf_t& elf,
@@ -638,7 +723,11 @@ namespace basecode::binfmt::io::elf {
                                const symtab_t* symtab,
                                u32 first_global_idx);
 
+        u32 size(const symtab_t& symtab);
+
         u0 rehash(symtab_t& symtab, u32 size);
+
+        sym_t* get(const symtab_t& symtab, u32 idx);
 
         status_t write(const symtab_t& symtab, file_t& file);
 

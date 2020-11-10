@@ -71,7 +71,7 @@ static const u8 s_rot13_code[] = {
     0xc3,                                           //0000000004010AC: C3                      ret
 };
 
-TEST_CASE("basecode::binfmt ELF read obj") {
+TEST_CASE("basecode::binfmt ELF read obj file") {
     using namespace binfmt;
 
     io::session_t s{};

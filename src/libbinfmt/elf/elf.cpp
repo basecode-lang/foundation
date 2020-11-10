@@ -21,6 +21,187 @@
 #include <basecode/core/string.h>
 
 namespace basecode::binfmt::io::elf {
+    namespace file {
+        static str::slice_t s_class_names[] = {
+            "None"_ss,
+            "ELF32"_ss,
+            "ELF64"_ss,
+        };
+
+        static str::slice_t s_os_abi_names[] = {
+            "UNIX - System V"_ss,
+            "HPUX"_ss,
+            "NETBSD"_ss,
+            "GNU"_ss,
+            "LINUX/GNU"_ss,
+            "SOLARIS"_ss,
+            "AIX"_ss,
+            "IRIX"_ss,
+            "FREEBSD"_ss,
+            "TRU64"_ss,
+            "MODESTO"_ss,
+            "OPENBSD"_ss,
+            "ARM_EABI"_ss,
+            "ARM"_ss,
+            "STANDALONE"_ss,
+        };
+
+        static str::slice_t s_file_type_names[] = {
+            "None"_ss,
+            "REL (Relocatable file)"_ss,
+            "EXEC"_ss,
+            "DYN"_ss,
+            "CORE"_ss
+        };
+
+        static str::slice_t s_version_names[] = {
+            "None"_ss,
+            "Current"_ss,
+        };
+
+        static str::slice_t s_endianess_names[] = {
+            "None"_ss,
+            "Little endian"_ss,
+            "Big endian"_ss
+        };
+
+        str::slice_t class_name(u8 cls) {
+            return s_class_names[cls];
+        }
+
+        str::slice_t os_abi_name(u8 os_abi) {
+            return s_os_abi_names[os_abi];
+        }
+
+        str::slice_t version_name(u8 version) {
+            return s_version_names[version];
+        }
+
+        str::slice_t file_type_name(u16 type) {
+            return s_file_type_names[type];
+        }
+
+        str::slice_t endianess_name(u8 endianess) {
+            return s_endianess_names[endianess];
+        }
+    }
+
+    namespace machine {
+        static str::slice_t s_machine_names[] = {
+            "None"_ss,
+            "M32"_ss,
+            "SPARC"_ss,
+            "Intel 80386"_ss,
+            "Motorola 68000"_ss,
+            "Motorola 88000"_ss,
+            "Intel 80860"_ss,
+            "MIPS R3000 BE"_ss,
+            "IBM System/370"_ss,
+            "MIPS R330 LE"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "PARISC/HPPA"_ss,
+            "Fujitsu VPP500"_ss,
+            "SPARC32"_ss,
+            "Intel 80960"_ss,
+            "PowerPC"_ss,
+            "PowerPC 64-bit"_ss,
+            "IBM S390"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "????"_ss,
+            "NEC V800"_ss,
+            "Fujitsu FR20"_ss,
+            "TRW RH-32"_ss,
+            "RCE"_ss,
+            "ARM"_ss,
+            "Digital Alpha"_ss,
+            "Hitachi SH"_ss,
+            "SPARC v9 64-bit"_ss,
+            "Siemens Tricore"_ss,
+            "Argonaut RISC Core"_ss,
+            "Hitachi H8/300"_ss,
+            "Hitachi H8/300H"_ss,
+            "Hitachi H8S"_ss,
+            "Hitachi H8/500"_ss,
+            "Intel Merced"_ss,
+            "Stanford MIPS-X"_ss,
+            "Motorola Coldfire"_ss,
+            "Motorola M68HC12"_ss,
+            "Fujitsu MMA"_ss,
+            "Siemens PCP"_ss,
+            "Sony nCPU embedded RISC"_ss,
+            "Denso NDR1 microprocessor"_ss,
+            "Motorola Star*Core"_ss,
+            "Toyota ME16"_ss,
+            "STM ST100"_ss,
+            "Tinyj embedded"_ss,
+            "AMD x86-64 architecture"_ss,
+            "Sony DSP"_ss,
+            "????"_ss,
+            "????"_ss,
+            "Siemens FX66"_ss,
+            "STM ST9+ 8/16"_ss,
+            "STM ST7 8-bit"_ss,
+            "Motorola MC68HC16"_ss,
+            "Motorola MC68HC11"_ss,
+            "Motorola MC68HC08"_ss,
+            "Motorola MC68HC05"_ss,
+            "SGI SVx"_ss,
+            "STM ST19 8-bit"_ss,
+            "Digital VAX"_ss,
+            "Axis Comm. 32-bit"_ss,
+            "Infineon Tech. 32-bit"_ss,
+            "Element 14 64-bit DSP"_ss,
+            "LSI Logic 16-bit DSP"_ss,
+            "Donald Knuth's educational 64-bit"_ss,
+            "Harvard University machine-independent object files"_ss,
+            "SiTera Prism"_ss,
+            "Atmel AVR 8-bit"_ss,
+            "Fujitsu FR30"_ss,
+            "Mitsubishi D10V"_ss,
+            "Mitsubishi D30V"_ss,
+            "NEC v850"_ss,
+            "Mitsubishi M32R"_ss,
+            "Matsushita MN10300"_ss,
+            "Matsushita MN10200"_ss,
+            "picoJava"_ss,
+            "OpenRISC 32-bit"_ss,
+            "ARC Cores Tangent-A5"_ss,
+            "Tensilica Xtensa Architecture"_ss,
+        };
+
+        str::slice_t name(u16 type) {
+            switch (type) {
+                case 183:
+                    return "ARM AArch64"_ss;
+                case 188:
+                    return "Tilera TILEPro"_ss;
+                case 191:
+                    return "Tilera TILE-Gx"_ss;
+                case 243:
+                    return "RISC-V"_ss;
+                default:
+                    break;
+            }
+            return s_machine_names[type];
+        }
+    }
+
     namespace hash {
         u0 free(hash_t& hash) {
             array::free(hash.buckets);
@@ -77,8 +258,13 @@ namespace basecode::binfmt::io::elf {
     }
 
     namespace strtab {
+        u0 init(strtab_t& strtab) {
+            strtab.type = strtab_type_t::no_copy;
+        }
+
         u0 free(strtab_t& strtab) {
-            str_array::free(strtab.strings);
+            if (strtab.type == strtab_type_t::owned)
+                str_array::free(strtab.strings);
         }
 
         header_t& make_section(elf_t& elf,
@@ -110,7 +296,27 @@ namespace basecode::binfmt::io::elf {
         }
 
         u0 init(strtab_t& strtab, alloc_t* alloc) {
-            str_array::init(strtab.strings, alloc);
+            strtab.type = strtab_type_t::owned;
+            if (strtab.type == strtab_type_t::owned)
+                str_array::init(strtab.strings, alloc);
+        }
+
+        u32 add_str(strtab_t& strtab, str::slice_t str) {
+            const auto offset = strtab.strings.buf.size + 1;
+            str_array::append(strtab.strings, str);
+            return offset;
+        }
+
+        const s8* get(const strtab_t& strtab, u32 offset) {
+            switch (strtab.type) {
+                case strtab_type_t::no_copy:
+                    return strtab.buf + offset;
+                case strtab_type_t::owned:
+                    return (const s8*) strtab.strings.buf.data + offset;
+                default:
+                    break;
+            }
+            return nullptr;
         }
 
         status_t write(const strtab_t& strtab, file_t& file) {
@@ -120,18 +326,18 @@ namespace basecode::binfmt::io::elf {
             FILE_WRITE_STR(slice);
             return status_t::ok;
         }
-
-        u32 add_str(strtab_t& strtab, str::slice_t str) {
-            const auto offset = strtab.strings.buf.size + 1;
-            str_array::append(strtab.strings, str);
-            return offset;
-        }
     }
 
     namespace symtab {
+        u0 init(symtab_t& symtab) {
+            symtab.type = symtab_type_t::no_copy;
+        }
+
         u0 free(symtab_t& symtab) {
-            hash::free(symtab.hash);
-            array::free(symtab.symbols);
+            if (symtab.type == symtab_type_t::owned) {
+                hash::free(symtab.owned.hash);
+                array::free(symtab.owned.symbols);
+            }
         }
 
         u64 hash_name(str::slice_t str) {
@@ -145,10 +351,18 @@ namespace basecode::binfmt::io::elf {
             return h;
         }
 
+        u32 size(const symtab_t& symtab) {
+            if (symtab.type == symtab_type_t::no_copy)
+                return symtab.no_copy.size;
+            else
+                return symtab.owned.symbols.size;
+        }
+
         header_t& make_section(elf_t& elf,
                                str::slice_t name,
                                const symtab_t* symtab,
                                u32 first_global_idx) {
+            const auto& ssc = symtab->owned;
             auto& hdr = array::append(elf.headers);
             hdr.section = {};
             hdr.number  = ++elf.section.count;
@@ -163,7 +377,7 @@ namespace basecode::binfmt::io::elf {
             sc.addr.align = sizeof(u64);
             sc.name_index = elf::strtab::add_str(elf.section_names,
                                                  string::interned::fold(name));
-            sc.size       = symtab->symbols.size * elf::symtab::entity_size;
+            sc.size       = ssc.symbols.size * elf::symtab::entity_size;
 
             auto& block = array::append(elf.blocks);
             block.type        = block_type_t::symtab;
@@ -176,11 +390,20 @@ namespace basecode::binfmt::io::elf {
         }
 
         u0 rehash(symtab_t& symtab, u32 size) {
-            hash::rehash(symtab.hash, size);
+            if (symtab.type == symtab_type_t::owned)
+                hash::rehash(symtab.owned.hash, size);
+        }
+
+        sym_t* get(const symtab_t& symtab, u32 idx) {
+            if (symtab.type != symtab_type_t::no_copy)
+                return nullptr;
+            if (idx < symtab.no_copy.size)
+                return &symtab.no_copy.buf[idx];
+            return nullptr;
         }
 
         status_t write(const symtab_t& symtab, file_t& file) {
-            for (const auto& sym : symtab.symbols) {
+            for (const auto& sym : symtab.owned.symbols) {
                 FILE_WRITE(u32, sym.name_index);
                 FILE_WRITE(u8, sym.info);
                 FILE_WRITE(u8, sym.other);
@@ -192,6 +415,8 @@ namespace basecode::binfmt::io::elf {
         }
 
         status_t add_sym(symtab_t& symtab, const symbol_t* symbol) {
+            auto& ssc = symtab.owned;
+
             u32 name_index;
             u32 bucket_idx{};
 
@@ -199,12 +424,12 @@ namespace basecode::binfmt::io::elf {
                 const auto intern_rc = string::interned::get(symbol->name);
                 if (!OK(intern_rc.status))
                     return status_t::symbol_not_found;
-                name_index = elf::strtab::add_str(*symtab.strtab, intern_rc.slice);
+                name_index = elf::strtab::add_str(*ssc.strtab, intern_rc.slice);
                 const auto name_hash  = hash_name(intern_rc.slice);
-                bucket_idx = name_hash % symtab.hash.buckets.size;
+                bucket_idx = name_hash % ssc.hash.buckets.size;
             }
 
-            auto& sym = array::append(symtab.symbols);
+            auto& sym = array::append(ssc.symbols);
             if (symbol) {
                 u32 scope{};
                 u32 type{};
@@ -261,36 +486,40 @@ namespace basecode::binfmt::io::elf {
                 sym.index      = symbol->section;
             }
 
-            u32 sym_idx = symtab.hash.buckets[bucket_idx];
+            u32 sym_idx = ssc.hash.buckets[bucket_idx];
             if (sym_idx == 0) {
-                sym_idx = symtab.symbols.size - 1;
-                symtab.hash.buckets[bucket_idx]             = sym_idx;
-                symtab.hash.chains[symtab.symbols.size - 1] = sym_idx;
+                sym_idx = ssc.symbols.size - 1;
+                ssc.hash.buckets[bucket_idx]                   = sym_idx;
+                ssc.hash.chains[symtab.owned.symbols.size - 1] = sym_idx;
             } else {
-                while (symtab.hash.chains[sym_idx] != 0)
+                while (ssc.hash.chains[sym_idx] != 0)
                     ++sym_idx;
-                symtab.hash.chains[sym_idx] = symtab.symbols.size - 1;
+                ssc.hash.chains[sym_idx] = ssc.symbols.size - 1;
             }
 
             return status_t::ok;
         }
 
         u0 init(symtab_t& symtab, strtab_t* strtab, alloc_t* alloc) {
-            symtab.strtab = strtab;
-            hash::init(symtab.hash, alloc);
-            array::init(symtab.symbols, alloc);
+            symtab.type = symtab_type_t::owned;
+            auto& ssc = symtab.owned;
+            ssc.strtab = strtab;
+            hash::init(ssc.hash, alloc);
+            array::init(ssc.symbols, alloc);
         }
 
         status_t find_sym(symtab_t& symtab, str::slice_t name, sym_t** sym) {
+            auto& ssc = symtab.owned;
+
             *sym = nullptr;
 
             const auto name_hash = hash_name(name);
-            const auto bucket_idx = name_hash % symtab.hash.buckets.size;
+            const auto bucket_idx = name_hash % ssc.hash.buckets.size;
 
-            auto chain_idx = symtab.hash.buckets[bucket_idx];
-            while (chain_idx != 0 && chain_idx < symtab.hash.chains.size) {
-                auto temp_sym = &symtab.symbols[symtab.hash.chains[chain_idx]];
-                auto str_offset = (const s8*) symtab.strtab->strings.buf.data + temp_sym->name_index;
+            auto chain_idx = ssc.hash.buckets[bucket_idx];
+            while (chain_idx != 0 && chain_idx < ssc.hash.chains.size) {
+                auto temp_sym = &ssc.symbols[ssc.hash.chains[chain_idx]];
+                auto str_offset = (const s8*) ssc.strtab->strings.buf.data + temp_sym->name_index;
                 auto cmp = strncmp(str_offset, (const s8*) name.data, name.length);
                 if (cmp == 0) {
                     *sym = temp_sym;
@@ -300,6 +529,128 @@ namespace basecode::binfmt::io::elf {
             }
 
             return status_t::symbol_not_found;
+        }
+    }
+
+    namespace section {
+        namespace type {
+            static str::slice_t s_type_names[] = {
+                "NULL"_ss,
+                "PROGBITS"_ss,
+                "SYMTAB"_ss,
+                "STRTAB"_ss,
+                "RELA"_ss,
+                "HASH"_ss,
+                "DYNAMIC"_ss,
+                "NOTE"_ss,
+                "NOBITS"_ss,
+                "REL"_ss,
+                "SHLIB"_ss,
+                "DYNSYM"_ss,
+                "????"_ss,
+                "????"_ss,
+                "INIT_ARRAY"_ss,
+                "FINI_ARRAY"_ss,
+                "PREINIT_ARRAY"_ss,
+                "GROUP"_ss,
+                "SYMTAB_SHNDX"_ss,
+            };
+
+            str::slice_t name(u32 type) {
+                switch (type) {
+                    case x86_64_unwind:     return "X86_64_UNWIND"_ss;
+                    case gnu_eh_frame:      return "GNU_EH_FRAME"_ss;
+                    case gnu_stack:         return "GNU_STACK"_ss;
+                    case gnu_rel_ro:        return "GNU_RELRO"_ss;
+                    case gnu_attributes:    return "GNU_ATTRIBUTES"_ss;
+                    case gnu_hash:          return "GNU_HASH"_ss;
+                    case gnu_lib_list:      return "GNU_LIBLIST"_ss;
+                    case checksum:          return "CHECKSUM"_ss;
+                    case gnu_ver_def:       return "GNU_VERDEF"_ss;
+                    case gnu_ver_need:      return "GNU_VERNEED"_ss;
+                    case gnu_ver_sym:       return "GNU_VERSYM"_ss;
+                    case null ... symtab_shndx:
+                        return s_type_names[type];
+                    default: {
+                        if (type >= low_os && type <= high_os) {
+                            return string::interned::fold(format::format("LOOS+0x{:x}", type & 0x0fffffffU));
+                        } else if (type >= low_proc && type <= high_proc) {
+                            return string::interned::fold(format::format("LOPROC+0x{:x}", type & 0x0fffffffU));
+                        } else if (type >= low_user && type <= high_user) {
+                            return string::interned::fold(format::format("LOUSER+0x{:x}", type & 0x0fffffffU));
+                        }
+                        break;
+                    }
+                }
+                return "UNKNOWN"_ss;
+            }
+        }
+
+        namespace flags {
+            static const s8 s_flag_chars[] = {
+                'W',
+                'A',
+                'X',
+                'M',
+                'S',
+                'I',
+                'L',
+                'O',
+                'G',
+                'T',
+                'C',
+                'o',
+                'E'
+            };
+
+            static const s8* s_flag_names[] = {
+                "WRITE",
+                "ALLOC",
+                "EXEC_INSTR",
+                "MERGE",
+                "STRINGS",
+                "INFO",
+                "ORDER",
+                "OS_NON_CONFORM",
+                "GROUP",
+                "TLS",
+                "COMPRESSED",
+                "ORDERED",
+                "EXCLUDE",
+            };
+
+            static u32 s_flags[] = {
+                write, alloc, exec_instr, merge, strings, info_link, link_order,
+                os_non_conform, group, tls, compressed, ordered, exclude
+            };
+
+            const s8* name(u32 flag) {
+                u32 idx{};
+                for (u32 mask : s_flags) {
+                    if ((flag & mask) == mask)
+                        return s_flag_names[idx];
+                    ++idx;
+                }
+                return "UNKNOWN";
+            }
+
+            u0 chars(u32 flags, s8* chars) {
+                u32 ci{};
+                u32 fi{};
+                for (u32 mask : s_flags) {
+                    if ((flags & mask) == mask)
+                        chars[ci++] = s_flag_chars[fi];
+                    ++fi;
+                }
+                chars[ci] = '\0';
+            }
+
+            u0 names(u32 flags, const s8** names) {
+                u32 idx{};
+                for (u32 mask : s_flags) {
+                    names[idx++] = (flags & mask) == mask ? s_flag_names[idx] : nullptr;
+                }
+            }
         }
     }
 
@@ -317,11 +668,27 @@ namespace basecode::binfmt::io::elf {
         const auto& file = *opts.file;
 
         elf.alloc = opts.alloc;
+        elf.magic[0]                       = 0x7f;
+        elf.magic[1]                       = 'E';
+        elf.magic[2]                       = 'L';
+        elf.magic[3]                       = 'F';
+        elf.magic[file::magic_class]       = opts.clazz;
+        elf.magic[file::magic_data]        = opts.endianess;
+        elf.magic[file::magic_version]     = opts.version;
+        elf.magic[file::magic_os_abi]      = opts.os_abi;
+        elf.magic[file::magic_abi_version] = opts.abi_version;
+
         array::init(elf.blocks, elf.alloc);
         array::init(elf.headers, elf.alloc);
-        strtab::init(elf.strings, elf.alloc);
-        strtab::init(elf.section_names, elf.alloc);
-        symtab::init(elf.symbols, &elf.strings, elf.alloc);
+
+        if (opts.access_mode == access_mode_t::read) {
+            strtab::init(elf.strings);
+            symtab::init(elf.symbols);
+        } else {
+            strtab::init(elf.strings, elf.alloc);
+            strtab::init(elf.section_names,  elf.alloc);
+            symtab::init(elf.symbols, &elf.strings, elf.alloc);
+        }
 
         if (file.file_type == file_type_t::obj) {
             elf.file_type = elf::file::type::rel;
@@ -427,6 +794,13 @@ namespace basecode::binfmt::io::elf {
                 FILE_READ(u32, sc.info);
                 FILE_READ(u64, sc.addr.align);
                 FILE_READ(u64, sc.entry_size);
+
+                if (elf.str_ndx > 0 && hdr.number == elf.str_ndx) {
+                    elf.strings.buf = (const s8*) file.buf.data + sc.offset;
+                } else if (sc.type == section::type::symtab) {
+                    elf.symbols.no_copy.buf  = (sym_t*) (file.buf.data + sc.offset);
+                    elf.symbols.no_copy.size = sc.size / sc.entry_size;
+                }
             }
         }
 
@@ -474,15 +848,8 @@ namespace basecode::binfmt::io::elf {
     }
 
     status_t write_file_header(file_t& file, elf_t& elf) {
-        FILE_WRITE(u8, u8(0x7f));
-        FILE_WRITE(u8, u8('E'));
-        FILE_WRITE(u8, u8('L'));
-        FILE_WRITE(u8, u8('F'));
-        FILE_WRITE(u8, u8(class_64));
-        FILE_WRITE(u8, u8(data_2lsb));
-        FILE_WRITE(u8, u8(version_current));
-        FILE_WRITE(u8, u8(os_abi_linux));
-        FILE_WRITE0(u64);
+        for (u8 magic : elf.magic)
+            FILE_WRITE(u8, magic);
         FILE_WRITE(u16, elf.file_type);
         FILE_WRITE(u16, elf.machine);
         FILE_WRITE(const u32, version_current);

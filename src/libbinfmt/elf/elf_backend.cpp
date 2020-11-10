@@ -34,15 +34,15 @@ namespace basecode::binfmt::io::elf {
             format::print("ELF Header:\n");
             format::print("  Magic:    ");
             format::print_hex_dump(elf.magic, 16, false, false);
-            format::print("  Class:                             {}\n", elf.magic[4]);
-            format::print("  Data:                              {}\n", elf.magic[5]);
-            format::print("  Version:                           {}\n", elf.magic[6]);
-            format::print("  OS/ABI:                            {}\n", elf.magic[7]);
-            format::print("  ABI Version:                       {}\n", elf.magic[8]);
-            format::print("  Type:                              {}\n", elf.file_type);
-            format::print("  Machine:                           {}\n", elf.machine);
-            format::print("  Version:                           {}\n", 1);
-            format::print("  Entry point address:               {}\n", elf.entry_point);
+            format::print("  Class:                             {}\n", elf::file::class_name(elf.magic[elf::file::magic_class]));
+            format::print("  Data:                              {}\n", elf::file::endianess_name(elf.magic[elf::file::magic_data]));
+            format::print("  Version:                           {}\n", elf::file::version_name(elf.magic[elf::file::magic_version]));
+            format::print("  OS/ABI:                            {}\n", elf::file::os_abi_name(elf.magic[elf::file::magic_os_abi]));
+            format::print("  ABI Version:                       {}\n", elf.magic[elf::file::magic_abi_version]);
+            format::print("  Type:                              {}\n", elf::file::file_type_name(elf.file_type));
+            format::print("  Machine:                           {}\n", elf::machine::name(elf.machine));
+            format::print("  Version:                           0x{:x}\n", 1);
+            format::print("  Entry point address:               0x{:x}\n", elf.entry_point);
             format::print("  Start of program headers:          {} (bytes into file)\n", elf.segment.offset);
             format::print("  Start of section headers:          {} (bytes into file)\n", elf.section.offset);
             format::print("  Flags:                             0x{:x}\n", elf.proc_flags);
@@ -56,12 +56,50 @@ namespace basecode::binfmt::io::elf {
             format::print("  [Nr] Name              Type             Address           Offset\n");
             format::print("       Size              EntSize          Flags  Link  Info  Align\n");
 
+            s8 name[17];
+            name[16] = '\0';
+
+            s8 flag_chars[14];
+
             for (const auto& hdr : elf.headers) {
                 if (hdr.type != header_type_t::section)
                     continue;
                 const auto& sc = hdr.subclass.section;
-                format::print("  [{:>}]\n", hdr.number);
-                format::print("       {:016x}  {:016x}\n", sc.size, sc.entry_size);
+
+                std::memcpy(name, strtab::get(elf.strings, sc.name_index), 16);
+                elf::section::flags::chars(sc.flags, flag_chars);
+
+                format::print(" [{:>3}] {:<17} {:<16} {:016x} {:08x}\n",
+                              hdr.number,
+                              name,
+                              section::type::name(sc.type),
+                              sc.addr.base,
+                              sc.offset);
+                format::print("       {:016x}  {:016x} {:<7}{:>4}  {:>4}    {:<}\n",
+                              sc.size,
+                              sc.entry_size,
+                              flag_chars,
+                              sc.link,
+                              sc.info,
+                              sc.addr.align);
+            }
+
+//            Symbol table '.symtab' contains 108 entries:
+//               Num:    Value          Size Type    Bind   Vis      Ndx Name
+
+            const auto symtab_size = elf::symtab::size(elf.symbols);
+
+            format::print("\nSymbol table '{}' contains {} entries:\n", ".symtab", symtab_size);
+            format::print("  Num:     Value         Size Type     Bind   Vis       Ndx Name\n");
+            for (u32 i = 0; i < symtab_size; ++i) {
+                auto sym = elf::symtab::get(elf.symbols, i);
+                std::memcpy(name, elf::strtab::get(elf.strings, sym->name_index), 16);
+                format::print("{:>5}: {:016x} {:>5} NOTYPE   LOCAL   DEFAULT  {} {}\n",
+                              i,
+                              sym->value,
+                              sym->size,
+                              sym->index,
+                              name);
             }
         }
 
@@ -87,6 +125,7 @@ namespace basecode::binfmt::io::elf {
             opts.file        = &file;
             opts.alloc       = g_elf_sys.alloc;
             opts.entry_point = {};
+            opts.access_mode = elf::access_mode_t::read;
 
             elf_t elf{};
             status = elf::init(elf, opts);
@@ -120,6 +159,7 @@ namespace basecode::binfmt::io::elf {
             opts.file        = &file;
             opts.alloc       = g_elf_sys.alloc;
             opts.entry_point = file.opts.base_addr;
+            opts.access_mode = elf::access_mode_t::write;
 
             status_t status{};
 
@@ -275,17 +315,16 @@ namespace basecode::binfmt::io::elf {
                                                          &elf.strings);
                 elf.symbols.link = strtab.number - 1;
 
+                auto& ssc = elf.symbols.owned;
+
                 // XXX: first_global_idx is hard coded!!!
                 //      need to set this while walking the symbols list
                 auto& symtab = elf::symtab::make_section(elf,
                                                          ".symtab"_ss,
                                                          &elf.symbols,
                                                          1);
-                elf.symbols.hash.link = symtab.number - 1;
-
-                elf::hash::make_section(elf,
-                                        ".hash"_ss,
-                                        &elf.symbols.hash);
+                ssc.hash.link = symtab.number - 1;
+                elf::hash::make_section(elf, ".hash"_ss, &ssc.hash);
             }
 
             if (elf.section.count > 0) {
