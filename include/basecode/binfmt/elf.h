@@ -39,55 +39,45 @@
 //  - init/fini array symbols
 //
 namespace basecode::binfmt::io::elf {
-    struct elf_t;
-    struct dyn_t;
-    struct sym_t;
-    struct rel_t;
-    struct ver_t;
-    struct rela_t;
-    struct note_t;
-    struct opts_t;
-    struct hash_t;
-    struct block_t;
-    struct header_t;
-    struct strtab_t;
-    struct ver_aux_t;
-    struct sym_bind_t;
-
-    using sym_list_t            = array_t<sym_t>;
-    using note_list_t           = array_t<note_t>;
-    using block_list_t          = array_t<block_t>;
-    using header_list_t         = array_t<header_t>;
-    using sym_idx_list_t        = array_t<u32>;
-
-    enum class access_mode_t : u8 {
-        read,
-        write,
+   struct file_header_t final {
+        u8                      magic[16];
+        u16                     type;
+        u16                     machine;
+        u32                     version;
+        u64                     entry_point;
+        u64                     pgm_hdr_offset;
+        u64                     sect_hdr_offset;
+        u32                     flags;
+        u16                     header_size;
+        u16                     pgm_hdr_size;
+        u16                     pgm_hdr_count;
+        u16                     sect_hdr_size;
+        u16                     sect_hdr_count;
+        u16                     strtab_ndx;
     };
 
-    enum class block_type_t : u8 {
-        hash,
-        slice,
-        strtab,
-        symtab,
+    struct pgm_header_t final {
+        u32                     type;
+        u32                     flags;
+        u64                     offset;
+        u64                     virt_addr;
+        u64                     phys_addr;
+        u64                     file_size;
+        u64                     mem_size;
+        u64                     align;
     };
 
-    enum class strtab_type_t : u8 {
-        none,
-        no_copy,
-        owned,
-    };
-
-    enum class symtab_type_t : u8 {
-        none,
-        no_copy,
-        owned,
-    };
-
-    enum class header_type_t : u8 {
-        none,
-        section,
-        segment
+    struct sect_header_t final {
+        u32                     name_offset;
+        u32                     type;
+        u64                     flags;
+        u64                     addr;
+        u64                     offset;
+        u64                     size;
+        u32                     link;
+        u32                     info;
+        u64                     addr_align;
+        u64                     entity_size;
     };
 
     struct ver_t final {
@@ -122,7 +112,7 @@ namespace basecode::binfmt::io::elf {
     };
 
     struct sym_t final {
-        u32                     name_index;
+        u32                     name_offset;
         u8                      info;
         u8                      other;
         u16                     index;
@@ -146,92 +136,15 @@ namespace basecode::binfmt::io::elf {
         s64                     addend;
     };
 
-    struct note_t final {
-        u64                     type;
-        str::slice_t            name;
-        str::slice_t            descriptor;
+    struct note_header_t final {
+        u32                     name_size;
+        u32                     desc_size;
+        u32                     type;
     };
 
     struct dyn_t final {
         s64                     tag;
         u64                     value;
-    };
-
-    struct strtab_t final {
-        union {
-            str_array_t         strings;
-            const s8*           buf;
-        };
-        strtab_type_t           type;
-    };
-
-    struct hash_t final {
-        sym_idx_list_t          buckets;
-        sym_idx_list_t          chains;
-        u32                     link;
-    };
-
-    struct symtab_t final {
-        union {
-            struct {
-                sym_t*          buf;
-                u32             size;
-            }                   no_copy;
-            struct {
-                strtab_t*       strtab;
-                sym_list_t      symbols;
-                hash_t          hash;
-            }                   owned;
-        };
-        u32                     link;
-        symtab_type_t           type;
-    };
-
-    struct block_t final {
-        union {
-            const hash_t*       hash;
-            const str::slice_t* slice;
-            const strtab_t*     strtab;
-            const symtab_t*     symtab;
-        }                       data;
-        u64                     offset;
-        block_type_t            type;
-    };
-
-    struct header_t final {
-        const section_t*        section;
-        union {
-            struct {
-                struct {
-                    u64         offset;
-                    u64         size;
-                }               file;
-                struct {
-                    u64         virt;
-                    u64         phys;
-                    u64         size;
-                }               addr;
-                u64             align;
-                u32             type;
-                u32             flags;
-            }                   segment;
-            struct {
-                struct {
-                    u64         base;
-                    u64         align;
-                }               addr;
-                u64             size;
-                u64             flags;
-                u64             offset;
-                u64             entry_size;
-                u32             link;
-                u32             info;
-                u32             type;
-                u32             name_index;
-            }                   section;
-        }                       subclass;
-        u32                     number;
-        header_type_t           type;
     };
 
     struct opts_t final {
@@ -243,34 +156,13 @@ namespace basecode::binfmt::io::elf {
         u8                      version;
         u8                      endianess;
         u8                      abi_version;
-        access_mode_t           access_mode;
     };
 
     struct elf_t final {
         alloc_t*                alloc;
-        block_list_t            blocks;
-        header_list_t           headers;
-        strtab_t                strings;
-        strtab_t                section_names;
-        symtab_t                symbols;
-        u8                      magic[16];
-        u64                     entry_point;
-        struct {
-            u64                 offset;
-            u16                 count;
-        }                       segment;
-        struct {
-            u64                 base_offset;
-            u32                 rel_offset;
-        }                       data;
-        struct {
-            u64                 offset;
-            u16                 count;
-        }                       section;
-        u32                     proc_flags;
-        u16                     file_type;
-        u16                     machine;
-        u16                     str_ndx;
+        file_header_t*          file_header;
+        pgm_header_t*           segments;
+        sect_header_t*          sections;
     };
 
     [[maybe_unused]] constexpr u32 class_64         = 2;
@@ -652,38 +544,8 @@ namespace basecode::binfmt::io::elf {
         }
     }
 
-    namespace hash {
-        [[maybe_unused]] constexpr u32 entity_size          = sizeof(u32);
-
-        u0 free(hash_t& hash);
-
-        header_t& make_section(elf_t& elf,
-                               str::slice_t name,
-                               const hash_t* hash);
-
-        u0 rehash(hash_t& hash, u32 size);
-
-        u0 init(hash_t& hash, alloc_t* alloc);
-
-        status_t write(const hash_t& hash, file_t& file);
-    }
-
     namespace strtab {
-        u0 init(strtab_t& strtab);
-
-        u0 free(strtab_t& strtab);
-
-        header_t& make_section(elf_t& elf,
-                              str::slice_t name,
-                              const strtab_t* strtab);
-
-        u0 init(strtab_t& strtab, alloc_t* alloc);
-
-        u32 add_str(strtab_t& strtab, str::slice_t str);
-
-        const s8* get(const strtab_t& strtab, u32 offset);
-
-        status_t write(const strtab_t& strtab, file_t& file);
+        const s8* get(const elf_t& elf, u32 offset);
     }
 
     namespace symtab {
@@ -712,109 +574,22 @@ namespace basecode::binfmt::io::elf {
             [[maybe_unused]] constexpr u8 protected_        = 0x3;
         }
 
-        u0 free(symtab_t& symtab);
-
-        u0 init(symtab_t& symtab);
-
         u64 hash_name(str::slice_t str);
 
-        header_t& make_section(elf_t& elf,
-                               str::slice_t name,
-                               const symtab_t* symtab,
-                               u32 first_global_idx);
+        sym_t* get(const elf_t& elf, u32 sect_num, u32 sym_idx);
+    }
 
-        u32 size(const symtab_t& symtab);
-
-        u0 rehash(symtab_t& symtab, u32 size);
-
-        sym_t* get(const symtab_t& symtab, u32 idx);
-
-        status_t write(const symtab_t& symtab, file_t& file);
-
-        status_t add_sym(symtab_t& symtab, const symbol_t* symbol);
-
-        u0 init(symtab_t& symtab, strtab_t* strtab, alloc_t* alloc);
-
-        status_t find_sym(symtab_t& symtab, str::slice_t name, sym_t** sym);
+    namespace hashtab {
+        [[maybe_unused]] constexpr u32 entity_size          = sizeof(u32);
     }
 
     u0 free(elf_t& elf);
 
+    status_t read(elf_t& elf, file_t& file);
+
+    status_t write(elf_t& elf, file_t& file);
+
     status_t init(elf_t& elf, const opts_t& opts);
-
-    status_t write_blocks(file_t& file, elf_t& elf);
-
-    status_t read_sections(file_t& file, elf_t& elf);
-
-    status_t write_sections(file_t& file, elf_t& elf);
-
-    status_t write_segments(file_t& file, elf_t& elf);
-
-    status_t read_file_header(file_t& file, elf_t& elf);
-
-    status_t write_file_header(file_t& file, elf_t& elf);
-
-    status_t write_dyn(file_t& file, elf_t& elf, const dyn_t& dyn);
-
-    status_t write_rel(file_t& file, elf_t& elf, const rel_t& rel);
-
-    status_t write_rela(file_t& file, elf_t& elf, const rela_t& rela);
-
-    status_t write_note(file_t& file, elf_t& elf, const note_t& note);
-
-    status_t write_header(file_t& file, elf_t& elf, const header_t& hdr);
 
     status_t get_section_name(const binfmt::section_t* section, str::slice_t& name);
 }
-
-/* 64-bit ELF base types. */
-//    typedef __u64	Elf64_Addr;
-//    typedef __u16	Elf64_Half;
-//    typedef __s16	Elf64_SHalf;
-//    typedef __u64	Elf64_Off;
-//    typedef __s32	Elf64_Sword;
-//    typedef __u32	Elf64_Word;
-//    typedef __u64	Elf64_Xword;
-//    typedef __s64	Elf64_Sxword;
-
-//    typedef struct elf64_hdr {
-//        unsigned char	e_ident[EI_NIDENT];	/* ELF "magic number" */
-//        Elf64_Half e_type;
-//        Elf64_Half e_machine;
-//        Elf64_Word e_version;
-//        Elf64_Addr e_entry;		/* Entry point virtual address */
-//        Elf64_Off e_phoff;		/* Program header table file offset */
-//        Elf64_Off e_shoff;		/* Section header table file offset */
-//        Elf64_Word e_flags;
-//        Elf64_Half e_ehsize;
-//        Elf64_Half e_phentsize;
-//        Elf64_Half e_phnum;
-//        Elf64_Half e_shentsize;
-//        Elf64_Half e_shnum;
-//        Elf64_Half e_shstrndx;
-//    } Elf64_Ehdr;
-
-//    typedef struct elf64_phdr {
-//        Elf64_Word p_type;
-//        Elf64_Word p_flags;
-//        Elf64_Off p_offset;		/* Segment file offset */
-//        Elf64_Addr p_vaddr;		/* Segment virtual address */
-//        Elf64_Addr p_paddr;		/* Segment physical address */
-//        Elf64_Xword p_filesz;		/* Segment size in file */
-//        Elf64_Xword p_memsz;		/* Segment size in memory */
-//        Elf64_Xword p_align;		/* Segment alignment, file & memory */
-//    } Elf64_Phdr;
-
-//    typedef struct elf64_shdr {
-//        Elf64_Word sh_name;		/* Section name, index in string tbl */
-//        Elf64_Word sh_type;		/* Type of section */
-//        Elf64_Xword sh_flags;		/* Miscellaneous section attributes */
-//        Elf64_Addr sh_addr;		/* Section virtual addr at execution */
-//        Elf64_Off sh_offset;		/* Section file offset */
-//        Elf64_Xword sh_size;		/* Size of section in bytes */
-//        Elf64_Word sh_link;		/* Index of another section */
-//        Elf64_Word sh_info;		/* Additional section information */
-//        Elf64_Xword sh_addralign;	/* Section alignment */
-//        Elf64_Xword sh_entsize;	/* Entry size if section holds table */
-//    } Elf64_Shdr;
-
