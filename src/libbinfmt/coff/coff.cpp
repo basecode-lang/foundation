@@ -845,6 +845,7 @@ namespace basecode::binfmt::io::coff {
                 }
                 break;
             case type_t::reloc:
+            case type_t::group:
             case type_t::import:
             case type_t::export_:
                 return status_t::invalid_section_type;

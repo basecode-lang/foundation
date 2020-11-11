@@ -363,83 +363,167 @@ namespace basecode::binfmt::io::elf {
     }
 
     status_t init(elf_t& elf, const opts_t& opts) {
-//        using type_t = binfmt::machine::type_t;
-//        const auto& file = *opts.file;
+        auto& file = *opts.file;
 
-        elf.alloc = opts.alloc;
-//        elf.magic[0]                       = 0x7f;
-//        elf.magic[1]                       = 'E';
-//        elf.magic[2]                       = 'L';
-//        elf.magic[3]                       = 'F';
-//        elf.magic[file::magic_class]       = opts.clazz;
-//        elf.magic[file::magic_data]        = opts.endianess;
-//        elf.magic[file::magic_version]     = opts.version;
-//        elf.magic[file::magic_os_abi]      = opts.os_abi;
-//        elf.magic[file::magic_abi_version] = opts.abi_version;
+        auto buf = FILE_PTR();
+        auto fh = (file_header_t*) (buf);
+        elf.alloc       = opts.alloc;
+        elf.file_header = fh;
 
-//        array::init(elf.blocks, elf.alloc);
-//        array::init(elf.headers, elf.alloc);
-
-//        if (opts.access_mode == access_mode_t::read) {
-//            strtab::init(elf.strings);
-//            symtab::init(elf.symbols);
-//        } else {
-//            strtab::init(elf.strings, elf.alloc);
-//            strtab::init(elf.section_names,  elf.alloc);
-//            symtab::init(elf.symbols, &elf.strings, elf.alloc);
-//        }
-
-//        if (file.file_type == file_type_t::obj) {
-//            elf.file_type = elf::file::type::rel;
-//        } else {
-//            elf.entry_point = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
-//            ++elf.section.count;
-//
-//            auto& null_section = array::append(elf.headers);
-//            ZERO_MEM(&null_section, header_t);
-//            null_section.type = header_type_t::section;
-//
-//            switch (file.machine) {
-//                case type_t::unknown:
-//                    return status_t::invalid_machine_type;
-//                case type_t::x86_64:
-//                    elf.machine = elf::machine::x86_64;
-//                    break;
-//                case type_t::aarch64:
-//                    elf.machine = elf::machine::aarch64;
-//                    break;
-//            }
-//
-//            switch (file.file_type) {
-//                case file_type_t::exe:
-//                    elf.file_type = elf::file::type::exec;
-//                    break;
-//                case file_type_t::dll:
-//                    elf.file_type = elf::file::type::dyn;
-//                    break;
-//                default:
-//                    break;
-//            }
-//        }
+        fh->magic[0]                       = 0x7f;
+        fh->magic[1]                       = 'E';
+        fh->magic[2]                       = 'L';
+        fh->magic[3]                       = 'F';
+        fh->magic[file::magic_class]       = opts.clazz;
+        fh->magic[file::magic_data]        = opts.endianess;
+        fh->magic[file::magic_version]     = opts.version;
+        fh->magic[file::magic_os_abi]      = opts.os_abi;
+        fh->magic[file::magic_abi_version] = opts.abi_version;
+        fh->flags          = opts.flags;
+        fh->header_size    = file::header_size;
+        fh->entry_point    = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
+        if (opts.num_segments > 0) {
+            fh->pgm_hdr_size   = segment::header_size;
+            fh->pgm_hdr_count  = opts.num_segments;
+            fh->pgm_hdr_offset = fh->header_size;
+            elf.segments       = (pgm_header_t*) (buf + elf.file_header->pgm_hdr_offset);
+        }
+        if (opts.num_sections > 0) {
+            fh->sect_hdr_size   = section::header_size;
+            fh->sect_hdr_count  = opts.num_sections;
+            fh->sect_hdr_offset =
+                std::max<u64>(fh->pgm_hdr_offset + (fh->pgm_hdr_count * fh->pgm_hdr_size), fh->header_size);
+            elf.sections = (sect_header_t*) (buf + elf.file_header->sect_hdr_offset);
+        }
+        if (opts.strtab_size > 0) {
+            fh->strtab_ndx         = 1;
+            elf.strtab             = &elf.sections[1];
+            elf.strtab->flags      = {};
+            elf.strtab->addr       = {};
+            elf.strtab->addr_align = 1;
+            elf.strtab->size       = opts.strtab_size;
+            elf.strtab->type       = section::type::strtab;
+        }
+        if (opts.symtab_size > 0) {
+            elf.symtab              = &elf.sections[fh->sect_hdr_count - 1];
+            elf.symtab->link        = fh->strtab_ndx;
+            elf.symtab->info        = 0;
+            elf.symtab->size        = opts.symtab_size;
+            elf.symtab->type        = section::type::strtab;
+            elf.symtab->addr        = {};
+            elf.symtab->addr_align  = 8;
+            elf.symtab->entity_size = symtab::entity_size;
+        }
 
         return status_t::ok;
     }
 
     status_t read(elf_t& elf, file_t& file) {
-        elf.file_header = (file_header_t*) FILE_PTR();
-        if (elf.file_header->pgm_hdr_offset
-        &&  elf.file_header->pgm_hdr_count > 0) {
-            elf.segments = (pgm_header_t*) (file.buf.data + elf.file_header->pgm_hdr_offset);
-        }
-        if (elf.file_header->sect_hdr_offset
-        &&  elf.file_header->sect_hdr_count > 0) {
-            elf.sections = (sect_header_t*) (file.buf.data + elf.file_header->sect_hdr_offset);
-        }
         return status_t::ok;
     }
 
     status_t write(elf_t& elf, file_t& file) {
-//        FILE_WRITE_STR(slice::make(file.buf.data, sizeof(file_header_t)));
+        using machine_type_t = binfmt::machine::type_t;
+        using section_type_t = binfmt::section::type_t;
+
+        auto fh = elf.file_header;
+        auto module = file.module;
+        auto msc = &module->subclass.object;
+
+        switch (file.file_type) {
+            case file_type_t::obj:
+                fh->type = file::type::rel;
+                break;
+            case file_type_t::exe:
+                fh->type = file::type::exec;
+                break;
+            case file_type_t::dll:
+                fh->type = file::type::dyn;
+                break;
+            default:
+                return status_t::invalid_file_type;
+        }
+
+        switch (file.machine) {
+            case machine_type_t::unknown:
+                return status_t::invalid_machine_type;
+            case machine_type_t::x86_64:
+                fh->machine = elf::machine::x86_64;
+                break;
+            case machine_type_t::aarch64:
+                fh->machine = elf::machine::aarch64;
+                break;
+        }
+
+        u64 virt_addr       {fh->entry_point};
+        u64 data_offset     {fh->sect_hdr_offset + (fh->sect_hdr_size * fh->sect_hdr_count)};
+        u32 sect_idx        {1};
+
+        if (elf.strtab) {
+            elf.strtab->offset = data_offset;
+            ++sect_idx;
+            data_offset += elf.strtab->size;
+        }
+
+        const u32 start_sect_idx  {sect_idx};
+
+        for (const auto& section : msc->sections) {
+            auto& hdr = elf.sections[sect_idx];
+            hdr.addr       = virt_addr;
+            hdr.offset     = data_offset;
+            hdr.addr_align = 8;
+            switch (section.type) {
+                case section_type_t::data:
+                case section_type_t::custom: {
+                    hdr.flags |= section::flags::alloc;
+                    if (!section.flags.init) {
+                        hdr.type = section::type::nobits;
+                        hdr.size = section.subclass.size;
+                    } else {
+                        hdr.type = section::type::progbits;
+                        hdr.size = section.subclass.data.length;
+                        data_offset += hdr.size;
+                    }
+                    if (section.flags.write)
+                        hdr.flags |= section::flags::write;
+                    virt_addr = align(virt_addr + hdr.size, hdr.addr_align);
+                    break;
+                }
+                case section_type_t::code: {
+                    hdr.type = section::type::progbits;
+                    hdr.size = section.subclass.data.length;
+                    hdr.flags |= section::flags::alloc | section::flags::exec_instr;
+                    if (section.flags.write)
+                        hdr.flags |= section::flags::write;
+                    data_offset += hdr.size;
+                    virt_addr = align(virt_addr + hdr.size, hdr.addr_align);
+                    break;
+                }
+                case section_type_t::reloc: {
+                    hdr.type        = section::type::rela;
+                    hdr.size        = section.subclass.relocs.size * relocs::entity_size;
+                    hdr.entity_size = relocs::entity_size;
+                    if (section.flags.group)
+                        hdr.flags |= section::flags::group;
+                    hdr.link = fh->sect_hdr_count - 1;
+                    hdr.info = section.link + start_sect_idx;
+                    data_offset += hdr.size;
+                    break;
+                }
+                case section_type_t::group: {
+                    hdr.type        = section::type::group;
+                    hdr.size        = (section.subclass.relocs.size + 1) * group::entity_size;
+                    hdr.link        = fh->sect_hdr_count - 1;
+                    hdr.info        = section.link + start_sect_idx;
+                    hdr.entity_size = group::entity_size;
+                    data_offset += hdr.size;
+                    break;
+                }
+                default:
+                    break;
+            }
+        }
+
         return status_t::ok;
     }
 }

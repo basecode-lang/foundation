@@ -140,7 +140,7 @@ namespace basecode::buf {
             auto status = buf::unmap(buf);
             if (!OK(status))
                 return status;
-        } else {
+        } else if (buf.mode == buf_mode_t::alloc) {
             memory::free(buf.alloc, buf.data);
             buf.data = {};
             buf.length = buf.capacity = {};
@@ -171,12 +171,19 @@ namespace basecode::buf {
 
         s32 rc{};
         if (buf.file && buf.data) {
-            rc = munmap(buf.data, buf.length);
+            rc = msync(buf.data, buf.length, MS_SYNC);
+            if (rc == 0) {
+#ifdef _MSC_VER
+                auto h = (HANDLE) _get_osfhandle(buf.file);
+                FlushFileBuffers(h);
+#endif
+                rc = munmap(buf.data, buf.length);
+            }
             close(buf.file);
             buf.data   = {};
             buf.file   = 0;
             buf.length = {};
-            buf.mode = buf_mode_t::none;
+            buf.mode   = buf_mode_t::none;
             path::reset(buf.path);
         }
 
@@ -218,7 +225,29 @@ namespace basecode::buf {
         buf.capacity = new_capacity;
     }
 
-    status_t map(buf_t& buf, const path_t& path) {
+    status_t load(buf_t& buf, const path_t& path) {
+        if (buf.mode == buf_mode_t::mapped)
+            return status_t::buf_already_mapped;
+
+        usize file_size{};
+        if (!OK(filesys::file_size(path, file_size)))
+            return status_t::unable_to_open_file;
+
+        auto file = fopen(path::c_str(path), "rb");
+        if (!file)
+            return status_t::unable_to_open_file;
+
+        defer(fclose(file));
+
+        buf.mode = buf_mode_t::alloc;
+        path::set(buf.path, path);
+
+        write(buf, 0, file, file_size);
+
+        return status_t::ok;
+    }
+
+    status_t map_existing(buf_t& buf, const path_t& path) {
         if (buf.mode == buf_mode_t::mapped)
             return status_t::buf_already_mapped;
 
@@ -256,28 +285,6 @@ namespace basecode::buf {
         return status_t::ok;
     }
 
-    status_t load(buf_t& buf, const path_t& path) {
-        if (buf.mode == buf_mode_t::mapped)
-            return status_t::buf_already_mapped;
-
-        usize file_size{};
-        if (!OK(filesys::file_size(path, file_size)))
-            return status_t::unable_to_open_file;
-
-        auto file = fopen(path::c_str(path), "rb");
-        if (!file)
-            return status_t::unable_to_open_file;
-
-        defer(fclose(file));
-
-        buf.mode = buf_mode_t::alloc;
-        path::set(buf.path, path);
-
-        write(buf, 0, file, file_size);
-
-        return status_t::ok;
-    }
-
     status_t zero_fill(buf_t& buf, u32 offset, u32 length) {
         std::memset(buf.data + offset, 0, length);
         return status_t::ok;
@@ -285,6 +292,46 @@ namespace basecode::buf {
 
     status_t read(buf_t& buf, u32 offset, u0* data, u32 length) {
         std::memcpy(data, buf.data + offset, length);
+        return status_t::ok;
+    }
+
+    status_t map_new(buf_t& buf, const path_t& path, usize size) {
+        if (buf.mode == buf_mode_t::mapped)
+            return status_t::buf_already_mapped;
+
+        mode_t mode = S_IRUSR | S_IWUSR;
+#ifdef _WIN32
+        s32 flags = O_TRUNC | O_BINARY | O_RDWR | O_CREAT;
+#else
+        s32 flags = O_RDWR | O_CREAT;
+#endif
+        buf.file = open(path::c_str(path), flags, mode);
+        if (buf.file == -1)
+            return status_t::unable_to_open_file;
+//#ifdef _WIN32
+//        if (_chsize(buf.file, size) != 0)
+//            return status_t::unable_to_truncate_file;
+//#else
+//        if (ftruncate(buf.file, size) != 0)
+//            return status_t::unable_to_truncate_file;
+//#endif
+        auto map = mmap(nullptr,
+                        size,
+                        PROT_READ | PROT_WRITE,
+                        MAP_SHARED,
+                        buf.file,
+                        0);
+        if (map == MAP_FAILED) {
+            close(buf.file);
+            buf.file = 0;
+            return status_t::mmap_error;
+        }
+
+        buf.mode   = buf_mode_t::mapped;
+        buf.data   = (u8*) map;
+        buf.length = size;
+        path::set(buf.path, path);
+
         return status_t::ok;
     }
 

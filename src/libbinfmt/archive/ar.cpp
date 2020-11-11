@@ -282,7 +282,7 @@ namespace basecode::binfmt::ar {
             stopwatch_t timer{};
             stopwatch::start(timer);
 
-            auto status = buf::map(ar.buf, path);
+            auto status = buf::map_existing(ar.buf, path);
             if (!OK(status))
                 return status_t::read_error;
 

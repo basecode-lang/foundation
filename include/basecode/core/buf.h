@@ -76,6 +76,7 @@ namespace basecode {
             end_of_buffer,
             cannot_unmap_buf,
             buf_already_mapped,
+            unable_to_truncate_file,
             cannot_reset_mapped_buf,
             cannot_save_over_mapped_path,
         };
@@ -154,13 +155,15 @@ namespace basecode {
 
         u0 reserve(buf_t& buf, u32 new_capacity);
 
-        status_t map(buf_t& buf, const path_t& path);
-
         status_t load(buf_t& buf, const path_t& path);
 
         buf_t make(alloc_t* alloc = context::top()->alloc);
 
+        status_t map_existing(buf_t& buf, const path_t& path);
+
         u0 init(buf_t& buf, alloc_t* alloc = context::top()->alloc);
+
+        status_t map_new(buf_t& buf, const path_t& path, usize size);
 
         status_t load(buf_t& buf, const String_Concept auto& value) {
             if (buf.mode == buf_mode_t::mapped)

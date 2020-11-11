@@ -89,7 +89,7 @@ TEST_CASE("basecode::binfmt ELF read obj file") {
     REQUIRE(OK(io::read(s)));
 }
 
-TEST_CASE("basecode::binfmt ELF test") {
+TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
     using namespace binfmt;
 
     stopwatch_t timer{};

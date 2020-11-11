@@ -103,6 +103,14 @@ namespace basecode::binfmt {
     namespace section {
         u0 free(section_t& section) {
             switch (section.type) {
+                case section::type_t::reloc:
+                    array::free(section.subclass.relocs);
+                    break;
+                case section::type_t::group:
+                    for (auto& group : section.subclass.groups)
+                        array::free(group.sections);
+                    array::free(section.subclass.groups);
+                    break;
                 case section::type_t::import:
                     for (auto& import : section.subclass.imports)
                         array::free(import.symbols);
@@ -119,15 +127,23 @@ namespace basecode::binfmt {
                       const section_opts_t& opts) {
             section->alloc = g_binfmt_sys.alloc;
             array::init(section->symbols, section->alloc);
-            section->type             = type;
-            section->flags            = opts.flags;
-            section->align            = opts.align;
-            section->symbol           = opts.symbol;
+            section->type   = type;
+            section->info   = opts.info;
+            section->link   = opts.link;
+            section->flags  = opts.flags;
+            section->align  = opts.align;
+            section->symbol = opts.symbol;
             switch (section->type) {
                 case section::type_t::data:
                 case section::type_t::code:
                 case section::type_t::custom:
                     section->subclass.data = {};
+                    break;
+                case section::type_t::reloc:
+                    array::init(section->subclass.relocs, section->alloc);
+                    break;
+                case section::type_t::group:
+                    array::init(section->subclass.groups, section->alloc);
                     break;
                 case section::type_t::import:
                     array::init(section->subclass.imports, section->alloc);

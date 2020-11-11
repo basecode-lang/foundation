@@ -239,7 +239,7 @@ namespace basecode::binfmt::io::coff {
             if (file.file_type != file_type_t::obj)
                 return status_t::invalid_input_type;
 
-            if (!OK(buf::map(file.buf, file.path)))
+            if (!OK(buf::map_existing(file.buf, file.path)))
                 return status_t::read_error;
             defer(buf::unmap(file.buf));
 

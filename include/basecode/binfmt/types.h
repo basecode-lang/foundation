@@ -26,6 +26,7 @@
 
 namespace basecode::binfmt {
     struct reloc_t;
+    struct group_t;
     struct module_t;
     struct symbol_t;
     struct import_t;
@@ -42,6 +43,7 @@ namespace basecode::binfmt {
 
     using id_list_t             = array_t<u32>;
     using reloc_list_t          = array_t<reloc_t>;
+    using group_list_t          = array_t<group_t>;
     using import_list_t         = array_t<import_t>;
     using symbol_list_t         = array_t<symbol_t>;
     using member_list_t         = array_t<member_t>;
@@ -72,6 +74,9 @@ namespace basecode::binfmt {
         not_ar_long_name                = 2017,
         section_entry_out_of_bounds     = 2018,
         bad_cv_signature                = 2019,
+        missing_linked_section          = 2020,
+        custom_section_missing_symbol   = 2021,
+        invalid_file_type               = 2022,
     };
 
     enum class module_type_t : u8 {
@@ -145,7 +150,8 @@ namespace basecode::binfmt {
             code,                   // XXX: SHT_PROGBITS
             data,                   // XXX: SHT_PROGBITS or SHT_NOBITS
             debug,                  // XXX: SHT_PROGBITS
-            reloc,                  // XXX: SHT_RELA, SHT_REL
+            group,                  // XXX: SHT_GROUP
+            reloc,                  // XXX:
             import,                 // XXX: SHT_DYNAMIC, SHT_DYNSYM
             export_,
             resource,               // XXX: win only?
@@ -161,8 +167,9 @@ namespace basecode::binfmt {
             u32                 exec:       1;
             u32                 write:      1;
             u32                 alloc:      1;
+            u32                 group:      1;
             u32                 can_free:   1;
-            u32                 pad:        24;
+            u32                 pad:        23;
         };
     }
 
@@ -205,6 +212,11 @@ namespace basecode::binfmt {
         }                       flags;
     };
 
+    struct group_t final {
+        u32                     flags;
+        id_list_t               sections;
+    };
+
     struct reloc_t final {
         u64                     virtual_addr;
         symbol_id               symbol;
@@ -214,6 +226,8 @@ namespace basecode::binfmt {
     union section_subclass_t {
         u64                     size;
         str::slice_t            data;
+        reloc_list_t            relocs;
+        group_list_t            groups;
         import_list_t           imports;
     };
 
@@ -222,16 +236,20 @@ namespace basecode::binfmt {
         const module_t*         module;
         symbol_list_t           symbols;
         section_subclass_t      subclass;
-        u32                     align;
         symbol_id               symbol;
         section_id              id;
+        section_id              link;
+        u32                     info;
+        u32                     align;
         section::flags_t        flags;
         section::type_t         type;
     };
 
     struct section_opts_t final {
+        section_id              link;
         symbol_id               symbol;
         section::flags_t        flags;
+        u32                     info;
         u32                     align;
     };
 

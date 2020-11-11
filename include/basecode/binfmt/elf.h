@@ -151,6 +151,11 @@ namespace basecode::binfmt::io::elf {
         alloc_t*                alloc;
         file_t*                 file;
         u64                     entry_point;
+        u32                     strtab_size;
+        u32                     symtab_size;
+        u32                     num_segments;
+        u32                     num_sections;
+        u32                     flags;
         u8                      clazz;
         u8                      os_abi;
         u8                      version;
@@ -158,11 +163,18 @@ namespace basecode::binfmt::io::elf {
         u8                      abi_version;
     };
 
+    struct group_t final {
+        u32                     flags;
+        u32                     sect_hdr_indexes[0];
+    };
+
     struct elf_t final {
         alloc_t*                alloc;
         file_header_t*          file_header;
         pgm_header_t*           segments;
         sect_header_t*          sections;
+        sect_header_t*          strtab;
+        sect_header_t*          symtab;
     };
 
     [[maybe_unused]] constexpr u32 class_64         = 2;
@@ -173,6 +185,7 @@ namespace basecode::binfmt::io::elf {
     [[maybe_unused]] constexpr u32 version_current  = 1;
 
     namespace note {
+        [[maybe_unused]] constexpr u32 header_size  = sizeof(note_header_t);
         [[maybe_unused]] constexpr u32 pr_status    = 1;
         [[maybe_unused]] constexpr u32 pr_fp_reg    = 2;
         [[maybe_unused]] constexpr u32 pr_rs_info   = 3;
@@ -188,7 +201,7 @@ namespace basecode::binfmt::io::elf {
     }
 
     namespace file {
-        [[maybe_unused]] constexpr u16 header_size          = 64;
+        [[maybe_unused]] constexpr u16 header_size          = sizeof(file_header_t);
         [[maybe_unused]] constexpr u16 magic_class          = 4;
         [[maybe_unused]] constexpr u16 magic_data           = 5;
         [[maybe_unused]] constexpr u16 magic_version        = 6;
@@ -214,7 +227,13 @@ namespace basecode::binfmt::io::elf {
         str::slice_t endianess_name(u8 endianess);
     }
 
+    namespace group {
+        [[maybe_unused]] constexpr u32 entity_size          = sizeof(u32);
+    }
+
     namespace relocs {
+        [[maybe_unused]] constexpr u32 entity_size              = sizeof(rela_t);
+
         namespace x86_64 {
             [[maybe_unused]] constexpr u32 none                 = 0;
             [[maybe_unused]] constexpr u32 d64                  = 1;
@@ -591,5 +610,5 @@ namespace basecode::binfmt::io::elf {
 
     status_t init(elf_t& elf, const opts_t& opts);
 
-    status_t get_section_name(const binfmt::section_t* section, str::slice_t& name);
+    status_t get_section_name(const module_t* module, const binfmt::section_t* section, str::slice_t& name);
 }
