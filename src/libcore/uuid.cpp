@@ -24,7 +24,7 @@
 namespace basecode::uuid {
     uuid_t make() {
         uuid_t u{};
-#ifdef _WIN32
+#ifdef _MSC_VER
         auto hr = CoCreateGuid((GUID*) &u);
         assert(!FAILED(hr));
 #else
