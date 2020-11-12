@@ -22,8 +22,8 @@
 #include <io.h>
 #include <sys/mman.h>
 
-#define DWORD_HI(x) ((x) >> 32U)
-#define DWORD_LO(x) ((x) & 0xffffffffU)
+#define DWORD_HI(x)             ((x) >> 32U)
+#define DWORD_LO(x)             ((x) & 0xffffffffU)
 
 struct mmap_tag_t final {
     HANDLE                      fdh     {};
@@ -33,8 +33,8 @@ struct mmap_tag_t final {
     bool                        free    {true};
 };
 
-static mmap_tag_t   s_tags[256] {};
-static mmap_tag_t*  s_head_tag  {};
+thread_local mmap_tag_t         s_tags[256] {};
+thread_local mmap_tag_t*        s_head_tag  {};
 
 static mmap_tag_t* tag_alloc() {
     for (auto& s_tag : s_tags) {

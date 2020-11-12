@@ -237,6 +237,10 @@ namespace basecode::binfmt::io::elf {
                 + data_size
                 + 16;
 
+            // XXX: if files are smaller than some currently unknown size,
+            //      we should use the buf_t in alloc mode and call save.  if greater
+            //      than this size, we should map_new/unmap
+            //
             if (!OK(buf::map_new(file.buf, file.path, file_size)))
                 return status_t::read_error;
 
