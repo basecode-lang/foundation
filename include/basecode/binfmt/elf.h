@@ -124,11 +124,6 @@ namespace basecode::binfmt::io::elf {
         u16                     flags;
     };
 
-    struct rel_t final {
-        u64                     offset;
-        u64                     info;
-    };
-
     struct rela_t final {
         u64                     offset;
         u64                     info;
@@ -139,6 +134,7 @@ namespace basecode::binfmt::io::elf {
         u32                     name_size;
         u32                     desc_size;
         u32                     type;
+        u8                      data[0];
     };
 
     struct dyn_t final {

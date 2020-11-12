@@ -298,7 +298,6 @@ namespace basecode::binfmt::io::coff {
                               .code = true,
                               .exec = true,
                               .write = false,
-                              .alloc = true,
                           },
                           ".text"_ss);
 
@@ -309,7 +308,6 @@ namespace basecode::binfmt::io::coff {
                               .init = true,
                               .exec = false,
                               .write = true,
-                              .alloc = true,
                           },
                           ".data"_ss);
 
@@ -320,7 +318,6 @@ namespace basecode::binfmt::io::coff {
                               .init = true,
                               .exec = false,
                               .write = false,
-                              .alloc = true,
                           },
                           ".rdata"_ss);
 
@@ -331,7 +328,6 @@ namespace basecode::binfmt::io::coff {
                               .init = true,
                               .exec = false,
                               .write = false,
-                              .alloc = true,
                           },
                           ".debug"_ss);
 
@@ -342,7 +338,6 @@ namespace basecode::binfmt::io::coff {
                               .init = false,
                               .exec = false,
                               .write = true,
-                              .alloc = true,
                           },
                           ".bss"_ss);
 
@@ -353,7 +348,6 @@ namespace basecode::binfmt::io::coff {
                               .init = true,
                               .exec = false,
                               .write = true,
-                              .alloc = true,
                           },
                           ".idata"_ss);
 
@@ -364,7 +358,6 @@ namespace basecode::binfmt::io::coff {
                               .init = true,
                               .exec = false,
                               .write = false,
-                              .alloc = true,
                           },
                           ".edata"_ss);
 
@@ -375,7 +368,6 @@ namespace basecode::binfmt::io::coff {
                               .init = true,
                               .exec = false,
                               .write = false,
-                              .alloc = true,
                           },
                           ".rsrc"_ss);
 
@@ -386,7 +378,6 @@ namespace basecode::binfmt::io::coff {
                               .init = true,
                               .exec = false,
                               .write = false,
-                              .alloc = true,
                           },
                           ".pdata"_ss);
 
@@ -407,7 +398,13 @@ namespace basecode::binfmt::io::coff {
     }
 
     status_t get_section_name(const binfmt::section_t* section, str::slice_t& name) {
-        const auto entry = name_map::find(internal::g_coff_sys.section_names, section->type, section->flags);
+        name_flags_t flags{};
+        flags.pad   = {};
+        flags.exec  = section->flags.exec;
+        flags.code  = section->flags.code;
+        flags.init  = section->flags.init;
+        flags.write = section->flags.write;
+        const auto entry = name_map::find(internal::g_coff_sys.section_names, section->type, flags);
         if (!entry)
             return status_t::cannot_map_section_name;
         name = entry->name;

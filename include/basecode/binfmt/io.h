@@ -83,9 +83,17 @@ namespace basecode::binfmt::io {
         dll
     };
 
+    struct name_flags_t final {
+        u32                 code:       1;
+        u32                 init:       1;
+        u32                 exec:       1;
+        u32                 write:      1;
+        u32                 pad:        28;
+    };
+
     struct name_map_t final {
         str::slice_t            name;
-        section::flags_t        flags;
+        name_flags_t            flags;
         section::type_t         type;
     };
 
@@ -130,7 +138,7 @@ namespace basecode::binfmt::io {
     namespace name_map {
         u0 add(name_list_t& names,
                section::type_t type,
-               section::flags_t flags,
+               name_flags_t flags,
                str::slice_t name);
 
         u0 free(name_list_t& names);
@@ -139,7 +147,7 @@ namespace basecode::binfmt::io {
 
         const name_map_t* find(const name_list_t& names,
                                section::type_t type,
-                               section::flags_t flags);
+                               name_flags_t flags);
     }
 
     namespace session {

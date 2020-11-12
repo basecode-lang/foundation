@@ -212,7 +212,7 @@ namespace basecode::binfmt::io::coff {
             [[maybe_unused]] constexpr u16 section_rel          = 11;
             [[maybe_unused]] constexpr u16 section_rel_7        = 12;
             [[maybe_unused]] constexpr u16 token                = 13;
-            [[maybe_unused]] constexpr u16 rel32_signed         = 14;
+            [[maybe_unused]] constexpr u16 span_rel32_signed    = 14;
             [[maybe_unused]] constexpr u16 pair                 = 15;
             [[maybe_unused]] constexpr u16 span32_signed        = 16;
 
@@ -231,9 +231,9 @@ namespace basecode::binfmt::io::coff {
             [[maybe_unused]] constexpr u16 section_rel          = 8;
             [[maybe_unused]] constexpr u16 section_rel_low12a   = 9;
             [[maybe_unused]] constexpr u16 section_rel_high12a  = 10;
-            [[maybe_unused]] constexpr u16 section_rel_loe12l   = 11;
+            [[maybe_unused]] constexpr u16 section_rel_low12l   = 11;
             [[maybe_unused]] constexpr u16 token                = 12;
-            [[maybe_unused]] constexpr u16 section              = 13;
+            [[maybe_unused]] constexpr u16 section              = 12;
             [[maybe_unused]] constexpr u16 addr64               = 14;
             [[maybe_unused]] constexpr u16 branch19             = 15;
             [[maybe_unused]] constexpr u16 branch14             = 16;

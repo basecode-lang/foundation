@@ -94,6 +94,44 @@ TEST_CASE("basecode::binfmt ELF read obj file") {
     REQUIRE(backend_obj->module);
 }
 
+TEST_CASE("basecode::binfmt ELF round trip obj file") {
+    using namespace binfmt;
+
+    io::session_t read_session{};
+    io::session::init(read_session);
+
+    io::session_t write_session{};
+    io::session::init(write_session);
+
+    auto source_obj_path = R"(C:\temp\test\elf\backend.cpp.o)"_path;
+    auto dest_obj_path   = R"(backend.cpp.o)"_path;
+    defer(
+        path::free(source_obj_path);
+        path::free(dest_obj_path);
+        io::session::free(read_session);
+        io::session::free(write_session);
+         );
+
+    auto source_obj = io::session::add_file(read_session,
+                                            source_obj_path,
+                                            io::type_t::elf,
+                                            io::file_type_t::obj);
+    REQUIRE(source_obj);
+    REQUIRE(!source_obj->module);
+    REQUIRE(OK(io::read(read_session)));
+    REQUIRE(source_obj->module);
+
+    auto dest_obj = io::session::add_file(write_session,
+                                          source_obj->module,
+                                          dest_obj_path,
+                                          source_obj->machine,
+                                          source_obj->bin_type,
+                                          source_obj->file_type);
+
+    REQUIRE(dest_obj);
+    REQUIRE(OK(io::write(write_session)));
+}
+
 TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
     using namespace binfmt;
 

@@ -77,7 +77,8 @@ namespace basecode::binfmt {
         missing_linked_section          = 2020,
         custom_section_missing_symbol   = 2021,
         invalid_file_type               = 2022,
-        elf_unsupported_section         = 2023
+        elf_unsupported_section         = 2023,
+        invalid_relocation_type         = 2024,
     };
 
     enum class module_type_t : u8 {
@@ -117,29 +118,140 @@ namespace basecode::binfmt {
 
         namespace x86_64::reloc {
             enum class type_t : u8 {
-                absolute,
-                addr64,
-                addr32,
-                addr32nb,
-                rel32,
-                section,
-                section_rel,
-                pair
+                none,                   // COFF: absolute
+                direct_64,              // COFF: addr64
+                pc_rel_32,              // COFF: rel32 - rel32_5
+                got_32,
+                plt_32,
+                copy,
+                glob_dat,
+                jump_slot,
+                relative,
+                got_pc_rel,
+                direct_32,
+                direct_32_signed,
+                direct_16,
+                pc_rel_16_signed,
+                direct_8_signed,
+                pc_rel_8_signed,
+                dtp_mod_64,
+                dtp_offset_64,
+                tp_offset_64,
+                tls_gd_signed,
+                tls_ld_signed,
+                dtp_offset_32,
+                got_tp_offset_signed,
+                tp_offset_32,
+                pc_rel_64,
+                got_offset_64,
+                got_pc_rel_32_signed,
+                got_pc_rel_offset,
+                got_plt_64,
+                size_sym_32,
+                size_sym_64,
+                got_pc_32_tls_desc,
+                tls_desc_call,
+                tls_desc,
+                i_relative,
+                relative_64,
+                got_pc_relx,
+                rex_got_pc_relx,
             };
         }
 
         namespace aarch64::reloc {
             enum class type_t : u8 {
-                absolute,
-                addr32,
-                addr32nb,
-                branch24,
-                branch11,
-                rel32,
-                section,
-                section_rel,
-                mov32,
-                pair,
+                none,
+                abs_64,
+                abs_32,
+                abs_16,
+                pc_rel_64,
+                pc_rel_32,
+                pc_rel_16,
+                movw_uabs_g0,
+                movw_uabs_g0_nc,
+                movw_uabs_g1,
+                movw_uabs_g1_nc,
+                movw_uabs_g2,
+                movw_uabs_g2_nc,
+                movw_uabs_g3,
+                movw_sabs_g0,
+                movw_sabs_g1,
+                movw_sabs_g2,
+                ld_pc_rel_lo_19,
+                adr_pc_rel_lo21,
+                adr_pc_rel_pg_hi_21,
+                adr_pc_rel_pg_hi_21_nc,
+                add_abs_lo_12_nc,
+                ldst_8_abs_lo_12_nc,
+                tst_br_14,
+                cond_br_19,
+                jump_26,
+                call_26,
+                ldst_16_abs_lo_12_nc,
+                ldst_32_abs_lo_12_nc,
+                ldst_64_abs_lo_12_nc,
+                movw_pc_rel_g0,
+                movw_pc_rel_g0_nc,
+                movw_pc_rel_g1,
+                movw_pc_rel_g1_nc,
+                movw_pc_rel_g2,
+                movw_pc_rel_g2_nc,
+                movw_pc_rel_g3,
+                ldst_128_abs_lo12_nc,
+                movw_gotoff_g0,
+                movw_gotoff_g0_nc,
+                movw_gotoff_g1,
+                movw_gotoff_g1_nc,
+                movw_gotoff_g2,
+                movw_gotoff_g2_nc,
+                movw_gotoff_g3,
+                got_rel_64,
+                got_rel_32,
+                got_ld_pc_rel_19,
+                ld_64_got_off_lo_15,
+                adr_got_page,
+                ld_64_got_lo12_nc,
+                ld_64_got_page_lo_15,
+                tls_gd_adr_pc_rel_21,
+                tls_gd_adr_page_21,
+                tls_gd_add_lo12_nc,
+                tls_gd_movw_g1,
+                tls_gd_movw_g0_nc,
+                tls_ld_pc_rel_19,
+                tls_ld_movw_dtp_rel_g2,
+                tls_ld_movw_dtp_rel_g1,
+                tls_ld_movw_dtp_rel_g1_nc,
+                tls_ld_movw_dtp_rel_g0,
+                tls_ld_movw_dtp_rel_g0_nc,
+                tls_add_dtp_rel_hi_12,
+                tls_add_dtp_rel_lo_12,
+                tls_add_dtp_rel_lo_12_nc,
+                tls_ldst_8_dtp_rel_lo_12,
+                tls_ldst_8_dtp_rel_lo_12_nc,
+                tls_ldst_16_dtp_rel_lo_12,
+                tls_ldst_16_dtp_rel_lo_12_nc,
+                tls_ldst_32_dtp_rel_lo_12,
+                tls_ldst_32_dtp_rel_lo_12_nc,
+                tls_ldst_64_dtp_rel_lo_12,
+                tls_ldst_64_dtp_rel_lo_12_nc,
+                tls_ie_movw_got_tp_rel_g1,
+                tls_ie_movw_got_tp_rel_g0_nc,
+                tls_ie_adr_got_tp_rel_page_21,
+                tls_ie_ld_64_got_tp_rel_lo_12_nc,
+
+                // XXX: holy fuck, AArch64 has tons of TLS relocs
+                //      finish up to TLS_D_LDST128_DTPREL_LO12_NC
+
+                copy,
+                glob_dat,
+                jump_slot,
+                relative,
+                tls_dtp_mod_64,
+                tls_dtp_rel64,
+                tls_tp_rel_64,
+                tls_desc,
+                i_relative,
             };
         }
     }
@@ -170,9 +282,10 @@ namespace basecode::binfmt {
             u32                 alloc:      1;
             u32                 group:      1;
             u32                 merge:      1;
+            u32                 strings:    1;
             u32                 exclude:    1;
             u32                 tls:        1;
-            u32                 pad:        23;
+            u32                 pad:        22;
         };
     }
 
@@ -223,16 +336,20 @@ namespace basecode::binfmt {
     };
 
     struct reloc_t final {
-        u64                     virtual_addr;
+        u64                     offset;
+        s64                     addend;
         symbol_id               symbol;
-        u8                      type;
+        union {
+            machine::x86_64::reloc::type_t  x86_64_type;
+            machine::aarch64::reloc::type_t aarch64_type;
+        };
     };
 
     union section_subclass_t {
         u64                     size;
         str::slice_t            data;
+        group_t                 group;
         reloc_list_t            relocs;
-        group_list_t            groups;
         import_list_t           imports;
     };
 

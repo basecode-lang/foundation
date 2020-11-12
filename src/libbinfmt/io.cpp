@@ -98,7 +98,7 @@ namespace basecode::binfmt::io {
 
         u0 add(name_list_t& names,
                section::type_t type,
-               section::flags_t flags,
+               name_flags_t flags,
                str::slice_t name) {
             auto entry = &array::append(names);
             entry->type      = type;
@@ -113,10 +113,10 @@ namespace basecode::binfmt::io {
 
         const name_map_t* find(const name_list_t& names,
                                section::type_t type,
-                               section::flags_t flags) {
+                               name_flags_t flags) {
             for (const auto& entry : names) {
                 if (entry.type == type
-                &&  std::memcmp(&entry.flags, &flags, sizeof(section::flags_t)) == 0) {
+                &&  std::memcmp(&entry.flags, &flags, sizeof(name_flags_t)) == 0) {
                     return &entry;
                 }
             }

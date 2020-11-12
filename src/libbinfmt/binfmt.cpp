@@ -112,9 +112,7 @@ namespace basecode::binfmt {
                     array::free(section.subclass.relocs);
                     break;
                 case section::type_t::group:
-                    for (auto& group : section.subclass.groups)
-                        array::free(group.sections);
-                    array::free(section.subclass.groups);
+                    array::free(section.subclass.group.sections);
                     break;
                 case section::type_t::import:
                     for (auto& import : section.subclass.imports)
@@ -148,7 +146,7 @@ namespace basecode::binfmt {
                     array::init(section->subclass.relocs, section->alloc);
                     break;
                 case section::type_t::group:
-                    array::init(section->subclass.groups, section->alloc);
+                    array::init(section->subclass.group.sections, section->alloc);
                     break;
                 case section::type_t::import:
                     array::init(section->subclass.imports, section->alloc);

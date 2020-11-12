@@ -180,6 +180,12 @@ namespace basecode::binfmt::io::elf {
             opts.strs[opts.strtab_idx++] = {};
             opts.strs[opts.strtab_idx++] = ".strtab"_ss;
 
+            defer(
+                memory::free(g_elf_sys.alloc, opts.strs);
+                if (opts.syms)
+                    memory::free(g_elf_sys.alloc, opts.syms);
+                 );
+
             for (const auto& section : msc->sections) {
                 status = elf::get_section_name(file.module, &section, opts.strs[opts.strtab_idx++]);
                 if (!OK(status))
@@ -197,7 +203,7 @@ namespace basecode::binfmt::io::elf {
                         data_size = align(data_size + (section.subclass.relocs.size * relocs::entity_size), 8);
                         break;
                     case section_type_t::group:
-                        data_size = align(data_size + ((section.subclass.groups.size + 1) * group::entity_size), 8);
+                        data_size = align(data_size + ((section.subclass.group.sections.size + 1) * group::entity_size), 8);
                         break;
                     default:
                         break;
@@ -240,9 +246,6 @@ namespace basecode::binfmt::io::elf {
             defer(
                 elf::free(elf);
                 buf::unmap(file.buf);
-                memory::free(g_elf_sys.alloc, opts.strs);
-                if (opts.syms)
-                    memory::free(g_elf_sys.alloc, opts.syms);
                 stopwatch::stop(timer);
                 stopwatch::print_elapsed("binfmt ELF write time"_ss, 40, timer);
                 );
@@ -265,13 +268,22 @@ namespace basecode::binfmt::io::elf {
             name_map::init(g_elf_sys.segment_names, g_elf_sys.alloc);
 
             name_map::add(g_elf_sys.section_names,
+                          type_t::init,
+                          {
+                              .code = true,
+                              .init = true,
+                              .exec = false,
+                              .write = true,
+                          },
+                          ".init"_ss);
+
+            name_map::add(g_elf_sys.section_names,
                           type_t::code,
                           {
                               .code = true,
                               .init = true,
                               .exec = true,
                               .write = false,
-                              .alloc = true,
                           },
                           ".text"_ss);
 
@@ -282,7 +294,6 @@ namespace basecode::binfmt::io::elf {
                               .init = true,
                               .exec = false,
                               .write = true,
-                              .alloc = true,
                           },
                           ".data"_ss);
 
@@ -293,7 +304,6 @@ namespace basecode::binfmt::io::elf {
                               .init = true,
                               .exec = false,
                               .write = false,
-                              .alloc = true,
                           },
                           ".rodata"_ss);
 
@@ -304,31 +314,33 @@ namespace basecode::binfmt::io::elf {
                               .init = false,
                               .exec = false,
                               .write = true,
-                              .alloc = true,
                           },
                           ".bss"_ss);
 
             name_map::add(g_elf_sys.section_names,
                           type_t::reloc,
-                          {
-                              .code = false,
-                              .init = true,
-                              .exec = false,
-                              .write = false,
-                              .alloc = false,
-                          },
+                          {},
+                          ".rela"_ss);
+
+            name_map::add(g_elf_sys.section_names,
+                          type_t::reloc,
+                          {},
                           ".rela"_ss);
 
             name_map::add(g_elf_sys.section_names,
                           type_t::group,
+                          {},
+                          ".group"_ss);
+
+            name_map::add(g_elf_sys.section_names,
+                          type_t::unwind,
                           {
                               .code = false,
                               .init = true,
                               .exec = false,
                               .write = false,
-                              .alloc = false,
                           },
-                          ".group"_ss);
+                          ".eh_frame"_ss);
 
             return status_t::ok;
         }
@@ -351,11 +363,18 @@ namespace basecode::binfmt::io::elf {
                               str::slice_t& name) {
         using section_type_t = binfmt::section::type_t;
 
+        name_flags_t flags{};
+        flags.pad   = {};
+        flags.exec  = section->flags.exec;
+        flags.code  = section->flags.code;
+        flags.init  = section->flags.init;
+        flags.write = section->flags.write;
+
         switch (section->type) {
             case section_type_t::reloc: {
                 const auto entry = name_map::find(internal::g_elf_sys.section_names,
                                                   section->type,
-                                                  section->flags);
+                                                  flags);
                 if (!entry)
                     return status_t::cannot_map_section_name;
                 if (!section->link) {
@@ -368,26 +387,30 @@ namespace basecode::binfmt::io::elf {
                     return status_t::missing_linked_section;
                 const auto linked_entry = name_map::find(internal::g_elf_sys.section_names,
                                                          linked_section->type,
-                                                         linked_section->flags);
+                                                         flags);
                 if (!linked_entry)
                     return status_t::cannot_map_section_name;
                 name = string::interned::fold(format::format("{}{}", entry->name, linked_entry->name));
                 break;
             }
             case section_type_t::custom: {
-                auto sym = binfmt::module::get_symbol(*module, section->symbol);
-                if (!sym)
-                    return status_t::custom_section_missing_symbol;
-                auto intern_rc = string::interned::get(sym->name);
-                if (!OK(intern_rc.status))
-                    return status_t::symbol_not_found;
-                name = intern_rc.slice;
+                if (!section->symbol) {
+                    name = string::interned::fold(".custom");
+                } else {
+                    auto sym = binfmt::module::get_symbol(*module, section->symbol);
+                    if (!sym)
+                        return status_t::custom_section_missing_symbol;
+                    auto intern_rc = string::interned::get(sym->name);
+                    if (!OK(intern_rc.status))
+                        return status_t::symbol_not_found;
+                    name = intern_rc.slice;
+                }
                 break;
             }
             default: {
                 const auto entry = name_map::find(internal::g_elf_sys.section_names,
                                                   section->type,
-                                                  section->flags);
+                                                  flags);
                 if (!entry)
                     return status_t::cannot_map_section_name;
                 name = entry->name;
