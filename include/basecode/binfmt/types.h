@@ -89,8 +89,11 @@ namespace basecode::binfmt {
     namespace symbol {
         enum class type_t : u8 {
             none,
+            tls,
             file,
             object,
+            common,
+            section,
             function,
         };
 
@@ -346,8 +349,7 @@ namespace basecode::binfmt {
     };
 
     union section_subclass_t {
-        u64                     size;
-        str::slice_t            data;
+        const u8*               data;
         group_t                 group;
         reloc_list_t            relocs;
         import_list_t           imports;
@@ -356,12 +358,12 @@ namespace basecode::binfmt {
     struct section_t final {
         alloc_t*                alloc;
         const module_t*         module;
-//        symbol_list_t           symbols;
         section_subclass_t      subclass;
         symbol_id               symbol;
         section_id              id;
         section_id              link;
         u32                     info;
+        u32                     size;
         u32                     align;
         section::flags_t        flags;
         section::type_t         type;
@@ -372,6 +374,7 @@ namespace basecode::binfmt {
         symbol_id               symbol;
         section::flags_t        flags;
         u32                     info;
+        u32                     size;
         u32                     align;
     };
 

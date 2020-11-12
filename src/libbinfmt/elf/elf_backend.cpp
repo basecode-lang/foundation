@@ -187,7 +187,7 @@ namespace basecode::binfmt::io::elf {
                     memory::free(g_elf_sys.alloc, opts.syms);
                  );
 
-            for (const auto& section : msc->sections) {
+            for (auto& section : msc->sections) {
                 status = elf::get_section_name(file.module,
                                                &section,
                                                opts.strs[opts.strtab_idx++]);
@@ -195,39 +195,13 @@ namespace basecode::binfmt::io::elf {
                     return status;
                 const auto alignment = std::max<u32>(section.align, 8);
                 switch (section.type) {
-                    case section_type_t::init:
-                    case section_type_t::fini:
-                    case section_type_t::unwind:
-                    case section_type_t::custom: {
-                        const auto new_size = data_size + section.subclass.data.length;
-                        data_size = align(new_size, alignment);
-                        break;
-                    }
                     case section_type_t::data: {
-                        if (section.flags.init) {
-                            const auto new_size = data_size + section.subclass.data.length;
-                            data_size = align(new_size, alignment);
-                        }
-                        break;
-                    }
-                    case section_type_t::code: {
-                        const auto new_size = data_size + section.subclass.data.length;
-                        data_size = align(new_size, alignment);
-                        break;
-                    }
-                    case section_type_t::reloc: {
-                        const auto new_size = data_size
-                            + (section.subclass.relocs.size * relocs::entity_size);
-                        data_size = align(new_size, alignment);
-                        break;
-                    }
-                    case section_type_t::group: {
-                        const auto new_size = data_size
-                            + ((section.subclass.group.sections.size + 1) * group::entity_size);
-                        data_size = align(new_size, alignment);
+                        if (section.flags.init)
+                            data_size = align(data_size + section.size, alignment);
                         break;
                     }
                     default:
+                        data_size = align(data_size + section.size, alignment);
                         break;
                 }
             }
@@ -273,6 +247,7 @@ namespace basecode::binfmt::io::elf {
             status = elf::init(elf, opts);
             if (!OK(status))
                 return status;
+
             status = elf::write(elf, file);
             if (!OK(status))
                 return status;

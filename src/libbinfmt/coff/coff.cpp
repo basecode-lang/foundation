@@ -285,8 +285,7 @@ namespace basecode::binfmt::io::coff {
                 case sym_type_t::aux_weak_extern:
                     aux->subclass.aux_weak_extern = {};
                     break;
-                default:
-                    break;
+                default:break;
             }
             coff.symtab.file.size += entry_size;
             return aux;
@@ -530,7 +529,7 @@ namespace basecode::binfmt::io::coff {
             FILE_READ(u64, strtab_offset);
 
             auto sym = symtab::make_symbol(coff, strtab_offset, sym_offset);
-            auto sc = &sym->subclass.sym;
+            auto sc  = &sym->subclass.sym;
 
             FILE_READ(u32, sc->value);
             FILE_READ(s16, sc->section);
@@ -624,8 +623,8 @@ namespace basecode::binfmt::io::coff {
 
     status_t read_section_headers(file_t& file, coff_t& coff) {
         u32 hdr_offset;
-        u16 num_relocs  {};
-        u16 num_line_nos{};
+        u16 num_relocs      {};
+        u16 num_line_nos    {};
         for (u32 i = 0; i < coff.headers.size; ++i) {
             auto& hdr = coff.headers[i];
             hdr.number = i + 1;
@@ -755,10 +754,11 @@ namespace basecode::binfmt::io::coff {
             if (!OK(intern_rc.status))
                 return status_t::symbol_not_found;
             auto sym = coff::symtab::make_symbol(coff, intern_rc.slice);
-            auto sc = &sym->subclass.sym;
+            auto sc  = &sym->subclass.sym;
             sc->value   = symbol.value;
             sc->section = symbol.section;
             switch (symbol.type) {
+                default:
                 case symbol::type_t::none:
                 case symbol::type_t::object:
                     sc->type = 0;
@@ -766,6 +766,10 @@ namespace basecode::binfmt::io::coff {
                 case symbol::type_t::file:
                     sc->type   = 0;
                     sc->sclass = symtab::sclass::file;
+                    break;
+                case symbol::type_t::section:
+                    sc->type   = 0;
+                    sc->sclass = symtab::sclass::static_;
                     break;
                 case symbol::type_t::function:
                     sc->type = symtab::type::function;
@@ -776,14 +780,14 @@ namespace basecode::binfmt::io::coff {
                     case symbol::scope_t::none:
                         sc->sclass = symtab::sclass::null_;
                         break;
+                    case symbol::scope_t::weak:
+                        sc->sclass = symtab::sclass::weak_external;
+                        break;
                     case symbol::scope_t::local:
                         sc->sclass = symtab::sclass::static_;
                         break;
                     case symbol::scope_t::global:
                         sc->sclass = symtab::sclass::external_;
-                        break;
-                    case symbol::scope_t::weak:
-                        sc->sclass = symtab::sclass::weak_external;
                         break;
                 }
             }
@@ -806,14 +810,14 @@ namespace basecode::binfmt::io::coff {
 
         hdr.file.offset = coff.offset;
         hdr.rva.base    = coff.rva;
-        const auto& sc = hdr.section->subclass;
+        hdr.rva.size    = hdr.section->size;
+
         switch (hdr.section->type) {
             case type_t::code:
                 if (!coff.code.base)
                     coff.code.base = hdr.rva.base;
-                hdr.rva.size    = sc.data.length;
-                hdr.file.size   = align(hdr.rva.size, coff.align.file);
                 coff.code.size += hdr.rva.size;
+                hdr.file.size   = align(hdr.rva.size, coff.align.file);
                 coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
                 coff.offset     = align(coff.offset + hdr.rva.size, coff.align.file);
                 coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
@@ -823,19 +827,17 @@ namespace basecode::binfmt::io::coff {
                 if (hdr.section->flags.init) {
                     if (!coff.init_data.base)
                         coff.init_data.base = hdr.rva.base;
-                    hdr.rva.size  = sc.data.length;
-                    hdr.file.size = align(hdr.rva.size, coff.align.file);
                     coff.init_data.size += hdr.rva.size;
+                    hdr.file.size   = align(hdr.rva.size, coff.align.file);
                     coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
                     coff.offset     = align(coff.offset + hdr.rva.size, coff.align.file);
                     coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
                 } else {
                     if (!coff.uninit_data.base)
                         coff.uninit_data.base = hdr.rva.base;
-                    hdr.rva.size    = sc.size;
+                    coff.uninit_data.size += hdr.rva.size;
                     hdr.file.offset = 0;
                     hdr.file.size   = 0;
-                    coff.uninit_data.size += hdr.rva.size;
                     coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
                     coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
                 }
@@ -857,7 +859,7 @@ namespace basecode::binfmt::io::coff {
 
         set_section_flags(file, hdr);
 
-        auto sym = section::get_symbol(coff, hdr);
+        auto sym     = section::get_symbol(coff, hdr);
         auto aux_sec = symtab::get_aux(coff, sym, 0);
         if (aux_sec)
             aux_sec->subclass.aux_section.len = hdr.rva.size;
@@ -880,7 +882,7 @@ namespace basecode::binfmt::io::coff {
             case type_t::code:
             case type_t::data:
             case type_t::custom:
-                FILE_WRITE_STR(sc.data);
+                FILE_WRITE_STR(slice::make(sc.data, hdr.section->size));
                 break;
             case type_t::import:
             case type_t::export_:

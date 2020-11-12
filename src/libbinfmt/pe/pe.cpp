@@ -214,8 +214,8 @@ namespace basecode::binfmt::io::pe {
         coff.size.headers = coff.offset
                             + (pe_sig_size + coff::header_size + pe.coff.size.opt_hdr)
                             + (coff.headers.size * coff::section::header_size);
-        coff.offset       = align(coff.size.headers, coff.align.file);
-        coff.rva          = align(coff.size.headers, coff.align.section);
+        coff.offset = align(coff.size.headers, coff.align.file);
+        coff.rva    = align(coff.size.headers, coff.align.section);
 
         for (auto& hdr : coff.headers) {
             auto status = build_section(file, pe, hdr);

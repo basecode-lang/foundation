@@ -18,7 +18,6 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/binfmt/io.h>
-#include <basecode/core/defer.h>
 #include <basecode/binfmt/binfmt.h>
 #include "test.h"
 
@@ -148,12 +147,10 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
                                                     .init = true,
                                                     .exec = true,
                                                     .alloc = true
-                                                }
+                                                },
+                                                .size = sizeof(s_rot13_code)
                                             });
-        auto set_data_rc = section::data(mod,
-                                         text_rc.id,
-                                         s_rot13_code,
-                                         sizeof(s_rot13_code));
+        auto set_data_rc = section::data(mod, text_rc.id, s_rot13_code);
 
         module::make_symbol(mod,
                             "ReadFile"_ss,
@@ -187,14 +184,15 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
         auto rdata_rc = module::make_section(mod,
                                              section::type_t::data,
                                              {
-                                               .flags = {
-                                                   .code = false,
-                                                   .init = true,
-                                                   .alloc = true
-                                               }
-                                           });
+                                                 .flags = {
+                                                     .code = false,
+                                                     .init = true,
+                                                     .alloc = true
+                                                 },
+                                                 .size = sizeof(s_rot13_table)
+                                             });
         auto rdata = module::get_section(mod, rdata_rc.id);
-        section::data(mod, rdata_rc.id, s_rot13_table, sizeof(s_rot13_table));
+        section::data(mod, rdata_rc.id, s_rot13_table);
         REQUIRE(OK(rdata_rc.status));
         REQUIRE(rdata);
     }
@@ -208,14 +206,13 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
                                                    .init   = false,
                                                    .write  = true,
                                                    .alloc  = true
-                                               }
+                                               },
+                                               .size = 4096
                                            });
-        auto bss = module::get_section(mod, bss_rc.id);
-        section::reserve(mod, bss_rc.id, 4096);
-
         REQUIRE(OK(bss_rc.status));
+        auto bss = module::get_section(mod, bss_rc.id);
         REQUIRE(bss);
-        REQUIRE(bss->subclass.size == 4096);
+        REQUIRE(bss->size == 4096);
     }
 
     io::session_t s{};

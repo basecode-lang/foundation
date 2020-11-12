@@ -93,12 +93,10 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                   .code = true,
                                                   .exec = true,
                                                   .alloc = true,
-                                              }
+                                              },
+                                              .size = sizeof(s_rot13_code)
                                           });
-        auto set_data_rc = section::data(*mod,
-                                         text_rc.id,
-                                         s_rot13_code,
-                                         sizeof(s_rot13_code));
+        auto set_data_rc = section::data(*mod, text_rc.id, s_rot13_code);
         REQUIRE(OK(set_data_rc.status));
         REQUIRE(OK(text_rc.status));
     }
@@ -111,12 +109,10 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                    .code = false,
                                                    .init = true,
                                                    .alloc = true,
-                                               }
+                                               },
+                                               .size = sizeof(s_rot13_table)
                                            });
-        auto set_data_rc = section::data(*mod,
-                                         rdata_rc.id,
-                                         s_rot13_table,
-                                         sizeof(s_rot13_table));
+        auto set_data_rc = section::data(*mod, rdata_rc.id, s_rot13_table);
         REQUIRE(OK(set_data_rc.status));
         REQUIRE(OK(rdata_rc.status));
     }
@@ -192,14 +188,13 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                 .init   = false,
                                                 .write  = true,
                                                 .alloc  = true,
-                                            }
+                                            },
+                                            .size = 4096
                                          });
-        auto bss = module::get_section(*mod, bss_rc.id);
-        section::reserve(*mod, bss_rc.id, 4096);
-
         REQUIRE(OK(bss_rc.status));
+        auto bss = module::get_section(*mod, bss_rc.id);
         REQUIRE(bss);
-        REQUIRE(bss->subclass.size == 4096);
+        REQUIRE(bss->size == 4096);
     }
 
     io::session_t s{};

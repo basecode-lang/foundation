@@ -619,6 +619,7 @@ namespace basecode::binfmt::io::elf {
             auto sect_type = map->type;
             sect_opts.info          = hdr.info;
             sect_opts.link          = hdr.link;
+            sect_opts.size          = hdr.size;
             sect_opts.flags         = map->flags;
             sect_opts.align         = hdr.addr_align;
             sect_opts.flags.tls     = (hdr.flags & section::flags::tls) != 0;
@@ -641,36 +642,31 @@ namespace basecode::binfmt::io::elf {
             auto section = binfmt::module::get_section(*module, r.id);
             switch (section->type) {
                 case binfmt::section::type_t::data: {
-                    if (section->flags.init) {
-                        section->subclass.data = slice::make(buf + hdr.offset, hdr.size);
-                    } else {
-                        section->subclass.size = hdr.size;
-                    }
+                    if (section->flags.init)
+                        section->subclass.data = buf + hdr.offset;
                     break;
                 }
                 case binfmt::section::type_t::code:
                 case binfmt::section::type_t::init:
                 case binfmt::section::type_t::fini:
+                case binfmt::section::type_t::unwind:
                 case binfmt::section::type_t::custom:
                 case binfmt::section::type_t::pre_init: {
-                    section->subclass.data = slice::make(buf + hdr.offset, hdr.size);
+                    section->subclass.data = buf + hdr.offset;
                     break;
                 }
-                case binfmt::section::type_t::unwind: {
-                    // XXX: do we want to carry the name back?
-                    section->subclass.data = slice::make(buf + hdr.offset, hdr.size);
+                case binfmt::section::type_t::rsrc: {
                     break;
                 }
-                case binfmt::section::type_t::rsrc:
-                    break;
                 case binfmt::section::type_t::note: {
                     auto note_hdr = (note_header_t*) (buf + hdr.offset);
                     UNUSED(note_hdr);
                     // XXX: need to finish
                     break;
                 }
-                case binfmt::section::type_t::debug:
+                case binfmt::section::type_t::debug: {
                     break;
+                }
                 case binfmt::section::type_t::group: {
                     auto gsc = &section->subclass.group;
                     auto group = (group_t*) (buf + hdr.offset);
@@ -1085,10 +1081,12 @@ namespace basecode::binfmt::io::elf {
                     }
                     break;
                 }
-                case binfmt::section::type_t::import:
+                case binfmt::section::type_t::import: {
                     break;
-                case binfmt::section::type_t::export_:
+                }
+                case binfmt::section::type_t::export_: {
                     break;
+                }
             }
         }
 
@@ -1111,14 +1109,23 @@ namespace basecode::binfmt::io::elf {
                 case elf::symtab::type::notype:
                     sym_opts.type = symbol::type_t::none;
                     break;
+                case elf::symtab::type::tls:
+                    sym_opts.type = symbol::type_t::tls;
+                    break;
                 case elf::symtab::type::file:
                     sym_opts.type = symbol::type_t::file;
+                    break;
+                case elf::symtab::type::func:
+                    sym_opts.type = symbol::type_t::function;
+                    break;
+                case elf::symtab::type::common:
+                    sym_opts.type = symbol::type_t::common;
                     break;
                 case elf::symtab::type::object:
                     sym_opts.type = symbol::type_t::object;
                     break;
-                case elf::symtab::type::func:
-                    sym_opts.type = symbol::type_t::function;
+                case elf::symtab::type::section:
+                    sym_opts.type = symbol::type_t::section;
                     break;
             }
 
@@ -1213,7 +1220,7 @@ namespace basecode::binfmt::io::elf {
             elf.symtab.offset            = 0;
             elf.symtab.sect              = &elf.sections[fh->sect_hdr_count - 1];
             elf.symtab.sect->link        = fh->strtab_ndx;
-            elf.symtab.sect->info        = 1;   // first global index!
+            elf.symtab.sect->info        = {};
             elf.symtab.sect->addr        = {};
             elf.symtab.sect->addr_align  = 8;
             elf.symtab.sect->entity_size = symtab::entity_size;
@@ -1265,6 +1272,7 @@ namespace basecode::binfmt::io::elf {
             hdr.addr        = virt_addr;
             hdr.link        = section.link;
             hdr.info        = section.info;
+            hdr.size        = section.size;
             hdr.offset      = data_offset;
             hdr.addr_align  = section.align;
             hdr.name_offset = strtab::add(elf, elf.opts->strs[strs_idx++]);
@@ -1285,44 +1293,38 @@ namespace basecode::binfmt::io::elf {
                 case section_type_t::data: {
                     if (!section.flags.init) {
                         hdr.type = section::type::nobits;
-                        hdr.size = section.subclass.size;
                     } else {
+                        std::memcpy(data, section.subclass.data, hdr.size);
                         hdr.type = section::type::progbits;
-                        hdr.size = section.subclass.data.length;
-                        std::memcpy(data, section.subclass.data.data, hdr.size);
                         data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     }
                     virt_addr = align(virt_addr + hdr.size, hdr.addr_align);
                     break;
                 }
                 case section_type_t::init: {
+                    std::memcpy(data, section.subclass.data, hdr.size);
                     hdr.type = section::type::init_array;
-                    hdr.size = section.subclass.data.length;
-                    std::memcpy(data, section.subclass.data.data, hdr.size);
                     virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
                 }
                 case section_type_t::fini: {
+                    std::memcpy(data, section.subclass.data, hdr.size);
                     hdr.type = section::type::fini_array;
-                    hdr.size = section.subclass.data.length;
-                    std::memcpy(data, section.subclass.data.data, hdr.size);
                     virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
                 }
                 case section_type_t::code: {
+                    std::memcpy(data, section.subclass.data, hdr.size);
                     hdr.type = section::type::progbits;
-                    hdr.size = section.subclass.data.length;
-                    std::memcpy(data, section.subclass.data.data, hdr.size);
                     virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
                 }
                 case section_type_t::unwind: {
+                    std::memcpy(data, section.subclass.data, hdr.size);
                     hdr.type = section::type::x86_64_unwind;
-                    hdr.size = section.subclass.data.length;
-                    std::memcpy(data, section.subclass.data.data, hdr.size);
                     virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
@@ -1330,7 +1332,6 @@ namespace basecode::binfmt::io::elf {
                 case section_type_t::reloc: {
                     hdr.type        = section::type::rela;
                     hdr.entity_size = relocs::entity_size;
-                    hdr.size        = section.subclass.relocs.size * relocs::entity_size;
                     auto rela = (rela_t*) data;
                     for (u32 j = 0; j < section.subclass.relocs.size; ++j) {
                         const auto& reloc = section.subclass.relocs[j];
@@ -1344,7 +1345,6 @@ namespace basecode::binfmt::io::elf {
                 case section_type_t::group: {
                     hdr.type        = section::type::group;
                     hdr.entity_size = group::entity_size;
-                    hdr.size        = (section.subclass.group.sections.size + 1) * group::entity_size;
                     auto group = (group_t*) data;
                     group->flags = section.subclass.group.flags;
                     for (u32 j = 0; j < section.subclass.group.sections.size; ++j)
@@ -1353,9 +1353,8 @@ namespace basecode::binfmt::io::elf {
                     break;
                 }
                 case section_type_t::custom: {
+                    std::memcpy(data, section.subclass.data, hdr.size);
                     hdr.type = section::type::progbits;
-                    hdr.size = section.subclass.data.length;
-                    std::memcpy(data, section.subclass.data.data, hdr.size);
                     virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
@@ -1381,11 +1380,20 @@ namespace basecode::binfmt::io::elf {
                     case symbol::type_t::none:
                         type = elf::symtab::type::notype;
                         break;
+                    case symbol::type_t::tls:
+                        type = elf::symtab::type::tls;
+                        break;
                     case symbol::type_t::file:
                         type = elf::symtab::type::file;
                         break;
+                    case symbol::type_t::common:
+                        type = elf::symtab::type::common;
+                        break;
                     case symbol::type_t::object:
                         type = elf::symtab::type::object;
+                        break;
+                    case symbol::type_t::section:
+                        type = elf::symtab::type::section;
                         break;
                     case symbol::type_t::function:
                         type = elf::symtab::type::func;
@@ -1394,14 +1402,18 @@ namespace basecode::binfmt::io::elf {
 
                 switch (symbol->scope) {
                     case symbol::scope_t::none:
+                    case symbol::scope_t::weak:
+                        scope = elf::symtab::scope::weak;
+                        if (!elf.symtab.sect->info)
+                            elf.symtab.sect->info = i + 1;
+                        break;
                     case symbol::scope_t::local:
                         scope = elf::symtab::scope::local;
                         break;
                     case symbol::scope_t::global:
                         scope = elf::symtab::scope::global;
-                        break;
-                    case symbol::scope_t::weak:
-                        scope = elf::symtab::scope::weak;
+                        if (!elf.symtab.sect->info)
+                            elf.symtab.sect->info = i + 1;
                         break;
                 }
 

@@ -42,15 +42,13 @@ namespace basecode::binfmt {
     namespace section {
         u0 free(section_t& section);
 
-        result_t reserve(module_t& module, section_id id, u64 size);
+        result_t data(module_t& module, section_id id, const u8* data);
 
         import_t* get_import(module_t& module, section_id id, import_id import);
 
         result_t import_module(module_t& module, section_id id, symbol_id symbol);
 
         status_t init(section_t& section, section::type_t type, symbol_id symbol);
-
-        result_t data(module_t& module, section_id id, const u8* data, u32 length);
     }
 
     namespace module {

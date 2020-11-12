@@ -122,17 +122,16 @@ namespace basecode::binfmt {
                 default:
                     break;
             }
-//            array::free(section.symbols);
         }
 
         status_t init(section_t* section,
                       section::type_t type,
                       const section_opts_t& opts) {
-            section->alloc = g_binfmt_sys.alloc;
-//            array::init(section->symbols, section->alloc);
+            section->alloc  = g_binfmt_sys.alloc;
             section->type   = type;
             section->info   = opts.info;
             section->link   = opts.link;
+            section->size   = opts.size;
             section->flags  = opts.flags;
             section->align  = opts.align;
             section->symbol = opts.symbol;
@@ -157,17 +156,11 @@ namespace basecode::binfmt {
             return status_t::ok;
         }
 
-        result_t reserve(module_t& module, section_id id, u64 size) {
+        result_t data(module_t& module, section_id id, const u8* data) {
             auto section = module::get_section(module, id);
             if (!section)
                 return {0, status_t::section_not_found};
-            if (section->type != section::type_t::data
-            &&  section->type != section::type_t::custom) {
-                return {0, status_t::invalid_section_type};
-            }
-            if (section->flags.init)
-                return {0, status_t::invalid_section_type};
-            section->subclass.size = size;
+            section->subclass.data = data;
             return {section->id, status_t::ok};
         }
 
@@ -176,14 +169,6 @@ namespace basecode::binfmt {
             if (!section || section->type != section::type_t::import)
                 return nullptr;
             return &section->subclass.imports[import - 1];
-        }
-
-        result_t data(module_t& module, section_id id, const u8* data, u32 length) {
-            auto section = module::get_section(module, id);
-            if (!section)
-                return {0, status_t::section_not_found};
-            section->subclass.data = slice::make(data, length);
-            return {section->id, status_t::ok};
         }
 
         result_t import_module(module_t& module, section_id id, symbol_id module_symbol) {

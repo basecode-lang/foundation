@@ -18,7 +18,6 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/binfmt/io.h>
-#include <basecode/binfmt/binfmt.h>
 
 using namespace basecode;
 
