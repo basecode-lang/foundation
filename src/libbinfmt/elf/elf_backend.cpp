@@ -173,7 +173,8 @@ namespace basecode::binfmt::io::elf {
                                                        alignof(symbol_t*));
             }
 
-            const auto strs_size = sizeof(str::slice_t) * (opts.num_sections + opts.num_symbols);
+            const auto strs_size = sizeof(str::slice_t)
+                * (opts.num_sections + opts.num_symbols);
             opts.strs = (str::slice_t*) memory::alloc(g_elf_sys.alloc,
                                                       strs_size,
                                                       alignof(str::slice_t));
@@ -187,24 +188,45 @@ namespace basecode::binfmt::io::elf {
                  );
 
             for (const auto& section : msc->sections) {
-                status = elf::get_section_name(file.module, &section, opts.strs[opts.strtab_idx++]);
+                status = elf::get_section_name(file.module,
+                                               &section,
+                                               opts.strs[opts.strtab_idx++]);
                 if (!OK(status))
                     return status;
+                const auto alignment = std::max<u32>(section.align, 8);
                 switch (section.type) {
-                    case section_type_t::data:
-                    case section_type_t::custom:
-                        if (section.flags.init)
-                            data_size = align(data_size + section.subclass.data.length, 8);
+                    case section_type_t::init:
+                    case section_type_t::fini:
+                    case section_type_t::unwind:
+                    case section_type_t::custom: {
+                        const auto new_size = data_size + section.subclass.data.length;
+                        data_size = align(new_size, alignment);
                         break;
-                    case section_type_t::code:
-                        data_size = align(data_size + section.subclass.data.length, 8);
+                    }
+                    case section_type_t::data: {
+                        if (section.flags.init) {
+                            const auto new_size = data_size + section.subclass.data.length;
+                            data_size = align(new_size, alignment);
+                        }
                         break;
-                    case section_type_t::reloc:
-                        data_size = align(data_size + (section.subclass.relocs.size * relocs::entity_size), 8);
+                    }
+                    case section_type_t::code: {
+                        const auto new_size = data_size + section.subclass.data.length;
+                        data_size = align(new_size, alignment);
                         break;
-                    case section_type_t::group:
-                        data_size = align(data_size + ((section.subclass.group.sections.size + 1) * group::entity_size), 8);
+                    }
+                    case section_type_t::reloc: {
+                        const auto new_size = data_size
+                            + (section.subclass.relocs.size * relocs::entity_size);
+                        data_size = align(new_size, alignment);
                         break;
+                    }
+                    case section_type_t::group: {
+                        const auto new_size = data_size
+                            + ((section.subclass.group.sections.size + 1) * group::entity_size);
+                        data_size = align(new_size, alignment);
+                        break;
+                    }
                     default:
                         break;
                 }
@@ -212,16 +234,14 @@ namespace basecode::binfmt::io::elf {
 
             opts.strs[opts.strtab_idx++] = ".symtab"_ss;
 
-            if (file.module->symbols.size > 0) {
-                u32 idx{};
-                for (const auto& symbol : file.module->symbols) {
-                    auto intern_rc = string::interned::get(symbol.name);
-                    if (!OK(intern_rc.status))
-                        return status_t::symbol_not_found;
-                    opts.syms[idx] = (symbol_t*) &symbol;
-                    opts.strs[opts.strtab_idx++] = intern_rc.slice;
-                    ++idx;
-                }
+            u32 idx{};
+            for (const auto& symbol : file.module->symbols) {
+                auto intern_rc = string::interned::get(symbol.name);
+                if (!OK(intern_rc.status))
+                    return status_t::symbol_not_found;
+                opts.syms[idx] = (symbol_t*) &symbol;
+                opts.strs[opts.strtab_idx++] = intern_rc.slice;
+                ++idx;
             }
 
             opts.strtab_size = 0;
@@ -377,20 +397,32 @@ namespace basecode::binfmt::io::elf {
                                                   flags);
                 if (!entry)
                     return status_t::cannot_map_section_name;
-                if (!section->link) {
+                if (!section->info) {
                     name = entry->name;
                     break;
                 }
 
-                auto linked_section = binfmt::module::get_section(*module, section->link);
+                auto linked_section = binfmt::module::get_section(*module, section->info + 1);
                 if (!linked_section)
                     return status_t::missing_linked_section;
-                const auto linked_entry = name_map::find(internal::g_elf_sys.section_names,
-                                                         linked_section->type,
-                                                         flags);
-                if (!linked_entry)
-                    return status_t::cannot_map_section_name;
-                name = string::interned::fold(format::format("{}{}", entry->name, linked_entry->name));
+
+                if (linked_section->type == section_type_t::custom) {
+                    name = string::interned::fold(format::format("{}.custom", entry->name));
+                } else {
+                    flags.exec  = linked_section->flags.exec;
+                    flags.code  = linked_section->flags.code;
+                    flags.init  = linked_section->flags.init;
+                    flags.write = linked_section->flags.write;
+                    const auto linked_entry = name_map::find(internal::g_elf_sys.section_names,
+                                                             linked_section->type,
+                                                             flags);
+                    if (!linked_entry)
+                        return status_t::cannot_map_section_name;
+
+                    name = string::interned::fold(format::format("{}{}",
+                                                                 entry->name,
+                                                                 linked_entry->name));
+                }
                 break;
             }
             case section_type_t::custom: {

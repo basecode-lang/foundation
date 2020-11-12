@@ -468,19 +468,9 @@ namespace basecode::binfmt::io::elf {
 
         namespace flags {
             static const s8 s_flag_chars[] = {
-                'W',
-                'A',
-                'X',
-                'M',
-                'S',
-                'I',
-                'L',
-                'O',
-                'G',
-                'T',
-                'C',
-                'o',
-                'E'
+                'W', 'A', 'X', 'M', 'S',
+                'I', 'L', 'O', 'G', 'T',
+                'C', 'o', 'E'
             };
 
             static const s8* s_flag_names[] = {
@@ -627,11 +617,10 @@ namespace basecode::binfmt::io::elf {
 
             binfmt::section_opts_t sect_opts{};
             auto sect_type = map->type;
-            sect_opts.align = hdr.addr_align;
-            sect_opts.info  = hdr.info;
-            if (hdr.link != elf.symtab.ndx)
-                sect_opts.link  = hdr.link;
+            sect_opts.info          = hdr.info;
+            sect_opts.link          = hdr.link;
             sect_opts.flags         = map->flags;
+            sect_opts.align         = hdr.addr_align;
             sect_opts.flags.tls     = (hdr.flags & section::flags::tls) != 0;
             sect_opts.flags.alloc   = (hdr.flags & section::flags::alloc) != 0;
             sect_opts.flags.write   = (hdr.flags & section::flags::write) != 0;
@@ -1193,12 +1182,14 @@ namespace basecode::binfmt::io::elf {
         fh->version        = 1;
         fh->header_size    = file::header_size;
         fh->entry_point    = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
+
         if (opts.num_segments > 0) {
             fh->pgm_hdr_size   = segment::header_size;
             fh->pgm_hdr_count  = opts.num_segments;
             fh->pgm_hdr_offset = fh->header_size;
             elf.segments       = (pgm_header_t*) (buf + elf.file_header->pgm_hdr_offset);
         }
+
         if (opts.num_sections > 0) {
             fh->sect_hdr_size   = section::header_size;
             fh->sect_hdr_count  = opts.num_sections;
@@ -1206,6 +1197,7 @@ namespace basecode::binfmt::io::elf {
                 std::max<u64>(fh->pgm_hdr_offset + (fh->pgm_hdr_count * fh->pgm_hdr_size), fh->header_size);
             elf.sections = (sect_header_t*) (buf + elf.file_header->sect_hdr_offset);
         }
+
         if (opts.strtab_size > 1) {
             fh->strtab_ndx              = 1;
             elf.strtab.offset           = 0;
@@ -1216,6 +1208,7 @@ namespace basecode::binfmt::io::elf {
             elf.strtab.sect->size       = opts.strtab_size;
             elf.strtab.sect->type       = section::type::strtab;
         }
+
         if (opts.num_symbols > 0) {
             elf.symtab.offset            = 0;
             elf.symtab.sect              = &elf.sections[fh->sect_hdr_count - 1];
@@ -1266,19 +1259,30 @@ namespace basecode::binfmt::io::elf {
             elf.strtab.sect->name_offset = strtab::add(elf, elf.opts->strs[1]);
         }
 
-        const u32 start_sect_idx  {sect_idx};
-
         for (const auto& section : msc->sections) {
             auto& hdr = elf.sections[sect_idx++];
-            hdr.addr       = virt_addr;
-            hdr.offset     = data_offset;
-            hdr.addr_align = 8;
+            hdr.flags       = {};
+            hdr.addr        = virt_addr;
+            hdr.link        = section.link;
+            hdr.info        = section.info;
+            hdr.offset      = data_offset;
+            hdr.addr_align  = section.align;
             hdr.name_offset = strtab::add(elf, elf.opts->strs[strs_idx++]);
+
+            if (section.flags.exec)     hdr.flags |= section::flags::exec_instr;
+            if (section.flags.alloc)    hdr.flags |= section::flags::alloc;
+            if (section.flags.write)    hdr.flags |= section::flags::write;
+            if (section.flags.group)    hdr.flags |= section::flags::group;
+            if (section.flags.merge)    hdr.flags |= section::flags::merge;
+            if (section.flags.exclude)  hdr.flags |= section::flags::exclude;
+            if (section.flags.strings) {
+                hdr.flags |= section::flags::strings;
+                hdr.entity_size = 1;
+            }
+
             u8* data = buf + hdr.offset;
             switch (section.type) {
-                case section_type_t::data:
-                case section_type_t::custom: {
-                    hdr.flags |= section::flags::alloc;
+                case section_type_t::data: {
                     if (!section.flags.init) {
                         hdr.type = section::type::nobits;
                         hdr.size = section.subclass.size;
@@ -1288,17 +1292,36 @@ namespace basecode::binfmt::io::elf {
                         std::memcpy(data, section.subclass.data.data, hdr.size);
                         data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     }
-                    if (section.flags.write)
-                        hdr.flags |= section::flags::write;
                     virt_addr = align(virt_addr + hdr.size, hdr.addr_align);
+                    break;
+                }
+                case section_type_t::init: {
+                    hdr.type = section::type::init_array;
+                    hdr.size = section.subclass.data.length;
+                    std::memcpy(data, section.subclass.data.data, hdr.size);
+                    virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
+                    data_offset = align(data_offset + hdr.size, hdr.addr_align);
+                    break;
+                }
+                case section_type_t::fini: {
+                    hdr.type = section::type::fini_array;
+                    hdr.size = section.subclass.data.length;
+                    std::memcpy(data, section.subclass.data.data, hdr.size);
+                    virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
+                    data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
                 }
                 case section_type_t::code: {
                     hdr.type = section::type::progbits;
                     hdr.size = section.subclass.data.length;
-                    hdr.flags |= section::flags::alloc | section::flags::exec_instr;
-                    if (section.flags.write)
-                        hdr.flags |= section::flags::write;
+                    std::memcpy(data, section.subclass.data.data, hdr.size);
+                    virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
+                    data_offset = align(data_offset + hdr.size, hdr.addr_align);
+                    break;
+                }
+                case section_type_t::unwind: {
+                    hdr.type = section::type::x86_64_unwind;
+                    hdr.size = section.subclass.data.length;
                     std::memcpy(data, section.subclass.data.data, hdr.size);
                     virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
@@ -1306,21 +1329,34 @@ namespace basecode::binfmt::io::elf {
                 }
                 case section_type_t::reloc: {
                     hdr.type        = section::type::rela;
-                    hdr.size        = section.subclass.relocs.size * relocs::entity_size;
                     hdr.entity_size = relocs::entity_size;
-                    if (section.flags.group)
-                        hdr.flags |= section::flags::group;
-                    hdr.link = fh->sect_hdr_count - 1;
-                    hdr.info = section.link + start_sect_idx;
+                    hdr.size        = section.subclass.relocs.size * relocs::entity_size;
+                    auto rela = (rela_t*) data;
+                    for (u32 j = 0; j < section.subclass.relocs.size; ++j) {
+                        const auto& reloc = section.subclass.relocs[j];
+                        rela[j].info   = ELF64_R_INFO(reloc.symbol, 0);
+                        rela[j].offset = reloc.offset;
+                        rela[j].addend = reloc.addend;
+                    }
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
                 }
                 case section_type_t::group: {
                     hdr.type        = section::type::group;
-                    hdr.size        = (section.subclass.relocs.size + 1) * group::entity_size;
-                    hdr.link        = fh->sect_hdr_count - 1;
-                    hdr.info        = section.link + start_sect_idx;
                     hdr.entity_size = group::entity_size;
+                    hdr.size        = (section.subclass.group.sections.size + 1) * group::entity_size;
+                    auto group = (group_t*) data;
+                    group->flags = section.subclass.group.flags;
+                    for (u32 j = 0; j < section.subclass.group.sections.size; ++j)
+                        group->sect_hdr_indexes[j] = section.subclass.group.sections[j];
+                    data_offset = align(data_offset + hdr.size, hdr.addr_align);
+                    break;
+                }
+                case section_type_t::custom: {
+                    hdr.type = section::type::progbits;
+                    hdr.size = section.subclass.data.length;
+                    std::memcpy(data, section.subclass.data.data, hdr.size);
+                    virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
                 }
