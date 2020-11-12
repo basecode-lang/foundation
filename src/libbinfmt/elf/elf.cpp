@@ -376,12 +376,57 @@ namespace basecode::binfmt::io::elf {
 
     status_t init(elf_t& elf, const opts_t& opts) {
         auto& file = *opts.file;
-
-        auto buf = FILE_PTR();
-        auto fh = (file_header_t*) (buf);
         elf.alloc       = opts.alloc;
         elf.opts        = &opts;
-        elf.file_header = fh;
+        elf.file_header = (file_header_t*) (FILE_PTR());
+        return status_t::ok;
+    }
+
+    status_t read(elf_t& elf, file_t& file) {
+        auto buf = FILE_PTR();
+
+        //const auto& opts = *elf.opts;
+
+        elf.file_header = (file_header_t*) (buf);
+        if (std::memcmp(elf.file_header->magic, "\177ELF", 4) != 0)
+            return status_t::read_error;
+
+        if (elf.file_header->pgm_hdr_count > 0) {
+            elf.segments = (pgm_header_t*) (buf + elf.file_header->pgm_hdr_offset);
+        }
+
+        if (elf.file_header->sect_hdr_count > 0) {
+            elf.sections = (sect_header_t*) (buf + elf.file_header->sect_hdr_offset);
+        }
+
+        if (elf.file_header->strtab_ndx > 0) {
+            elf.strtab.ndx    = elf.file_header->strtab_ndx;
+            elf.strtab.sect   = &elf.sections[elf.strtab.ndx];
+            elf.strtab.offset = elf.strtab.sect->size;
+        }
+
+        for (u32 i = 1; i < elf.file_header->sect_hdr_count; ++i) {
+            const auto& hdr = elf.sections[i];
+            if (hdr.type == section::type::symtab) {
+                elf.symtab.ndx    = i;
+                elf.symtab.sect   = &elf.sections[i];
+                elf.symtab.offset = elf.symtab.sect->size;
+                break;
+            }
+        }
+
+        return status_t::ok;
+    }
+
+    status_t write(elf_t& elf, file_t& file) {
+        using machine_type_t = binfmt::machine::type_t;
+        using section_type_t = binfmt::section::type_t;
+
+        auto buf = FILE_PTR();
+        const auto& opts = *elf.opts;
+        auto fh     = elf.file_header;
+        auto module = file.module;
+        auto msc    = &module->subclass.object;
 
         fh->magic[0]                       = 0x7f;
         fh->magic[1]                       = 'E';
@@ -431,21 +476,6 @@ namespace basecode::binfmt::io::elf {
             elf.symtab.sect->size        = opts.num_symbols * symtab::entity_size;
         }
 
-        return status_t::ok;
-    }
-
-    status_t read(elf_t& elf, file_t& file) {
-        return status_t::ok;
-    }
-
-    status_t write(elf_t& elf, file_t& file) {
-        using machine_type_t = binfmt::machine::type_t;
-        using section_type_t = binfmt::section::type_t;
-
-        auto fh = elf.file_header;
-        auto module = file.module;
-        auto msc = &module->subclass.object;
-
         switch (file.file_type) {
             case file_type_t::obj:
                 fh->type = file::type::rel;
@@ -492,7 +522,7 @@ namespace basecode::binfmt::io::elf {
             hdr.offset     = data_offset;
             hdr.addr_align = 8;
             hdr.name_offset = strtab::add(elf, elf.opts->strs[strs_idx++]);
-            u8* data = (u8*) (((u8*) elf.file_header) + hdr.offset);
+            u8* data = buf + hdr.offset;
             switch (section.type) {
                 case section_type_t::data:
                 case section_type_t::custom: {
@@ -550,7 +580,7 @@ namespace basecode::binfmt::io::elf {
         if (elf.symtab.sect) {
             elf.symtab.sect->offset      = data_offset;
             elf.symtab.sect->name_offset = strtab::add(elf, elf.opts->strs[strs_idx++]);
-            auto data = (sym_t*) (((u8*) elf.file_header) + elf.symtab.sect->offset);
+            auto data = (sym_t*) (buf + elf.symtab.sect->offset);
             for (u32 i = 0; i < elf.opts->num_symbols - 1; ++i) {
                 const auto symbol = elf.opts->syms[i];
                 auto& sym = data[i + 1];

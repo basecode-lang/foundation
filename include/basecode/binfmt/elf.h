@@ -179,10 +179,12 @@ namespace basecode::binfmt::io::elf {
         sect_header_t*          sections;
         struct {
             sect_header_t*      sect;
+            u32                 ndx;
             u32                 offset;
         }                       strtab;
         struct {
             sect_header_t*      sect;
+            u32                 ndx;
             u32                 offset;
         }                       symtab;
     };

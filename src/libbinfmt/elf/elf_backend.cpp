@@ -63,12 +63,8 @@ namespace basecode::binfmt::io::elf {
 
             s8 flag_chars[14];
 
-            u32 symtab_sect_no{};
-
             for (u32 i = 0; i < elf.file_header->sect_hdr_count; ++i) {
                 const auto& hdr = elf.sections[i];
-                if (hdr.type == elf::section::type::symtab)
-                    symtab_sect_no = i;
                 std::memcpy(name, strtab::get(elf, hdr.name_offset), 16);
                 elf::section::flags::chars(hdr.flags, flag_chars);
 
@@ -87,13 +83,12 @@ namespace basecode::binfmt::io::elf {
                               hdr.addr_align);
             }
 
-            const auto& symtab = elf.sections[symtab_sect_no];
-            const auto symtab_size = symtab.size / symtab.entity_size;
+            const auto symtab_size = elf.symtab.sect->size / elf.symtab.sect->entity_size;
 
             format::print("\nSymbol table '{}' contains {} entries:\n", ".symtab", symtab_size);
             format::print("  Num:     Value         Size Type     Bind   Vis       Ndx Name\n");
             for (u32 i = 0; i < symtab_size; ++i) {
-                auto sym = elf::symtab::get(elf, symtab_sect_no, i);
+                auto sym = elf::symtab::get(elf, elf.symtab.ndx, i);
                 std::memcpy(name, elf::strtab::get(elf, sym->name_offset), 16);
                 format::print("{:>5}: {:016x} {:>5} NOTYPE   LOCAL   DEFAULT  {} {}\n",
                               i,
