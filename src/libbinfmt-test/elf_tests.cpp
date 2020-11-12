@@ -20,7 +20,6 @@
 #include <basecode/binfmt/io.h>
 #include <basecode/core/defer.h>
 #include <basecode/binfmt/binfmt.h>
-#include <basecode/core/stopwatch.h>
 #include "test.h"
 
 using namespace basecode;
@@ -76,10 +75,12 @@ TEST_CASE("basecode::binfmt ELF read obj file") {
 
     io::session_t s{};
     io::session::init(s);
-    defer(io::session::free(s));
 
     auto backend_obj_path = R"(C:\temp\test\elf\backend.cpp.o)"_path;
-    defer(path::free(backend_obj_path));
+    defer(
+        path::free(backend_obj_path);
+        io::session::free(s);
+        );
 
     auto backend_obj = io::session::add_file(s,
                                              backend_obj_path,
@@ -91,9 +92,6 @@ TEST_CASE("basecode::binfmt ELF read obj file") {
 
 TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
     using namespace binfmt;
-
-    stopwatch_t timer{};
-    stopwatch::start(timer);
 
     module_t mod{};
     REQUIRE(OK(module::init(mod, module_type_t::object, 20)));
@@ -183,10 +181,12 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
 
     io::session_t s{};
     io::session::init(s);
-    defer(io::session::free(s));
 
     auto rot13_exe_path = "rot13_elf.exe"_path;
-    defer(path::free(rot13_exe_path));
+    defer(
+        io::session::free(s);
+        path::free(rot13_exe_path);
+        );
     auto rot13_exe_file = io::session::add_file(s,
                                                 &mod,
                                                 rot13_exe_path,
@@ -200,7 +200,4 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
     rot13_exe_file->flags.console = true;
 
     REQUIRE(OK(io::write(s)));
-
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("binfmt write ELF executable time"_ss, 40, timer);
 }

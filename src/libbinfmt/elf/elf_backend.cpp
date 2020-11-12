@@ -99,7 +99,7 @@ namespace basecode::binfmt::io::elf {
                               i,
                               sym->value,
                               sym->size,
-                              sym->index,
+                              sym->section_ndx,
                               name);
             }
         }
@@ -138,7 +138,7 @@ namespace basecode::binfmt::io::elf {
                 return status;
 
             stopwatch::stop(timer);
-            stopwatch::print_elapsed("binfmt read ELF obj time"_ss, 40, timer);
+            stopwatch::print_elapsed("binfmt ELF read time"_ss, 40, timer);
 
             format_elf(elf);
 
@@ -148,75 +148,17 @@ namespace basecode::binfmt::io::elf {
         static status_t write(file_t& file) {
             using section_type_t = binfmt::section::type_t;
 
+            stopwatch_t timer{};
+            stopwatch::start(timer);
+
             status_t status{};
-
             auto msc = &file.module->subclass.object;
-
-            u32 symtab_size{};
-            u32 data_size{};
-            u32 strtab_size  = 1;
-            u32 num_sections = msc->sections.size;
-            ++num_sections;                                 // N.B. include ELF null section
-            ++num_sections;                                 // N.B. ELF always needs a .strtab
-            if (file.module->symbols.size > 0) {
-                symtab_size = (file.module->symbols.size + 1) * (symtab::entity_size);   // N.B. include ELF null symbol
-                ++num_sections;
-                basecode::hashtab::for_each_pair(file.module->symbols,
-                                                 [](const auto idx, const auto& key, auto& symbol, auto* user) -> u32 {
-                                                     auto& size = *(u32*) user;
-                                                     auto intern_rc = string::interned::get(key);
-                                                     if (!OK(intern_rc.status))
-                                                         return u32(intern_rc.status);
-                                                     size += intern_rc.slice.length + 1;
-                                                     return 0;
-                                                 },
-                                                 &strtab_size);
-                str::slice_t name{};
-                for (const auto& section : msc->sections) {
-                    status = elf::get_section_name(file.module, &section, name);
-                    if (!OK(status))
-                        return status;
-                    strtab_size += name.length + 1;
-                    switch (section.type) {
-                        case section_type_t::data:
-                        case section_type_t::custom:
-                            if (section.flags.init)
-                                data_size += section.subclass.data.length;
-                            break;
-                        case section_type_t::code:
-                            data_size += section.subclass.data.length;
-                            break;
-                        case section_type_t::reloc:
-                            data_size += section.subclass.relocs.size * relocs::entity_size;
-                            break;
-                        case section_type_t::group:
-                            data_size += (section.subclass.groups.size + 1) * group::entity_size;
-                            break;
-                        default:
-                            break;
-                    }
-                }
-            }
-
-            usize file_size = elf::file::header_size
-                + (num_sections * section::header_size)
-                + symtab_size
-                + strtab_size
-                + data_size;
-
-            if (!OK(buf::map_new(file.buf, file.path, file_size)))
-                return status_t::read_error;
-            defer(buf::unmap(file.buf));
 
             opts_t opts{};
             opts.file         = &file;
             opts.alloc        = g_elf_sys.alloc;
-            opts.flags        = {};
-            opts.num_segments = {};
-            opts.num_sections = num_sections;
             opts.entry_point  = file.opts.base_addr;
-            opts.strtab_size  = strtab_size;
-            opts.symtab_size  = symtab_size;
+            opts.num_sections = msc->sections.size + 2;
 
             // XXX: these need to come in on the file!
             opts.clazz       = elf::class_64;
@@ -225,12 +167,93 @@ namespace basecode::binfmt::io::elf {
             opts.abi_version = 0;
             opts.version     = elf::version_current;
 
+            u32 data_size   {};
+
+            if (file.module->symbols.size > 0) {
+                ++opts.num_sections;
+                opts.num_symbols = file.module->symbols.size + 1;
+                const auto syms_size = sizeof(u64) * opts.num_symbols;
+                opts.syms = (symbol_t**) memory::alloc(g_elf_sys.alloc,
+                                                       syms_size,
+                                                       alignof(symbol_t*));
+            }
+
+            const auto strs_size = sizeof(str::slice_t) * (opts.num_sections + opts.num_symbols);
+            opts.strs = (str::slice_t*) memory::alloc(g_elf_sys.alloc,
+                                                      strs_size,
+                                                      alignof(str::slice_t));
+            opts.strs[opts.strtab_idx++] = {};
+            opts.strs[opts.strtab_idx++] = ".strtab"_ss;
+
+            for (const auto& section : msc->sections) {
+                status = elf::get_section_name(file.module, &section, opts.strs[opts.strtab_idx++]);
+                if (!OK(status))
+                    return status;
+                switch (section.type) {
+                    case section_type_t::data:
+                    case section_type_t::custom:
+                        if (section.flags.init)
+                            data_size = align(data_size + section.subclass.data.length, 8);
+                        break;
+                    case section_type_t::code:
+                        data_size = align(data_size + section.subclass.data.length, 8);
+                        break;
+                    case section_type_t::reloc:
+                        data_size = align(data_size + (section.subclass.relocs.size * relocs::entity_size), 8);
+                        break;
+                    case section_type_t::group:
+                        data_size = align(data_size + ((section.subclass.groups.size + 1) * group::entity_size), 8);
+                        break;
+                    default:
+                        break;
+                }
+            }
+
+            opts.strs[opts.strtab_idx++] = ".symtab"_ss;
+
+            if (file.module->symbols.size > 0) {
+                basecode::hashtab::for_each_pair(
+                    file.module->symbols,
+                    [](const auto idx, const auto& key, auto& symbol, auto* user) -> u32 {
+                        auto& opts = *(opts_t*) user;
+                        auto intern_rc = string::interned::get(key);
+                        if (!OK(intern_rc.status))
+                            return u32(intern_rc.status);
+                        opts.syms[idx] = &symbol;
+                        opts.strs[opts.strtab_idx++] = intern_rc.slice;
+                        return 0;
+                    },
+                    &opts);
+            }
+
+            opts.strtab_size = 0;
+            for (u32 i = 0; i < opts.strtab_idx; ++i)
+                opts.strtab_size += opts.strs[i].length + 1;
+
+            usize file_size = elf::file::header_size
+                + (opts.num_sections * section::header_size)
+                + (opts.num_symbols * symtab::entity_size)
+                + opts.strtab_size
+                + data_size
+                + 16;
+
+            if (!OK(buf::map_new(file.buf, file.path, file_size)))
+                return status_t::read_error;
+
             elf_t elf{};
+            defer(
+                elf::free(elf);
+                buf::unmap(file.buf);
+                memory::free(g_elf_sys.alloc, opts.strs);
+                if (opts.syms)
+                    memory::free(g_elf_sys.alloc, opts.syms);
+                stopwatch::stop(timer);
+                stopwatch::print_elapsed("binfmt ELF write time"_ss, 40, timer);
+                );
+
             status = elf::init(elf, opts);
             if (!OK(status))
                 return status;
-            defer(elf::free(elf));
-
             status = elf::write(elf, file);
             if (!OK(status))
                 return status;

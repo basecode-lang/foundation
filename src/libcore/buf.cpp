@@ -165,31 +165,6 @@ namespace basecode::buf {
         return status_t::ok;
     }
 
-    status_t unmap(buf_t& buf) {
-        if (buf.mode != buf_mode_t::mapped)
-            return status_t::cannot_unmap_buf;
-
-        s32 rc{};
-        if (buf.file && buf.data) {
-            rc = msync(buf.data, buf.length, MS_SYNC);
-            if (rc == 0) {
-#ifdef _MSC_VER
-                auto h = (HANDLE) _get_osfhandle(buf.file);
-                FlushFileBuffers(h);
-#endif
-                rc = munmap(buf.data, buf.length);
-            }
-            close(buf.file);
-            buf.data   = {};
-            buf.file   = 0;
-            buf.length = {};
-            buf.mode   = buf_mode_t::none;
-            path::reset(buf.path);
-        }
-
-        return rc == 0 ? status_t::ok : status_t::munmap_error;
-    }
-
     u0 init(buf_t& buf, alloc_t* alloc) {
         buf.data   = {};
         buf.file   = {};
@@ -199,6 +174,28 @@ namespace basecode::buf {
         path::init(buf.path, buf.alloc);
         array::init(buf.lines, buf.alloc);
         array::init(buf.tokens, buf.alloc);
+    }
+
+    status_t unmap(buf_t& buf, b8 sync) {
+        if (buf.mode != buf_mode_t::mapped)
+            return status_t::cannot_unmap_buf;
+
+        s32 rc{};
+        if (buf.file && buf.data) {
+            if (sync) {
+                rc = msync(buf.data, buf.length, MS_SYNC);
+            }
+            if (rc == 0)
+                rc = munmap(buf.data, buf.length);
+            close(buf.file);
+            buf.data   = {};
+            buf.file   = 0;
+            buf.length = {};
+            buf.mode   = buf_mode_t::none;
+            path::reset(buf.path);
+        }
+
+        return rc == 0 ? status_t::ok : status_t::munmap_error;
     }
 
     str::slice_t line(buf_t& buf, u32 idx) {
@@ -308,13 +305,15 @@ namespace basecode::buf {
         buf.file = open(path::c_str(path), flags, mode);
         if (buf.file == -1)
             return status_t::unable_to_open_file;
-//#ifdef _WIN32
-//        if (_chsize(buf.file, size) != 0)
-//            return status_t::unable_to_truncate_file;
-//#else
-//        if (ftruncate(buf.file, size) != 0)
-//            return status_t::unable_to_truncate_file;
-//#endif
+
+#ifdef _WIN32
+        if (_chsize(buf.file, size) != 0)
+            return status_t::unable_to_truncate_file;
+#else
+        if (ftruncate(buf.file, size) != 0)
+            return status_t::unable_to_truncate_file;
+#endif
+
         auto map = mmap(nullptr,
                         size,
                         PROT_READ | PROT_WRITE,

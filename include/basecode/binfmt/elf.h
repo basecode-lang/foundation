@@ -115,7 +115,7 @@ namespace basecode::binfmt::io::elf {
         u32                     name_offset;
         u8                      info;
         u8                      other;
-        u16                     index;
+        u16                     section_ndx;
         u64                     value;
         u64                     size;
     };
@@ -147,12 +147,20 @@ namespace basecode::binfmt::io::elf {
         u64                     value;
     };
 
+    struct group_t final {
+        u32                     flags;
+        u32                     sect_hdr_indexes[0];
+    };
+
     struct opts_t final {
         alloc_t*                alloc;
         file_t*                 file;
+        symbol_t**              syms;
+        str::slice_t*           strs;
         u64                     entry_point;
+        u32                     strtab_idx;
         u32                     strtab_size;
-        u32                     symtab_size;
+        u32                     num_symbols;
         u32                     num_segments;
         u32                     num_sections;
         u32                     flags;
@@ -163,18 +171,20 @@ namespace basecode::binfmt::io::elf {
         u8                      abi_version;
     };
 
-    struct group_t final {
-        u32                     flags;
-        u32                     sect_hdr_indexes[0];
-    };
-
     struct elf_t final {
         alloc_t*                alloc;
+        const opts_t*           opts;
         file_header_t*          file_header;
         pgm_header_t*           segments;
         sect_header_t*          sections;
-        sect_header_t*          strtab;
-        sect_header_t*          symtab;
+        struct {
+            sect_header_t*      sect;
+            u32                 offset;
+        }                       strtab;
+        struct {
+            sect_header_t*      sect;
+            u32                 offset;
+        }                       symtab;
     };
 
     [[maybe_unused]] constexpr u32 class_64         = 2;
@@ -564,6 +574,8 @@ namespace basecode::binfmt::io::elf {
     }
 
     namespace strtab {
+        u32 add(elf_t& elf, str::slice_t str);
+
         const s8* get(const elf_t& elf, u32 offset);
     }
 

@@ -149,11 +149,11 @@ namespace basecode {
 
         status_t reset(buf_t& buf);
 
-        status_t unmap(buf_t& buf);
-
         str::slice_t line(buf_t& buf, u32 idx);
 
         u0 reserve(buf_t& buf, u32 new_capacity);
+
+        status_t unmap(buf_t& buf, b8 sync = false);
 
         status_t load(buf_t& buf, const path_t& path);
 

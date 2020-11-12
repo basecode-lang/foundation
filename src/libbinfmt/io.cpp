@@ -87,11 +87,6 @@ namespace basecode::binfmt::io {
             auto status = s_systems[idx]->write(file);
             if (!OK(status))
                 return status;
-            if (file.flags.save) {
-                status = file::save(file);
-                if (!OK(status))
-                    return status;
-            }
         }
         return status_t::ok;
     }
@@ -163,15 +158,13 @@ namespace basecode::binfmt::io {
                          const path_t& path,
                          machine::type_t machine,
                          type_t bin_type,
-                         file_type_t output_type,
-                         b8 save_to_disk) {
+                         file_type_t output_type) {
             return add_file(s,
                             module,
                             path::c_str(path),
                             machine,
                             bin_type,
                             output_type,
-                            save_to_disk,
                             path.str.length);
         }
 
@@ -208,7 +201,6 @@ namespace basecode::binfmt::io {
                          machine::type_t machine,
                          type_t bin_type,
                          file_type_t output_type,
-                         b8 save_to_disk,
                          s32 path_len) {
             auto file = &array::append(s.files);
             file::init(*file, s.alloc);
@@ -218,7 +210,6 @@ namespace basecode::binfmt::io {
             file->machine    = machine;
             file->bin_type   = bin_type;
             file->file_type  = output_type;
-            file->flags.save = save_to_disk;
             return file;
         }
 

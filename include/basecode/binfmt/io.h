@@ -98,7 +98,6 @@ namespace basecode::binfmt::io {
         machine::type_t         machine;
         struct {
             u32                 gui:        1;
-            u32                 save:       1;
             u32                 console:    1;
             u32                 pad:        30;
         }                       flags;
@@ -163,7 +162,6 @@ namespace basecode::binfmt::io {
                          machine::type_t machine,
                          type_t bin_type,
                          file_type_t output_type,
-                         b8 save_to_disk = true,
                          s32 path_len = -1);
 
         file_t* add_file(session_t& s,
@@ -171,8 +169,7 @@ namespace basecode::binfmt::io {
                          const path_t& path,
                          machine::type_t machine,
                          type_t bin_type,
-                         file_type_t output_type,
-                         b8 save_to_disk = true);
+                         file_type_t output_type);
 
         file_t* add_file(session_t& s,
                         const String_Concept auto& path,
@@ -186,16 +183,14 @@ namespace basecode::binfmt::io {
                          const String_Concept auto& path,
                          machine::type_t machine,
                          type_t bin_type,
-                         file_type_t output_type,
-                         b8 save_to_disk = true) {
+                         file_type_t output_type) {
             return add_file(s,
                             module,
                             (const s8*) path.data,
                             machine,
                             bin_type,
                             output_type,
-                            path.length,
-                            save_to_disk);
+                            path.length);
         }
 
         status_t init(session_t& s, alloc_t* alloc = context::top()->alloc);

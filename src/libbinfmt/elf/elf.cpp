@@ -203,6 +203,18 @@ namespace basecode::binfmt::io::elf {
     }
 
     namespace strtab {
+        u32 add(elf_t& elf, str::slice_t str) {
+            const auto offset = elf.strtab.offset;
+            if (str.length == 0) {
+                ++elf.strtab.offset;
+            } else {
+                s8* data = ((s8*) elf.file_header) + elf.strtab.sect->offset + offset;
+                std::memcpy(data, str.data, str.length + 1);
+                elf.strtab.offset += str.length + 1;
+            }
+            return offset;
+        }
+
         const s8* get(const elf_t& elf, u32 offset) {
             if (elf.file_header->strtab_ndx == 0)
                 return nullptr;
@@ -368,6 +380,7 @@ namespace basecode::binfmt::io::elf {
         auto buf = FILE_PTR();
         auto fh = (file_header_t*) (buf);
         elf.alloc       = opts.alloc;
+        elf.opts        = &opts;
         elf.file_header = fh;
 
         fh->magic[0]                       = 0x7f;
@@ -380,6 +393,7 @@ namespace basecode::binfmt::io::elf {
         fh->magic[file::magic_os_abi]      = opts.os_abi;
         fh->magic[file::magic_abi_version] = opts.abi_version;
         fh->flags          = opts.flags;
+        fh->version        = 1;
         fh->header_size    = file::header_size;
         fh->entry_point    = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
         if (opts.num_segments > 0) {
@@ -395,24 +409,26 @@ namespace basecode::binfmt::io::elf {
                 std::max<u64>(fh->pgm_hdr_offset + (fh->pgm_hdr_count * fh->pgm_hdr_size), fh->header_size);
             elf.sections = (sect_header_t*) (buf + elf.file_header->sect_hdr_offset);
         }
-        if (opts.strtab_size > 0) {
-            fh->strtab_ndx         = 1;
-            elf.strtab             = &elf.sections[1];
-            elf.strtab->flags      = {};
-            elf.strtab->addr       = {};
-            elf.strtab->addr_align = 1;
-            elf.strtab->size       = opts.strtab_size;
-            elf.strtab->type       = section::type::strtab;
+        if (opts.strtab_size > 1) {
+            fh->strtab_ndx              = 1;
+            elf.strtab.offset           = 0;
+            elf.strtab.sect             = &elf.sections[1];
+            elf.strtab.sect->flags      = {};
+            elf.strtab.sect->addr       = {};
+            elf.strtab.sect->addr_align = 1;
+            elf.strtab.sect->size       = opts.strtab_size;
+            elf.strtab.sect->type       = section::type::strtab;
         }
-        if (opts.symtab_size > 0) {
-            elf.symtab              = &elf.sections[fh->sect_hdr_count - 1];
-            elf.symtab->link        = fh->strtab_ndx;
-            elf.symtab->info        = 0;
-            elf.symtab->size        = opts.symtab_size;
-            elf.symtab->type        = section::type::strtab;
-            elf.symtab->addr        = {};
-            elf.symtab->addr_align  = 8;
-            elf.symtab->entity_size = symtab::entity_size;
+        if (opts.num_symbols > 0) {
+            elf.symtab.offset            = 0;
+            elf.symtab.sect              = &elf.sections[fh->sect_hdr_count - 1];
+            elf.symtab.sect->link        = fh->strtab_ndx;
+            elf.symtab.sect->info        = 1;   // first global index!
+            elf.symtab.sect->addr        = {};
+            elf.symtab.sect->addr_align  = 8;
+            elf.symtab.sect->entity_size = symtab::entity_size;
+            elf.symtab.sect->type        = section::type::symtab;
+            elf.symtab.sect->size        = opts.num_symbols * symtab::entity_size;
         }
 
         return status_t::ok;
@@ -455,23 +471,28 @@ namespace basecode::binfmt::io::elf {
                 break;
         }
 
-        u64 virt_addr       {fh->entry_point};
-        u64 data_offset     {fh->sect_hdr_offset + (fh->sect_hdr_size * fh->sect_hdr_count)};
-        u32 sect_idx        {1};
+        u64 virt_addr   {fh->entry_point};
+        u64 data_offset {fh->sect_hdr_offset + (fh->sect_hdr_size * fh->sect_hdr_count)};
+        u32 sect_idx    {1};
+        u32 strs_idx    {2};
 
-        if (elf.strtab) {
-            elf.strtab->offset = data_offset;
+        if (elf.strtab.sect) {
+            elf.strtab.sect->offset = data_offset;
             ++sect_idx;
-            data_offset += elf.strtab->size;
+            data_offset = align(data_offset + elf.strtab.sect->size, 8);
+            strtab::add(elf, elf.opts->strs[0]);
+            elf.strtab.sect->name_offset = strtab::add(elf, elf.opts->strs[1]);
         }
 
         const u32 start_sect_idx  {sect_idx};
 
         for (const auto& section : msc->sections) {
-            auto& hdr = elf.sections[sect_idx];
+            auto& hdr = elf.sections[sect_idx++];
             hdr.addr       = virt_addr;
             hdr.offset     = data_offset;
             hdr.addr_align = 8;
+            hdr.name_offset = strtab::add(elf, elf.opts->strs[strs_idx++]);
+            u8* data = (u8*) (((u8*) elf.file_header) + hdr.offset);
             switch (section.type) {
                 case section_type_t::data:
                 case section_type_t::custom: {
@@ -482,7 +503,8 @@ namespace basecode::binfmt::io::elf {
                     } else {
                         hdr.type = section::type::progbits;
                         hdr.size = section.subclass.data.length;
-                        data_offset += hdr.size;
+                        std::memcpy(data, section.subclass.data.data, hdr.size);
+                        data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     }
                     if (section.flags.write)
                         hdr.flags |= section::flags::write;
@@ -495,8 +517,9 @@ namespace basecode::binfmt::io::elf {
                     hdr.flags |= section::flags::alloc | section::flags::exec_instr;
                     if (section.flags.write)
                         hdr.flags |= section::flags::write;
-                    data_offset += hdr.size;
-                    virt_addr = align(virt_addr + hdr.size, hdr.addr_align);
+                    std::memcpy(data, section.subclass.data.data, hdr.size);
+                    virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
+                    data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
                 }
                 case section_type_t::reloc: {
@@ -507,7 +530,7 @@ namespace basecode::binfmt::io::elf {
                         hdr.flags |= section::flags::group;
                     hdr.link = fh->sect_hdr_count - 1;
                     hdr.info = section.link + start_sect_idx;
-                    data_offset += hdr.size;
+                    data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
                 }
                 case section_type_t::group: {
@@ -516,11 +539,75 @@ namespace basecode::binfmt::io::elf {
                     hdr.link        = fh->sect_hdr_count - 1;
                     hdr.info        = section.link + start_sect_idx;
                     hdr.entity_size = group::entity_size;
-                    data_offset += hdr.size;
+                    data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
                 }
                 default:
                     break;
+            }
+        }
+
+        if (elf.symtab.sect) {
+            elf.symtab.sect->offset      = data_offset;
+            elf.symtab.sect->name_offset = strtab::add(elf, elf.opts->strs[strs_idx++]);
+            auto data = (sym_t*) (((u8*) elf.file_header) + elf.symtab.sect->offset);
+            for (u32 i = 0; i < elf.opts->num_symbols - 1; ++i) {
+                const auto symbol = elf.opts->syms[i];
+                auto& sym = data[i + 1];
+
+                u32 scope{};
+                u32 type{};
+                u32 vis{};
+
+                switch (symbol->type) {
+                    case symbol::type_t::none:
+                        type = elf::symtab::type::notype;
+                        break;
+                    case symbol::type_t::file:
+                        type = elf::symtab::type::file;
+                        break;
+                    case symbol::type_t::object:
+                        type = elf::symtab::type::object;
+                        break;
+                    case symbol::type_t::function:
+                        type = elf::symtab::type::func;
+                        break;
+                }
+
+                switch (symbol->scope) {
+                    case symbol::scope_t::none:
+                    case symbol::scope_t::local:
+                        scope = elf::symtab::scope::local;
+                        break;
+                    case symbol::scope_t::global:
+                        scope = elf::symtab::scope::global;
+                        break;
+                    case symbol::scope_t::weak:
+                        scope = elf::symtab::scope::weak;
+                        break;
+                }
+
+                switch (symbol->visibility) {
+                    case symbol::visibility_t::default_:
+                        vis = elf::symtab::visibility::default_;
+                        break;
+                    case symbol::visibility_t::internal_:
+                        vis = elf::symtab::visibility::internal;
+                        break;
+                    case symbol::visibility_t::hidden:
+                        vis = elf::symtab::visibility::hidden;
+                        break;
+                    case symbol::visibility_t::protected_:
+                        vis = elf::symtab::visibility::protected_;
+                        break;
+                }
+
+                sym.name_offset = strtab::add(elf, elf.opts->strs[strs_idx++]);
+                sym.size        = symbol->size;
+                sym.value       = symbol->value;
+                sym.info        = ELF64_ST_INFO(scope, type);
+                sym.other       = ELF64_ST_VISIBILITY(vis);
+                sym.section_ndx = symbol->section + 1;
             }
         }
 
