@@ -281,30 +281,24 @@ namespace basecode::binfmt::io::coff {
 
             name_map::init(g_coff_sys.section_names, g_coff_sys.alloc);
 
-            name_map::add(g_coff_sys.section_names,
-                          type_t::tls,
-                          {
-                              .code = false,
-                              .data = true,
-                              .init = true,
-                              .read = true,
-                              .exec = false,
-                              .write = true,
-                              .alloc = false,
-                              .can_free = false
-                          },
-                          ".tls"_ss);
+//            name_map::add(g_coff_sys.section_names,
+//                          type_t::tls,
+//                          {
+//                              .code = false,
+//                              .init = true,
+//                              .exec = false,
+//                              .write = true,
+//                              .alloc = true,
+//                          },
+//                          ".tls"_ss);
 
             name_map::add(g_coff_sys.section_names,
                           type_t::code,
                           {
                               .code = true,
-                              .data = false,
-                              .read = true,
                               .exec = true,
                               .write = false,
-                              .alloc = false,
-                              .can_free = false
+                              .alloc = true,
                           },
                           ".text"_ss);
 
@@ -312,13 +306,10 @@ namespace basecode::binfmt::io::coff {
                           type_t::data,
                           {
                               .code = false,
-                              .data = true,
                               .init = true,
-                              .read = true,
                               .exec = false,
                               .write = true,
-                              .alloc = false,
-                              .can_free = false
+                              .alloc = true,
                           },
                           ".data"_ss);
 
@@ -326,13 +317,10 @@ namespace basecode::binfmt::io::coff {
                           type_t::data,
                           {
                               .code = false,
-                              .data = true,
                               .init = true,
-                              .read = true,
                               .exec = false,
                               .write = false,
-                              .alloc = false,
-                              .can_free = false
+                              .alloc = true,
                           },
                           ".rdata"_ss);
 
@@ -340,13 +328,10 @@ namespace basecode::binfmt::io::coff {
                           type_t::debug,
                           {
                               .code = false,
-                              .data = true,
                               .init = true,
-                              .read = true,
                               .exec = false,
                               .write = false,
-                              .alloc = false,
-                              .can_free = true
+                              .alloc = true,
                           },
                           ".debug"_ss);
 
@@ -354,13 +339,10 @@ namespace basecode::binfmt::io::coff {
                           type_t::data,
                           {
                               .code = false,
-                              .data = true,
                               .init = false,
-                              .read = true,
                               .exec = false,
                               .write = true,
-                              .alloc = false,
-                              .can_free = false
+                              .alloc = true,
                           },
                           ".bss"_ss);
 
@@ -368,13 +350,10 @@ namespace basecode::binfmt::io::coff {
                           type_t::import,
                           {
                               .code = false,
-                              .data = true,
                               .init = true,
-                              .read = true,
                               .exec = false,
                               .write = true,
-                              .alloc = false,
-                              .can_free = false
+                              .alloc = true,
                           },
                           ".idata"_ss);
 
@@ -382,41 +361,32 @@ namespace basecode::binfmt::io::coff {
                           type_t::export_,
                           {
                               .code = false,
-                              .data = true,
                               .init = true,
-                              .read = true,
                               .exec = false,
                               .write = false,
-                              .alloc = false,
-                              .can_free = false
+                              .alloc = true,
                           },
                           ".edata"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          type_t::resource,
+                          type_t::rsrc,
                           {
                               .code = false,
-                              .data = true,
                               .init = true,
-                              .read = true,
                               .exec = false,
                               .write = false,
-                              .alloc = false,
-                              .can_free = false
+                              .alloc = true,
                           },
                           ".rsrc"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          type_t::exception,
+                          type_t::unwind,
                           {
                               .code = false,
-                              .data = true,
                               .init = true,
-                              .read = true,
                               .exec = false,
                               .write = false,
-                              .alloc = false,
-                              .can_free = false
+                              .alloc = true,
                           },
                           ".pdata"_ss);
 

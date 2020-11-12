@@ -332,14 +332,15 @@ namespace basecode::binfmt::io::coff {
         const auto section = hdr.section;
         const auto& flags = section->flags;
 
-        if (flags.data) {
+        if (!flags.code) {
             if (flags.init)
                 hdr.flags |= section::data_init;
             else
                 hdr.flags |= section::data_uninit;
+        } else {
+            hdr.flags |= section::content_code;
         }
-        if (flags.code)     hdr.flags |= section::content_code;
-        if (flags.read)     hdr.flags |= section::memory_read;
+        if (flags.alloc)    hdr.flags |= section::memory_read;
         if (flags.write)    hdr.flags |= section::memory_write;
         if (flags.exec)     hdr.flags |= section::memory_execute;
 
@@ -749,49 +750,44 @@ namespace basecode::binfmt::io::coff {
             }
         }
 
-        hashtab::for_each_pair(
-            module->symbols,
-            [](const auto idx, const auto& key, auto& symbol, auto* user) -> u32 {
-                auto& coff = *((coff_t*) user);
-                const auto intern_rc = string::interned::get(symbol.name);
-                if (!OK(intern_rc.status))
-                    return u32(status_t::symbol_not_found);
-                auto sym = coff::symtab::make_symbol(coff, intern_rc.slice);
-                auto sc = &sym->subclass.sym;
-                sc->value   = symbol.value;
-                sc->section = symbol.section;
-                switch (symbol.type) {
-                    case symbol::type_t::none:
-                    case symbol::type_t::object:
-                        sc->type = 0;
+        for (const auto& symbol : module->symbols) {
+            const auto intern_rc = string::interned::get(symbol.name);
+            if (!OK(intern_rc.status))
+                return status_t::symbol_not_found;
+            auto sym = coff::symtab::make_symbol(coff, intern_rc.slice);
+            auto sc = &sym->subclass.sym;
+            sc->value   = symbol.value;
+            sc->section = symbol.section;
+            switch (symbol.type) {
+                case symbol::type_t::none:
+                case symbol::type_t::object:
+                    sc->type = 0;
+                    break;
+                case symbol::type_t::file:
+                    sc->type   = 0;
+                    sc->sclass = symtab::sclass::file;
+                    break;
+                case symbol::type_t::function:
+                    sc->type = symtab::type::function;
+                    break;
+            }
+            if (!sc->sclass) {
+                switch (symbol.scope) {
+                    case symbol::scope_t::none:
+                        sc->sclass = symtab::sclass::null_;
                         break;
-                    case symbol::type_t::file:
-                        sc->type   = 0;
-                        sc->sclass = symtab::sclass::file;
+                    case symbol::scope_t::local:
+                        sc->sclass = symtab::sclass::static_;
                         break;
-                    case symbol::type_t::function:
-                        sc->type = symtab::type::function;
+                    case symbol::scope_t::global:
+                        sc->sclass = symtab::sclass::external_;
+                        break;
+                    case symbol::scope_t::weak:
+                        sc->sclass = symtab::sclass::weak_external;
                         break;
                 }
-                if (!sc->sclass) {
-                    switch (symbol.scope) {
-                        case symbol::scope_t::none:
-                            sc->sclass = symtab::sclass::null_;
-                            break;
-                        case symbol::scope_t::local:
-                            sc->sclass = symtab::sclass::static_;
-                            break;
-                        case symbol::scope_t::global:
-                            sc->sclass = symtab::sclass::external_;
-                            break;
-                        case symbol::scope_t::weak:
-                            sc->sclass = symtab::sclass::weak_external;
-                            break;
-                    }
-                }
-                return 0;
-            },
-            &coff);
+            }
+        }
 
         return status;
     }
@@ -849,10 +845,13 @@ namespace basecode::binfmt::io::coff {
             case type_t::import:
             case type_t::export_:
                 return status_t::invalid_section_type;
-            case type_t::tls:
+            case type_t::rsrc:
+            case type_t::note:
+            case type_t::init:
+            case type_t::fini:
             case type_t::debug:
-            case type_t::resource:
-            case type_t::exception:
+            case type_t::unwind:
+            case type_t::pre_init:
                 return status_t::not_implemented;
         }
 
@@ -886,10 +885,9 @@ namespace basecode::binfmt::io::coff {
             case type_t::import:
             case type_t::export_:
                 return status_t::invalid_section_type;
-            case type_t::tls:
+            case type_t::rsrc:
             case type_t::debug:
-            case type_t::resource:
-            case type_t::exception:
+            case type_t::unwind:
                 return status_t::not_implemented;
             default:
                 break;

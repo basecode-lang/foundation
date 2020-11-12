@@ -48,7 +48,7 @@ namespace basecode::binfmt {
     using symbol_list_t         = array_t<symbol_t>;
     using member_list_t         = array_t<member_t>;
     using section_list_t        = array_t<section_t>;
-    using symbol_table_t        = hashtab_t<intern_id, symbol_t>;
+    using symbol_table_t        = hashtab_t<intern_id, symbol_id>;
     using section_ptr_list_t    = array_t<section_t*>;
     using symbol_offs_list_t    = array_t<symbol_offs_t>;
 
@@ -77,6 +77,7 @@ namespace basecode::binfmt {
         missing_linked_section          = 2020,
         custom_section_missing_symbol   = 2021,
         invalid_file_type               = 2022,
+        elf_unsupported_section         = 2023
     };
 
     enum class module_type_t : u8 {
@@ -144,31 +145,33 @@ namespace basecode::binfmt {
     }
 
     namespace section {
-        // XXX: ELF symbol table: SHT_HASH, SHT_SYMTAB, SHT_STRTAB
         enum class type_t : u8 {
-            tls,                    // XXX: win only?
-            code,                   // XXX: SHT_PROGBITS
-            data,                   // XXX: SHT_PROGBITS or SHT_NOBITS
-            debug,                  // XXX: SHT_PROGBITS
-            group,                  // XXX: SHT_GROUP
-            reloc,                  // XXX:
-            import,                 // XXX: SHT_DYNAMIC, SHT_DYNSYM
+            code,
+            data,
+            rsrc,
+            note,
+            init,
+            fini,
+            debug,
+            group,
+            reloc,
+            import,
+            unwind,
+            custom,
             export_,
-            resource,               // XXX: win only?
-            exception,              // XXX: win only?
-            custom
+            pre_init,
         };
 
         struct flags_t final {
             u32                 code:       1;
-            u32                 data:       1;
             u32                 init:       1;
-            u32                 read:       1;
             u32                 exec:       1;
             u32                 write:      1;
             u32                 alloc:      1;
             u32                 group:      1;
-            u32                 can_free:   1;
+            u32                 merge:      1;
+            u32                 exclude:    1;
+            u32                 tls:        1;
             u32                 pad:        23;
         };
     }
@@ -176,8 +179,10 @@ namespace basecode::binfmt {
     struct symbol_t final {
         u64                     size;
         u64                     value;
-        intern_id               name;
         section_id              section;
+        intern_id               name;
+        symbol_id               next;
+        symbol_id               id;
         symbol::type_t          type;
         symbol::scope_t         scope;
         symbol::visibility_t    visibility;
@@ -234,7 +239,7 @@ namespace basecode::binfmt {
     struct section_t final {
         alloc_t*                alloc;
         const module_t*         module;
-        symbol_list_t           symbols;
+//        symbol_list_t           symbols;
         section_subclass_t      subclass;
         symbol_id               symbol;
         section_id              id;
@@ -287,7 +292,8 @@ namespace basecode::binfmt {
 
     struct module_t final {
         alloc_t*                alloc;
-        symbol_table_t          symbols;
+        symbol_list_t           symbols;
+        symbol_table_t          symtab;
         module_subclass_t       subclass;
         module_id               id;
         module_type_t           type;

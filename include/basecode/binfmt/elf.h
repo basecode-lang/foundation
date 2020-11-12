@@ -19,7 +19,6 @@
 #pragma once
 
 #include <basecode/binfmt/io.h>
-#include <basecode/core/str_array.h>
 
 #define ELF64_R_SYM(i)              ((i) >> 32)
 #define ELF64_R_TYPE(i)             ((i) & 0xffffffff)
@@ -27,7 +26,7 @@
 #define ELF64_ST_BIND(val)          (((u8) (val)) >> 4)
 #define ELF64_ST_TYPE(val)          ((val) & 0xf)
 #define ELF64_ST_VISIBILITY(o)      ((o) & 0x03)
-#define ELF64_ST_INFO(bind, type)   (((bind) <<4 ) + ((type) & 0xf))
+#define ELF64_ST_INFO(bind, type)   (((bind) << 4) + ((type) & 0xf))
 
 // XXX:
 //  STT_GNU_IFUNC?

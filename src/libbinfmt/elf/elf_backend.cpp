@@ -207,18 +207,15 @@ namespace basecode::binfmt::io::elf {
             opts.strs[opts.strtab_idx++] = ".symtab"_ss;
 
             if (file.module->symbols.size > 0) {
-                basecode::hashtab::for_each_pair(
-                    file.module->symbols,
-                    [](const auto idx, const auto& key, auto& symbol, auto* user) -> u32 {
-                        auto& opts = *(opts_t*) user;
-                        auto intern_rc = string::interned::get(key);
-                        if (!OK(intern_rc.status))
-                            return u32(intern_rc.status);
-                        opts.syms[idx] = &symbol;
-                        opts.strs[opts.strtab_idx++] = intern_rc.slice;
-                        return 0;
-                    },
-                    &opts);
+                u32 idx{};
+                for (const auto& symbol : file.module->symbols) {
+                    auto intern_rc = string::interned::get(symbol.name);
+                    if (!OK(intern_rc.status))
+                        return status_t::symbol_not_found;
+                    opts.syms[idx] = (symbol_t*) &symbol;
+                    opts.strs[opts.strtab_idx++] = intern_rc.slice;
+                    ++idx;
+                }
             }
 
             opts.strtab_size = 0;
@@ -271,13 +268,10 @@ namespace basecode::binfmt::io::elf {
                           type_t::code,
                           {
                               .code = true,
-                              .data = false,
                               .init = true,
-                              .read = true,
                               .exec = true,
                               .write = false,
                               .alloc = true,
-                              .can_free = false
                           },
                           ".text"_ss);
 
@@ -285,13 +279,10 @@ namespace basecode::binfmt::io::elf {
                           type_t::data,
                           {
                               .code = false,
-                              .data = true,
                               .init = true,
-                              .read = true,
                               .exec = false,
                               .write = true,
                               .alloc = true,
-                              .can_free = false
                           },
                           ".data"_ss);
 
@@ -299,13 +290,10 @@ namespace basecode::binfmt::io::elf {
                           type_t::data,
                           {
                               .code = false,
-                              .data = true,
                               .init = true,
-                              .read = true,
                               .exec = false,
                               .write = false,
                               .alloc = true,
-                              .can_free = false
                           },
                           ".rodata"_ss);
 
@@ -313,13 +301,10 @@ namespace basecode::binfmt::io::elf {
                           type_t::data,
                           {
                               .code = false,
-                              .data = true,
                               .init = false,
-                              .read = true,
                               .exec = false,
                               .write = true,
                               .alloc = true,
-                              .can_free = false
                           },
                           ".bss"_ss);
 
@@ -327,13 +312,10 @@ namespace basecode::binfmt::io::elf {
                           type_t::reloc,
                           {
                               .code = false,
-                              .data = false,
-                              .init = false,
-                              .read = false,
+                              .init = true,
                               .exec = false,
                               .write = false,
                               .alloc = false,
-                              .can_free = false
                           },
                           ".rela"_ss);
 
@@ -341,13 +323,10 @@ namespace basecode::binfmt::io::elf {
                           type_t::group,
                           {
                               .code = false,
-                              .data = false,
-                              .init = false,
-                              .read = false,
+                              .init = true,
                               .exec = false,
                               .write = false,
                               .alloc = false,
-                              .can_free = false
                           },
                           ".group"_ss);
 

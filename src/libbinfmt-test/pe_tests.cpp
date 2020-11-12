@@ -91,8 +91,8 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                             {
                                               .flags = {
                                                   .code = true,
-                                                  .read = true,
-                                                  .exec = true
+                                                  .exec = true,
+                                                  .alloc = true,
                                               }
                                           });
         auto set_data_rc = section::data(*mod,
@@ -108,9 +108,9 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                              section::type_t::data,
                                              {
                                                .flags = {
-                                                   .data = true,
+                                                   .code = false,
                                                    .init = true,
-                                                   .read = true,
+                                                   .alloc = true,
                                                }
                                            });
         auto set_data_rc = section::data(*mod,
@@ -126,10 +126,10 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                              section::type_t::import,
                                              {
                                                 .flags = {
-                                                    .data = true,
+                                                    .code = false,
                                                     .init = true,
-                                                    .read = true,
                                                     .write = true,
+                                                    .alloc = true,
                                                 }
                                            });
         auto kernel32_sym_rc = module::make_symbol(*mod,
@@ -188,10 +188,10 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                            section::type_t::data,
                                            {
                                             .flags = {
-                                                .data   = true,
+                                                .code   = false,
                                                 .init   = false,
-                                                .read   = true,
                                                 .write  = true,
+                                                .alloc  = true,
                                             }
                                          });
         auto bss = module::get_section(*mod, bss_rc.id);

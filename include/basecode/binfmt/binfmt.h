@@ -30,6 +30,8 @@ namespace basecode::binfmt {
 
         status_t init(alloc_t* alloc = context::top()->alloc);
 
+        status_t make_module(module_type_t type, module_t** mod);
+
         status_t make_module(module_type_t type, module_id id, module_t** mod);
     }
 

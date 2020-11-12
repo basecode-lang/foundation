@@ -31,6 +31,7 @@ namespace basecode::binfmt {
         alloc_t*                alloc;
         module_list_t           modules;
         module_map_t            module_map;
+        module_id               id;
     };
 
     system_t                    g_binfmt_sys;
@@ -79,6 +80,10 @@ namespace basecode::binfmt {
             return hashtab::find(g_binfmt_sys.module_map, id);
         }
 
+        status_t make_module(module_type_t type, module_t** mod) {
+            return make_module(type, ++g_binfmt_sys.id, mod);
+        }
+
         status_t make_module(module_type_t type, module_id id, module_t** mod) {
             auto new_mod = &stable_array::append(g_binfmt_sys.modules);
             auto status = module::init(*new_mod, type, id);
@@ -119,14 +124,14 @@ namespace basecode::binfmt {
                 default:
                     break;
             }
-            array::free(section.symbols);
+//            array::free(section.symbols);
         }
 
         status_t init(section_t* section,
                       section::type_t type,
                       const section_opts_t& opts) {
             section->alloc = g_binfmt_sys.alloc;
-            array::init(section->symbols, section->alloc);
+//            array::init(section->symbols, section->alloc);
             section->type   = type;
             section->info   = opts.info;
             section->link   = opts.link;
@@ -216,7 +221,8 @@ namespace basecode::binfmt {
                     break;
                 }
             }
-            hashtab::free(module.symbols);
+            array::free(module.symbols);
+            hashtab::free(module.symtab);
         }
 
         status_t init(module_t& module, module_type_t type, module_id id) {
@@ -235,12 +241,13 @@ namespace basecode::binfmt {
                     array::init(sc.sections, module.alloc);
                     break;
             }
-            hashtab::init(module.symbols, module.alloc);
+            array::init(module.symbols, module.alloc);
+            hashtab::init(module.symtab, module.alloc);
             return status_t::ok;
         }
 
         symbol_t* get_symbol(const module_t& module, symbol_id id) {
-            return hashtab::find(const_cast<symbol_table_t&>(module.symbols), id);
+            return (symbol_t*) &module.symbols[id - 1];
         }
 
         section_t* get_section(const module_t& module, section_id id) {
@@ -252,7 +259,10 @@ namespace basecode::binfmt {
 
         symbol_t* find_symbol(const module_t& module, const s8* name, s32 len) {
             const auto rc = string::interned::fold_for_result(name, len);
-            return hashtab::find(const_cast<symbol_table_t&>(module.symbols), rc.id);
+            auto id = hashtab::find(module.symtab, rc.id);
+            if (!id)
+                return nullptr;
+            return (symbol_t*) &module.symbols[*id - 1];
         }
 
         u0 find_sections(const module_t& module, symbol_id symbol, section_ptr_list_t& list) {
@@ -282,21 +292,30 @@ namespace basecode::binfmt {
         }
 
         result_t make_symbol(module_t& module, const symbol_opts_t& opts, const s8* name, s32 len) {
-            {
-                auto symbol = find_symbol(module, name, len);
-                if (symbol)
-                    return {0, status_t::duplicate_symbol};
+            const auto rc          = string::interned::fold_for_result(name, len);
+            auto       next_symbol = &array::append(module.symbols);
+            next_symbol->id         = module.symbols.size;
+            next_symbol->next       = {};
+            next_symbol->name       = rc.id;
+            next_symbol->type       = opts.type;
+            next_symbol->size       = opts.size;
+            next_symbol->value      = opts.value;
+            next_symbol->scope      = opts.scope;
+            next_symbol->section    = opts.section;
+            next_symbol->visibility = opts.visibility;
+            auto prev_symbol_id = hashtab::find(module.symtab, rc.id);
+            if (prev_symbol_id) {
+                symbol_t* tmp_symbol{};
+                symbol_id next_id = *prev_symbol_id;
+                while (next_id) {
+                    tmp_symbol = &module.symbols[next_id - 1];
+                    next_id = tmp_symbol->next;
+                }
+                tmp_symbol->next = next_symbol->id;
+            } else {
+                hashtab::insert(module.symtab, rc.id, next_symbol->id);
             }
-            const auto rc     = string::interned::fold_for_result(name, len);
-            auto       symbol = hashtab::emplace(module.symbols, rc.id);
-            symbol->name       = rc.id;
-            symbol->type       = opts.type;
-            symbol->size       = opts.size;
-            symbol->value      = opts.value;
-            symbol->scope      = opts.scope;
-            symbol->section    = opts.section;
-            symbol->visibility = opts.visibility;
-            return {symbol->name, status_t::ok};
+            return {next_symbol->id, status_t::ok};
         }
     }
 }

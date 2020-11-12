@@ -87,7 +87,11 @@ TEST_CASE("basecode::binfmt ELF read obj file") {
                                              io::type_t::elf,
                                              io::file_type_t::obj);
     REQUIRE(backend_obj);
+    REQUIRE(!backend_obj->module);
+
     REQUIRE(OK(io::read(s)));
+
+    REQUIRE(backend_obj->module);
 }
 
 TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
@@ -104,7 +108,6 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
                                                 .flags = {
                                                     .code = true,
                                                     .init = true,
-                                                    .read = true,
                                                     .exec = true,
                                                     .alloc = true
                                                 }
@@ -147,9 +150,8 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
                                              section::type_t::data,
                                              {
                                                .flags = {
-                                                   .data = true,
+                                                   .code = false,
                                                    .init = true,
-                                                   .read = true,
                                                    .alloc = true
                                                }
                                            });
@@ -164,9 +166,8 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
                                            section::type_t::data,
                                            {
                                                .flags = {
-                                                   .data   = true,
+                                                   .code   = false,
                                                    .init   = false,
-                                                   .read   = true,
                                                    .write  = true,
                                                    .alloc  = true
                                                }

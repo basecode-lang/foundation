@@ -19,8 +19,171 @@
 #include <basecode/core/bits.h>
 #include <basecode/binfmt/elf.h>
 #include <basecode/core/string.h>
+#include <basecode/binfmt/binfmt.h>
 
 namespace basecode::binfmt::io::elf {
+    enum section_map_status_t : u8 {
+        ok,
+        skip,
+        error,
+        not_supported,
+    };
+
+    struct section_map_t final {
+        binfmt::section::flags_t    flags;
+        binfmt::section::type_t     type;
+        section_map_status_t        status;
+    };
+
+    static section_map_t s_section_maps[64] = {
+        [section::type::null]           = {
+            .status = section_map_status_t::skip
+        },
+
+        [section::type::progbits]       = {
+            .flags = {
+                .code = false,
+                .init = true,
+                .alloc = true,
+            },
+            .type = binfmt::section::type_t::data,
+            .status = section_map_status_t::ok,
+        },
+
+        [section::type::symtab]         = {
+            .status = section_map_status_t::skip
+        },
+
+        [section::type::strtab]         = {
+            .status = section_map_status_t::skip
+        },
+
+        [section::type::rela]           = {
+            .type = binfmt::section::type_t::reloc,
+            .status = section_map_status_t::ok,
+        },
+
+        [section::type::hash]           = {
+            .status = section_map_status_t::not_supported,
+        },
+
+        [section::type::dynamic]        = {
+            .status = section_map_status_t::not_supported,
+        },
+
+        [section::type::note]           = {
+            .type = binfmt::section::type_t::note,
+            .status = section_map_status_t::ok,
+        },
+
+        [section::type::nobits]         = {
+            .flags = {
+                .code = false,
+                .init = false,
+                .write = true,
+                .alloc = true,
+            },
+            .type = binfmt::section::type_t::data,
+            .status = section_map_status_t::ok,
+        },
+
+        [section::type::rel]            = {
+            .status = section_map_status_t::not_supported
+        },
+
+        [section::type::shlib]          = {
+            .status = section_map_status_t::not_supported,
+        },
+
+        [section::type::dynsym]         = {
+            .status = section_map_status_t::not_supported,
+        },
+
+        [section::type::init_array]     = {
+            .flags = {
+                .code = true,
+                .init = true,
+                .write = true,
+                .alloc = true,
+            },
+            .type = binfmt::section::type_t::init,
+            .status = section_map_status_t::ok,
+        },
+
+        [section::type::fini_array]     = {
+            .flags = {
+                .code = true,
+                .init = true,
+                .write = true,
+                .alloc = true,
+            },
+            .type = binfmt::section::type_t::fini,
+            .status = section_map_status_t::ok,
+        },
+
+        [section::type::pre_init_array] = {
+            .flags = {
+                .code = true,
+                .init = true,
+                .write = true,
+                .alloc = true,
+            },
+            .type = binfmt::section::type_t::pre_init,
+            .status = section_map_status_t::ok,
+        },
+
+        [section::type::group]          = {
+            .type = binfmt::section::type_t::group,
+            .status = section_map_status_t::ok,
+        },
+
+        [section::type::symtab_shndx]   = {
+            .status = section_map_status_t::not_supported,
+        },
+
+        [12] = { .status = section_map_status_t::skip },
+        [13] = { .status = section_map_status_t::skip },
+
+        [30] = {
+            .flags = {
+                .code = false,
+                .init = true,
+                .alloc = true,
+            },
+            .type = binfmt::section::type_t::unwind,
+            .status = section_map_status_t::ok,
+        },
+
+        [31] = {
+            .type = binfmt::section::type_t::custom,
+            .status = section_map_status_t::ok,
+        }
+    };
+
+    static section_map_t* find_section_map(u32 type) {
+        switch (type) {
+            case section::type::null ... section::type::rel:
+            case section::type::shlib ... section::type::symtab_shndx: {
+                return &s_section_maps[type];
+            }
+            case elf::section::type::x86_64_unwind:
+                return &s_section_maps[30];
+            case elf::section::type::gnu_hash:
+            case elf::section::type::gnu_stack:
+            case elf::section::type::gnu_rel_ro:
+            case elf::section::type::gnu_ver_def:
+            case elf::section::type::gnu_ver_sym:
+            case elf::section::type::gnu_ver_need:
+            case elf::section::type::gnu_eh_frame:
+            case elf::section::type::gnu_lib_list:
+            case elf::section::type::gnu_attributes:
+                break;
+            default:
+                return &s_section_maps[31];
+        }
+        return nullptr;
+    }
+
     namespace file {
         static str::slice_t s_class_names[] = {
             "None"_ss,
@@ -414,6 +577,157 @@ namespace basecode::binfmt::io::elf {
                 break;
             }
         }
+
+        status_t status{};
+        module_t* module{};
+
+        status = binfmt::system::make_module(module_type_t::object, &module);
+        if (!OK(status))
+            return status;
+
+        for (u32 i = 1; i < elf.file_header->sect_hdr_count; ++i) {
+            const auto& hdr = elf.sections[i];
+
+            auto map = find_section_map(hdr.type);
+            if (!map)
+                return status_t::read_error;
+
+            if (map->status == section_map_status_t::skip)
+                continue;
+
+            if (map->status == section_map_status_t::not_supported)
+                return status_t::elf_unsupported_section;
+
+            binfmt::section_opts_t sect_opts{};
+            auto sect_type = map->type;
+            sect_opts.align = hdr.addr_align;
+            sect_opts.info  = hdr.info;
+            if (hdr.link != elf.symtab.ndx)
+                sect_opts.link  = hdr.link;
+            sect_opts.flags = map->flags;
+            if (hdr.flags & section::flags::alloc)
+                sect_opts.flags.alloc = true;
+            if (hdr.flags & section::flags::write)
+                sect_opts.flags.write = true;
+            if (hdr.flags & section::flags::group)
+                sect_opts.flags.group = true;
+            if (hdr.flags & section::flags::merge)
+                sect_opts.flags.merge = true;
+            if (hdr.flags & section::flags::group)
+                sect_opts.flags.group = true;
+            if (hdr.flags & section::flags::tls)
+                sect_opts.flags.tls = true;
+            if (hdr.flags & section::flags::exclude)
+                sect_opts.flags.exclude = true;
+            if (hdr.flags & section::flags::exec_instr) {
+                sect_opts.flags.code = true;
+                sect_opts.flags.exec = true;
+                sect_type = binfmt::section::type_t::code;
+            }
+
+            auto r = binfmt::module::make_section(*module, sect_type, sect_opts);
+            if (!OK(r.status))
+                return r.status;
+
+            auto section = binfmt::module::get_section(*module, r.id);
+            switch (section->type) {
+                case binfmt::section::type_t::data: {
+                    if (section->flags.init) {
+                        section->subclass.data = slice::make(buf + hdr.offset, hdr.size);
+                    } else {
+                        section->subclass.size = hdr.size;
+                    }
+                    break;
+                }
+                case binfmt::section::type_t::code:
+                case binfmt::section::type_t::init:
+                case binfmt::section::type_t::fini:
+                case binfmt::section::type_t::unwind:
+                case binfmt::section::type_t::custom:
+                case binfmt::section::type_t::pre_init: {
+                    section->subclass.data = slice::make(buf + hdr.offset, hdr.size);
+                    break;
+                }
+                case binfmt::section::type_t::rsrc:
+                    break;
+                case binfmt::section::type_t::note:
+                    break;
+                case binfmt::section::type_t::debug:
+                    break;
+                case binfmt::section::type_t::group:
+                    break;
+                case binfmt::section::type_t::reloc:
+                    break;
+                case binfmt::section::type_t::import:
+                    break;
+                case binfmt::section::type_t::export_:
+                    break;
+            }
+        }
+
+        const auto symtab_count = elf.symtab.sect->size / elf.symtab.sect->entity_size;
+        for (u32 i = 1; i < symtab_count; ++i) {
+            auto       sym  = elf::symtab::get(elf, elf.symtab.ndx, i);
+            const auto name = elf::strtab::get(elf, sym->name_offset);
+
+            binfmt::symbol_opts_t sym_opts{};
+            sym_opts.size    = sym->size;
+            sym_opts.value   = sym->value;
+            sym_opts.section = sym->section_ndx - 1;
+
+            auto type  = ELF64_ST_TYPE(sym->info);
+            auto scope = ELF64_ST_BIND(sym->info);
+            auto vis   = ELF64_ST_VISIBILITY(sym->other);
+
+            switch (type) {
+                default:
+                case elf::symtab::type::notype:
+                    sym_opts.type = symbol::type_t::none;
+                    break;
+                case elf::symtab::type::file:
+                    sym_opts.type = symbol::type_t::file;
+                    break;
+                case elf::symtab::type::object:
+                    sym_opts.type = symbol::type_t::object;
+                    break;
+                case elf::symtab::type::func:
+                    sym_opts.type = symbol::type_t::function;
+                    break;
+            }
+
+            switch (scope) {
+                default:
+                case elf::symtab::scope::local:
+                    sym_opts.scope = symbol::scope_t::local;
+                    break;
+                case elf::symtab::scope::global:
+                    sym_opts.scope = symbol::scope_t::global;
+                    break;
+                case elf::symtab::scope::weak:
+                    sym_opts.scope = symbol::scope_t::weak;
+                    break;
+            }
+
+            switch (vis) {
+                default:
+                case elf::symtab::visibility::default_:
+                    sym_opts.visibility = symbol::visibility_t::default_;
+                    break;
+                case elf::symtab::visibility::internal:
+                    sym_opts.visibility = symbol::visibility_t::internal_;
+                    break;
+                case elf::symtab::visibility::hidden:
+                    sym_opts.visibility = symbol::visibility_t::hidden;
+                    break;
+                case elf::symtab::visibility::protected_:
+                    sym_opts.visibility = symbol::visibility_t::protected_;
+                    break;
+            }
+
+            binfmt::module::make_symbol(*module, sym_opts, name);
+        }
+
+        file.module = module;
 
         return status_t::ok;
     }
