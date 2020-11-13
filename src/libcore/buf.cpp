@@ -355,6 +355,8 @@ namespace basecode::buf {
     }
 
     status_t save(buf_t& buf, const path_t& path, u32 offset, u32 length) {
+        if (buf.length == 0)
+            return status_t::cannot_save_zero_length_buf;
         if (buf.mode == buf_mode_t::mapped
         &&  buf.path == path) {
             return status_t::cannot_save_over_mapped_path;

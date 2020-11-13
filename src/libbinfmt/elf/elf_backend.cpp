@@ -111,11 +111,11 @@ namespace basecode::binfmt::io::elf {
             if (file.file_type != file_type_t::obj)
                 return status_t::invalid_input_type;
 
-            if (!OK(buf::map_existing(file.buf, file.path)))
-                return status_t::read_error;
-            defer(buf::unmap(file.buf));
-
             status_t status;
+
+            status = io::file::map_existing(file);
+            if (!OK(status))
+                return status;
 
             opts_t opts{};
             opts.file        = &file;
@@ -228,17 +228,14 @@ namespace basecode::binfmt::io::elf {
                 + data_size
                 + 16;
 
-            // XXX: if files are smaller than some currently unknown size,
-            //      we should use the buf_t in alloc mode and call save.  if greater
-            //      than this size, we should map_new/unmap
-            //
-            if (!OK(buf::map_new(file.buf, file.path, file_size)))
-                return status_t::read_error;
+            status = io::file::map_new(file, file_size);
+            if (!OK(status))
+                return status;
 
             elf_t elf{};
             defer(
                 elf::free(elf);
-                buf::unmap(file.buf);
+                io::file::unmap(file);
                 stopwatch::stop(timer);
                 stopwatch::print_elapsed("binfmt ELF write time"_ss, 40, timer);
                 );
@@ -357,6 +354,11 @@ namespace basecode::binfmt::io::elf {
                               str::slice_t& name) {
         using section_type_t = binfmt::section::type_t;
 
+        if (section->name.length > 0) {
+            name = section->name;
+            return status_t::ok;
+        }
+
         name_flags_t flags{};
         flags.pad   = {};
         flags.exec  = section->flags.exec;
@@ -400,17 +402,7 @@ namespace basecode::binfmt::io::elf {
                 break;
             }
             case section_type_t::custom: {
-                if (!section->symbol) {
-                    name = string::interned::fold(".custom");
-                } else {
-                    auto sym = binfmt::module::get_symbol(*module, section->symbol);
-                    if (!sym)
-                        return status_t::custom_section_missing_symbol;
-                    auto intern_rc = string::interned::get(sym->name);
-                    if (!OK(intern_rc.status))
-                        return status_t::symbol_not_found;
-                    name = intern_rc.slice;
-                }
+                name = string::interned::fold(".custom");
                 break;
             }
             default: {

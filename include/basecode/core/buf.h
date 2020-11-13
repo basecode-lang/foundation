@@ -78,6 +78,7 @@ namespace basecode {
             buf_already_mapped,
             unable_to_truncate_file,
             cannot_reset_mapped_buf,
+            cannot_save_zero_length_buf,
             cannot_save_over_mapped_path,
         };
 

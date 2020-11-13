@@ -124,6 +124,10 @@ namespace basecode::binfmt::io {
         }
     }
 
+    // XXX: if files are smaller than some currently unknown size,
+    //      we should use the buf_t in alloc mode and call save.  if greater
+    //      than this size, we should map_new/unmap
+    //
     namespace file {
         u0 free(file_t& file) {
             buf::cursor::free(file.crsr);
@@ -138,10 +142,29 @@ namespace basecode::binfmt::io {
             return status_t::ok;
         }
 
+        status_t map_existing(file_t& file) {
+            if (!OK(buf::map_existing(file.buf, file.path)))
+                return status_t::read_error;
+            return status_t::ok;
+        }
+
         status_t init(file_t& file, alloc_t* alloc) {
             path::init(file.path, alloc);
             buf::init(file.buf, alloc);
             buf::cursor::init(file.crsr, file.buf);
+            return status_t::ok;
+        }
+
+        status_t unmap(file_t& file, b8 sync_flush) {
+            auto status = buf::unmap(file.buf, sync_flush);
+            if (!OK(status))
+                return status_t::write_error;
+            return status_t::ok;
+        }
+
+        status_t map_new(file_t& file, usize file_size) {
+            if (!OK(buf::map_new(file.buf, file.path, file_size)))
+                return status_t::read_error;
             return status_t::ok;
         }
     }

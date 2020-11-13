@@ -269,7 +269,7 @@ namespace basecode::binfmt::io::elf {
             [[maybe_unused]] constexpr u32 pc64                 = 24;
             [[maybe_unused]] constexpr u32 got_off_64           = 25;
             [[maybe_unused]] constexpr u32 got_pc_32            = 26;
-            [[maybe_unused]] constexpr u32 got_64               = 27;
+            [[maybe_unused]] constexpr u32 got_entry_64         = 27;
             [[maybe_unused]] constexpr u32 got_pc_rel_64        = 28;
             [[maybe_unused]] constexpr u32 got_pc_64            = 29;
             [[maybe_unused]] constexpr u32 got_plt_64           = 30;

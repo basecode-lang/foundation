@@ -146,10 +146,15 @@ namespace basecode::binfmt {
                 got_tp_offset_signed,
                 tp_offset_32,
                 pc_rel_64,
+                got_pc_32,
+                got_entry_64,
                 got_offset_64,
+                got_pc_rel_64,
+                got_pc_64,
                 got_pc_rel_32_signed,
                 got_pc_rel_offset,
                 got_plt_64,
+                plt_offset_64,
                 size_sym_32,
                 size_sym_64,
                 got_pc_32_tls_desc,
@@ -358,8 +363,8 @@ namespace basecode::binfmt {
     struct section_t final {
         alloc_t*                alloc;
         const module_t*         module;
+        str::slice_t            name;
         section_subclass_t      subclass;
-        symbol_id               symbol;
         section_id              id;
         section_id              link;
         u32                     info;
@@ -370,8 +375,8 @@ namespace basecode::binfmt {
     };
 
     struct section_opts_t final {
+        str::slice_t            name;
         section_id              link;
-        symbol_id               symbol;
         section::flags_t        flags;
         u32                     info;
         u32                     size;

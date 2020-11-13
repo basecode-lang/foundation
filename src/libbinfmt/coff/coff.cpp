@@ -717,10 +717,7 @@ namespace basecode::binfmt::io::coff {
 
             str::slice_t name{};
             if (hdr.section->type == type_t::custom) {
-                auto intern_rc = string::interned::get(hdr.section->symbol);
-                if (!OK(intern_rc.status))
-                    return status_t::symbol_not_found;
-                name = intern_rc.slice;
+                name = hdr.section->name;
             } else {
                 status = coff::get_section_name(hdr.section, name);
                 if (!OK(status))

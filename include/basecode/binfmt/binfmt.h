@@ -62,7 +62,7 @@ namespace basecode::binfmt {
 
         symbol_t* find_symbol(const module_t& module, const s8* name, s32 len = -1);
 
-        u0 find_sections(const module_t& module, symbol_id symbol, section_ptr_list_t& list);
+        u0 find_sections(const module_t& module, str::slice_t name, section_ptr_list_t& list);
 
         const symbol_t* find_symbol(const module_t& module, const String_Concept auto& name) {
             return find_symbol(module, (const s8*) name.data, name.length);

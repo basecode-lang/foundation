@@ -132,9 +132,9 @@ namespace basecode::binfmt {
             section->info   = opts.info;
             section->link   = opts.link;
             section->size   = opts.size;
+            section->name   = opts.name;
             section->flags  = opts.flags;
             section->align  = opts.align;
-            section->symbol = opts.symbol;
             switch (section->type) {
                 case section::type_t::data:
                 case section::type_t::code:
@@ -248,21 +248,10 @@ namespace basecode::binfmt {
             return (symbol_t*) &module.symbols[*id - 1];
         }
 
-        u0 find_sections(const module_t& module, symbol_id symbol, section_ptr_list_t& list) {
-            if (module.type != module_type_t::object)
-                return;
-            auto& sc = module.subclass.object;
-            array::reset(list);
-            for (auto& section : sc.sections) {
-                if (section.symbol == symbol)
-                    array::append(list, (section_t*) &section);
-            }
-        }
-
         result_t make_section(module_t& module, section::type_t type, const section_opts_t& opts) {
             if (module.type != module_type_t::object)
-                return {0, status_t::invalid_section_type}; // FIXME
-            if (type != section::type_t::custom && opts.symbol != 0)
+                return {0, status_t::invalid_section_type};
+            if (type == section::type_t::custom && opts.name.length == 0)
                 return {0, status_t::spec_section_custom_name};
             auto& sc = module.subclass.object;
             auto section = &array::append(sc.sections);
@@ -299,6 +288,17 @@ namespace basecode::binfmt {
                 hashtab::insert(module.symtab, rc.id, next_symbol->id);
             }
             return {next_symbol->id, status_t::ok};
+        }
+
+        u0 find_sections(const module_t& module, str::slice_t name, section_ptr_list_t& list) {
+            if (module.type != module_type_t::object)
+                return;
+            auto& sc = module.subclass.object;
+            array::reset(list);
+            for (auto& section : sc.sections) {
+                if (section.name == name)
+                    array::append(list, (section_t*) &section);
+            }
         }
     }
 }

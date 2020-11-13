@@ -239,12 +239,14 @@ namespace basecode::binfmt::io::coff {
             if (file.file_type != file_type_t::obj)
                 return status_t::invalid_input_type;
 
-            if (!OK(buf::map_existing(file.buf, file.path)))
+            status_t status;
+
+            status = io::file::map_existing(file);
+            if (!OK(status))
                 return status_t::read_error;
-            defer(buf::unmap(file.buf));
 
             coff_t coff{};
-            auto status = coff::init(coff, file, g_coff_sys.alloc);
+            status = coff::init(coff, file, g_coff_sys.alloc);
             if (!OK(status))
                 return status;
             defer(coff::free(coff));
@@ -398,13 +400,21 @@ namespace basecode::binfmt::io::coff {
     }
 
     status_t get_section_name(const binfmt::section_t* section, str::slice_t& name) {
+        if (section->name.length > 0) {
+            name = section->name;
+            return status_t::ok;
+        }
+
         name_flags_t flags{};
         flags.pad   = {};
         flags.exec  = section->flags.exec;
         flags.code  = section->flags.code;
         flags.init  = section->flags.init;
         flags.write = section->flags.write;
-        const auto entry = name_map::find(internal::g_coff_sys.section_names, section->type, flags);
+
+        const auto entry = name_map::find(internal::g_coff_sys.section_names,
+                                          section->type,
+                                          flags);
         if (!entry)
             return status_t::cannot_map_section_name;
         name = entry->name;

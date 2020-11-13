@@ -132,7 +132,13 @@ namespace basecode::binfmt::io {
 
         status_t save(file_t& file);
 
+        status_t map_existing(file_t& file);
+
         status_t init(file_t& file, alloc_t* alloc);
+
+        status_t map_new(file_t& file, usize file_size);
+
+        status_t unmap(file_t& file, b8 sync_flush = false);
     }
 
     namespace name_map {
