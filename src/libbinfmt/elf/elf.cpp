@@ -160,6 +160,255 @@ namespace basecode::binfmt::io::elf {
         }
     };
 
+    static u32 s_arm64_to_elf_relocs[] = {
+        [u32(binfmt::machine::aarch64::reloc::type_t::none)]                        = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::abs_64)]                      = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::abs_32)]                      = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::abs_16)]                      = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::pc_rel_64)]                   = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::pc_rel_32)]                   = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::pc_rel_16)]                   = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::movw_uabs_g0)]                = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::movw_uabs_g0_nc)]             = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::movw_uabs_g1)]                = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::movw_uabs_g1_nc)]             = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::movw_uabs_g2)]                = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::movw_uabs_g2_nc)]             = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::movw_uabs_g3)]                = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::movw_sabs_g0)]                = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::movw_sabs_g1)]                = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::movw_sabs_g2)]                = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::ld_pc_rel_lo_19)]             = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::adr_pc_rel_lo21)]             = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::adr_pc_rel_pg_hi_21)]         = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::adr_pc_rel_pg_hi_21_nc)]      = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::add_abs_lo_12_nc)]            = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::ldst_8_abs_lo_12_nc)]         = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::tst_br_14)]                   = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::cond_br_19)]                  = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::jump_26)]                     = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::call_26)]                     = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::got_rel_64)]                  = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::got_rel_32)]                  = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::adr_got_page)]                = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::copy)]                        = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::glob_dat)]                    = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::jump_slot)]                   = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::relative)]                    = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::tls_dtp_mod_64)]              = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::tls_dtp_rel64)]               = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::tls_tp_rel_64)]               = relocs::aarch64::none,
+        [u32(binfmt::machine::aarch64::reloc::type_t::tls_desc)]                    = relocs::aarch64::none,
+    };
+
+    static binfmt::machine::aarch64::reloc::type_t s_elf_to_arm64_relocs[] = {
+        [relocs::aarch64::none]                             = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::abs64]                            = binfmt::machine::aarch64::reloc::type_t::abs_64,
+        [relocs::aarch64::abs32]                            = binfmt::machine::aarch64::reloc::type_t::abs_32,
+        [relocs::aarch64::abs16]                            = binfmt::machine::aarch64::reloc::type_t::abs_16,
+        [relocs::aarch64::prel64]                           = binfmt::machine::aarch64::reloc::type_t::pc_rel_64,
+        [relocs::aarch64::prel32]                           = binfmt::machine::aarch64::reloc::type_t::pc_rel_32,
+        [relocs::aarch64::prel16]                           = binfmt::machine::aarch64::reloc::type_t::pc_rel_16,
+        [relocs::aarch64::movw_uabs_g0]                     = binfmt::machine::aarch64::reloc::type_t::movw_uabs_g0,
+        [relocs::aarch64::movw_uabs_g0_nc]                  = binfmt::machine::aarch64::reloc::type_t::movw_uabs_g0_nc,
+        [relocs::aarch64::movw_uabs_g1]                     = binfmt::machine::aarch64::reloc::type_t::movw_uabs_g1,
+        [relocs::aarch64::movw_uabs_g1_nc]                  = binfmt::machine::aarch64::reloc::type_t::movw_uabs_g1_nc,
+        [relocs::aarch64::movw_uabs_g2]                     = binfmt::machine::aarch64::reloc::type_t::movw_uabs_g2,
+        [relocs::aarch64::movw_uabs_g2_nc]                  = binfmt::machine::aarch64::reloc::type_t::movw_uabs_g2_nc,
+        [relocs::aarch64::movw_uabs_g3]                     = binfmt::machine::aarch64::reloc::type_t::movw_uabs_g3,
+        [relocs::aarch64::movw_sabs_g0]                     = binfmt::machine::aarch64::reloc::type_t::movw_sabs_g0,
+        [relocs::aarch64::movw_sabs_g1]                     = binfmt::machine::aarch64::reloc::type_t::movw_sabs_g1,
+        [relocs::aarch64::movw_sabs_g2]                     = binfmt::machine::aarch64::reloc::type_t::movw_sabs_g2,
+        [relocs::aarch64::ld_prel_lo19]                     = binfmt::machine::aarch64::reloc::type_t::ld_pc_rel_lo_19,
+        [relocs::aarch64::adr_prel_lo21]                    = binfmt::machine::aarch64::reloc::type_t::adr_pc_rel_lo21,
+        [relocs::aarch64::adr_prel_pg_hi21]                 = binfmt::machine::aarch64::reloc::type_t::adr_pc_rel_pg_hi_21,
+        [relocs::aarch64::adr_prel_pg_hi21_nc]              = binfmt::machine::aarch64::reloc::type_t::adr_pc_rel_pg_hi_21_nc,
+        [relocs::aarch64::add_abs_lo12_nc]                  = binfmt::machine::aarch64::reloc::type_t::add_abs_lo_12_nc,
+        [relocs::aarch64::ldst8_abs_lo12_nc]                = binfmt::machine::aarch64::reloc::type_t::ldst_8_abs_lo_12_nc,
+        [relocs::aarch64::tstbr14]                          = binfmt::machine::aarch64::reloc::type_t::tst_br_14,
+        [relocs::aarch64::condbr19]                         = binfmt::machine::aarch64::reloc::type_t::cond_br_19,
+        [relocs::aarch64::jump26]                           = binfmt::machine::aarch64::reloc::type_t::jump_26,
+        [relocs::aarch64::call26]                           = binfmt::machine::aarch64::reloc::type_t::call_26,
+        [relocs::aarch64::ldst16_abs_lo12_nc]               = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::ldst32_abs_lo12_nc]               = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::ldst64_abs_lo12_nc]               = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_prel_g0]                     = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_prel_g0_nc]                  = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_prel_g1]                     = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_prel_g1_nc]                  = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_prel_g2]                     = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_prel_g2_nc]                  = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_prel_g3]                     = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::ldst128_abs_lo12_nc]              = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_gotoff_g0]                   = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_gotoff_g0_nc]                = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_gotoff_g1]                   = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_gotoff_g1_nc]                = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_gotoff_g2]                   = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_gotoff_g2_nc]                = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::movw_gotoff_g3]                   = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::gotrel64]                         = binfmt::machine::aarch64::reloc::type_t::got_rel_64,
+        [relocs::aarch64::gotrel32]                         = binfmt::machine::aarch64::reloc::type_t::got_rel_32,
+        [relocs::aarch64::got_ld_prel19]                    = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::ld64_gotoff_lo15]                 = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::adr_got_page]                     = binfmt::machine::aarch64::reloc::type_t::adr_got_page,
+        [relocs::aarch64::ld64_got_lo12_nc]                 = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::ld64_gotpage_lo15]                = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsgd_adr_prel21]                 = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsgd_adr_page21]                 = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsgd_add_lo12_nc]                = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsgd_movw_g1]                    = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsgd_movw_g0_nc]                 = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_adr_prel21]                 = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_adr_page21]                 = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_add_lo12_nc]                = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_movw_g1]                    = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_movw_g0_nc]                 = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ld_prel19]                  = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_movw_dtprel_g2]             = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_movw_dtprel_g1]             = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_movw_dtprel_g1_nc]          = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_movw_dtprel_g0]             = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_movw_dtprel_g0_nc]          = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_add_dtprel_hi12]            = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_add_dtprel_lo12]            = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_add_dtprel_lo12_nc]         = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ldst8_dtprel_lo12]          = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ldst8_dtprel_lo12_nc]       = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ldst16_dtprel_lo12]         = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ldst16_dtprel_lo12_nc]      = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ldst32_dtprel_lo12]         = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ldst32_dtprel_lo12_nc]      = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ldst64_dtprel_lo12]         = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ldst64_dtprel_lo12_nc]      = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsie_movw_gottprel_g1]           = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsie_movw_gottprel_g0_nc]        = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsie_adr_gottprel_page21]        = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsie_ld64_gottprel_lo12_nc]      = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsie_ld_gottprel_prel19]         = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_movw_tprel_g2]              = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_movw_tprel_g1]              = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_movw_tprel_g1_nc]           = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_movw_tprel_g0]              = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_movw_tprel_g0_nc]           = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_add_tprel_hi12]             = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_add_tprel_lo12]             = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_add_tprel_lo12_nc]          = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_ldst8_tprel_lo12]           = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_ldst8_tprel_lo12_nc]        = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_ldst16_tprel_lo12]          = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_ldst16_tprel_lo12_nc]       = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_ldst32_tprel_lo12]          = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_ldst32_tprel_lo12_nc]       = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_ldst64_tprel_lo12]          = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_ldst64_tprel_lo12_nc]       = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsdesc_ld_prel19]                = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsdesc_adr_prel21]               = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsdesc_adr_page21]               = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsdesc_ld64_lo12]                = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsdesc_add_lo12]                 = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsdesc_off_g1]                   = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsdesc_off_g0_nc]                = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsdesc_ldr]                      = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsdesc_add]                      = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsdesc_call]                     = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_ldst128_tprel_lo12]         = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsle_ldst128_tprel_lo12_nc]      = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ldst128_dtprel_lo12]        = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::tlsld_ldst128_dtprel_lo12_nc]     = binfmt::machine::aarch64::reloc::type_t::none,
+        [relocs::aarch64::copy]                             = binfmt::machine::aarch64::reloc::type_t::copy,
+        [relocs::aarch64::glob_dat]                         = binfmt::machine::aarch64::reloc::type_t::glob_dat,
+        [relocs::aarch64::jump_slot]                        = binfmt::machine::aarch64::reloc::type_t::jump_slot,
+        [relocs::aarch64::relative]                         = binfmt::machine::aarch64::reloc::type_t::relative,
+        [relocs::aarch64::tls_dtpmod64]                     = binfmt::machine::aarch64::reloc::type_t::tls_dtp_mod_64,
+        [relocs::aarch64::tls_dtprel64]                     = binfmt::machine::aarch64::reloc::type_t::tls_dtp_rel64,
+        [relocs::aarch64::tls_tprel64]                      = binfmt::machine::aarch64::reloc::type_t::tls_tp_rel_64,
+        [relocs::aarch64::tls_desc]                         = binfmt::machine::aarch64::reloc::type_t::tls_desc,
+    };
+
+    static u32 s_amd64_to_elf_relocs[] = {
+        [u32(binfmt::machine::x86_64::reloc::type_t::none)]                 = relocs::x86_64::none,
+        [u32(binfmt::machine::x86_64::reloc::type_t::direct_64)]            = relocs::x86_64::d64,
+        [u32(binfmt::machine::x86_64::reloc::type_t::pc_rel_32)]            = relocs::x86_64::pc32,
+        [u32(binfmt::machine::x86_64::reloc::type_t::got_32)]               = relocs::x86_64::got32,
+        [u32(binfmt::machine::x86_64::reloc::type_t::plt_32)]               = relocs::x86_64::plt32,
+        [u32(binfmt::machine::x86_64::reloc::type_t::copy)]                 = relocs::x86_64::copy,
+        [u32(binfmt::machine::x86_64::reloc::type_t::glob_dat)]             = relocs::x86_64::glob_dat,
+        [u32(binfmt::machine::x86_64::reloc::type_t::jump_slot)]            = relocs::x86_64::jmp_slot,
+        [u32(binfmt::machine::x86_64::reloc::type_t::relative)]             = relocs::x86_64::relative,
+        [u32(binfmt::machine::x86_64::reloc::type_t::got_pc_rel)]           = relocs::x86_64::got_pc_rel,
+        [u32(binfmt::machine::x86_64::reloc::type_t::direct_32)]            = relocs::x86_64::dir32_zx,
+        [u32(binfmt::machine::x86_64::reloc::type_t::direct_32_signed)]     = relocs::x86_64::dir32_sx,
+        [u32(binfmt::machine::x86_64::reloc::type_t::direct_16)]            = relocs::x86_64::dir16_zx,
+        [u32(binfmt::machine::x86_64::reloc::type_t::pc_rel_16_signed)]     = relocs::x86_64::pc_rel_16_sx,
+        [u32(binfmt::machine::x86_64::reloc::type_t::direct_8_signed)]      = relocs::x86_64::dir8_sx,
+        [u32(binfmt::machine::x86_64::reloc::type_t::pc_rel_8_signed)]      = relocs::x86_64::pc_rel_8_sx,
+        [u32(binfmt::machine::x86_64::reloc::type_t::dtp_mod_64)]           = relocs::x86_64::dtp_mod_64,
+        [u32(binfmt::machine::x86_64::reloc::type_t::dtp_offset_64)]        = relocs::x86_64::dtp_off_64,
+        [u32(binfmt::machine::x86_64::reloc::type_t::tp_offset_64)]         = relocs::x86_64::tp_off_64,
+        [u32(binfmt::machine::x86_64::reloc::type_t::tls_gd_signed)]        = relocs::x86_64::tls_gd,
+        [u32(binfmt::machine::x86_64::reloc::type_t::tls_ld_signed)]        = relocs::x86_64::tls_ld,
+        [u32(binfmt::machine::x86_64::reloc::type_t::dtp_offset_32)]        = relocs::x86_64::dtp_off_32,
+        [u32(binfmt::machine::x86_64::reloc::type_t::got_tp_offset_signed)] = relocs::x86_64::got_tp_off,
+        [u32(binfmt::machine::x86_64::reloc::type_t::tp_offset_32)]         = relocs::x86_64::tp_off_32,
+        [u32(binfmt::machine::x86_64::reloc::type_t::pc_rel_64)]            = relocs::x86_64::pc64,
+        [u32(binfmt::machine::x86_64::reloc::type_t::got_offset_64)]        = relocs::x86_64::got_off_64,
+        [u32(binfmt::machine::x86_64::reloc::type_t::got_plt_64)]           = relocs::x86_64::got_plt_64,
+        [u32(binfmt::machine::x86_64::reloc::type_t::size_sym_32)]          = relocs::x86_64::size32,
+        [u32(binfmt::machine::x86_64::reloc::type_t::size_sym_64)]          = relocs::x86_64::size64,
+        [u32(binfmt::machine::x86_64::reloc::type_t::got_pc_32_tls_desc)]   = relocs::x86_64::got_pc_32_tls_desc,
+        [u32(binfmt::machine::x86_64::reloc::type_t::tls_desc_call)]        = relocs::x86_64::tls_desc_call,
+        [u32(binfmt::machine::x86_64::reloc::type_t::tls_desc)]             = relocs::x86_64::tls_desc,
+        [u32(binfmt::machine::x86_64::reloc::type_t::i_relative)]           = relocs::x86_64::i_relative,
+        [u32(binfmt::machine::x86_64::reloc::type_t::relative_64)]          = relocs::x86_64::relative64,
+        [u32(binfmt::machine::x86_64::reloc::type_t::got_pc_relx)]          = relocs::x86_64::got_pc_relx,
+        [u32(binfmt::machine::x86_64::reloc::type_t::rex_got_pc_relx)]      = relocs::x86_64::rex_got_pc_relx,
+    };
+
+    static binfmt::machine::x86_64::reloc::type_t s_elf_to_amd64_relocs[] = {
+        [relocs::x86_64::none]                 = binfmt::machine::x86_64::reloc::type_t::none,
+        [relocs::x86_64::d64]                  = binfmt::machine::x86_64::reloc::type_t::direct_64,
+        [relocs::x86_64::pc32]                 = binfmt::machine::x86_64::reloc::type_t::pc_rel_32,
+        [relocs::x86_64::got32]                = binfmt::machine::x86_64::reloc::type_t::got_32,
+        [relocs::x86_64::plt32]                = binfmt::machine::x86_64::reloc::type_t::plt_32,
+        [relocs::x86_64::copy]                 = binfmt::machine::x86_64::reloc::type_t::copy,
+        [relocs::x86_64::glob_dat]             = binfmt::machine::x86_64::reloc::type_t::glob_dat,
+        [relocs::x86_64::jmp_slot]             = binfmt::machine::x86_64::reloc::type_t::jump_slot,
+        [relocs::x86_64::relative]             = binfmt::machine::x86_64::reloc::type_t::relative,
+        [relocs::x86_64::got_pc_rel]           = binfmt::machine::x86_64::reloc::type_t::got_pc_rel,
+        [relocs::x86_64::dir32_zx]             = binfmt::machine::x86_64::reloc::type_t::direct_32,
+        [relocs::x86_64::dir32_sx]             = binfmt::machine::x86_64::reloc::type_t::direct_32_signed,
+        [relocs::x86_64::dir16_zx]             = binfmt::machine::x86_64::reloc::type_t::direct_16,
+        [relocs::x86_64::pc_rel_16_sx]         = binfmt::machine::x86_64::reloc::type_t::pc_rel_16_signed,
+        [relocs::x86_64::dir8_sx]              = binfmt::machine::x86_64::reloc::type_t::direct_8_signed,
+        [relocs::x86_64::pc_rel_8_sx]          = binfmt::machine::x86_64::reloc::type_t::pc_rel_8_signed,
+        [relocs::x86_64::dtp_mod_64]           = binfmt::machine::x86_64::reloc::type_t::dtp_mod_64,
+        [relocs::x86_64::dtp_off_64]           = binfmt::machine::x86_64::reloc::type_t::dtp_offset_64,
+        [relocs::x86_64::tp_off_64]            = binfmt::machine::x86_64::reloc::type_t::tp_offset_64,
+        [relocs::x86_64::tls_gd]               = binfmt::machine::x86_64::reloc::type_t::tls_gd_signed,
+        [relocs::x86_64::tls_ld]               = binfmt::machine::x86_64::reloc::type_t::tls_ld_signed,
+        [relocs::x86_64::dtp_off_32]           = binfmt::machine::x86_64::reloc::type_t::dtp_offset_32,
+        [relocs::x86_64::got_tp_off]           = binfmt::machine::x86_64::reloc::type_t::got_tp_offset_signed,
+        [relocs::x86_64::tp_off_32]            = binfmt::machine::x86_64::reloc::type_t::tp_offset_32,
+        [relocs::x86_64::pc64]                 = binfmt::machine::x86_64::reloc::type_t::pc_rel_64,
+        [relocs::x86_64::got_off_64]           = binfmt::machine::x86_64::reloc::type_t::got_offset_64,
+        [relocs::x86_64::got_pc_32]            = binfmt::machine::x86_64::reloc::type_t::none,
+        [relocs::x86_64::got_64]               = binfmt::machine::x86_64::reloc::type_t::none,
+        [relocs::x86_64::got_pc_rel_64]        = binfmt::machine::x86_64::reloc::type_t::none,
+        [relocs::x86_64::got_pc_64]            = binfmt::machine::x86_64::reloc::type_t::none,
+        [relocs::x86_64::got_plt_64]           = binfmt::machine::x86_64::reloc::type_t::got_plt_64,
+        [relocs::x86_64::plt_off_64]           = binfmt::machine::x86_64::reloc::type_t::none,
+        [relocs::x86_64::size32]               = binfmt::machine::x86_64::reloc::type_t::size_sym_32,
+        [relocs::x86_64::size64]               = binfmt::machine::x86_64::reloc::type_t::size_sym_64,
+        [relocs::x86_64::got_pc_32_tls_desc]   = binfmt::machine::x86_64::reloc::type_t::got_pc_32_tls_desc,
+        [relocs::x86_64::tls_desc_call]        = binfmt::machine::x86_64::reloc::type_t::tls_desc_call,
+        [relocs::x86_64::tls_desc]             = binfmt::machine::x86_64::reloc::type_t::tls_desc,
+        [relocs::x86_64::i_relative]           = binfmt::machine::x86_64::reloc::type_t::i_relative,
+        [relocs::x86_64::relative64]           = binfmt::machine::x86_64::reloc::type_t::relative_64,
+        [relocs::x86_64::got_pc_relx]          = binfmt::machine::x86_64::reloc::type_t::got_pc_relx,
+        [relocs::x86_64::rex_got_pc_relx]      = binfmt::machine::x86_64::reloc::type_t::rex_got_pc_relx,
+    };
+
     static section_map_t* find_section_map(u32 type) {
         switch (type) {
             case section::type::null ... section::type::rel:
@@ -538,8 +787,6 @@ namespace basecode::binfmt::io::elf {
     status_t read(elf_t& elf, file_t& file) {
         auto buf = FILE_PTR();
 
-        //const auto& opts = *elf.opts;
-
         elf.file_header = (file_header_t*) (buf);
         if (std::memcmp(elf.file_header->magic, "\177ELF", 4) != 0)
             return status_t::read_error;
@@ -694,389 +941,12 @@ namespace basecode::binfmt::io::elf {
                         switch (file.machine) {
                             case binfmt::machine::type_t::unknown:
                                 break;
-                            case binfmt::machine::type_t::x86_64: {
-                                switch (type) {
-                                    case relocs::x86_64::none:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::none;
-                                        break;
-                                    case relocs::x86_64::d64:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::direct_64;
-                                        break;
-                                    case relocs::x86_64::pc32:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::pc_rel_32;
-                                        break;
-                                    case relocs::x86_64::got32:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::got_32;
-                                        break;
-                                    case relocs::x86_64::plt32:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::plt_32;
-                                        break;
-                                    case relocs::x86_64::copy:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::copy;
-                                        break;
-                                    case relocs::x86_64::glob_dat:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::glob_dat;
-                                        break;
-                                    case relocs::x86_64::jmp_slot:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::jump_slot;
-                                        break;
-                                    case relocs::x86_64::relative:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::relative;
-                                        break;
-                                    case relocs::x86_64::got_pc_rel:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::got_pc_rel;
-                                        break;
-                                    case relocs::x86_64::dir32_zx:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::direct_32;
-                                        break;
-                                    case relocs::x86_64::dir32_sx:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::direct_32_signed;
-                                        break;
-                                    case relocs::x86_64::dir16_zx:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::direct_16;
-                                        break;
-                                    case relocs::x86_64::pc_rel_16_sx:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::pc_rel_16_signed;
-                                        break;
-                                    case relocs::x86_64::dir8_sx:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::direct_8_signed;
-                                        break;
-                                    case relocs::x86_64::pc_rel_8_sx:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::pc_rel_8_signed;
-                                        break;
-                                    case relocs::x86_64::dtp_mod_64:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::dtp_mod_64;
-                                        break;
-                                    case relocs::x86_64::dtp_off_64:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::dtp_offset_64;
-                                        break;
-                                    case relocs::x86_64::tp_off_64:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::tp_offset_64;
-                                        break;
-                                    case relocs::x86_64::tls_gd:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::tls_gd_signed;
-                                        break;
-                                    case relocs::x86_64::tls_ld:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::tls_ld_signed;
-                                        break;
-                                    case relocs::x86_64::dtp_off_32:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::dtp_offset_32;
-                                        break;
-                                    case relocs::x86_64::got_tp_off:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::got_tp_offset_signed;
-                                        break;
-                                    case relocs::x86_64::tp_off_32:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::tp_offset_32;
-                                        break;
-                                    case relocs::x86_64::pc64:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::pc_rel_64;
-                                        break;
-                                    case relocs::x86_64::got_off_64:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::got_offset_64;
-                                        break;
-                                    case relocs::x86_64::got_pc_32:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::got_pc_rel_32_signed;
-                                        break;
-                                    case relocs::x86_64::got_64:
-//                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::;
-                                        break;
-                                    case relocs::x86_64::got_pc_rel_64:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::got_pc_rel_offset;
-                                        break;
-                                    case relocs::x86_64::got_pc_64:
-//                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::got;
-                                        break;
-                                    case relocs::x86_64::got_plt_64:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::got_plt_64;
-                                        break;
-                                    case relocs::x86_64::plt_off_64:
-//                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::;
-                                        break;
-                                    case relocs::x86_64::size32:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::size_sym_32;
-                                        break;
-                                    case relocs::x86_64::size64:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::size_sym_64;
-                                        break;
-                                    case relocs::x86_64::got_pc_32_tls_desc:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::got_pc_32_tls_desc;
-                                        break;
-                                    case relocs::x86_64::tls_desc_call:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::tls_desc_call;
-                                        break;
-                                    case relocs::x86_64::tls_desc:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::tls_desc;
-                                        break;
-                                    case relocs::x86_64::i_relative:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::i_relative;
-                                        break;
-                                    case relocs::x86_64::relative64:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::relative_64;
-                                        break;
-                                    case relocs::x86_64::got_pc_relx:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::got_pc_relx;
-                                        break;
-                                    case relocs::x86_64::rex_got_pc_relx:
-                                        reloc.x86_64_type = binfmt::machine::x86_64::reloc::type_t::rex_got_pc_relx;
-                                        break;
-                                    default:
-                                        return status_t::invalid_relocation_type;
-                                }
+                            case binfmt::machine::type_t::x86_64:
+                                reloc.x86_64_type = s_elf_to_amd64_relocs[type];
                                 break;
-                            }
-                            case binfmt::machine::type_t::aarch64: {
-                                switch (type) {
-                                    case relocs::aarch64::none:
-                                        break;
-                                    case relocs::aarch64::abs64:
-                                        break;
-                                    case relocs::aarch64::abs32:
-                                        break;
-                                    case relocs::aarch64::abs16:
-                                        break;
-                                    case relocs::aarch64::prel64:
-                                        break;
-                                    case relocs::aarch64::prel32:
-                                        break;
-                                    case relocs::aarch64::prel16:
-                                        break;
-                                    case relocs::aarch64::movw_uabs_g0:
-                                        break;
-                                    case relocs::aarch64::movw_uabs_g0_nc:
-                                        break;
-                                    case relocs::aarch64::movw_uabs_g1:
-                                        break;
-                                    case relocs::aarch64::movw_uabs_g1_nc:
-                                        break;
-                                    case relocs::aarch64::movw_uabs_g2:
-                                        break;
-                                    case relocs::aarch64::movw_uabs_g2_nc:
-                                        break;
-                                    case relocs::aarch64::movw_uabs_g3:
-                                        break;
-                                    case relocs::aarch64::movw_sabs_g0:
-                                        break;
-                                    case relocs::aarch64::movw_sabs_g1:
-                                        break;
-                                    case relocs::aarch64::movw_sabs_g2:
-                                        break;
-                                    case relocs::aarch64::ld_prel_lo19:
-                                        break;
-                                    case relocs::aarch64::adr_prel_lo21:
-                                        break;
-                                    case relocs::aarch64::adr_prel_pg_hi21:
-                                        break;
-                                    case relocs::aarch64::adr_prel_pg_hi21_nc:
-                                        break;
-                                    case relocs::aarch64::add_abs_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::ldst8_abs_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tstbr14:
-                                        break;
-                                    case relocs::aarch64::condbr19:
-                                        break;
-                                    case relocs::aarch64::jump26:
-                                        break;
-                                    case relocs::aarch64::call26:
-                                        break;
-                                    case relocs::aarch64::ldst16_abs_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::ldst32_abs_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::ldst64_abs_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::movw_prel_g0:
-                                        break;
-                                    case relocs::aarch64::movw_prel_g0_nc:
-                                        break;
-                                    case relocs::aarch64::movw_prel_g1:
-                                        break;
-                                    case relocs::aarch64::movw_prel_g1_nc:
-                                        break;
-                                    case relocs::aarch64::movw_prel_g2:
-                                        break;
-                                    case relocs::aarch64::movw_prel_g2_nc:
-                                        break;
-                                    case relocs::aarch64::movw_prel_g3:
-                                        break;
-                                    case relocs::aarch64::ldst128_abs_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::movw_gotoff_g0:
-                                        break;
-                                    case relocs::aarch64::movw_gotoff_g0_nc:
-                                        break;
-                                    case relocs::aarch64::movw_gotoff_g1:
-                                        break;
-                                    case relocs::aarch64::movw_gotoff_g1_nc:
-                                        break;
-                                    case relocs::aarch64::movw_gotoff_g2:
-                                        break;
-                                    case relocs::aarch64::movw_gotoff_g2_nc:
-                                        break;
-                                    case relocs::aarch64::movw_gotoff_g3:
-                                        break;
-                                    case relocs::aarch64::gotrel64:
-                                        break;
-                                    case relocs::aarch64::gotrel32:
-                                        break;
-                                    case relocs::aarch64::got_ld_prel19:
-                                        break;
-                                    case relocs::aarch64::ld64_gotoff_lo15:
-                                        break;
-                                    case relocs::aarch64::adr_got_page:
-                                        break;
-                                    case relocs::aarch64::ld64_got_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::ld64_gotpage_lo15:
-                                        break;
-                                    case relocs::aarch64::tlsgd_adr_prel21:
-                                        break;
-                                    case relocs::aarch64::tlsgd_adr_page21:
-                                        break;
-                                    case relocs::aarch64::tlsgd_add_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsgd_movw_g1:
-                                        break;
-                                    case relocs::aarch64::tlsgd_movw_g0_nc:
-                                        break;
-                                    case relocs::aarch64::tlsld_adr_prel21:
-                                        break;
-                                    case relocs::aarch64::tlsld_adr_page21:
-                                        break;
-                                    case relocs::aarch64::tlsld_add_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsld_movw_g1:
-                                        break;
-                                    case relocs::aarch64::tlsld_movw_g0_nc:
-                                        break;
-                                    case relocs::aarch64::tlsld_ld_prel19:
-                                        break;
-                                    case relocs::aarch64::tlsld_movw_dtprel_g2:
-                                        break;
-                                    case relocs::aarch64::tlsld_movw_dtprel_g1:
-                                        break;
-                                    case relocs::aarch64::tlsld_movw_dtprel_g1_nc:
-                                        break;
-                                    case relocs::aarch64::tlsld_movw_dtprel_g0:
-                                        break;
-                                    case relocs::aarch64::tlsld_movw_dtprel_g0_nc:
-                                        break;
-                                    case relocs::aarch64::tlsld_add_dtprel_hi12:
-                                        break;
-                                    case relocs::aarch64::tlsld_add_dtprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsld_add_dtprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsld_ldst8_dtprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsld_ldst8_dtprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsld_ldst16_dtprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsld_ldst16_dtprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsld_ldst32_dtprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsld_ldst32_dtprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsld_ldst64_dtprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsld_ldst64_dtprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsie_movw_gottprel_g1:
-                                        break;
-                                    case relocs::aarch64::tlsie_movw_gottprel_g0_nc:
-                                        break;
-                                    case relocs::aarch64::tlsie_adr_gottprel_page21:
-                                        break;
-                                    case relocs::aarch64::tlsie_ld64_gottprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsie_ld_gottprel_prel19:
-                                        break;
-                                    case relocs::aarch64::tlsle_movw_tprel_g2:
-                                        break;
-                                    case relocs::aarch64::tlsle_movw_tprel_g1:
-                                        break;
-                                    case relocs::aarch64::tlsle_movw_tprel_g1_nc:
-                                        break;
-                                    case relocs::aarch64::tlsle_movw_tprel_g0:
-                                        break;
-                                    case relocs::aarch64::tlsle_movw_tprel_g0_nc:
-                                        break;
-                                    case relocs::aarch64::tlsle_add_tprel_hi12:
-                                        break;
-                                    case relocs::aarch64::tlsle_add_tprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsle_add_tprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsle_ldst8_tprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsle_ldst8_tprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsle_ldst16_tprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsle_ldst16_tprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsle_ldst32_tprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsle_ldst32_tprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsle_ldst64_tprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsle_ldst64_tprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsdesc_ld_prel19:
-                                        break;
-                                    case relocs::aarch64::tlsdesc_adr_prel21:
-                                        break;
-                                    case relocs::aarch64::tlsdesc_adr_page21:
-                                        break;
-                                    case relocs::aarch64::tlsdesc_ld64_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsdesc_add_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsdesc_off_g1:
-                                        break;
-                                    case relocs::aarch64::tlsdesc_off_g0_nc:
-                                        break;
-                                    case relocs::aarch64::tlsdesc_ldr:
-                                        break;
-                                    case relocs::aarch64::tlsdesc_add:
-                                        break;
-                                    case relocs::aarch64::tlsdesc_call:
-                                        break;
-                                    case relocs::aarch64::tlsle_ldst128_tprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsle_ldst128_tprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::tlsld_ldst128_dtprel_lo12:
-                                        break;
-                                    case relocs::aarch64::tlsld_ldst128_dtprel_lo12_nc:
-                                        break;
-                                    case relocs::aarch64::copy:
-                                        break;
-                                    case relocs::aarch64::glob_dat:
-                                        break;
-                                    case relocs::aarch64::jump_slot:
-                                        break;
-                                    case relocs::aarch64::relative:
-                                        break;
-                                    case relocs::aarch64::tls_dtpmod64:
-                                        break;
-                                    case relocs::aarch64::tls_dtprel64:
-                                        break;
-                                    case relocs::aarch64::tls_tprel64:
-                                        break;
-                                    case relocs::aarch64::tls_desc:
-                                        break;
-                                    case relocs::aarch64::i_relative:
-                                        break;
-                                    default:
-                                        return status_t::invalid_relocation_type;
-                                }
+                            case binfmt::machine::type_t::aarch64:
+                                reloc.aarch64_type = s_elf_to_arm64_relocs[type];
                                 break;
-                            }
                         }
                     }
                     break;
@@ -1115,9 +985,6 @@ namespace basecode::binfmt::io::elf {
                 case elf::symtab::type::file:
                     sym_opts.type = symbol::type_t::file;
                     break;
-                case elf::symtab::type::func:
-                    sym_opts.type = symbol::type_t::function;
-                    break;
                 case elf::symtab::type::common:
                     sym_opts.type = symbol::type_t::common;
                     break;
@@ -1126,6 +993,9 @@ namespace basecode::binfmt::io::elf {
                     break;
                 case elf::symtab::type::section:
                     sym_opts.type = symbol::type_t::section;
+                    break;
+                case elf::symtab::type::func:
+                    sym_opts.type = symbol::type_t::function;
                     break;
             }
 
@@ -1188,7 +1058,12 @@ namespace basecode::binfmt::io::elf {
         fh->flags          = opts.flags;
         fh->version        = 1;
         fh->header_size    = file::header_size;
-        fh->entry_point    = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
+
+        b8 is_obj = file.file_type == file_type_t::obj;
+        if (!is_obj)
+            fh->entry_point = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
+        else
+            fh->entry_point = 0;
 
         if (opts.num_segments > 0) {
             fh->pgm_hdr_size   = segment::header_size;
@@ -1257,6 +1132,7 @@ namespace basecode::binfmt::io::elf {
         u64 data_offset {fh->sect_hdr_offset + (fh->sect_hdr_size * fh->sect_hdr_count)};
         u32 sect_idx    {1};
         u32 strs_idx    {2};
+        b8  inc_vaddr   {};
 
         if (elf.strtab.sect) {
             elf.strtab.sect->offset = data_offset;
@@ -1297,35 +1173,34 @@ namespace basecode::binfmt::io::elf {
                         std::memcpy(data, section.subclass.data, hdr.size);
                         hdr.type = section::type::progbits;
                         data_offset = align(data_offset + hdr.size, hdr.addr_align);
+                        inc_vaddr   = !is_obj;
                     }
-                    virt_addr = align(virt_addr + hdr.size, hdr.addr_align);
                     break;
                 }
                 case section_type_t::init: {
                     std::memcpy(data, section.subclass.data, hdr.size);
                     hdr.type = section::type::init_array;
-                    virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
+                    inc_vaddr   = !is_obj;
                     break;
                 }
                 case section_type_t::fini: {
                     std::memcpy(data, section.subclass.data, hdr.size);
                     hdr.type = section::type::fini_array;
-                    virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
+                    inc_vaddr   = !is_obj;
                     break;
                 }
                 case section_type_t::code: {
                     std::memcpy(data, section.subclass.data, hdr.size);
                     hdr.type = section::type::progbits;
-                    virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
+                    inc_vaddr   = !is_obj;
                     break;
                 }
                 case section_type_t::unwind: {
                     std::memcpy(data, section.subclass.data, hdr.size);
                     hdr.type = section::type::x86_64_unwind;
-                    virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
                     break;
                 }
@@ -1335,7 +1210,18 @@ namespace basecode::binfmt::io::elf {
                     auto rela = (rela_t*) data;
                     for (u32 j = 0; j < section.subclass.relocs.size; ++j) {
                         const auto& reloc = section.subclass.relocs[j];
-                        rela[j].info   = ELF64_R_INFO(reloc.symbol, 0);
+                        u32 type{};
+                        switch (file.machine) {
+                            case binfmt::machine::type_t::unknown:
+                                break;
+                            case binfmt::machine::type_t::x86_64:
+                                type = s_amd64_to_elf_relocs[u32(reloc.x86_64_type)];
+                                break;
+                            case binfmt::machine::type_t::aarch64:
+                                type = s_arm64_to_elf_relocs[u32(reloc.aarch64_type)];
+                                break;
+                        }
+                        rela[j].info   = ELF64_R_INFO(reloc.symbol, type);
                         rela[j].offset = reloc.offset;
                         rela[j].addend = reloc.addend;
                     }
@@ -1355,13 +1241,16 @@ namespace basecode::binfmt::io::elf {
                 case section_type_t::custom: {
                     std::memcpy(data, section.subclass.data, hdr.size);
                     hdr.type = section::type::progbits;
-                    virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
                     data_offset = align(data_offset + hdr.size, hdr.addr_align);
+                    inc_vaddr   = !is_obj;
                     break;
                 }
                 default:
                     break;
             }
+
+            if (inc_vaddr)
+                virt_addr   = align(virt_addr + hdr.size, hdr.addr_align);
         }
 
         if (elf.symtab.sect) {

@@ -213,9 +213,8 @@ namespace basecode::binfmt::io::elf {
                 auto intern_rc = string::interned::get(symbol.name);
                 if (!OK(intern_rc.status))
                     return status_t::symbol_not_found;
-                opts.syms[idx] = (symbol_t*) &symbol;
+                opts.syms[idx++]             = (symbol_t*) &symbol;
                 opts.strs[opts.strtab_idx++] = intern_rc.slice;
-                ++idx;
             }
 
             opts.strtab_size = 0;
