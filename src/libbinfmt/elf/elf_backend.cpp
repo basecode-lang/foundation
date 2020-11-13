@@ -62,10 +62,11 @@ namespace basecode::binfmt::io::elf {
             name[16] = '\0';
 
             s8 flag_chars[14];
+            auto strtab = ((u8*) (elf.file_header)) + elf.strtab.sect->offset;
 
             for (u32 i = 0; i < elf.file_header->sect_hdr_count; ++i) {
                 const auto& hdr = elf.sections[i];
-                std::memcpy(name, strtab::get(elf, hdr.name_offset), 16);
+                std::memcpy(name, strtab + hdr.name_offset, 16);
                 elf::section::flags::chars(hdr.flags, flag_chars);
 
                 format::print(" [{:>3}] {:<17} {:<16} {:016x} {:08x}\n",
@@ -89,7 +90,7 @@ namespace basecode::binfmt::io::elf {
             format::print("  Num:     Value         Size Type     Bind   Vis       Ndx Name\n");
             for (u32 i = 0; i < symtab_size; ++i) {
                 auto sym = elf::symtab::get(elf, elf.symtab.ndx, i);
-                std::memcpy(name, elf::strtab::get(elf, sym->name_offset), 16);
+                std::memcpy(name, strtab + sym->name_offset, 16);
                 format::print("{:>5}: {:016x} {:>5} NOTYPE   LOCAL   DEFAULT  {} {}\n",
                               i,
                               sym->value,
@@ -153,7 +154,6 @@ namespace basecode::binfmt::io::elf {
             opts.file         = &file;
             opts.alloc        = g_elf_sys.alloc;
             opts.entry_point  = file.opts.base_addr;
-            opts.num_sections = msc->sections.size + 2;
 
             // XXX: these need to come in on the file!
             opts.clazz       = elf::class_64;
@@ -162,36 +162,14 @@ namespace basecode::binfmt::io::elf {
             opts.abi_version = 0;
             opts.version     = elf::version_current;
 
-            u32 data_size   {};
+            u32 data_size       {};
+            u32 num_segments    {};
+            u32 num_sections    {msc->sections.size + 1};
 
-            if (file.module->symbols.size > 0) {
-                ++opts.num_sections;
-                opts.num_symbols = file.module->symbols.size + 1;
-                const auto syms_size = sizeof(u64) * opts.num_symbols;
-                opts.syms = (symbol_t**) memory::alloc(g_elf_sys.alloc,
-                                                       syms_size,
-                                                       alignof(symbol_t*));
-            }
-
-            const auto strs_size = sizeof(str::slice_t) * (opts.num_sections + opts.num_symbols);
-            opts.strs = (str::slice_t*) memory::alloc(g_elf_sys.alloc,
-                                                      strs_size,
-                                                      alignof(str::slice_t));
-            opts.strs[opts.strtab_idx++] = {};
-            opts.strs[opts.strtab_idx++] = ".strtab"_ss;
-
-            defer(
-                memory::free(g_elf_sys.alloc, opts.strs);
-                if (opts.syms)
-                    memory::free(g_elf_sys.alloc, opts.syms);
-                 );
+            if (file.module->symbols.size > 0)      ++num_sections;
+            if (file.module->strtab.offs.size > 0)  ++num_sections;
 
             for (auto& section : msc->sections) {
-                status = elf::get_section_name(file.module,
-                                               &section,
-                                               opts.strs[opts.strtab_idx++]);
-                if (!OK(status))
-                    return status;
                 const auto alignment = std::max<u32>(section.align, 8);
                 switch (section.type) {
                     case section_type_t::data: {
@@ -205,26 +183,16 @@ namespace basecode::binfmt::io::elf {
                 }
             }
 
-            opts.strs[opts.strtab_idx++] = ".symtab"_ss;
-
-            u32 idx{};
-            for (const auto& symbol : file.module->symbols) {
-                auto intern_rc = string::interned::get(symbol.name);
-                if (!OK(intern_rc.status))
-                    return status_t::symbol_not_found;
-                opts.syms[idx++]             = (symbol_t*) &symbol;
-                opts.strs[opts.strtab_idx++] = intern_rc.slice;
-            }
-
-            opts.strtab_size = 0;
-            for (u32 i = 0; i < opts.strtab_idx; ++i)
-                opts.strtab_size += opts.strs[i].length + 1;
-
-            usize file_size = elf::file::header_size
-                + (opts.num_sections * section::header_size)
-                + (opts.num_symbols * symtab::entity_size)
-                + opts.strtab_size
+            const auto symbols_size = file.module->symbols.size > 0 ?
+                                      (file.module->symbols.size + 1) * symtab::entity_size :
+                                      0;
+            opts.header_offset = elf::file::header_size
+                + symbols_size
+                + file.module->strtab.buf.size
                 + data_size;
+            usize file_size = opts.header_offset
+                + (num_segments * segment::header_size)
+                + (num_sections * section::header_size);
 
             status = io::file::map_new(file, file_size);
             if (!OK(status))
@@ -352,8 +320,10 @@ namespace basecode::binfmt::io::elf {
                               str::slice_t& name) {
         using section_type_t = binfmt::section::type_t;
 
-        if (section->name.length > 0) {
-            name = section->name;
+        if (section->name_offset > 0) {
+            const auto str = binfmt::string_table::get(section->module->strtab, section->name_offset);
+            name.data   = (const u8*) str;
+            name.length = strlen(str);
             return status_t::ok;
         }
 

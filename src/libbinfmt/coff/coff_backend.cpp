@@ -18,6 +18,7 @@
 
 #include <basecode/binfmt/cv.h>
 #include <basecode/binfmt/coff.h>
+#include <basecode/binfmt/binfmt.h>
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/slice_utils.h>
 
@@ -400,8 +401,10 @@ namespace basecode::binfmt::io::coff {
     }
 
     status_t get_section_name(const binfmt::section_t* section, str::slice_t& name) {
-        if (section->name.length > 0) {
-            name = section->name;
+        if (section->name_offset > 0) {
+            const auto str = binfmt::string_table::get(section->module->strtab, section->name_offset);
+            name.data   = (const u8*) str;
+            name.length = strlen(str);
             return status_t::ok;
         }
 

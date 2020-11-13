@@ -676,7 +676,7 @@ namespace basecode::binfmt::io::coff {
     }
 
     status_t init(coff_t& coff, file_t& file, alloc_t* alloc) {
-        using type_t = binfmt::section::type_t;
+//        using type_t = binfmt::section::type_t;
 
         coff.alloc = alloc;
         coff.buf   = file.buf.data;
@@ -716,13 +716,14 @@ namespace basecode::binfmt::io::coff {
             hdr.section = &module_sc.sections[i];
 
             str::slice_t name{};
-            if (hdr.section->type == type_t::custom) {
-                name = hdr.section->name;
-            } else {
-                status = coff::get_section_name(hdr.section, name);
-                if (!OK(status))
-                    return status;
-            }
+            // XXX: FIXME!
+//            if (hdr.section->type == type_t::custom) {
+//                name = hdr.section->name;
+//            } else {
+//                status = coff::get_section_name(hdr.section, name);
+//                if (!OK(status))
+//                    return status;
+//            }
 
             auto sym = coff::symtab::make_symbol(coff, name);
             {
@@ -747,10 +748,8 @@ namespace basecode::binfmt::io::coff {
         }
 
         for (const auto& symbol : module->symbols) {
-            const auto intern_rc = string::interned::get(symbol.name);
-            if (!OK(intern_rc.status))
-                return status_t::symbol_not_found;
-            auto sym = coff::symtab::make_symbol(coff, intern_rc.slice);
+            // XXX: FIXME!
+            auto sym = coff::symtab::make_symbol(coff, slice::make(nullptr, 0));
             auto sc  = &sym->subclass.sym;
             sc->value   = symbol.value;
             sc->section = symbol.section;

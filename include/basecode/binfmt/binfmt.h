@@ -62,6 +62,8 @@ namespace basecode::binfmt {
 
         symbol_t* find_symbol(const module_t& module, const s8* name, s32 len = -1);
 
+        result_t make_symbol(module_t& module, const symbol_opts_t& opts, u32 name_offset);
+
         u0 find_sections(const module_t& module, str::slice_t name, section_ptr_list_t& list);
 
         const symbol_t* find_symbol(const module_t& module, const String_Concept auto& name) {
@@ -75,5 +77,21 @@ namespace basecode::binfmt {
         result_t make_symbol(module_t& module, const String_Concept auto& name, const symbol_opts_t& opts = {}) {
             return make_symbol(module, opts, (const s8*) name.data, name.length);
         }
+    }
+
+    namespace string_table {
+        u0 free(string_table_t& table);
+
+        u0 reset(string_table_t& table);
+
+        status_t init(string_table_t& table);
+
+        u32 append(string_table_t& table, str::slice_t str);
+
+        const s8* get(const string_table_t& table, u32 offset);
+
+        s32 find(const string_table_t& table, str::slice_t str);
+
+        status_t init(string_table_t& table, u8* buf, u32 size_in_bytes);
     }
 }

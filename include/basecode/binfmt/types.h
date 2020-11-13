@@ -48,7 +48,7 @@ namespace basecode::binfmt {
     using symbol_list_t         = array_t<symbol_t>;
     using member_list_t         = array_t<member_t>;
     using section_list_t        = array_t<section_t>;
-    using symbol_table_t        = hashtab_t<intern_id, symbol_id>;
+    using symbol_table_t        = hashtab_t<u32, symbol_id>;
     using section_ptr_list_t    = array_t<section_t*>;
     using symbol_offs_list_t    = array_t<symbol_offs_t>;
 
@@ -79,6 +79,11 @@ namespace basecode::binfmt {
         invalid_file_type               = 2022,
         elf_unsupported_section         = 2023,
         invalid_relocation_type         = 2024,
+    };
+
+    enum class string_table_mode_t : u8 {
+        shared,
+        exclusive,
     };
 
     enum class module_type_t : u8 {
@@ -300,16 +305,16 @@ namespace basecode::binfmt {
     struct symbol_t final {
         u64                     size;
         u64                     value;
-        section_id              section;
-        intern_id               name;
-        symbol_id               next;
         symbol_id               id;
+        symbol_id               next;
+        section_id              section;
+        u32                     name_offset;
         symbol::type_t          type;
         symbol::scope_t         scope;
         symbol::visibility_t    visibility;
 
         b8 operator==(const symbol_t& other) const {
-            return name == other.name;
+            return id == other.id;
         }
     };
 
@@ -353,17 +358,36 @@ namespace basecode::binfmt {
         };
     };
 
+    struct string_table_t final {
+        alloc_t*                alloc;
+        struct {
+            u8*                 data;
+            u32                 size;
+            u32                 capacity;
+        }                       buf;
+        struct {
+            u32*                data;
+            u32                 size;
+            u32                 capacity;
+        }                       offs;
+        string_table_mode_t     mode;
+
+        const s8* operator[](u32 idx) const {
+            return (const s8*) (buf.data + offs.data[idx]);
+        }
+    };
+
     union section_subclass_t {
         const u8*               data;
         group_t                 group;
         reloc_list_t            relocs;
+        string_table_t          strtab;
         import_list_t           imports;
     };
 
     struct section_t final {
         alloc_t*                alloc;
         const module_t*         module;
-        str::slice_t            name;
         section_subclass_t      subclass;
         section_id              id;
         section_id              link;
@@ -371,18 +395,19 @@ namespace basecode::binfmt {
         u32                     size;
         u32                     align;
         u32                     ext_type;
+        u32                     name_offset;
         section::flags_t        flags;
         section::type_t         type;
     };
 
     struct section_opts_t final {
-        str::slice_t            name;
         section_id              link;
         section::flags_t        flags;
         u32                     info;
         u32                     size;
         u32                     align;
         u32                     ext_type;
+        u32                     name_offset;
     };
 
     enum class member_type_t : u8 {
@@ -421,6 +446,7 @@ namespace basecode::binfmt {
         alloc_t*                alloc;
         symbol_list_t           symbols;
         symbol_table_t          symtab;
+        string_table_t          strtab;
         module_subclass_t       subclass;
         module_id               id;
         module_type_t           type;

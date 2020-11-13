@@ -20,13 +20,13 @@
 
 #include <basecode/binfmt/io.h>
 
-#define ELF64_R_SYM(i)              ((i) >> 32)
-#define ELF64_R_TYPE(i)             ((i) & 0xffffffff)
-#define ELF64_R_INFO(sym, type)     ((((u64) (sym)) << 32) + (type))
-#define ELF64_ST_BIND(val)          (((u8) (val)) >> 4)
-#define ELF64_ST_TYPE(val)          ((val) & 0xf)
-#define ELF64_ST_VISIBILITY(o)      ((o) & 0x03)
-#define ELF64_ST_INFO(bind, type)   (((bind) << 4) + ((type) & 0xf))
+#define ELF64_R_SYM(i)              ((i) >> u32(32))
+#define ELF64_R_TYPE(i)             ((i) & u32(0xffffffff))
+#define ELF64_R_INFO(sym, type)     ((((u64) (sym)) << u32(32)) + (type))
+#define ELF64_ST_BIND(val)          (((u8) (val)) >> u32(4))
+#define ELF64_ST_TYPE(val)          ((val) & u32(0xf))
+#define ELF64_ST_VISIBILITY(o)      ((o) & u32(0x03))
+#define ELF64_ST_INFO(bind, type)   (((bind) << u32(4)) + ((type) & u32(0xf)))
 
 // XXX:
 //  STT_GNU_IFUNC?
@@ -150,14 +150,8 @@ namespace basecode::binfmt::io::elf {
     struct opts_t final {
         alloc_t*                alloc;
         file_t*                 file;
-        symbol_t**              syms;
-        str::slice_t*           strs;
         u64                     entry_point;
-        u32                     strtab_idx;
-        u32                     strtab_size;
-        u32                     num_symbols;
-        u32                     num_segments;
-        u32                     num_sections;
+        u32                     header_offset;
         u32                     flags;
         u8                      clazz;
         u8                      os_abi;
@@ -566,12 +560,6 @@ namespace basecode::binfmt::io::elf {
             [[maybe_unused]] constexpr u32 exec             = 0x1;
             [[maybe_unused]] constexpr u32 write            = 0x2;
         }
-    }
-
-    namespace strtab {
-        u32 add(elf_t& elf, str::slice_t str);
-
-        const s8* get(const elf_t& elf, u32 offset);
     }
 
     namespace symtab {
