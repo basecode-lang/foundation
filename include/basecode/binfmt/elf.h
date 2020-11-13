@@ -175,12 +175,10 @@ namespace basecode::binfmt::io::elf {
         struct {
             sect_header_t*      sect;
             u32                 ndx;
-            u32                 offset;
         }                       strtab;
         struct {
             sect_header_t*      sect;
             u32                 ndx;
-            u32                 offset;
         }                       symtab;
     };
 

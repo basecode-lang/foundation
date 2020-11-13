@@ -106,10 +106,19 @@ namespace basecode {
         u8                      bytes[8];
     };
 
+#ifdef __SSE4_2__
     union m128i_bytes_t final {
         __m128i                 value;
         u8                      bytes[16];
     };
+#endif
+
+#ifdef __AVX2__
+    union m256i_bytes_t final {
+        __m256i                 value;
+        u8                      bytes[32];
+    };
+#endif
 
     template <typename From, typename To> concept convertible_to = std::is_convertible_v<From, To> && requires(std::add_rvalue_reference_t<From> (&f)()) {
         static_cast<To>(f());

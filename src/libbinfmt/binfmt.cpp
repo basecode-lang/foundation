@@ -127,14 +127,15 @@ namespace basecode::binfmt {
         status_t init(section_t* section,
                       section::type_t type,
                       const section_opts_t& opts) {
-            section->alloc  = g_binfmt_sys.alloc;
-            section->type   = type;
-            section->info   = opts.info;
-            section->link   = opts.link;
-            section->size   = opts.size;
-            section->name   = opts.name;
-            section->flags  = opts.flags;
-            section->align  = opts.align;
+            section->alloc    = g_binfmt_sys.alloc;
+            section->type     = type;
+            section->info     = opts.info;
+            section->link     = opts.link;
+            section->size     = opts.size;
+            section->name     = opts.name;
+            section->flags    = opts.flags;
+            section->align    = opts.align;
+            section->ext_type = opts.ext_type;
             switch (section->type) {
                 case section::type_t::data:
                 case section::type_t::code:

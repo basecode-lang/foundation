@@ -173,8 +173,7 @@ namespace basecode::binfmt::io::elf {
                                                        alignof(symbol_t*));
             }
 
-            const auto strs_size = sizeof(str::slice_t)
-                * (opts.num_sections + opts.num_symbols);
+            const auto strs_size = sizeof(str::slice_t) * (opts.num_sections + opts.num_symbols);
             opts.strs = (str::slice_t*) memory::alloc(g_elf_sys.alloc,
                                                       strs_size,
                                                       alignof(str::slice_t));
@@ -225,8 +224,7 @@ namespace basecode::binfmt::io::elf {
                 + (opts.num_sections * section::header_size)
                 + (opts.num_symbols * symtab::entity_size)
                 + opts.strtab_size
-                + data_size
-                + 16;
+                + data_size;
 
             status = io::file::map_new(file, file_size);
             if (!OK(status))

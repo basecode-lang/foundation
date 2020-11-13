@@ -370,6 +370,7 @@ namespace basecode::binfmt {
         u32                     info;
         u32                     size;
         u32                     align;
+        u32                     ext_type;
         section::flags_t        flags;
         section::type_t         type;
     };
@@ -381,6 +382,7 @@ namespace basecode::binfmt {
         u32                     info;
         u32                     size;
         u32                     align;
+        u32                     ext_type;
     };
 
     enum class member_type_t : u8 {
