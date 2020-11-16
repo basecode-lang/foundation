@@ -19,4 +19,31 @@
 #include <basecode/binfmt/macho.h>
 
 namespace basecode::binfmt::io::macho {
+    u0 free(macho_t& macho) {
+        UNUSED(macho);
+    }
+
+    status_t read(macho_t& macho, file_t& file) {
+        UNUSED(macho);
+        UNUSED(file);
+        return status_t::ok;
+    }
+
+    status_t write(macho_t& macho, file_t& file) {
+        UNUSED(macho);
+        UNUSED(file);
+        return status_t::ok;
+    }
+
+    status_t get_section_name(const module_t* module,
+                              const binfmt::section_t* section,
+                              str::slice_t& name) {
+        return status_t::ok;
+    }
+
+    status_t init(macho_t& macho, const opts_t& opts) {
+        macho.alloc = opts.alloc;
+        macho.opts  = &opts;
+        return status_t::ok;
+    }
 }
