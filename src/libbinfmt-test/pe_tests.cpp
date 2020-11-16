@@ -85,7 +85,26 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     REQUIRE(OK(system::make_module(module_type_t::object, 10, &mod)));
     REQUIRE(system::get_module(10) != nullptr);
 
-    /* .text section */ {
+    // 1. create the default string table
+    auto strtab_rc = module::make_section(*mod, section::type_t::strtab);
+    REQUIRE(OK(strtab_rc.status));
+    module::set_default_strtab(*mod, strtab_rc.id);
+
+    auto kernel32_str_rc = section::add_string(*mod, strtab_rc.id, "KERNEL32.DLL"_ss);
+    REQUIRE(OK(kernel32_str_rc.status));
+    auto read_file_str_rc = section::add_string(*mod, strtab_rc.id, "ReadFile"_ss);
+    REQUIRE(OK(read_file_str_rc.status));
+    auto write_file_str_rc = section::add_string(*mod, strtab_rc.id, "WriteFile"_ss);
+    REQUIRE(OK(write_file_str_rc.status));
+    auto get_std_handle_str_rc = section::add_string(*mod, strtab_rc.id, "GetStdHandle"_ss);
+    REQUIRE(OK(get_std_handle_str_rc.status));
+
+    // 2. create the default symbol table
+    auto symtab_rc = module::make_section(*mod, section::type_t::symtab);
+    REQUIRE(OK(symtab_rc.status));
+    module::set_default_symtab(*mod, symtab_rc.id);
+
+    /* 3. .text section */ {
         auto text_rc = module::make_section(*mod,
                                             section::type_t::code,
                                             {
@@ -96,12 +115,12 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                               },
                                               .size = sizeof(s_rot13_code)
                                           });
-        auto set_data_rc = section::data(*mod, text_rc.id, s_rot13_code);
+        auto set_data_rc = section::set_data(*mod, text_rc.id, s_rot13_code);
         REQUIRE(OK(set_data_rc.status));
         REQUIRE(OK(text_rc.status));
     }
 
-    /* .rdata section */ {
+    /* 4. .rdata section */ {
         auto rdata_rc = module::make_section(*mod,
                                              section::type_t::data,
                                              {
@@ -112,12 +131,12 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                },
                                                .size = sizeof(s_rot13_table)
                                            });
-        auto set_data_rc = section::data(*mod, rdata_rc.id, s_rot13_table);
+        auto set_data_rc = section::set_data(*mod, rdata_rc.id, s_rot13_table);
         REQUIRE(OK(set_data_rc.status));
         REQUIRE(OK(rdata_rc.status));
     }
 
-    /* .idata section */ {
+    /* 5. .idata section */ {
         auto idata_rc = module::make_section(*mod,
                                              section::type_t::import,
                                              {
@@ -128,38 +147,42 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                     .alloc = true,
                                                 }
                                            });
-        auto kernel32_sym_rc = module::make_symbol(*mod,
-                                                   "kernel32.dll"_ss,
+        auto kernel32_sym_rc = section::add_symbol(*mod,
+                                                   symtab_rc.id,
                                                    {
-                                                     .value = 1,
-                                                     .section = idata_rc.id,
-                                                     .type   = symbol::type_t::file,
-                                                     .scope  = symbol::scope_t::local
-                                                 });
-        auto read_file_sym_rc = module::make_symbol(*mod,
-                                                    "ReadFile"_ss,
-                                                    {
-                                                      .value = 2,
-                                                      .section = idata_rc.id,
-                                                      .type = symbol::type_t::function,
-                                                      .scope = symbol::scope_t::global,
-                                                  });
-        auto write_file_sym_rc = module::make_symbol(*mod,
-                                                     "WriteFile"_ss,
-                                                     {
-                                                       .value = 3,
+                                                       .value = 1,
+                                                       .name_offset = kernel32_str_rc.id,
                                                        .section = idata_rc.id,
-                                                       .type = symbol::type_t::function,
-                                                       .scope = symbol::scope_t::global,
+                                                       .type   = symbol::type_t::file,
+                                                       .scope  = symbol::scope_t::local
                                                    });
-        auto get_std_handle_sym_rc = module::make_symbol(*mod,
-                                                         "GetStdHandle"_ss,
+        auto read_file_sym_rc = section::add_symbol(*mod,
+                                                    symtab_rc.id,
+                                                    {
+                                                        .value = 2,
+                                                        .name_offset = read_file_str_rc.id,
+                                                        .section = idata_rc.id,
+                                                        .type = symbol::type_t::function,
+                                                        .scope = symbol::scope_t::global,
+                                                    });
+        auto write_file_sym_rc = section::add_symbol(*mod,
+                                                     symtab_rc.id,
+                                                     {
+                                                         .value = 3,
+                                                         .name_offset = write_file_str_rc.id,
+                                                         .section = idata_rc.id,
+                                                         .type = symbol::type_t::function,
+                                                         .scope = symbol::scope_t::global,
+                                                     });
+        auto get_std_handle_sym_rc = section::add_symbol(*mod,
+                                                         symtab_rc.id,
                                                          {
-                                                           .value = 4,
-                                                           .section = idata_rc.id,
-                                                           .type = symbol::type_t::function,
-                                                           .scope = symbol::scope_t::global,
-                                                       });
+                                                             .value = 4,
+                                                             .name_offset = get_std_handle_str_rc.id,
+                                                             .section = idata_rc.id,
+                                                             .type = symbol::type_t::function,
+                                                             .scope = symbol::scope_t::global,
+                                                         });
         auto kernel32_imp_rc = section::import_module(*mod, idata_rc.id, kernel32_sym_rc.id);
         auto kernel32_imp    = section::get_import(*mod, idata_rc.id, kernel32_imp_rc.id);
         import::add_symbol(kernel32_imp, get_std_handle_sym_rc.id);
@@ -179,7 +202,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
         REQUIRE(kernel32_imp->symbols[2] == write_file_sym_rc.id);
     }
 
-    /* .bss section */ {
+    /* 6. .bss section */ {
         auto bss_rc = module::make_section(*mod,
                                            section::type_t::data,
                                            {

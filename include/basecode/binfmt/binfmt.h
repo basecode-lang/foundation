@@ -42,41 +42,47 @@ namespace basecode::binfmt {
     namespace section {
         u0 free(section_t& section);
 
-        result_t data(module_t& module, section_id id, const u8* data);
+        result_t set_data(module_t& module, section_id id, const u8* data);
+
+        result_t add_string(module_t& module, section_id id, str::slice_t str);
 
         import_t* get_import(module_t& module, section_id id, import_id import);
 
         result_t import_module(module_t& module, section_id id, symbol_id symbol);
 
         status_t init(section_t& section, section::type_t type, symbol_id symbol);
+
+        result_t add_symbol(module_t& module, section_id id, const symbol_opts_t& opts);
     }
 
     namespace module {
         u0 free(module_t& module);
 
-        symbol_t* get_symbol(const module_t& module, symbol_id id);
+        u0 find_sections(const module_t& module,
+                         str::slice_t name,
+                         section_ptr_list_t& list);
+
+        result_t make_section(module_t& module,
+                              section::type_t type,
+                              const section_opts_t& opts = {});
+
+        u0 set_default_strtab(module_t& module, section_id id);
+
+        u0 set_default_symtab(module_t& module, section_id id);
 
         section_t* get_section(const module_t& module, section_id id);
 
         status_t init(module_t& module, module_type_t type, module_id id);
+    }
 
-        symbol_t* find_symbol(const module_t& module, const s8* name, s32 len = -1);
+    namespace symbol_table {
+        u0 free(symbol_table_t& table);
 
-        result_t make_symbol(module_t& module, const symbol_opts_t& opts, u32 name_offset);
+        status_t init(symbol_table_t& table);
 
-        u0 find_sections(const module_t& module, str::slice_t name, section_ptr_list_t& list);
+        symbol_t* get_symbol(const symbol_table_t& symtab, symbol_id id);
 
-        const symbol_t* find_symbol(const module_t& module, const String_Concept auto& name) {
-            return find_symbol(module, (const s8*) name.data, name.length);
-        }
-
-        result_t make_section(module_t& module, section::type_t type, const section_opts_t& opts = {});
-
-        result_t make_symbol(module_t& module, const symbol_opts_t& opts, const s8* name, s32 len = -1);
-
-        result_t make_symbol(module_t& module, const String_Concept auto& name, const symbol_opts_t& opts = {}) {
-            return make_symbol(module, opts, (const s8*) name.data, name.length);
-        }
+        result_t make_symbol(symbol_table_t& symtab, const symbol_opts_t& opts);
     }
 
     namespace string_table {

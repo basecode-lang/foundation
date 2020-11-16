@@ -747,47 +747,47 @@ namespace basecode::binfmt::io::coff {
             }
         }
 
-        for (const auto& symbol : module->symbols) {
-            // XXX: FIXME!
-            auto sym = coff::symtab::make_symbol(coff, slice::make(nullptr, 0));
-            auto sc  = &sym->subclass.sym;
-            sc->value   = symbol.value;
-            sc->section = symbol.section;
-            switch (symbol.type) {
-                default:
-                case symbol::type_t::none:
-                case symbol::type_t::object:
-                    sc->type = 0;
-                    break;
-                case symbol::type_t::file:
-                    sc->type   = 0;
-                    sc->sclass = symtab::sclass::file;
-                    break;
-                case symbol::type_t::section:
-                    sc->type   = 0;
-                    sc->sclass = symtab::sclass::static_;
-                    break;
-                case symbol::type_t::function:
-                    sc->type = symtab::type::function;
-                    break;
-            }
-            if (!sc->sclass) {
-                switch (symbol.scope) {
-                    case symbol::scope_t::none:
-                        sc->sclass = symtab::sclass::null_;
-                        break;
-                    case symbol::scope_t::weak:
-                        sc->sclass = symtab::sclass::weak_external;
-                        break;
-                    case symbol::scope_t::local:
-                        sc->sclass = symtab::sclass::static_;
-                        break;
-                    case symbol::scope_t::global:
-                        sc->sclass = symtab::sclass::external_;
-                        break;
-                }
-            }
-        }
+        // XXX: FIXME!
+//        for (const auto& symbol : module->symbols) {
+//            auto sym = coff::symtab::make_symbol(coff, slice::make(nullptr, 0));
+//            auto sc  = &sym->subclass.sym;
+//            sc->value   = symbol.value;
+//            sc->section = symbol.section;
+//            switch (symbol.type) {
+//                default:
+//                case symbol::type_t::none:
+//                case symbol::type_t::object:
+//                    sc->type = 0;
+//                    break;
+//                case symbol::type_t::file:
+//                    sc->type   = 0;
+//                    sc->sclass = symtab::sclass::file;
+//                    break;
+//                case symbol::type_t::section:
+//                    sc->type   = 0;
+//                    sc->sclass = symtab::sclass::static_;
+//                    break;
+//                case symbol::type_t::function:
+//                    sc->type = symtab::type::function;
+//                    break;
+//            }
+//            if (!sc->sclass) {
+//                switch (symbol.scope) {
+//                    case symbol::scope_t::none:
+//                        sc->sclass = symtab::sclass::null_;
+//                        break;
+//                    case symbol::scope_t::weak:
+//                        sc->sclass = symtab::sclass::weak_external;
+//                        break;
+//                    case symbol::scope_t::local:
+//                        sc->sclass = symtab::sclass::static_;
+//                        break;
+//                    case symbol::scope_t::global:
+//                        sc->sclass = symtab::sclass::external_;
+//                        break;
+//                }
+//            }
+//        }
 
         return status;
     }

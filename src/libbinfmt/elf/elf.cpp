@@ -816,14 +816,14 @@ namespace basecode::binfmt::io::elf {
         if (elf.file_header->strtab_ndx > 0) {
             elf.strtab.ndx    = elf.file_header->strtab_ndx;
             elf.strtab.sect   = &elf.sections[elf.strtab.ndx];
-        }
-
-        for (u32 i = 1; i < elf.file_header->sect_hdr_count; ++i) {
-            const auto& hdr = elf.sections[i];
-            if (hdr.type == section::type::symtab) {
-                elf.symtab.ndx    = i;
-                elf.symtab.sect   = &elf.sections[i];
-                break;
+            for (u32 i = 1; i < elf.file_header->sect_hdr_count; ++i) {
+                const auto& hdr = elf.sections[i];
+                if (hdr.type == section::type::symtab
+                &&  hdr.link == elf.strtab.ndx) {
+                    elf.symtab.ndx    = i;
+                    elf.symtab.sect   = &elf.sections[i];
+                    break;
+                }
             }
         }
 
@@ -834,11 +834,11 @@ namespace basecode::binfmt::io::elf {
         if (!OK(status))
             return status;
 
-        status = binfmt::string_table::init(module->strtab,
-                                            buf + elf.strtab.sect->offset,
-                                            elf.strtab.sect->size);
-        if (!OK(status))
-            return status;
+//        status = binfmt::string_table::init(module->strtab,
+//                                            buf + elf.strtab.sect->offset,
+//                                            elf.strtab.sect->size);
+//        if (!OK(status))
+//            return status;
 
         for (u32 i = 1; i < elf.file_header->sect_hdr_count; ++i) {
             const auto& hdr = elf.sections[i];
@@ -943,6 +943,12 @@ namespace basecode::binfmt::io::elf {
                     }
                     break;
                 }
+                case binfmt::section::type_t::strtab: {
+                    break;
+                }
+                case binfmt::section::type_t::symtab: {
+                    break;
+                }
                 case binfmt::section::type_t::custom: {
                     section->subclass.data = buf + hdr.offset;
                     section->ext_type      = hdr.type;
@@ -957,82 +963,82 @@ namespace basecode::binfmt::io::elf {
             }
         }
 
-        const auto symtab_count = elf.symtab.sect->size / elf.symtab.sect->entity_size;
-        for (u32 i = 1; i < symtab_count; ++i) {
-            auto sym = elf::symtab::get(elf, elf.symtab.ndx, i);
-
-            binfmt::symbol_opts_t sym_opts{};
-            sym_opts.size    = sym->size;
-            sym_opts.value   = sym->value;
-            sym_opts.section = sym->section_ndx - 1;
-
-            auto type  = ELF64_ST_TYPE(sym->info);
-            auto scope = ELF64_ST_BIND(sym->info);
-            auto vis   = ELF64_ST_VISIBILITY(sym->other);
-
-            switch (type) {
-                default:
-                case elf::symtab::type::notype:
-                    sym_opts.type = symbol::type_t::none;
-                    break;
-                case elf::symtab::type::tls:
-                    sym_opts.type = symbol::type_t::tls;
-                    break;
-                case elf::symtab::type::file:
-                    sym_opts.type = symbol::type_t::file;
-                    break;
-                case elf::symtab::type::common:
-                    sym_opts.type = symbol::type_t::common;
-                    break;
-                case elf::symtab::type::object:
-                    sym_opts.type = symbol::type_t::object;
-                    break;
-                case elf::symtab::type::section:
-                    sym_opts.type = symbol::type_t::section;
-                    break;
-                case elf::symtab::type::func:
-                    sym_opts.type = symbol::type_t::function;
-                    break;
-            }
-
-            switch (scope) {
-                default:
-                case elf::symtab::scope::local:
-                    sym_opts.scope = symbol::scope_t::local;
-                    break;
-                case elf::symtab::scope::global:
-                    sym_opts.scope = symbol::scope_t::global;
-                    break;
-                case elf::symtab::scope::weak:
-                    sym_opts.scope = symbol::scope_t::weak;
-                    break;
-            }
-
-            switch (vis) {
-                default:
-                case elf::symtab::visibility::default_:
-                    sym_opts.visibility = symbol::visibility_t::default_;
-                    break;
-                case elf::symtab::visibility::internal:
-                    sym_opts.visibility = symbol::visibility_t::internal_;
-                    break;
-                case elf::symtab::visibility::hidden:
-                    sym_opts.visibility = symbol::visibility_t::hidden;
-                    break;
-                case elf::symtab::visibility::protected_:
-                    sym_opts.visibility = symbol::visibility_t::protected_;
-                    break;
-            }
-
-            binfmt::module::make_symbol(*module, sym_opts, sym->name_offset);
-        }
+//        const auto symtab_count = elf.symtab.sect->size / elf.symtab.sect->entity_size;
+//        for (u32 i = 1; i < symtab_count; ++i) {
+//            auto sym = elf::symtab::get(elf, elf.symtab.ndx, i);
+//
+//            binfmt::symbol_opts_t sym_opts{};
+//            sym_opts.size    = sym->size;
+//            sym_opts.value   = sym->value;
+//            sym_opts.section = sym->section_ndx - 1;
+//
+//            auto type  = ELF64_ST_TYPE(sym->info);
+//            auto scope = ELF64_ST_BIND(sym->info);
+//            auto vis   = ELF64_ST_VISIBILITY(sym->other);
+//
+//            switch (type) {
+//                default:
+//                case elf::symtab::type::notype:
+//                    sym_opts.type = symbol::type_t::none;
+//                    break;
+//                case elf::symtab::type::tls:
+//                    sym_opts.type = symbol::type_t::tls;
+//                    break;
+//                case elf::symtab::type::file:
+//                    sym_opts.type = symbol::type_t::file;
+//                    break;
+//                case elf::symtab::type::common:
+//                    sym_opts.type = symbol::type_t::common;
+//                    break;
+//                case elf::symtab::type::object:
+//                    sym_opts.type = symbol::type_t::object;
+//                    break;
+//                case elf::symtab::type::section:
+//                    sym_opts.type = symbol::type_t::section;
+//                    break;
+//                case elf::symtab::type::func:
+//                    sym_opts.type = symbol::type_t::function;
+//                    break;
+//            }
+//
+//            switch (scope) {
+//                default:
+//                case elf::symtab::scope::local:
+//                    sym_opts.scope = symbol::scope_t::local;
+//                    break;
+//                case elf::symtab::scope::global:
+//                    sym_opts.scope = symbol::scope_t::global;
+//                    break;
+//                case elf::symtab::scope::weak:
+//                    sym_opts.scope = symbol::scope_t::weak;
+//                    break;
+//            }
+//
+//            switch (vis) {
+//                default:
+//                case elf::symtab::visibility::default_:
+//                    sym_opts.visibility = symbol::visibility_t::default_;
+//                    break;
+//                case elf::symtab::visibility::internal:
+//                    sym_opts.visibility = symbol::visibility_t::internal_;
+//                    break;
+//                case elf::symtab::visibility::hidden:
+//                    sym_opts.visibility = symbol::visibility_t::hidden;
+//                    break;
+//                case elf::symtab::visibility::protected_:
+//                    sym_opts.visibility = symbol::visibility_t::protected_;
+//                    break;
+//            }
+//
+//            binfmt::module::make_symbol(*module, sym_opts, sym->name_offset);
+//        }
 
         file.module = module;
 
         return status_t::ok;
     }
 
-    status_t write(elf_t& elf, file_t& file) {
+status_t write(elf_t& elf, file_t& file) {
         using machine_type_t = binfmt::machine::type_t;
         using section_type_t = binfmt::section::type_t;
 
@@ -1071,31 +1077,31 @@ namespace basecode::binfmt::io::elf {
             elf.sections = (sect_header_t*) (buf + fh->sect_hdr_offset);
         }
 
-        if (module->strtab.buf.size > 0) {
-            ++fh->sect_hdr_count;
-            fh->strtab_ndx               = 1;
-            elf.strtab.sect              = &elf.sections[1];
-            elf.strtab.sect->type        = section::type::strtab;
-            elf.strtab.sect->size        = module->strtab.buf.size;
-            elf.strtab.sect->addr        = {};
-            elf.strtab.sect->flags       = {};
-            elf.strtab.sect->addr_align  = 1;
-            elf.strtab.sect->name_offset = binfmt::string_table::find(module->strtab, ".strtab"_ss);
-        }
-
-        if (module->symbols.size > 0) {
-            ++fh->sect_hdr_count;
-            elf.symtab.sect              = &elf.sections[fh->sect_hdr_count - 1];
-            elf.symtab.sect->link        = fh->strtab_ndx;
-            elf.symtab.sect->info        = {};
-            elf.symtab.sect->addr        = {};
-            elf.symtab.sect->type        = section::type::symtab;
-            elf.symtab.sect->size        = (module->symbols.size + 1) * symtab::entity_size;
-            elf.symtab.sect->flags       = {};
-            elf.symtab.sect->addr_align  = 8;
-            elf.symtab.sect->entity_size = symtab::entity_size;
-            elf.symtab.sect->name_offset = binfmt::string_table::find(module->strtab, ".symtab"_ss);
-        }
+//        if (module->strtab.buf.size > 0) {
+//            ++fh->sect_hdr_count;
+//            fh->strtab_ndx               = 1;
+//            elf.strtab.sect              = &elf.sections[1];
+//            elf.strtab.sect->type        = section::type::strtab;
+//            elf.strtab.sect->size        = module->strtab.buf.size;
+//            elf.strtab.sect->addr        = {};
+//            elf.strtab.sect->flags       = {};
+//            elf.strtab.sect->addr_align  = 1;
+//            elf.strtab.sect->name_offset = binfmt::string_table::find(module->strtab, ".strtab"_ss);
+//        }
+//
+//        if (module->symbols.size > 0) {
+//            ++fh->sect_hdr_count;
+//            elf.symtab.sect              = &elf.sections[fh->sect_hdr_count - 1];
+//            elf.symtab.sect->link        = fh->strtab_ndx;
+//            elf.symtab.sect->info        = {};
+//            elf.symtab.sect->addr        = {};
+//            elf.symtab.sect->type        = section::type::symtab;
+//            elf.symtab.sect->size        = (module->symbols.size + 1) * symtab::entity_size;
+//            elf.symtab.sect->flags       = {};
+//            elf.symtab.sect->addr_align  = 8;
+//            elf.symtab.sect->entity_size = symtab::entity_size;
+//            elf.symtab.sect->name_offset = binfmt::string_table::find(module->strtab, ".symtab"_ss);
+//        }
 
         if (num_segments > 0) {
             fh->pgm_hdr_count  = num_segments + 1;
@@ -1239,98 +1245,96 @@ namespace basecode::binfmt::io::elf {
                     inc_vaddr   = !is_obj;
                     break;
                 }
+                case section_type_t::strtab: {
+                    std::memcpy(data, section.subclass.strtab.buf.data, hdr.size);
+                    hdr.type = section::type::strtab;
+                    data_offset = align(data_offset + hdr.size, 8);
+                    inc_vaddr   = !is_obj && section.flags.alloc;
+                    break;
+                }
+                case section_type_t::symtab: {
+                    auto sym_data = (sym_t*) (buf + elf.symtab.sect->offset);
+                    u32 i       {};
+                    u32 scope   {};
+                    u32 type    {};
+                    u32 vis     {};
+                    for (const auto& symbol : section.subclass.symtab.symbols) {
+                        auto& sym = sym_data[i + 1];
+
+                        switch (symbol.type) {
+                            case symbol::type_t::none:
+                                type = elf::symtab::type::notype;
+                                break;
+                            case symbol::type_t::tls:
+                                type = elf::symtab::type::tls;
+                                break;
+                            case symbol::type_t::file:
+                                type = elf::symtab::type::file;
+                                break;
+                            case symbol::type_t::common:
+                                type = elf::symtab::type::common;
+                                break;
+                            case symbol::type_t::object:
+                                type = elf::symtab::type::object;
+                                break;
+                            case symbol::type_t::section:
+                                type = elf::symtab::type::section;
+                                break;
+                            case symbol::type_t::function:
+                                type = elf::symtab::type::func;
+                                break;
+                        }
+
+                        switch (symbol.scope) {
+                            case symbol::scope_t::none:
+                            case symbol::scope_t::weak:
+                                scope = elf::symtab::scope::weak;
+                                if (!elf.symtab.sect->info)
+                                    elf.symtab.sect->info = i + 1;
+                                break;
+                            case symbol::scope_t::local:
+                                scope = elf::symtab::scope::local;
+                                break;
+                            case symbol::scope_t::global:
+                                scope = elf::symtab::scope::global;
+                                if (!elf.symtab.sect->info)
+                                    elf.symtab.sect->info = i + 1;
+                                break;
+                        }
+
+                        switch (symbol.visibility) {
+                            case symbol::visibility_t::default_:
+                                vis = elf::symtab::visibility::default_;
+                                break;
+                            case symbol::visibility_t::internal_:
+                                vis = elf::symtab::visibility::internal;
+                                break;
+                            case symbol::visibility_t::hidden:
+                                vis = elf::symtab::visibility::hidden;
+                                break;
+                            case symbol::visibility_t::protected_:
+                                vis = elf::symtab::visibility::protected_;
+                                break;
+                        }
+
+                        sym.size        = symbol.size;
+                        sym.value       = symbol.value;
+                        sym.info        = ELF64_ST_INFO(scope, type);
+                        sym.other       = ELF64_ST_VISIBILITY(vis);
+                        sym.name_offset = symbol.name_offset;
+                        sym.section_ndx = symbol.section + 1;
+
+                        ++i;
+                    }
+                    data_offset = align(data_offset + hdr.size, 8);
+                    break;
+                }
                 default:
                     break;
             }
 
             if (inc_vaddr)
                 virt_addr = align(virt_addr + hdr.size, hdr.addr_align);
-        }
-
-        if (elf.strtab.sect) {
-            elf.strtab.sect->offset = data_offset;
-            std::memcpy(buf + data_offset, module->strtab.buf.data, module->strtab.buf.size);
-            data_offset = align(data_offset + elf.strtab.sect->size, 8);
-        }
-
-        if (elf.symtab.sect) {
-            elf.symtab.sect->offset = data_offset;
-            data_offset = align(data_offset + elf.symtab.sect->size, 8);
-
-            auto data = (sym_t*) (buf + elf.symtab.sect->offset);
-            u32 i{};
-            for (const auto& symbol : module->symbols) {
-                auto& sym = data[i + 1];
-
-                u32 scope{};
-                u32 type{};
-                u32 vis{};
-
-                switch (symbol.type) {
-                    case symbol::type_t::none:
-                        type = elf::symtab::type::notype;
-                        break;
-                    case symbol::type_t::tls:
-                        type = elf::symtab::type::tls;
-                        break;
-                    case symbol::type_t::file:
-                        type = elf::symtab::type::file;
-                        break;
-                    case symbol::type_t::common:
-                        type = elf::symtab::type::common;
-                        break;
-                    case symbol::type_t::object:
-                        type = elf::symtab::type::object;
-                        break;
-                    case symbol::type_t::section:
-                        type = elf::symtab::type::section;
-                        break;
-                    case symbol::type_t::function:
-                        type = elf::symtab::type::func;
-                        break;
-                }
-
-                switch (symbol.scope) {
-                    case symbol::scope_t::none:
-                    case symbol::scope_t::weak:
-                        scope = elf::symtab::scope::weak;
-                        if (!elf.symtab.sect->info)
-                            elf.symtab.sect->info = i + 1;
-                        break;
-                    case symbol::scope_t::local:
-                        scope = elf::symtab::scope::local;
-                        break;
-                    case symbol::scope_t::global:
-                        scope = elf::symtab::scope::global;
-                        if (!elf.symtab.sect->info)
-                            elf.symtab.sect->info = i + 1;
-                        break;
-                }
-
-                switch (symbol.visibility) {
-                    case symbol::visibility_t::default_:
-                        vis = elf::symtab::visibility::default_;
-                        break;
-                    case symbol::visibility_t::internal_:
-                        vis = elf::symtab::visibility::internal;
-                        break;
-                    case symbol::visibility_t::hidden:
-                        vis = elf::symtab::visibility::hidden;
-                        break;
-                    case symbol::visibility_t::protected_:
-                        vis = elf::symtab::visibility::protected_;
-                        break;
-                }
-
-                sym.size        = symbol.size;
-                sym.value       = symbol.value;
-                sym.info        = ELF64_ST_INFO(scope, type);
-                sym.other       = ELF64_ST_VISIBILITY(vis);
-                sym.name_offset = symbol.name_offset;
-                sym.section_ndx = symbol.section + 1;
-
-                ++i;
-            }
         }
 
         return status_t::ok;

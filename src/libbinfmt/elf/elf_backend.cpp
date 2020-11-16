@@ -166,9 +166,6 @@ namespace basecode::binfmt::io::elf {
             u32 num_segments    {};
             u32 num_sections    {msc->sections.size + 1};
 
-            if (file.module->symbols.size > 0)      ++num_sections;
-            if (file.module->strtab.offs.size > 0)  ++num_sections;
-
             for (auto& section : msc->sections) {
                 const auto alignment = std::max<u32>(section.align, 8);
                 switch (section.type) {
@@ -183,13 +180,7 @@ namespace basecode::binfmt::io::elf {
                 }
             }
 
-            const auto symbols_size = file.module->symbols.size > 0 ?
-                                      (file.module->symbols.size + 1) * symtab::entity_size :
-                                      0;
-            opts.header_offset = elf::file::header_size
-                + symbols_size
-                + file.module->strtab.buf.size
-                + data_size;
+            opts.header_offset = elf::file::header_size + data_size;
             usize file_size = opts.header_offset
                 + (num_segments * segment::header_size)
                 + (num_sections * section::header_size);
@@ -321,7 +312,10 @@ namespace basecode::binfmt::io::elf {
         using section_type_t = binfmt::section::type_t;
 
         if (section->name_offset > 0) {
-            const auto str = binfmt::string_table::get(section->module->strtab, section->name_offset);
+            const auto strtab_section = binfmt::module::get_section(*module, module->subclass.object.strtab);
+            if (!strtab_section)
+                return status_t::cannot_map_section_name;
+            const auto str = binfmt::string_table::get(strtab_section->subclass.strtab, section->name_offset);
             name.data   = (const u8*) str;
             name.length = strlen(str);
             return status_t::ok;

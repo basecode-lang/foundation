@@ -48,7 +48,6 @@ namespace basecode::binfmt {
     using symbol_list_t         = array_t<symbol_t>;
     using member_list_t         = array_t<member_t>;
     using section_list_t        = array_t<section_t>;
-    using symbol_table_t        = hashtab_t<u32, symbol_id>;
     using section_ptr_list_t    = array_t<section_t*>;
     using symbol_offs_list_t    = array_t<symbol_offs_t>;
 
@@ -280,6 +279,8 @@ namespace basecode::binfmt {
             debug,
             group,
             reloc,
+            strtab,
+            symtab,
             import,
             unwind,
             custom,
@@ -321,6 +322,7 @@ namespace basecode::binfmt {
     struct symbol_opts_t final {
         u64                     size;
         u64                     value;
+        u32                     name_offset;
         section_id              section;
         symbol::type_t          type;
         symbol::scope_t         scope;
@@ -358,6 +360,12 @@ namespace basecode::binfmt {
         };
     };
 
+    struct symbol_table_t final {
+        alloc_t*                alloc;
+        hashtab_t<u32, u32>     index;
+        symbol_list_t           symbols;
+    };
+
     struct string_table_t final {
         alloc_t*                alloc;
         struct {
@@ -382,6 +390,7 @@ namespace basecode::binfmt {
         group_t                 group;
         reloc_list_t            relocs;
         string_table_t          strtab;
+        symbol_table_t          symtab;
         import_list_t           imports;
     };
 
@@ -408,6 +417,10 @@ namespace basecode::binfmt {
         u32                     align;
         u32                     ext_type;
         u32                     name_offset;
+        struct {
+            u8*                 buf;
+            u32                 size_in_bytes;
+        }                       strtab;
     };
 
     enum class member_type_t : u8 {
@@ -435,6 +448,8 @@ namespace basecode::binfmt {
     union module_subclass_t final {
         struct {
             section_list_t      sections;
+            section_id          strtab;
+            section_id          symtab;
         }                       object;
         struct {
             member_list_t       members;
@@ -444,9 +459,6 @@ namespace basecode::binfmt {
 
     struct module_t final {
         alloc_t*                alloc;
-        symbol_list_t           symbols;
-        symbol_table_t          symtab;
-        string_table_t          strtab;
         module_subclass_t       subclass;
         module_id               id;
         module_type_t           type;

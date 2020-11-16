@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/binfmt/io.h>
-#include <basecode/core/string.h>
 #include <basecode/core/config.h>
 #include <basecode/core/filesys.h>
 #include <basecode/binfmt/binfmt.h>
@@ -119,6 +118,12 @@ namespace basecode::binfmt {
                         array::free(import.symbols);
                     array::free(section.subclass.imports);
                     break;
+                case section::type_t::strtab:
+                    string_table::free(section.subclass.strtab);
+                    break;
+                case section::type_t::symtab:
+                    symbol_table::free(section.subclass.symtab);
+                    break;
                 default:
                     break;
             }
@@ -151,13 +156,27 @@ namespace basecode::binfmt {
                 case section::type_t::import:
                     array::init(section->subclass.imports, section->alloc);
                     break;
+                case section::type_t::strtab:
+                    if (!opts.strtab.buf) {
+                        auto status = string_table::init(section->subclass.strtab);
+                        if (!OK(status))
+                            return status;
+                    } else {
+                        auto status = string_table::init(section->subclass.strtab, opts.strtab.buf, opts.strtab.size_in_bytes);
+                        if (!OK(status))
+                            return status;
+                    }
+                    break;
+                case section::type_t::symtab:
+                    symbol_table::init(section->subclass.symtab);
+                    break;
                 default:
                     break;
             }
             return status_t::ok;
         }
 
-        result_t data(module_t& module, section_id id, const u8* data) {
+        result_t set_data(module_t& module, section_id id, const u8* data) {
             auto section = module::get_section(module, id);
             if (!section)
                 return {0, status_t::section_not_found};
@@ -165,11 +184,26 @@ namespace basecode::binfmt {
             return {section->id, status_t::ok};
         }
 
+        result_t add_string(module_t& module, section_id id, str::slice_t str) {
+            auto section = module::get_section(module, id);
+            if (!section || section->type != section::type_t::strtab)
+                return {0, status_t::invalid_section_type};
+            auto offset = string_table::append(section->subclass.strtab, str);
+            return {offset, status_t::ok};
+        }
+
         import_t* get_import(module_t& module, section_id id, import_id import) {
             auto section = module::get_section(module, id);
             if (!section || section->type != section::type_t::import)
                 return nullptr;
             return &section->subclass.imports[import - 1];
+        }
+
+        result_t add_symbol(module_t& module, section_id id, const symbol_opts_t& opts) {
+            auto section = module::get_section(module, id);
+            if (!section || section->type != section::type_t::symtab)
+                return {0, status_t::invalid_section_type};
+            return symbol_table::make_symbol(section->subclass.symtab, opts);
         }
 
         result_t import_module(module_t& module, section_id id, symbol_id module_symbol) {
@@ -205,9 +239,21 @@ namespace basecode::binfmt {
                     break;
                 }
             }
-            array::free(module.symbols);
-            hashtab::free(module.symtab);
-            string_table::free(module.strtab);
+        }
+
+        u0 set_default_strtab(module_t& module, section_id id) {
+            module.subclass.object.strtab = id;
+        }
+
+        u0 set_default_symtab(module_t& module, section_id id) {
+            module.subclass.object.symtab = id;
+        }
+
+        section_t* get_section(const module_t& module, section_id id) {
+            if (module.type != module_type_t::object)
+                return nullptr;
+            auto& sc = module.subclass.object;
+            return (section_t*) &sc.sections[id - 1];
         }
 
         status_t init(module_t& module, module_type_t type, module_id id) {
@@ -226,66 +272,24 @@ namespace basecode::binfmt {
                     array::init(sc.sections, module.alloc);
                     break;
             }
-            array::init(module.symbols, module.alloc);
-            hashtab::init(module.symtab, module.alloc);
             return status_t::ok;
-        }
-
-        symbol_t* get_symbol(const module_t& module, symbol_id id) {
-            return (symbol_t*) &module.symbols[id - 1];
-        }
-
-        section_t* get_section(const module_t& module, section_id id) {
-            if (module.type != module_type_t::object)
-                return nullptr;
-            auto& sc = module.subclass.object;
-            return (section_t*) &sc.sections[id - 1];
-        }
-
-        symbol_t* find_symbol(const module_t& module, const s8* name, s32 len) {
-            const auto rc = string::interned::fold_for_result(name, len);
-            auto id = hashtab::find(module.symtab, rc.id);
-            if (!id)
-                return nullptr;
-            return (symbol_t*) &module.symbols[*id - 1];
         }
 
         u0 find_sections(const module_t& module, str::slice_t name, section_ptr_list_t& list) {
             if (module.type != module_type_t::object)
                 return;
             auto& sc = module.subclass.object;
+            auto strtab_section = get_section(module, sc.strtab);
+            if (!strtab_section)
+                return;
+            auto name_offset = string_table::find(strtab_section->subclass.strtab, name);
+            if (name_offset == -1)
+                return;
             array::reset(list);
             for (auto& section : sc.sections) {
-                const auto str = string_table::get(module.strtab, section.name_offset);
-                if (std::memcmp(name.data, str, name.length) == 0)
+                if (name_offset == section.name_offset)
                     array::append(list, (section_t*) &section);
             }
-        }
-
-        result_t make_symbol(module_t& module, const symbol_opts_t& opts, u32 name_offset) {
-            auto next_symbol = &array::append(module.symbols);
-            next_symbol->id          = module.symbols.size;
-            next_symbol->next        = {};
-            next_symbol->type        = opts.type;
-            next_symbol->size        = opts.size;
-            next_symbol->value       = opts.value;
-            next_symbol->scope       = opts.scope;
-            next_symbol->section     = opts.section;
-            next_symbol->visibility  = opts.visibility;
-            next_symbol->name_offset = name_offset;
-            auto prev_symbol_id = hashtab::find(module.symtab, name_offset);
-            if (prev_symbol_id) {
-                symbol_t* tmp_symbol{};
-                symbol_id next_id = *prev_symbol_id;
-                while (next_id) {
-                    tmp_symbol = &module.symbols[next_id - 1];
-                    next_id = tmp_symbol->next;
-                }
-                tmp_symbol->next = next_symbol->id;
-            } else {
-                hashtab::insert(module.symtab, name_offset, next_symbol->id);
-            }
-            return {next_symbol->id, status_t::ok};
         }
 
         result_t make_section(module_t& module, section::type_t type, const section_opts_t& opts) {
@@ -302,13 +306,49 @@ namespace basecode::binfmt {
                 return {0, status};
             return {section->id, status_t::ok};
         }
+    }
 
-        result_t make_symbol(module_t& module, const symbol_opts_t& opts, const s8* name, s32 len) {
-            const auto str         = slice::make(name, len);
-            auto       name_offset = string_table::find(module.strtab, str);
-            if (name_offset == -1)
-                name_offset = string_table::append(module.strtab, str);
-            return make_symbol(module, opts, name_offset);
+    namespace symbol_table {
+        u0 free(symbol_table_t& table) {
+            hashtab::free(table.index);
+            array::free(table.symbols);
+        }
+
+        status_t init(symbol_table_t& table) {
+            table.alloc = g_binfmt_sys.alloc;
+            array::init(table.symbols, table.alloc);
+            hashtab::init(table.index, table.alloc);
+            return status_t::ok;
+        }
+
+        symbol_t* get_symbol(const symbol_table_t& symtab, symbol_id id) {
+            return (symbol_t*) &symtab.symbols[id - 1];
+        }
+
+        result_t make_symbol(symbol_table_t& symtab, const symbol_opts_t& opts) {
+            auto next_symbol = &array::append(symtab.symbols);
+            next_symbol->id          = symtab.symbols.size;
+            next_symbol->next        = {};
+            next_symbol->type        = opts.type;
+            next_symbol->size        = opts.size;
+            next_symbol->value       = opts.value;
+            next_symbol->scope       = opts.scope;
+            next_symbol->section     = opts.section;
+            next_symbol->visibility  = opts.visibility;
+            next_symbol->name_offset = opts.name_offset;
+            auto prev_symbol_id = hashtab::find(symtab.index, opts.name_offset);
+            if (prev_symbol_id) {
+                symbol_t* tmp_symbol{};
+                symbol_id next_id = *prev_symbol_id;
+                while (next_id) {
+                    tmp_symbol = &symtab.symbols[next_id - 1];
+                    next_id = tmp_symbol->next;
+                }
+                tmp_symbol->next = next_symbol->id;
+            } else {
+                hashtab::insert(symtab.index, opts.name_offset, next_symbol->id);
+            }
+            return {next_symbol->id, status_t::ok};
         }
     }
 

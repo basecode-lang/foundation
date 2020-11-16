@@ -138,6 +138,25 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
     REQUIRE(OK(module::init(mod, module_type_t::object, 20)));
     defer(module::free(mod));
 
+    // 1. create the default string table
+    auto strtab_rc = module::make_section(mod, section::type_t::strtab);
+    REQUIRE(OK(strtab_rc.status));
+    module::set_default_strtab(mod, strtab_rc.id);
+
+    auto kernel32_str_rc = section::add_string(mod, strtab_rc.id, "KERNEL32.DLL"_ss);
+    REQUIRE(OK(kernel32_str_rc.status));
+    auto read_file_str_rc = section::add_string(mod, strtab_rc.id, "ReadFile"_ss);
+    REQUIRE(OK(read_file_str_rc.status));
+    auto write_file_str_rc = section::add_string(mod, strtab_rc.id, "WriteFile"_ss);
+    REQUIRE(OK(write_file_str_rc.status));
+    auto get_std_handle_str_rc = section::add_string(mod, strtab_rc.id, "GetStdHandle"_ss);
+    REQUIRE(OK(get_std_handle_str_rc.status));
+
+    // 2. create the default symbol table
+    auto symtab_rc = module::make_section(mod, section::type_t::symtab);
+    REQUIRE(OK(symtab_rc.status));
+    module::set_default_symtab(mod, symtab_rc.id);
+
     /* .text section */ {
         auto text_rc = module::make_section(mod,
                                             section::type_t::code,
@@ -150,28 +169,31 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
                                                 },
                                                 .size = sizeof(s_rot13_code)
                                             });
-        auto set_data_rc = section::data(mod, text_rc.id, s_rot13_code);
+        auto set_data_rc = section::set_data(mod, text_rc.id, s_rot13_code);
 
-        module::make_symbol(mod,
-                            "ReadFile"_ss,
+        section::add_symbol(mod,
+                            symtab_rc.id,
                             {
                                 .value = 2,
+                                .name_offset = read_file_str_rc.id,
                                 .section = text_rc.id,
                                 .type = symbol::type_t::function,
                                 .scope = symbol::scope_t::global
                             });
-        module::make_symbol(mod,
-                            "WriteFile"_ss,
+        section::add_symbol(mod,
+                            symtab_rc.id,
                             {
                                 .value = 3,
+                                .name_offset = write_file_str_rc.id,
                                 .section = text_rc.id,
                                 .type = symbol::type_t::function,
                                 .scope  = symbol::scope_t::global
                             });
-        module::make_symbol(mod,
-                            "GetStdHandle"_ss,
+        section::add_symbol(mod,
+                            symtab_rc.id,
                             {
                                 .value = 4,
+                                .name_offset = get_std_handle_str_rc.id,
                                 .section = text_rc.id,
                                 .type = symbol::type_t::function,
                                 .scope  = symbol::scope_t::global
@@ -192,7 +214,7 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
                                                  .size = sizeof(s_rot13_table)
                                              });
         auto rdata = module::get_section(mod, rdata_rc.id);
-        section::data(mod, rdata_rc.id, s_rot13_table);
+        section::set_data(mod, rdata_rc.id, s_rot13_table);
         REQUIRE(OK(rdata_rc.status));
         REQUIRE(rdata);
     }

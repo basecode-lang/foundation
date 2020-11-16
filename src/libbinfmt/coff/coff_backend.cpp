@@ -402,7 +402,10 @@ namespace basecode::binfmt::io::coff {
 
     status_t get_section_name(const binfmt::section_t* section, str::slice_t& name) {
         if (section->name_offset > 0) {
-            const auto str = binfmt::string_table::get(section->module->strtab, section->name_offset);
+            const auto strtab_section = binfmt::module::get_section(*section->module, section->module->subclass.object.strtab);
+            if (!strtab_section)
+                return status_t::cannot_map_section_name;
+            const auto str = binfmt::string_table::get(strtab_section->subclass.strtab, section->name_offset);
             name.data   = (const u8*) str;
             name.length = strlen(str);
             return status_t::ok;

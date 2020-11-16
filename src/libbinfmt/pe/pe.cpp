@@ -337,8 +337,8 @@ namespace basecode::binfmt::io::pe {
                     auto& module = array::append(import_table.modules);
                     module.iat_rva = module.fwd_chain = module.time_stamp = {};
                     {
-                        const auto symbol    = module::get_symbol(*file.module, import.module_symbol);
                         // XXX: FIXME!
+//                        const auto symbol    = module::get_symbol(*file.module, import.module_symbol);
                         const auto intern_rc = string::interned::get(0); // XXX: FIXME!
                         if (!OK(intern_rc.status))
                             return status_t::symbol_not_found;
@@ -354,8 +354,8 @@ namespace basecode::binfmt::io::pe {
                     module.symbols.size  = import.symbols.size;
                     lookup_rva += (import.symbols.size + 1) * import_lookup_table::entry_size;
                     for (auto symbol_id : import.symbols) {
-                        const auto symbol    = module::get_symbol(*file.module, symbol_id);
                         // XXX: FIXME!
+//                        const auto symbol    = module::get_symbol(*file.module, symbol_id);
                         const auto intern_rc = string::interned::get(0);    // XXX: FIXME!
                         if (!OK(intern_rc.status))
                             return status_t::symbol_not_found;
