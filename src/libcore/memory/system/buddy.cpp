@@ -19,8 +19,8 @@
 #include <basecode/core/memory/system/buddy.h>
 
 namespace basecode::memory::buddy {
-    constexpr u32 max_levels    = 32;
-    constexpr u32 leaf_size     = 16;
+    [[maybe_unused]] constexpr u32 max_levels    = 32;
+    [[maybe_unused]] constexpr u32 leaf_size     = 16;
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
     }

@@ -20,11 +20,51 @@ set(GFX_INC_DIR     "${INC_DIR_BASE}/basecode/gfx")
 #
 # -----------------------------------------------------------------------------
 
+# glfw
 option(GLFW_BUILD_EXAMPLES  "" OFF)
 option(GLFW_BUILD_TESTS     "" OFF)
 option(GLFW_BUILD_DOCS      "" OFF)
 option(GLFW_INSTALL         "" OFF)
 add_subdirectory(glfw EXCLUDE_FROM_ALL)
+
+target_compile_options(
+    glfw PRIVATE
+    -Wno-documentation
+    -Wno-reserved-id-macro
+    -Wno-extra-semi-stmt
+    -Wno-missing-prototypes
+    -Wno-sign-conversion
+    -Wno-undef
+    -Wno-shadow
+    -Wno-implicit-int-float-conversion
+    -Wno-cast-qual
+    -Wno-bad-function-cast
+    -Wno-unused-parameter
+    -Wno-missing-field-initializers
+    -Wno-pedantic
+    -Wno-double-promotion
+)
+
+# libpng
+option(PNG_STATIC "" ON)
+option(PNG_SHARED "" OFF)
+option(PNG_TESTS  "" OFF)
+add_subdirectory(libpng EXCLUDE_FROM_ALL)
+set(PNG_PNG_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/libpng")
+set(PNG_PNG_INCLUDE_DIRS "${PNG_PNG_INCLUDE_DIR}")
+if (MSVC)
+    if (CMAKE_BUILD_TYPE MATCHES Debug)
+        set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16_staticd.lib")
+    else ()
+        set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16_static.lib")
+    endif ()
+else ()
+    if (CMAKE_BUILD_TYPE MATCHES Debug)
+        set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16d.a")
+    else ()
+        set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16.a")
+    endif ()
+endif ()
 
 # harfbuzz
 #
@@ -65,7 +105,7 @@ configure_file (
 
 # -----------------------------------------------------------------------------
 #
-# libbasecode-core static library
+# libbasecode-gfx static library
 #
 # -----------------------------------------------------------------------------
 
@@ -88,7 +128,6 @@ set(
 
         ${GFX_INC_DIR}/clip/clip.h
         ${GFX_INC_DIR}/clip/clip_common.h
-        ${GFX_INC_DIR}/clip/clip_x11_png.h
         ${GFX_INC_DIR}/clip/clip_lock_impl.h
 
         clip/clip.cpp
@@ -100,7 +139,7 @@ if (APPLE)
 elseif (WIN32)
     set(CLIP_SOURCES ${CLIP_SOURCES} clip/clip_win.cpp)
 elseif (UNIX)
-    set(CLIP_SOURCES ${CLIP_SOURCES} clip/clip_x11.cpp)
+    set(CLIP_SOURCES ${CLIP_SOURCES} clip/clip_x11.cpp ${GFX_INC_DIR}/clip/clip_x11_png.h)
 endif()
 
 set(
@@ -162,17 +201,12 @@ target_include_directories(
                 ${PROJECT_SOURCE_DIR}/harfbuzz/src
                 ${PROJECT_SOURCE_DIR}/freetype/include
 )
-set_target_properties(
-        ${LIBRARY_TARGET}
-        PROPERTIES
-
-        LIBRARY_OUTPUT_NAME ${LIBRARY_NAME}
-)
+set_target_properties(${LIBRARY_TARGET} PROPERTIES OUTPUT_NAME ${LIBRARY_NAME})
 target_link_libraries(
         ${LIBRARY_TARGET}
 
-        PRIVATE glfw
-                freetype
+        PRIVATE basecode-core
+                glfw
                 ${FRAMEWORKS}
 )
 
@@ -200,5 +234,6 @@ target_link_libraries(
 
         INTERFACE   ${LIBRARY_TARGET}
                     basecode-core
+                    glfw
                     ${FRAMEWORKS}
 )

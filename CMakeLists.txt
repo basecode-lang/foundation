@@ -132,27 +132,6 @@ else ()
     set(BZIP2_LIBRARIES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libbz2.a")
 endif ()
 
-# libpng
-option(PNG_STATIC "" ON)
-option(PNG_SHARED "" OFF)
-option(PNG_TESTS  "" OFF)
-add_subdirectory(ext/libpng-1.6.37 EXCLUDE_FROM_ALL)
-set(PNG_PNG_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/ext/libpng-1.6.37")
-set(PNG_PNG_INCLUDE_DIRS "${PNG_PNG_INCLUDE_DIR}")
-if (MSVC)
-    if (CMAKE_BUILD_TYPE MATCHES Debug)
-        set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16_staticd.lib")
-    else ()
-        set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16_static.lib")
-    endif ()
-else ()
-    if (CMAKE_BUILD_TYPE MATCHES Debug)
-        set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16d.a")
-    else ()
-        set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16.a")
-    endif ()
-endif ()
-
 # libfmt
 add_subdirectory(ext/fmt-7.0.3 EXCLUDE_FROM_ALL)
 
@@ -232,6 +211,7 @@ set(
         ext/sqlite-3.33.0/sqlite3.c
 )
 add_library(sqlite3 ${SQLITE3_SOURCES})
+target_compile_options(sqlite3 PRIVATE -Wno-unused-variable)
 target_include_directories(sqlite3 INTERFACE ext/sqlite-3.33.0)
 
 # -----------------------------------------------------------------------------
