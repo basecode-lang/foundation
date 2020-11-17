@@ -79,10 +79,10 @@ s32 main(s32 argc, const s8** argv) {
 
     {
         config_settings_t settings{};
-        settings.product_name  = string::interned::fold(PRODUCT_NAME);
-        settings.build_type    = string::interned::fold(BUILD_TYPE);
-        settings.version.major = VERSION_MAJOR;
-        settings.version.minor = VERSION_MINOR;
+        settings.product_name  = string::interned::fold(BINFMT_PRODUCT_NAME);
+        settings.build_type    = string::interned::fold(BINFMT_BUILD_TYPE);
+        settings.version.major = BINFMT_VERSION_MAJOR;
+        settings.version.minor = BINFMT_VERSION_MINOR;
         settings.test_runner   = true;
         auto status = config::system::init(settings);
         if (!OK(status)) {
