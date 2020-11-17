@@ -234,10 +234,6 @@ set(
 add_library(sqlite3 ${SQLITE3_SOURCES})
 target_include_directories(sqlite3 INTERFACE ext/sqlite-3.33.0)
 
-if (WIN32)
-    include_directories(include/platform/win32)
-endif()
-
 # -----------------------------------------------------------------------------
 #
 # Project

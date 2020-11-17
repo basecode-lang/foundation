@@ -228,7 +228,9 @@ target_include_directories(
 target_include_directories(
     ${LIBRARY_TARGET} PRIVATE
 
-    fe/src)
+    fe/src
+    ${PLATFORM_INC_DIR}
+)
 target_compile_options(
     ${LIBRARY_TARGET}
 
@@ -270,6 +272,7 @@ target_include_directories(
 
     fe/src
     ${INC_DIR_BASE}
+    ${PLATFORM_INC_DIR}
     ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(
     ${PROJECT_NAME} INTERFACE
