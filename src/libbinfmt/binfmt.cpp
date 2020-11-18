@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/binfmt/io.h>
+#include <basecode/core/error.h>
 #include <basecode/core/config.h>
 #include <basecode/core/filesys.h>
 #include <basecode/binfmt/binfmt.h>
@@ -25,11 +26,15 @@
 namespace basecode::binfmt {
     using module_map_t          = hashtab_t<module_id, module_t*>;
     using module_list_t         = stable_array_t<module_t>;
+    using symbol_list_t         = stable_array_t<symbol_t>;
+    using section_list_t        = stable_array_t<section_t>;
 
     struct system_t final {
         alloc_t*                alloc;
         module_list_t           modules;
         module_map_t            module_map;
+        section_list_t          sections;
+        symbol_list_t           symbols;
         module_id               id;
     };
 
@@ -39,7 +44,11 @@ namespace basecode::binfmt {
         u0 fini() {
             for (auto mod : g_binfmt_sys.modules)
                 module::free(*mod);
+            for (auto section : g_binfmt_sys.sections)
+                section::free(*section);
             stable_array::free(g_binfmt_sys.modules);
+            stable_array::free(g_binfmt_sys.sections);
+            stable_array::free(g_binfmt_sys.symbols);
             hashtab::free(g_binfmt_sys.module_map);
             io::fini();
         }
@@ -48,7 +57,9 @@ namespace basecode::binfmt {
             g_binfmt_sys.alloc = alloc;
             hashtab::init(g_binfmt_sys.module_map, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.modules, g_binfmt_sys.alloc);
-            auto   file_path = "../etc/binfmt.fe"_path;
+            stable_array::init(g_binfmt_sys.sections, g_binfmt_sys.alloc);
+            stable_array::init(g_binfmt_sys.symbols, g_binfmt_sys.alloc);
+            auto file_path = "../etc/binfmt.fe"_path;
             path_t config_path{};
             filesys::bin_rel_path(config_path, file_path);
             defer({
@@ -79,28 +90,30 @@ namespace basecode::binfmt {
             return hashtab::find(g_binfmt_sys.module_map, id);
         }
 
-        status_t make_module(module_type_t type, module_t** mod) {
-            return make_module(type, ++g_binfmt_sys.id, mod);
+        module_t* make_module(module_type_t type) {
+            return make_module(type, ++g_binfmt_sys.id);
         }
 
-        status_t make_module(module_type_t type, module_id id, module_t** mod) {
+        module_t* make_module(module_type_t type, module_id id) {
             auto new_mod = &stable_array::append(g_binfmt_sys.modules);
             auto status = module::init(*new_mod, type, id);
-            if (!OK(status))
-                return status;
+            if (!OK(status)) {
+                error::report::add(status, error_report_level_t::error);
+                return nullptr;
+            }
             hashtab::insert(g_binfmt_sys.module_map, id, new_mod);
-            *mod = new_mod;
-            return status_t::ok;
+            return new_mod;
         }
     }
 
     namespace import {
-        status_t add_symbol(import_t* import, symbol_id symbol) {
+        u0 add_symbol(import_t* import, symbol_t* symbol) {
             auto idx = array::contains(import->symbols, symbol);
-            if (idx != -1)
-                return status_t::duplicate_import;
+            if (idx != -1) {
+                error::report::add(status_t::duplicate_import, error_report_level_t::error);
+                return;
+            }
             array::append(import->symbols, symbol);
-            return status_t::ok;
         }
     }
 
@@ -162,7 +175,9 @@ namespace basecode::binfmt {
                         if (!OK(status))
                             return status;
                     } else {
-                        auto status = string_table::init(section->subclass.strtab, opts.strtab.buf, opts.strtab.size_in_bytes);
+                        auto status = string_table::init(section->subclass.strtab,
+                                                         opts.strtab.buf,
+                                                         opts.strtab.size_in_bytes);
                         if (!OK(status))
                             return status;
                     }
@@ -176,49 +191,42 @@ namespace basecode::binfmt {
             return status_t::ok;
         }
 
-        result_t set_data(module_t& module, section_id id, const u8* data) {
-            auto section = module::get_section(module, id);
-            if (!section)
-                return {0, status_t::section_not_found};
+        u0 set_data(section_t* section, const u8* data) {
             section->subclass.data = data;
-            return {section->id, status_t::ok};
         }
 
-        result_t add_string(module_t& module, section_id id, str::slice_t str) {
-            auto section = module::get_section(module, id);
-            if (!section || section->type != section::type_t::strtab)
-                return {0, status_t::invalid_section_type};
-            auto offset = string_table::append(section->subclass.strtab, str);
-            return {offset, status_t::ok};
+        symbol_t* get_symbol(section_t* section, u32 idx) {
+            auto& ssc = section->subclass.symtab;
+            return ssc[idx];
         }
 
-        import_t* get_import(module_t& module, section_id id, import_id import) {
-            auto section = module::get_section(module, id);
-            if (!section || section->type != section::type_t::import)
+        u32 add_string(section_t* section, str::slice_t str) {
+            if (!section || section->type != section::type_t::strtab) {
+                error::report::add(status_t::invalid_section_type, error_report_level_t::error);
+                return 0;
+            }
+            return string_table::append(section->subclass.strtab, str);
+        }
+
+        import_t* add_import(section_t* section, symbol_t* module_symbol) {
+            if (!section || section->type != section::type_t::import) {
+                error::report::add(status_t::invalid_section_type, error_report_level_t::error);
                 return nullptr;
-            return &section->subclass.imports[import - 1];
-        }
-
-        result_t add_symbol(module_t& module, section_id id, const symbol_opts_t& opts) {
-            auto section = module::get_section(module, id);
-            if (!section || section->type != section::type_t::symtab)
-                return {0, status_t::invalid_section_type};
-            return symbol_table::make_symbol(section->subclass.symtab, opts);
-        }
-
-        result_t import_module(module_t& module, section_id id, symbol_id module_symbol) {
-            auto section = module::get_section(module, id);
-            if (!section)
-                return {0, status_t::section_not_found};
-            if (section->type != section::type_t::import)
-                return {0, status_t::invalid_section_type};
+            }
             auto import = &array::append(section->subclass.imports);
-            import->id            = section->subclass.imports.size;
             import->module_symbol = module_symbol;
-            import->section       = section->id;
+            import->section       = section;
             import->flags         = {};
             array::init(import->symbols);
-            return {import->id, status_t::ok};
+            return import;
+        }
+
+        symbol_t* add_symbol(section_t* section, const symbol_opts_t& opts) {
+            if (!section || section->type != section::type_t::symtab) {
+                error::report::add(status_t::invalid_section_type, error_report_level_t::error);
+                return nullptr;
+            }
+            return symbol_table::make_symbol(section->subclass.symtab, opts);
         }
     }
 
@@ -233,27 +241,125 @@ namespace basecode::binfmt {
                 }
                 case module_type_t::object: {
                     auto& sc = module.subclass.object;
-                    for (auto section : sc.sections)
-                        section::free(section);
                     array::free(sc.sections);
                     break;
                 }
             }
         }
 
-        u0 set_default_strtab(module_t& module, section_id id) {
-            module.subclass.object.strtab = id;
+        section_t* make_import(module_t& module) {
+            section_opts_t opts{};
+            opts.flags = {
+                .code = false,
+                .init = true,
+                .write = true,
+                .alloc = true,
+            };
+            return make_section(module, section::type_t::import, opts);
         }
 
-        u0 set_default_symtab(module_t& module, section_id id) {
-            module.subclass.object.symtab = id;
+        section_t* make_bss(module_t& module, u32 size) {
+            section_opts_t opts{};
+            opts.flags = {
+                .code   = false,
+                .init   = false,
+                .write  = true,
+                .alloc  = true,
+            };
+            opts.size = size;
+            return make_section(module, section::type_t::data, opts);
         }
 
-        section_t* get_section(const module_t& module, section_id id) {
-            if (module.type != module_type_t::object)
+        section_t* get_section(const module_t& module, u32 idx) {
+            auto msc = &module.subclass.object;
+            return idx < msc->sections.size ? msc->sections[idx] : nullptr;
+        }
+
+        section_t* make_data(module_t& module, u8* data, u32 size) {
+            section_opts_t opts{};
+            opts.flags = {
+                .code   = false,
+                .init   = true,
+                .write  = true,
+                .alloc  = true,
+            };
+            opts.size = size;
+            auto section = make_section(module, section::type_t::data, opts);
+            if (!section) {
+                // XXX: need an error condition here
                 return nullptr;
-            auto& sc = module.subclass.object;
-            return (section_t*) &sc.sections[id - 1];
+            }
+            section::set_data(section, data);
+            return section;
+        }
+
+        section_t* make_text(module_t& module, u8* data, u32 size) {
+            section_opts_t opts{};
+            opts.flags = {
+                .code   = true,
+                .init   = true,
+                .exec   = true,
+                .alloc  = true,
+            };
+            opts.size = size;
+            auto section = make_section(module, section::type_t::code, opts);
+            if (!section) {
+                // XXX: need an error condition here
+                return nullptr;
+            }
+            section::set_data(section, data);
+            return section;
+        }
+
+        section_t* make_default_string_table(module_t& module) {
+            auto sc = &module.subclass.object;
+            section_opts_t opts{};
+            auto section = make_section(module, section::type_t::strtab, opts);
+            sc->strtab = section;
+            return section;
+        }
+
+        section_t* make_default_symbol_table(module_t& module) {
+            auto sc = &module.subclass.object;
+            section_opts_t opts{};
+            if (!sc->strtab) {
+                auto strtab_section = make_default_string_table(module);
+                if (!strtab_section) {
+                    // XXX: need an error condition here
+                    return nullptr;
+                }
+                sc->strtab = strtab_section;
+            }
+            opts.link = sc->strtab;
+            auto section = make_section(module, section::type_t::symtab, opts);
+            sc->symtab = section;
+            return section;
+        }
+
+        section_t* make_rodata(module_t& module, u8* data, u32 size) {
+            section_opts_t opts{};
+            opts.flags = {
+                .code   = false,
+                .init   = true,
+                .write  = false,
+                .alloc  = true,
+            };
+            opts.size = size;
+            auto section = make_section(module, section::type_t::data, opts);
+            if (!section) {
+                // XXX: need an error condition here
+                return nullptr;
+            }
+            section::set_data(section, data);
+            return section;
+        }
+
+        status_t reserve_sections(module_t& module, u32 num_sections) {
+            auto msc = &module.subclass.object;
+            array::resize(msc->sections, num_sections);
+            for (u32 i = 0; i < num_sections; ++i)
+                msc->sections[i] = &stable_array::append(g_binfmt_sys.sections);
+            return status_t::ok;
         }
 
         status_t init(module_t& module, module_type_t type, module_id id) {
@@ -279,32 +385,38 @@ namespace basecode::binfmt {
             if (module.type != module_type_t::object)
                 return;
             auto& sc = module.subclass.object;
-            auto strtab_section = get_section(module, sc.strtab);
-            if (!strtab_section)
+            if (!sc.strtab)
                 return;
-            auto name_offset = string_table::find(strtab_section->subclass.strtab, name);
+            auto name_offset = string_table::find(sc.strtab->subclass.strtab, name);
             if (name_offset == -1)
                 return;
             array::reset(list);
-            for (auto& section : sc.sections) {
-                if (name_offset == section.name_offset)
-                    array::append(list, (section_t*) &section);
+            for (const auto section : sc.sections) {
+                if (name_offset == section->name_offset)
+                    array::append(list, section);
             }
         }
 
-        result_t make_section(module_t& module, section::type_t type, const section_opts_t& opts) {
-            if (module.type != module_type_t::object)
-                return {0, status_t::invalid_section_type};
-            if (type == section::type_t::custom && opts.name_offset == 0)
-                return {0, status_t::spec_section_custom_name};
+        section_t* make_section(module_t& module, section::type_t type, const section_opts_t& opts) {
+            if (module.type != module_type_t::object) {
+                error::report::add(status_t::invalid_section_type, error_report_level_t::error);
+                return nullptr;
+            }
+            if (type == section::type_t::custom && opts.name_offset == 0) {
+                error::report::add(status_t::spec_section_custom_name, error_report_level_t::error);
+                return nullptr;
+            }
             auto& sc = module.subclass.object;
-            auto section = &array::append(sc.sections);
-            section->id     = sc.sections.size;
+            auto section = &stable_array::append(g_binfmt_sys.sections);
             section->module = &module;
             auto status = section::init(section, type, opts);
-            if (!OK(status))
-                return {0, status};
-            return {section->id, status_t::ok};
+            if (!OK(status)) {
+                error::report::add(status, error_report_level_t::error);
+                return nullptr;
+            }
+            array::append(sc.sections, section);
+            section->number = sc.sections.size;
+            return section;
         }
     }
 
@@ -321,13 +433,8 @@ namespace basecode::binfmt {
             return status_t::ok;
         }
 
-        symbol_t* get_symbol(const symbol_table_t& symtab, symbol_id id) {
-            return (symbol_t*) &symtab.symbols[id - 1];
-        }
-
-        result_t make_symbol(symbol_table_t& symtab, const symbol_opts_t& opts) {
-            auto next_symbol = &array::append(symtab.symbols);
-            next_symbol->id          = symtab.symbols.size;
+        symbol_t* make_symbol(symbol_table_t& symtab, const symbol_opts_t& opts) {
+            auto next_symbol = &stable_array::append(g_binfmt_sys.symbols);
             next_symbol->next        = {};
             next_symbol->type        = opts.type;
             next_symbol->size        = opts.size;
@@ -336,19 +443,18 @@ namespace basecode::binfmt {
             next_symbol->section     = opts.section;
             next_symbol->visibility  = opts.visibility;
             next_symbol->name_offset = opts.name_offset;
-            auto prev_symbol_id = hashtab::find(symtab.index, opts.name_offset);
-            if (prev_symbol_id) {
-                symbol_t* tmp_symbol{};
-                symbol_id next_id = *prev_symbol_id;
-                while (next_id) {
-                    tmp_symbol = &symtab.symbols[next_id - 1];
-                    next_id = tmp_symbol->next;
+            auto prev_symbol = hashtab::find(symtab.index, opts.name_offset);
+            if (prev_symbol) {
+                while (true) {
+                    if (!prev_symbol->next)
+                        break;
+                    prev_symbol = prev_symbol->next;
                 }
-                tmp_symbol->next = next_symbol->id;
+                prev_symbol->next = next_symbol;
             } else {
-                hashtab::insert(symtab.index, opts.name_offset, next_symbol->id);
+                hashtab::insert(symtab.index, opts.name_offset, next_symbol);
             }
-            return {next_symbol->id, status_t::ok};
+            return next_symbol;
         }
     }
 

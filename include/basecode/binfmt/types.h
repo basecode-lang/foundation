@@ -35,49 +35,46 @@ namespace basecode::binfmt {
     struct version_t;
     struct symbol_offs_t;
 
-    using import_id             = u32;
-    using symbol_id             = u32;
     using module_id             = u32;
     using member_id             = u32;
-    using section_id            = u32;
 
     using id_list_t             = array_t<u32>;
     using reloc_list_t          = array_t<reloc_t>;
+    using symbol_map_t          = hashtab_t<u32, symbol_t*>;
     using group_list_t          = array_t<group_t>;
     using import_list_t         = array_t<import_t>;
-    using symbol_list_t         = array_t<symbol_t>;
     using member_list_t         = array_t<member_t>;
-    using section_list_t        = array_t<section_t>;
+    using symbol_ptr_list_t     = array_t<symbol_t*>;
     using section_ptr_list_t    = array_t<section_t*>;
     using symbol_offs_list_t    = array_t<symbol_offs_t>;
 
     enum class status_t : u32 {
-        ok                              = 0,
-        read_error                      = 2000,
-        write_error                     = 2001,
-        import_failure                  = 2002,
-        duplicate_import                = 2003,
-        duplicate_symbol                = 2004,
-        symbol_not_found                = 2005,
-        config_eval_error               = 2006,
-        invalid_section_type            = 2007,
-        container_init_error            = 2008,
-        invalid_container_type          = 2009,
-        spec_section_custom_name        = 2010,
-        not_implemented                 = 2011,
-        invalid_machine_type            = 2012,
-        invalid_output_type             = 2013,
-        cannot_map_section_name         = 2014,
-        section_not_found               = 2015,
-        invalid_input_type              = 2016,
-        not_ar_long_name                = 2017,
-        section_entry_out_of_bounds     = 2018,
-        bad_cv_signature                = 2019,
-        missing_linked_section          = 2020,
-        custom_section_missing_symbol   = 2021,
-        invalid_file_type               = 2022,
-        elf_unsupported_section         = 2023,
-        invalid_relocation_type         = 2024,
+        ok                      = 0,
+        read_error              = 20000,
+        write_error,
+        import_failure,
+        duplicate_import,
+        duplicate_symbol,
+        symbol_not_found,
+        config_eval_error,
+        invalid_section_type,
+        container_init_error,
+        invalid_container_type,
+        spec_section_custom_name,
+        not_implemented,
+        invalid_machine_type,
+        invalid_output_type,
+        cannot_map_section_name,
+        section_not_found,
+        invalid_input_type,
+        not_ar_long_name,
+        section_entry_out_of_bounds,
+        bad_cv_signature,
+        missing_linked_section,
+        custom_section_missing_symbol,
+        invalid_file_type,
+        elf_unsupported_section,
+        invalid_relocation_type,
     };
 
     enum class string_table_mode_t : u8 {
@@ -306,16 +303,15 @@ namespace basecode::binfmt {
     struct symbol_t final {
         u64                     size;
         u64                     value;
-        symbol_id               id;
-        symbol_id               next;
-        section_id              section;
+        symbol_t*               next;
+        section_t*              section;
         u32                     name_offset;
         symbol::type_t          type;
         symbol::scope_t         scope;
         symbol::visibility_t    visibility;
 
         b8 operator==(const symbol_t& other) const {
-            return id == other.id;
+            return this == &other;
         }
     };
 
@@ -323,22 +319,21 @@ namespace basecode::binfmt {
         u64                     size;
         u64                     value;
         u32                     name_offset;
-        section_id              section;
+        section_t*              section;
         symbol::type_t          type;
         symbol::scope_t         scope;
         symbol::visibility_t    visibility;
     };
 
     struct symbol_offs_t final {
-        symbol_id               symbol;
+        symbol_t*               symbol;
         u32                     offset;
     };
 
     struct import_t final {
-        id_list_t               symbols;
-        symbol_id               module_symbol;
-        section_id              section;
-        import_id               id;
+        symbol_ptr_list_t       symbols;
+        symbol_t*               module_symbol;
+        section_t*              section;
         struct {
             u32                 load:   1;
             u32                 pad:    31;
@@ -353,7 +348,7 @@ namespace basecode::binfmt {
     struct reloc_t final {
         u64                     offset;
         s64                     addend;
-        symbol_id               symbol;
+        symbol_t*               symbol;
         union {
             machine::x86_64::reloc::type_t  x86_64_type;
             machine::aarch64::reloc::type_t aarch64_type;
@@ -362,8 +357,16 @@ namespace basecode::binfmt {
 
     struct symbol_table_t final {
         alloc_t*                alloc;
-        hashtab_t<u32, u32>     index;
-        symbol_list_t           symbols;
+        symbol_map_t            index;
+        symbol_ptr_list_t       symbols;
+
+        symbol_t* operator[](u32 idx) {
+            return idx < symbols.size ? symbols[idx] : nullptr;
+        }
+
+        const symbol_t* operator[](u32 idx) const {
+            return idx < symbols.size ? symbols[idx] : nullptr;
+        }
     };
 
     struct string_table_t final {
@@ -397,20 +400,20 @@ namespace basecode::binfmt {
     struct section_t final {
         alloc_t*                alloc;
         const module_t*         module;
+        section_t*              link;
         section_subclass_t      subclass;
-        section_id              id;
-        section_id              link;
         u32                     info;
         u32                     size;
         u32                     align;
         u32                     ext_type;
+        u32                     number;
         u32                     name_offset;
         section::flags_t        flags;
         section::type_t         type;
     };
 
     struct section_opts_t final {
-        section_id              link;
+        section_t*              link;
         section::flags_t        flags;
         u32                     info;
         u32                     size;
@@ -447,9 +450,9 @@ namespace basecode::binfmt {
 
     union module_subclass_t final {
         struct {
-            section_list_t      sections;
-            section_id          strtab;
-            section_id          symtab;
+            section_ptr_list_t  sections;
+            section_t*          strtab;
+            section_t*          symtab;
         }                       object;
         struct {
             member_list_t       members;

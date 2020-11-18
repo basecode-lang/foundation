@@ -51,11 +51,13 @@ namespace basecode::binfmt::io::elf {
         },
 
         [section::type::symtab]         = {
-            .status = section_map_status_t::skip
+            .type = binfmt::section::type_t::symtab,
+            .status = section_map_status_t::ok
         },
 
         [section::type::strtab]         = {
-            .status = section_map_status_t::skip
+            .type = binfmt::section::type_t::strtab,
+            .status = section_map_status_t::ok
         },
 
         [section::type::rela]           = {
@@ -814,34 +816,31 @@ namespace basecode::binfmt::io::elf {
         }
 
         if (elf.file_header->strtab_ndx > 0) {
-            elf.strtab.ndx    = elf.file_header->strtab_ndx;
-            elf.strtab.sect   = &elf.sections[elf.strtab.ndx];
+            elf.strtab.ndx  = elf.file_header->strtab_ndx;
+            elf.strtab.sect = &elf.sections[elf.strtab.ndx];
             for (u32 i = 1; i < elf.file_header->sect_hdr_count; ++i) {
                 const auto& hdr = elf.sections[i];
                 if (hdr.type == section::type::symtab
                 &&  hdr.link == elf.strtab.ndx) {
-                    elf.symtab.ndx    = i;
-                    elf.symtab.sect   = &elf.sections[i];
+                    elf.symtab.ndx  = i;
+                    elf.symtab.sect = &elf.sections[i];
                     break;
                 }
             }
         }
 
-        module_t* module    {};
-        status_t status;
+        auto module = binfmt::system::make_module(module_type_t::object);
+        if (!module)
+            return status_t::read_error;
 
-        status = binfmt::system::make_module(module_type_t::object, &module);
-        if (!OK(status))
-            return status;
+        if (!OK(binfmt::module::reserve_sections(*module, elf.file_header->sect_hdr_count - 1)))
+            return status_t::read_error;
 
-//        status = binfmt::string_table::init(module->strtab,
-//                                            buf + elf.strtab.sect->offset,
-//                                            elf.strtab.sect->size);
-//        if (!OK(status))
-//            return status;
+        auto msc = &module->subclass.object;
 
         for (u32 i = 1; i < elf.file_header->sect_hdr_count; ++i) {
             const auto& hdr = elf.sections[i];
+            auto section = binfmt::module::get_section(*module, i - 1);
 
             auto map = find_section_map(hdr.type);
             if (!map)
@@ -853,11 +852,9 @@ namespace basecode::binfmt::io::elf {
             if (map->status == section_map_status_t::not_supported)
                 return status_t::elf_unsupported_section;
 
-            binfmt::section_opts_t sect_opts{};
             auto sect_type = map->type;
-
+            binfmt::section_opts_t sect_opts{};
             sect_opts.info          = hdr.info;
-            sect_opts.link          = hdr.link;
             sect_opts.size          = hdr.size;
             sect_opts.flags         = map->flags;
             sect_opts.align         = hdr.addr_align;
@@ -869,17 +866,24 @@ namespace basecode::binfmt::io::elf {
             sect_opts.flags.merge   = (hdr.flags & section::flags::merge) != 0;
             sect_opts.flags.exclude = (hdr.flags & section::flags::exclude) != 0;
             sect_opts.flags.strings = (hdr.flags & section::flags::strings) != 0;
+
             if (hdr.flags & section::flags::exec_instr) {
                 sect_opts.flags.code  = true;
                 sect_opts.flags.exec  = true;
                 sect_type = binfmt::section::type_t::code;
             }
 
-            auto r = binfmt::module::make_section(*module, sect_type, sect_opts);
-            if (!OK(r.status))
-                return r.status;
+            if (sect_type == binfmt::section::type_t::strtab) {
+                sect_opts.strtab.buf           = buf + hdr.offset;
+                sect_opts.strtab.size_in_bytes = hdr.size;
+            }
 
-            auto section = binfmt::module::get_section(*module, r.id);
+            if (!OK(binfmt::section::init(section, sect_type, sect_opts)))
+                return status_t::read_error;
+
+            if (hdr.link > 0)
+                section->link = binfmt::module::get_section(*module, hdr.link - 1);
+
             switch (section->type) {
                 case binfmt::section::type_t::data: {
                     if (section->flags.init)
@@ -894,26 +898,10 @@ namespace basecode::binfmt::io::elf {
                     section->subclass.data = buf + hdr.offset;
                     break;
                 }
-                case binfmt::section::type_t::rsrc: {
-                    break;
-                }
                 case binfmt::section::type_t::note: {
                     auto note_hdr = (note_header_t*) (buf + hdr.offset);
                     UNUSED(note_hdr);
                     // XXX: need to finish
-                    break;
-                }
-                case binfmt::section::type_t::debug: {
-                    break;
-                }
-                case binfmt::section::type_t::group: {
-                    auto gsc = &section->subclass.group;
-                    auto group = (group_t*) (buf + hdr.offset);
-                    auto num_groups = hdr.size / hdr.entity_size;
-                    gsc->flags = group->flags;
-                    array::resize(gsc->sections, num_groups);
-                    for (u32 j = 0; j < num_groups; ++j)
-                        gsc->sections[j] = group->sect_hdr_indexes[j];
                     break;
                 }
                 case binfmt::section::type_t::reloc: {
@@ -929,7 +917,8 @@ namespace basecode::binfmt::io::elf {
                         auto& reloc = relocs[j];
                         reloc.offset = rela.offset;
                         reloc.addend = rela.addend;
-                        reloc.symbol = sym;
+                        reloc.symbol = binfmt::section::get_symbol(section->link, sym - 1);
+
                         switch (file.machine) {
                             case binfmt::machine::type_t::unknown:
                                 break;
@@ -943,10 +932,14 @@ namespace basecode::binfmt::io::elf {
                     }
                     break;
                 }
-                case binfmt::section::type_t::strtab: {
-                    break;
-                }
-                case binfmt::section::type_t::symtab: {
+                case binfmt::section::type_t::group: {
+                    auto gsc = &section->subclass.group;
+                    auto group = (group_t*) (buf + hdr.offset);
+                    auto num_groups = hdr.size / hdr.entity_size;
+                    gsc->flags = group->flags;
+                    array::resize(gsc->sections, num_groups);
+                    for (u32 j = 0; j < num_groups; ++j)
+                        gsc->sections[j] = group->sect_hdr_indexes[j];
                     break;
                 }
                 case binfmt::section::type_t::custom: {
@@ -954,91 +947,95 @@ namespace basecode::binfmt::io::elf {
                     section->ext_type      = hdr.type;
                     break;
                 }
-                case binfmt::section::type_t::import: {
+                case binfmt::section::type_t::strtab: {
+                    if (i == elf.file_header->strtab_ndx)
+                        msc->strtab = section;
                     break;
                 }
+                case binfmt::section::type_t::symtab: {
+                    if (hdr.link > 0
+                    &&  hdr.link == elf.file_header->strtab_ndx) {
+                        msc->symtab = section;
+                    }
+                    const auto symtab_count = hdr.size / hdr.entity_size;
+                    for (u32 j = 1; j < symtab_count; ++j) {
+                        auto sym    = elf::symtab::get(elf, i, j);
+                        auto symbol = binfmt::section::add_symbol(section);
+                        symbol->size    = sym->size;
+                        symbol->value   = sym->value;
+                        symbol->section = binfmt::module::get_section(*module, sym->section_ndx - 1);
+
+                        switch (ELF64_ST_TYPE(sym->info)) {
+                            default:
+                            case elf::symtab::type::notype:
+                                symbol->type = symbol::type_t::none;
+                                break;
+                            case elf::symtab::type::tls:
+                                symbol->type = symbol::type_t::tls;
+                                break;
+                            case elf::symtab::type::file:
+                                symbol->type = symbol::type_t::file;
+                                break;
+                            case elf::symtab::type::common:
+                                symbol->type = symbol::type_t::common;
+                                break;
+                            case elf::symtab::type::object:
+                                symbol->type = symbol::type_t::object;
+                                break;
+                            case elf::symtab::type::section:
+                                symbol->type = symbol::type_t::section;
+                                break;
+                            case elf::symtab::type::func:
+                                symbol->type = symbol::type_t::function;
+                                break;
+                        }
+
+                        switch (ELF64_ST_BIND(sym->info)) {
+                            default:
+                            case elf::symtab::scope::local:
+                                symbol->scope = symbol::scope_t::local;
+                                break;
+                            case elf::symtab::scope::global:
+                                symbol->scope = symbol::scope_t::global;
+                                break;
+                            case elf::symtab::scope::weak:
+                                symbol->scope = symbol::scope_t::weak;
+                                break;
+                        }
+
+                        switch (ELF64_ST_VISIBILITY(sym->other)) {
+                            default:
+                            case elf::symtab::visibility::default_:
+                                symbol->visibility = symbol::visibility_t::default_;
+                                break;
+                            case elf::symtab::visibility::internal:
+                                symbol->visibility = symbol::visibility_t::internal_;
+                                break;
+                            case elf::symtab::visibility::hidden:
+                                symbol->visibility = symbol::visibility_t::hidden;
+                                break;
+                            case elf::symtab::visibility::protected_:
+                                symbol->visibility = symbol::visibility_t::protected_;
+                                break;
+                        }
+                    }
+                    break;
+                }
+                case binfmt::section::type_t::rsrc:
+                case binfmt::section::type_t::debug:
+                case binfmt::section::type_t::import:
                 case binfmt::section::type_t::export_: {
                     break;
                 }
             }
         }
 
-//        const auto symtab_count = elf.symtab.sect->size / elf.symtab.sect->entity_size;
-//        for (u32 i = 1; i < symtab_count; ++i) {
-//            auto sym = elf::symtab::get(elf, elf.symtab.ndx, i);
-//
-//            binfmt::symbol_opts_t sym_opts{};
-//            sym_opts.size    = sym->size;
-//            sym_opts.value   = sym->value;
-//            sym_opts.section = sym->section_ndx - 1;
-//
-//            auto type  = ELF64_ST_TYPE(sym->info);
-//            auto scope = ELF64_ST_BIND(sym->info);
-//            auto vis   = ELF64_ST_VISIBILITY(sym->other);
-//
-//            switch (type) {
-//                default:
-//                case elf::symtab::type::notype:
-//                    sym_opts.type = symbol::type_t::none;
-//                    break;
-//                case elf::symtab::type::tls:
-//                    sym_opts.type = symbol::type_t::tls;
-//                    break;
-//                case elf::symtab::type::file:
-//                    sym_opts.type = symbol::type_t::file;
-//                    break;
-//                case elf::symtab::type::common:
-//                    sym_opts.type = symbol::type_t::common;
-//                    break;
-//                case elf::symtab::type::object:
-//                    sym_opts.type = symbol::type_t::object;
-//                    break;
-//                case elf::symtab::type::section:
-//                    sym_opts.type = symbol::type_t::section;
-//                    break;
-//                case elf::symtab::type::func:
-//                    sym_opts.type = symbol::type_t::function;
-//                    break;
-//            }
-//
-//            switch (scope) {
-//                default:
-//                case elf::symtab::scope::local:
-//                    sym_opts.scope = symbol::scope_t::local;
-//                    break;
-//                case elf::symtab::scope::global:
-//                    sym_opts.scope = symbol::scope_t::global;
-//                    break;
-//                case elf::symtab::scope::weak:
-//                    sym_opts.scope = symbol::scope_t::weak;
-//                    break;
-//            }
-//
-//            switch (vis) {
-//                default:
-//                case elf::symtab::visibility::default_:
-//                    sym_opts.visibility = symbol::visibility_t::default_;
-//                    break;
-//                case elf::symtab::visibility::internal:
-//                    sym_opts.visibility = symbol::visibility_t::internal_;
-//                    break;
-//                case elf::symtab::visibility::hidden:
-//                    sym_opts.visibility = symbol::visibility_t::hidden;
-//                    break;
-//                case elf::symtab::visibility::protected_:
-//                    sym_opts.visibility = symbol::visibility_t::protected_;
-//                    break;
-//            }
-//
-//            binfmt::module::make_symbol(*module, sym_opts, sym->name_offset);
-//        }
-
         file.module = module;
 
         return status_t::ok;
     }
 
-status_t write(elf_t& elf, file_t& file) {
+    status_t write(elf_t& elf, file_t& file) {
         using machine_type_t = binfmt::machine::type_t;
         using section_type_t = binfmt::section::type_t;
 
@@ -1140,24 +1137,24 @@ status_t write(elf_t& elf, file_t& file) {
         u32 sect_idx    = elf.strtab.sect != nullptr ? 2 : 1;
         b8  inc_vaddr   = false;
 
-        for (const auto& section : msc->sections) {
+        for (const auto section : msc->sections) {
             auto& hdr = elf.sections[sect_idx++];
             hdr.flags       = {};
             hdr.addr        = virt_addr;
-            hdr.link        = section.link;
-            hdr.info        = section.info;
-            hdr.size        = section.size;
+            hdr.link        = section->link ? section->link->number : 0;
+            hdr.info        = section->info;
+            hdr.size        = section->size;
             hdr.offset      = data_offset;
-            hdr.addr_align  = section.align;
-            hdr.name_offset = section.name_offset;
+            hdr.addr_align  = section->align;
+            hdr.name_offset = section->name_offset;
 
-            if (section.flags.exec)     hdr.flags |= section::flags::exec_instr;
-            if (section.flags.alloc)    hdr.flags |= section::flags::alloc;
-            if (section.flags.write)    hdr.flags |= section::flags::write;
-            if (section.flags.group)    hdr.flags |= section::flags::group;
-            if (section.flags.merge)    hdr.flags |= section::flags::merge;
-            if (section.flags.exclude)  hdr.flags |= section::flags::exclude;
-            if (section.flags.strings) {
+            if (section->flags.exec)     hdr.flags |= section::flags::exec_instr;
+            if (section->flags.alloc)    hdr.flags |= section::flags::alloc;
+            if (section->flags.write)    hdr.flags |= section::flags::write;
+            if (section->flags.group)    hdr.flags |= section::flags::group;
+            if (section->flags.merge)    hdr.flags |= section::flags::merge;
+            if (section->flags.exclude)  hdr.flags |= section::flags::exclude;
+            if (section->flags.strings) {
                 hdr.flags |= section::flags::strings;
                 hdr.entity_size = 1;
             }
@@ -1165,12 +1162,12 @@ status_t write(elf_t& elf, file_t& file) {
             u8* data = buf + hdr.offset;
             const auto alignment = hdr.addr_align;
 
-            switch (section.type) {
+            switch (section->type) {
                 case section_type_t::data: {
-                    if (!section.flags.init) {
+                    if (!section->flags.init) {
                         hdr.type = section::type::nobits;
                     } else {
-                        std::memcpy(data, section.subclass.data, hdr.size);
+                        std::memcpy(data, section->subclass.data, hdr.size);
                         hdr.type = section::type::progbits;
                         data_offset = align(data_offset + hdr.size, alignment);
                         inc_vaddr   = !is_obj;
@@ -1178,28 +1175,28 @@ status_t write(elf_t& elf, file_t& file) {
                     break;
                 }
                 case section_type_t::init: {
-                    std::memcpy(data, section.subclass.data, hdr.size);
+                    std::memcpy(data, section->subclass.data, hdr.size);
                     hdr.type = section::type::init_array;
                     data_offset = align(data_offset + hdr.size, alignment);
                     inc_vaddr   = !is_obj;
                     break;
                 }
                 case section_type_t::fini: {
-                    std::memcpy(data, section.subclass.data, hdr.size);
+                    std::memcpy(data, section->subclass.data, hdr.size);
                     hdr.type = section::type::fini_array;
                     data_offset = align(data_offset + hdr.size, alignment);
                     inc_vaddr   = !is_obj;
                     break;
                 }
                 case section_type_t::code: {
-                    std::memcpy(data, section.subclass.data, hdr.size);
+                    std::memcpy(data, section->subclass.data, hdr.size);
                     hdr.type = section::type::progbits;
                     data_offset = align(data_offset + hdr.size, alignment);
                     inc_vaddr   = !is_obj;
                     break;
                 }
                 case section_type_t::unwind: {
-                    std::memcpy(data, section.subclass.data, hdr.size);
+                    std::memcpy(data, section->subclass.data, hdr.size);
                     hdr.type = section::type::x86_64_unwind;
                     data_offset = align(data_offset + hdr.size, alignment);
                     break;
@@ -1208,8 +1205,8 @@ status_t write(elf_t& elf, file_t& file) {
                     hdr.type        = section::type::rela;
                     hdr.entity_size = relocs::entity_size;
                     auto rela = (rela_t*) data;
-                    for (u32 j = 0; j < section.subclass.relocs.size; ++j) {
-                        const auto& reloc = section.subclass.relocs[j];
+                    for (u32 j = 0; j < section->subclass.relocs.size; ++j) {
+                        const auto& reloc = section->subclass.relocs[j];
                         u32 type{};
                         switch (file.machine) {
                             case binfmt::machine::type_t::unknown:
@@ -1232,24 +1229,24 @@ status_t write(elf_t& elf, file_t& file) {
                     hdr.type        = section::type::group;
                     hdr.entity_size = group::entity_size;
                     auto group = (group_t*) data;
-                    group->flags = section.subclass.group.flags;
-                    for (u32 j = 0; j < section.subclass.group.sections.size; ++j)
-                        group->sect_hdr_indexes[j] = section.subclass.group.sections[j];
+                    group->flags = section->subclass.group.flags;
+                    for (u32 j = 0; j < section->subclass.group.sections.size; ++j)
+                        group->sect_hdr_indexes[j] = section->subclass.group.sections[j];
                     data_offset = align(data_offset + hdr.size, alignment);
                     break;
                 }
                 case section_type_t::custom: {
-                    std::memcpy(data, section.subclass.data, hdr.size);
-                    hdr.type = section.ext_type != 0 ? section.ext_type : section::type::progbits;
+                    std::memcpy(data, section->subclass.data, hdr.size);
+                    hdr.type = section->ext_type != 0 ? section->ext_type : section::type::progbits;
                     data_offset = align(data_offset + hdr.size, alignment);
                     inc_vaddr   = !is_obj;
                     break;
                 }
                 case section_type_t::strtab: {
-                    std::memcpy(data, section.subclass.strtab.buf.data, hdr.size);
+                    std::memcpy(data, section->subclass.strtab.buf.data, hdr.size);
                     hdr.type = section::type::strtab;
                     data_offset = align(data_offset + hdr.size, 8);
-                    inc_vaddr   = !is_obj && section.flags.alloc;
+                    inc_vaddr   = !is_obj && section->flags.alloc;
                     break;
                 }
                 case section_type_t::symtab: {
@@ -1258,10 +1255,10 @@ status_t write(elf_t& elf, file_t& file) {
                     u32 scope   {};
                     u32 type    {};
                     u32 vis     {};
-                    for (const auto& symbol : section.subclass.symtab.symbols) {
+                    for (const auto& symbol : section->subclass.symtab.symbols) {
                         auto& sym = sym_data[i + 1];
 
-                        switch (symbol.type) {
+                        switch (symbol->type) {
                             case symbol::type_t::none:
                                 type = elf::symtab::type::notype;
                                 break;
@@ -1285,7 +1282,7 @@ status_t write(elf_t& elf, file_t& file) {
                                 break;
                         }
 
-                        switch (symbol.scope) {
+                        switch (symbol->scope) {
                             case symbol::scope_t::none:
                             case symbol::scope_t::weak:
                                 scope = elf::symtab::scope::weak;
@@ -1302,7 +1299,7 @@ status_t write(elf_t& elf, file_t& file) {
                                 break;
                         }
 
-                        switch (symbol.visibility) {
+                        switch (symbol->visibility) {
                             case symbol::visibility_t::default_:
                                 vis = elf::symtab::visibility::default_;
                                 break;
@@ -1317,12 +1314,12 @@ status_t write(elf_t& elf, file_t& file) {
                                 break;
                         }
 
-                        sym.size        = symbol.size;
-                        sym.value       = symbol.value;
+                        sym.size        = symbol->size;
+                        sym.value       = symbol->value;
                         sym.info        = ELF64_ST_INFO(scope, type);
                         sym.other       = ELF64_ST_VISIBILITY(vis);
-                        sym.name_offset = symbol.name_offset;
-                        sym.section_ndx = symbol.section + 1;
+                        sym.name_offset = symbol->name_offset;
+                        sym.section_ndx = symbol->section->number + 1;
 
                         ++i;
                     }

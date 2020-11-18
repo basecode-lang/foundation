@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/binfmt/io.h>
+#include <basecode/core/error.h>
 #include <basecode/binfmt/binfmt.h>
 #include <basecode/core/stopwatch.h>
 #include "test.h"
@@ -81,143 +82,101 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    module_t* mod{};
-    REQUIRE(OK(system::make_module(module_type_t::object, 10, &mod)));
+    auto mod = system::make_module(module_type_t::object, 10);
+    REQUIRE(mod);
     REQUIRE(system::get_module(10) != nullptr);
+    REQUIRE(error::report::ok());
 
     // 1. create the default string table
-    auto strtab_rc = module::make_section(*mod, section::type_t::strtab);
-    REQUIRE(OK(strtab_rc.status));
-    module::set_default_strtab(*mod, strtab_rc.id);
+    auto strtab_sect = module::make_default_string_table(*mod);
+    REQUIRE(strtab_sect);
+    REQUIRE(error::report::ok());
 
-    auto kernel32_str_rc = section::add_string(*mod, strtab_rc.id, "KERNEL32.DLL"_ss);
-    REQUIRE(OK(kernel32_str_rc.status));
-    auto read_file_str_rc = section::add_string(*mod, strtab_rc.id, "ReadFile"_ss);
-    REQUIRE(OK(read_file_str_rc.status));
-    auto write_file_str_rc = section::add_string(*mod, strtab_rc.id, "WriteFile"_ss);
-    REQUIRE(OK(write_file_str_rc.status));
-    auto get_std_handle_str_rc = section::add_string(*mod, strtab_rc.id, "GetStdHandle"_ss);
-    REQUIRE(OK(get_std_handle_str_rc.status));
+    auto kernel32_str       = section::add_string(strtab_sect, "KERNEL32.DLL"_ss);
+    auto read_file_str      = section::add_string(strtab_sect, "ReadFile"_ss);
+    auto write_file_str     = section::add_string(strtab_sect, "WriteFile"_ss);
+    auto get_std_handle_str = section::add_string(strtab_sect, "GetStdHandle"_ss);
+
+    REQUIRE(kernel32_str > 0);
+    REQUIRE(read_file_str > kernel32_str);
+    REQUIRE(write_file_str > read_file_str);
+    REQUIRE(get_std_handle_str > write_file_str);
+    REQUIRE(error::report::ok());
 
     // 2. create the default symbol table
-    auto symtab_rc = module::make_section(*mod, section::type_t::symtab);
-    REQUIRE(OK(symtab_rc.status));
-    module::set_default_symtab(*mod, symtab_rc.id);
+    auto symtab_sect = module::make_default_symbol_table(*mod);
+    REQUIRE(symtab_sect);
+    REQUIRE(error::report::ok());
+
+    auto kernel32_sym = section::add_symbol(symtab_sect);
+    REQUIRE(kernel32_sym);
+    kernel32_sym->value       = 1;
+    kernel32_sym->name_offset = kernel32_str;
+    kernel32_sym->type        = symbol::type_t::file;
+    kernel32_sym->scope       = symbol::scope_t::local;
+
+    auto read_file_sym = section::add_symbol(symtab_sect);
+    REQUIRE(read_file_sym);
+    read_file_sym->value       = 2;
+    read_file_sym->name_offset = read_file_str;
+    read_file_sym->type        = symbol::type_t::function;
+    read_file_sym->scope       = symbol::scope_t::global;
+
+    auto write_file_sym = section::add_symbol(symtab_sect);
+    REQUIRE(write_file_sym);
+    write_file_sym->value       = 3;
+    write_file_sym->name_offset = write_file_str;
+    write_file_sym->type        = symbol::type_t::function;
+    write_file_sym->scope       = symbol::scope_t::global;
+
+    auto get_std_handle_sym = section::add_symbol(symtab_sect);
+    REQUIRE(get_std_handle_sym);
+    get_std_handle_sym->value       = 4;
+    get_std_handle_sym->name_offset = get_std_handle_str;
+    get_std_handle_sym->type        = symbol::type_t::function;
+    get_std_handle_sym->scope       = symbol::scope_t::global;
+
+    REQUIRE(error::report::ok());
 
     /* 3. .text section */ {
-        auto text_rc = module::make_section(*mod,
-                                            section::type_t::code,
-                                            {
-                                              .flags = {
-                                                  .code = true,
-                                                  .exec = true,
-                                                  .alloc = true,
-                                              },
-                                              .size = sizeof(s_rot13_code)
-                                          });
-        auto set_data_rc = section::set_data(*mod, text_rc.id, s_rot13_code);
-        REQUIRE(OK(set_data_rc.status));
-        REQUIRE(OK(text_rc.status));
+        auto text_sect = module::make_text(*mod, (u8*) s_rot13_code, sizeof(s_rot13_code));
+        REQUIRE(text_sect);
+        REQUIRE(error::report::ok());
     }
 
     /* 4. .rdata section */ {
-        auto rdata_rc = module::make_section(*mod,
-                                             section::type_t::data,
-                                             {
-                                               .flags = {
-                                                   .code = false,
-                                                   .init = true,
-                                                   .alloc = true,
-                                               },
-                                               .size = sizeof(s_rot13_table)
-                                           });
-        auto set_data_rc = section::set_data(*mod, rdata_rc.id, s_rot13_table);
-        REQUIRE(OK(set_data_rc.status));
-        REQUIRE(OK(rdata_rc.status));
+        auto rodata_sect = module::make_rodata(*mod, (u8*) s_rot13_table, sizeof(s_rot13_table));
+        REQUIRE(rodata_sect);
+        REQUIRE(error::report::ok());
     }
 
     /* 5. .idata section */ {
-        auto idata_rc = module::make_section(*mod,
-                                             section::type_t::import,
-                                             {
-                                                .flags = {
-                                                    .code = false,
-                                                    .init = true,
-                                                    .write = true,
-                                                    .alloc = true,
-                                                }
-                                           });
-        auto kernel32_sym_rc = section::add_symbol(*mod,
-                                                   symtab_rc.id,
-                                                   {
-                                                       .value = 1,
-                                                       .name_offset = kernel32_str_rc.id,
-                                                       .section = idata_rc.id,
-                                                       .type   = symbol::type_t::file,
-                                                       .scope  = symbol::scope_t::local
-                                                   });
-        auto read_file_sym_rc = section::add_symbol(*mod,
-                                                    symtab_rc.id,
-                                                    {
-                                                        .value = 2,
-                                                        .name_offset = read_file_str_rc.id,
-                                                        .section = idata_rc.id,
-                                                        .type = symbol::type_t::function,
-                                                        .scope = symbol::scope_t::global,
-                                                    });
-        auto write_file_sym_rc = section::add_symbol(*mod,
-                                                     symtab_rc.id,
-                                                     {
-                                                         .value = 3,
-                                                         .name_offset = write_file_str_rc.id,
-                                                         .section = idata_rc.id,
-                                                         .type = symbol::type_t::function,
-                                                         .scope = symbol::scope_t::global,
-                                                     });
-        auto get_std_handle_sym_rc = section::add_symbol(*mod,
-                                                         symtab_rc.id,
-                                                         {
-                                                             .value = 4,
-                                                             .name_offset = get_std_handle_str_rc.id,
-                                                             .section = idata_rc.id,
-                                                             .type = symbol::type_t::function,
-                                                             .scope = symbol::scope_t::global,
-                                                         });
-        auto kernel32_imp_rc = section::import_module(*mod, idata_rc.id, kernel32_sym_rc.id);
-        auto kernel32_imp    = section::get_import(*mod, idata_rc.id, kernel32_imp_rc.id);
-        import::add_symbol(kernel32_imp, get_std_handle_sym_rc.id);
-        import::add_symbol(kernel32_imp, read_file_sym_rc.id);
-        import::add_symbol(kernel32_imp, write_file_sym_rc.id);
+        auto import_sect = module::make_import(*mod);
+        REQUIRE(import_sect);
+        REQUIRE(error::report::ok());
 
-        REQUIRE(OK(kernel32_sym_rc.status));
-        REQUIRE(OK(read_file_sym_rc.status));
-        REQUIRE(OK(write_file_sym_rc.status));
-        REQUIRE(OK(get_std_handle_sym_rc.status));
-        REQUIRE(OK(idata_rc.status));
-        REQUIRE(OK(kernel32_imp_rc.status));
-        REQUIRE(kernel32_imp);
-        REQUIRE(kernel32_imp->symbols.size == 3);
-        REQUIRE(kernel32_imp->symbols[0] == get_std_handle_sym_rc.id);
-        REQUIRE(kernel32_imp->symbols[1] == read_file_sym_rc.id);
-        REQUIRE(kernel32_imp->symbols[2] == write_file_sym_rc.id);
+        kernel32_sym->section       = import_sect;
+        read_file_sym->section      = import_sect;
+        write_file_sym->section     = import_sect;
+        get_std_handle_sym->section = import_sect;
+
+        auto kernel32_import = section::add_import(import_sect, kernel32_sym);
+        REQUIRE(kernel32_import);
+        import::add_symbol(kernel32_import, get_std_handle_sym);
+        import::add_symbol(kernel32_import, read_file_sym);
+        import::add_symbol(kernel32_import, write_file_sym);
+        REQUIRE(error::report::ok());
+
+        REQUIRE(kernel32_import->symbols.size == 3);
+        REQUIRE(kernel32_import->symbols[0] == get_std_handle_sym);
+        REQUIRE(kernel32_import->symbols[1] == read_file_sym);
+        REQUIRE(kernel32_import->symbols[2] == write_file_sym);
     }
 
     /* 6. .bss section */ {
-        auto bss_rc = module::make_section(*mod,
-                                           section::type_t::data,
-                                           {
-                                            .flags = {
-                                                .code   = false,
-                                                .init   = false,
-                                                .write  = true,
-                                                .alloc  = true,
-                                            },
-                                            .size = 4096
-                                         });
-        REQUIRE(OK(bss_rc.status));
-        auto bss = module::get_section(*mod, bss_rc.id);
-        REQUIRE(bss);
-        REQUIRE(bss->size == 4096);
+        auto bss_sect = module::make_bss(*mod, 4096);
+        REQUIRE(bss_sect);
+        REQUIRE(bss_sect->size == 4096);
     }
 
     io::session_t s{};

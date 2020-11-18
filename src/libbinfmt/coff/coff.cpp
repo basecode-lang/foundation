@@ -713,7 +713,7 @@ namespace basecode::binfmt::io::coff {
             auto& hdr = array::append(coff.headers);
             hdr = {};
             hdr.number  = i + 1;
-            hdr.section = &module_sc.sections[i];
+            hdr.section = module_sc.sections[i];
 
             str::slice_t name{};
             // XXX: FIXME!

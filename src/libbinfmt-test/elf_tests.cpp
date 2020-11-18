@@ -18,6 +18,7 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/binfmt/io.h>
+#include <basecode/core/error.h>
 #include <basecode/binfmt/binfmt.h>
 #include "test.h"
 
@@ -79,6 +80,7 @@ TEST_CASE("basecode::binfmt ELF read obj file") {
     defer(
         path::free(backend_obj_path);
         io::session::free(s);
+        error::report::print_range(0, error::report::count());
         );
 
     auto backend_obj = io::session::add_file(s,
@@ -109,6 +111,7 @@ TEST_CASE("basecode::binfmt ELF round trip obj file") {
         path::free(dest_obj_path);
         io::session::free(read_session);
         io::session::free(write_session);
+        error::report::print_range(0, error::report::count());
          );
 
     auto source_obj = io::session::add_file(read_session,
@@ -136,105 +139,74 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
 
     module_t mod{};
     REQUIRE(OK(module::init(mod, module_type_t::object, 20)));
-    defer(module::free(mod));
+    defer(module::free(mod);
+              error::report::print_range(0, error::report::count());
+    );
 
     // 1. create the default string table
-    auto strtab_rc = module::make_section(mod, section::type_t::strtab);
-    REQUIRE(OK(strtab_rc.status));
-    module::set_default_strtab(mod, strtab_rc.id);
+    auto strtab_sect = module::make_default_string_table(mod);
+    REQUIRE(strtab_sect);
+    REQUIRE(error::report::ok());
 
-    auto kernel32_str_rc = section::add_string(mod, strtab_rc.id, "KERNEL32.DLL"_ss);
-    REQUIRE(OK(kernel32_str_rc.status));
-    auto read_file_str_rc = section::add_string(mod, strtab_rc.id, "ReadFile"_ss);
-    REQUIRE(OK(read_file_str_rc.status));
-    auto write_file_str_rc = section::add_string(mod, strtab_rc.id, "WriteFile"_ss);
-    REQUIRE(OK(write_file_str_rc.status));
-    auto get_std_handle_str_rc = section::add_string(mod, strtab_rc.id, "GetStdHandle"_ss);
-    REQUIRE(OK(get_std_handle_str_rc.status));
+    auto kernel32_str       = section::add_string(strtab_sect, "KERNEL32.DLL"_ss);
+    auto read_file_str      = section::add_string(strtab_sect, "ReadFile"_ss);
+    auto write_file_str     = section::add_string(strtab_sect, "WriteFile"_ss);
+    auto get_std_handle_str = section::add_string(strtab_sect, "GetStdHandle"_ss);
+
+    REQUIRE(kernel32_str > 0);
+    REQUIRE(read_file_str > kernel32_str);
+    REQUIRE(write_file_str > read_file_str);
+    REQUIRE(get_std_handle_str > write_file_str);
+    REQUIRE(error::report::ok());
 
     // 2. create the default symbol table
-    auto symtab_rc = module::make_section(mod, section::type_t::symtab);
-    REQUIRE(OK(symtab_rc.status));
-    module::set_default_symtab(mod, symtab_rc.id);
+    auto symtab_sect = module::make_default_symbol_table(mod);
+    REQUIRE(symtab_sect);
+    REQUIRE(error::report::ok());
+
+    auto read_file_sym = section::add_symbol(symtab_sect);
+    REQUIRE(read_file_sym);
+    read_file_sym->value       = 2;
+    read_file_sym->name_offset = read_file_str;
+    read_file_sym->type        = symbol::type_t::function;
+    read_file_sym->scope       = symbol::scope_t::global;
+
+    auto write_file_sym = section::add_symbol(symtab_sect);
+    REQUIRE(write_file_sym);
+    write_file_sym->value       = 3;
+    write_file_sym->name_offset = write_file_str;
+    write_file_sym->type        = symbol::type_t::function;
+    write_file_sym->scope       = symbol::scope_t::global;
+
+    auto get_std_handle_sym = section::add_symbol(symtab_sect);
+    REQUIRE(get_std_handle_sym);
+    get_std_handle_sym->value       = 4;
+    get_std_handle_sym->name_offset = get_std_handle_str;
+    get_std_handle_sym->type        = symbol::type_t::function;
+    get_std_handle_sym->scope       = symbol::scope_t::global;
 
     /* .text section */ {
-        auto text_rc = module::make_section(mod,
-                                            section::type_t::code,
-                                            {
-                                                .flags = {
-                                                    .code = true,
-                                                    .init = true,
-                                                    .exec = true,
-                                                    .alloc = true
-                                                },
-                                                .size = sizeof(s_rot13_code)
-                                            });
-        auto set_data_rc = section::set_data(mod, text_rc.id, s_rot13_code);
+        auto text_sect = module::make_text(mod, (u8*) s_rot13_code, sizeof(s_rot13_code));
+        REQUIRE(text_sect);
+        REQUIRE(error::report::ok());
 
-        section::add_symbol(mod,
-                            symtab_rc.id,
-                            {
-                                .value = 2,
-                                .name_offset = read_file_str_rc.id,
-                                .section = text_rc.id,
-                                .type = symbol::type_t::function,
-                                .scope = symbol::scope_t::global
-                            });
-        section::add_symbol(mod,
-                            symtab_rc.id,
-                            {
-                                .value = 3,
-                                .name_offset = write_file_str_rc.id,
-                                .section = text_rc.id,
-                                .type = symbol::type_t::function,
-                                .scope  = symbol::scope_t::global
-                            });
-        section::add_symbol(mod,
-                            symtab_rc.id,
-                            {
-                                .value = 4,
-                                .name_offset = get_std_handle_str_rc.id,
-                                .section = text_rc.id,
-                                .type = symbol::type_t::function,
-                                .scope  = symbol::scope_t::global
-                            });
-        REQUIRE(OK(set_data_rc.status));
-        REQUIRE(OK(text_rc.status));
+        read_file_sym->section      = text_sect;
+        write_file_sym->section     = text_sect;
+        get_std_handle_sym->section = text_sect;
+
+        REQUIRE(error::report::ok());
     }
 
     /* .rdata section */ {
-        auto rdata_rc = module::make_section(mod,
-                                             section::type_t::data,
-                                             {
-                                                 .flags = {
-                                                     .code = false,
-                                                     .init = true,
-                                                     .alloc = true
-                                                 },
-                                                 .size = sizeof(s_rot13_table)
-                                             });
-        auto rdata = module::get_section(mod, rdata_rc.id);
-        section::set_data(mod, rdata_rc.id, s_rot13_table);
-        REQUIRE(OK(rdata_rc.status));
-        REQUIRE(rdata);
+        auto rodata_sect = module::make_rodata(mod, (u8*) s_rot13_table, sizeof(s_rot13_table));
+        REQUIRE(rodata_sect);
+        REQUIRE(error::report::ok());
     }
 
     /* .bss section */ {
-        auto bss_rc = module::make_section(mod,
-                                           section::type_t::data,
-                                           {
-                                               .flags = {
-                                                   .code   = false,
-                                                   .init   = false,
-                                                   .write  = true,
-                                                   .alloc  = true
-                                               },
-                                               .size = 4096
-                                           });
-        REQUIRE(OK(bss_rc.status));
-        auto bss = module::get_section(mod, bss_rc.id);
-        REQUIRE(bss);
-        REQUIRE(bss->size == 4096);
+        auto bss_sect = module::make_bss(mod, 4096);
+        REQUIRE(bss_sect);
+        REQUIRE(bss_sect->size == 4096);
     }
 
     io::session_t s{};

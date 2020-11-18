@@ -28,31 +28,33 @@ namespace basecode::binfmt {
 
         module_t* get_module(module_id id);
 
+        module_t* make_module(module_type_t type);
+
         status_t init(alloc_t* alloc = context::top()->alloc);
 
-        status_t make_module(module_type_t type, module_t** mod);
-
-        status_t make_module(module_type_t type, module_id id, module_t** mod);
+        module_t* make_module(module_type_t type, module_id id);
     }
 
     namespace import {
-        status_t add_symbol(import_t* import, symbol_id symbol);
+        u0 add_symbol(import_t* import, symbol_t* symbol);
     }
 
     namespace section {
         u0 free(section_t& section);
 
-        result_t set_data(module_t& module, section_id id, const u8* data);
+        status_t init(section_t* section,
+                      section::type_t type,
+                      const section_opts_t& opts);
 
-        result_t add_string(module_t& module, section_id id, str::slice_t str);
+        u0 set_data(section_t* section, const u8* data);
 
-        import_t* get_import(module_t& module, section_id id, import_id import);
+        symbol_t* get_symbol(section_t* section, u32 idx);
 
-        result_t import_module(module_t& module, section_id id, symbol_id symbol);
+        u32 add_string(section_t* section, str::slice_t str);
 
-        status_t init(section_t& section, section::type_t type, symbol_id symbol);
+        import_t* add_import(section_t* section, symbol_t* module_symbol);
 
-        result_t add_symbol(module_t& module, section_id id, const symbol_opts_t& opts);
+        symbol_t* add_symbol(section_t* section, const symbol_opts_t& opts = {});
     }
 
     namespace module {
@@ -62,15 +64,27 @@ namespace basecode::binfmt {
                          str::slice_t name,
                          section_ptr_list_t& list);
 
-        result_t make_section(module_t& module,
-                              section::type_t type,
-                              const section_opts_t& opts = {});
+        section_t* make_section(module_t& module,
+                                section::type_t type,
+                                const section_opts_t& opts = {});
 
-        u0 set_default_strtab(module_t& module, section_id id);
+        section_t* make_import(module_t& module);
 
-        u0 set_default_symtab(module_t& module, section_id id);
+        section_t* make_bss(module_t& module, u32 size);
 
-        section_t* get_section(const module_t& module, section_id id);
+        section_t* make_default_string_table(module_t& module);
+
+        section_t* make_default_symbol_table(module_t& module);
+
+        section_t* get_section(const module_t& module, u32 idx);
+
+        section_t* make_data(module_t& module, u8* data, u32 size);
+
+        section_t* make_text(module_t& module, u8* data, u32 size);
+
+        section_t* make_rodata(module_t& module, u8* data, u32 size);
+
+        status_t reserve_sections(module_t& module, u32 num_sections);
 
         status_t init(module_t& module, module_type_t type, module_id id);
     }
@@ -80,9 +94,7 @@ namespace basecode::binfmt {
 
         status_t init(symbol_table_t& table);
 
-        symbol_t* get_symbol(const symbol_table_t& symtab, symbol_id id);
-
-        result_t make_symbol(symbol_table_t& symtab, const symbol_opts_t& opts);
+        symbol_t* make_symbol(symbol_table_t& symtab, const symbol_opts_t& opts);
     }
 
     namespace string_table {

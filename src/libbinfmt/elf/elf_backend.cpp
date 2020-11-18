@@ -166,16 +166,16 @@ namespace basecode::binfmt::io::elf {
             u32 num_segments    {};
             u32 num_sections    {msc->sections.size + 1};
 
-            for (auto& section : msc->sections) {
-                const auto alignment = std::max<u32>(section.align, 8);
-                switch (section.type) {
+            for (auto section : msc->sections) {
+                const auto alignment = std::max<u32>(section->align, 8);
+                switch (section->type) {
                     case section_type_t::data: {
-                        if (section.flags.init)
-                            data_size = align(data_size + section.size, alignment);
+                        if (section->flags.init)
+                            data_size = align(data_size + section->size, alignment);
                         break;
                     }
                     default:
-                        data_size = align(data_size + section.size, alignment);
+                        data_size = align(data_size + section->size, alignment);
                         break;
                 }
             }
@@ -312,10 +312,10 @@ namespace basecode::binfmt::io::elf {
         using section_type_t = binfmt::section::type_t;
 
         if (section->name_offset > 0) {
-            const auto strtab_section = binfmt::module::get_section(*module, module->subclass.object.strtab);
-            if (!strtab_section)
+            auto msc = &section->module->subclass.object;
+            if (!msc->strtab)
                 return status_t::cannot_map_section_name;
-            const auto str = binfmt::string_table::get(strtab_section->subclass.strtab, section->name_offset);
+            const auto str = binfmt::string_table::get(msc->strtab->subclass.strtab, section->name_offset);
             name.data   = (const u8*) str;
             name.length = strlen(str);
             return status_t::ok;
