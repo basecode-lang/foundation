@@ -1020,20 +1020,6 @@ namespace basecode::binfmt::io::elf {
             elf.sections = (sect_header_t*) (buf + elf.file_header->sect_hdr_offset);
         }
 
-        if (elf.file_header->strtab_ndx > 0) {
-            elf.strtab.ndx  = elf.file_header->strtab_ndx;
-            elf.strtab.sect = &elf.sections[elf.strtab.ndx];
-            for (u32 i = 1; i < elf.file_header->sect_hdr_count; ++i) {
-                const auto& hdr = elf.sections[i];
-                if (hdr.type == section::type::symtab
-                &&  hdr.link == elf.strtab.ndx) {
-                    elf.symtab.ndx  = i;
-                    elf.symtab.sect = &elf.sections[i];
-                    break;
-                }
-            }
-        }
-
         file.module = binfmt::system::make_module(module_type_t::object);
         if (!file.module) {
             return status_t::read_error;
@@ -1384,7 +1370,9 @@ namespace basecode::binfmt::io::elf {
         name[16] = '\0';
 
         s8 flag_chars[14];
-        auto strtab = ((u8*) (elf.file_header)) + elf.strtab.sect->offset;
+        auto elf_buf = (u8*) elf.file_header;
+        auto strtab_sect = &elf.sections[elf.file_header->strtab_ndx];
+        auto strtab = elf_buf + strtab_sect->offset;
 
         for (u32 i = 0; i < elf.file_header->sect_hdr_count; ++i) {
             const auto& hdr = elf.sections[i];
@@ -1408,12 +1396,15 @@ namespace basecode::binfmt::io::elf {
                               hdr.addr_align);
         }
 
-        const auto symtab_size = elf.symtab.sect->size / elf.symtab.sect->entity_size;
+        auto symtab_ndx = elf.file_header->sect_hdr_count - 1;
+        auto symtab_sect = &elf.sections[symtab_ndx];
+
+        const auto symtab_size = symtab_sect->size / symtab_sect->entity_size;
 
         format::format_to(buf, "\nSymbol table '{}' contains {} entries:\n", ".symtab", symtab_size);
         format::format_to(buf, "  Num:     Value         Size Type     Bind   Vis       Ndx Name\n");
         for (u32 i = 0; i < symtab_size; ++i) {
-            auto sym = elf::symtab::get(elf, elf.symtab.ndx, i);
+            auto sym = elf::symtab::get(elf, symtab_ndx, i);
             std::memcpy(name, strtab + sym->name_offset, 16);
             format::format_to(buf,
                               "{:>5}: {:016x} {:>5} NOTYPE   LOCAL   DEFAULT  {} {}\n",

@@ -166,14 +166,6 @@ namespace basecode::binfmt::io::elf {
         file_header_t*          file_header;
         pgm_header_t*           segments;
         sect_header_t*          sections;
-        struct {
-            sect_header_t*      sect;
-            u32                 ndx;
-        }                       strtab;
-        struct {
-            sect_header_t*      sect;
-            u32                 ndx;
-        }                       symtab;
     };
 
     [[maybe_unused]] constexpr u32 class_64         = 2;
