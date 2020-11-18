@@ -843,12 +843,15 @@ namespace basecode::binfmt::io::coff {
             case type_t::import:
             case type_t::export_:
                 return status_t::invalid_section_type;
+            case type_t::none:
             case type_t::rsrc:
             case type_t::note:
             case type_t::init:
             case type_t::fini:
             case type_t::debug:
             case type_t::unwind:
+            case type_t::strtab:
+            case type_t::symtab:
             case type_t::pre_init:
                 return status_t::not_implemented;
         }

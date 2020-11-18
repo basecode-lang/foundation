@@ -605,5 +605,11 @@ namespace basecode::binfmt::io::elf {
 
     status_t init(elf_t& elf, const opts_t& opts);
 
+    u0 format_report(str_buf_t& buf, const elf_t& elf);
+
+    u32 section_alignment(const binfmt::section_t* section);
+
+    u32 section_file_size(const binfmt::section_t* section);
+
     status_t get_section_name(const module_t* module, const binfmt::section_t* section, str::slice_t& name);
 }

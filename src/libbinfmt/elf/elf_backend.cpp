@@ -32,74 +32,6 @@ namespace basecode::binfmt::io::elf {
 
         elf_system_t                g_elf_sys{};
 
-        static u0 format_elf(const elf_t& elf) {
-            format::print("ELF Header:\n");
-            format::print("  Magic:    ");
-            format::print_hex_dump(elf.file_header->magic, 16, false, false);
-            format::print("  Class:                             {}\n", elf::file::class_name(elf.file_header->magic[elf::file::magic_class]));
-            format::print("  Data:                              {}\n", elf::file::endianess_name(elf.file_header->magic[elf::file::magic_data]));
-            format::print("  Version:                           {}\n", elf::file::version_name(elf.file_header->magic[elf::file::magic_version]));
-            format::print("  OS/ABI:                            {}\n", elf::file::os_abi_name(elf.file_header->magic[elf::file::magic_os_abi]));
-            format::print("  ABI Version:                       {}\n", elf.file_header->magic[elf::file::magic_abi_version]);
-            format::print("  Type:                              {}\n", elf::file::file_type_name(elf.file_header->type));
-            format::print("  Machine:                           {}\n", elf::machine::name(elf.file_header->machine));
-            format::print("  Version:                           0x{:x}\n", elf.file_header->version);
-            format::print("  Entry point address:               0x{:x}\n", elf.file_header->entry_point);
-            format::print("  Start of program headers:          {} (bytes into file)\n", elf.file_header->pgm_hdr_offset);
-            format::print("  Start of section headers:          {} (bytes into file)\n", elf.file_header->sect_hdr_offset);
-            format::print("  Flags:                             0x{:x}\n", elf.file_header->flags);
-            format::print("  Size of this header:               {} (bytes)\n", file::header_size);
-            format::print("  Size of program headers:           {} (bytes)\n", elf.file_header->pgm_hdr_size);
-            format::print("  Number of program headers:         {}\n", elf.file_header->pgm_hdr_count);
-            format::print("  Size of section headers:           {} (bytes)\n", elf.file_header->sect_hdr_size);
-            format::print("  Number of section headers:         {}\n", elf.file_header->sect_hdr_count);
-            format::print("  Section header string table index: {}\n\n", elf.file_header->strtab_ndx);
-            format::print("Section Headers:\n");
-            format::print("  [Nr] Name              Type             Address           Offset\n");
-            format::print("       Size              EntSize          Flags  Link  Info  Align\n");
-
-            s8 name[17];
-            name[16] = '\0';
-
-            s8 flag_chars[14];
-            auto strtab = ((u8*) (elf.file_header)) + elf.strtab.sect->offset;
-
-            for (u32 i = 0; i < elf.file_header->sect_hdr_count; ++i) {
-                const auto& hdr = elf.sections[i];
-                std::memcpy(name, strtab + hdr.name_offset, 16);
-                elf::section::flags::chars(hdr.flags, flag_chars);
-
-                format::print(" [{:>3}] {:<17} {:<16} {:016x} {:08x}\n",
-                              i,
-                              name,
-                              section::type::name(hdr.type),
-                              hdr.addr,
-                              hdr.offset);
-                format::print("       {:016x}  {:016x} {:<7}{:>4}  {:>4}    {:<}\n",
-                              hdr.size,
-                              hdr.entity_size,
-                              flag_chars,
-                              hdr.link,
-                              hdr.info,
-                              hdr.addr_align);
-            }
-
-            const auto symtab_size = elf.symtab.sect->size / elf.symtab.sect->entity_size;
-
-            format::print("\nSymbol table '{}' contains {} entries:\n", ".symtab", symtab_size);
-            format::print("  Num:     Value         Size Type     Bind   Vis       Ndx Name\n");
-            for (u32 i = 0; i < symtab_size; ++i) {
-                auto sym = elf::symtab::get(elf, elf.symtab.ndx, i);
-                std::memcpy(name, strtab + sym->name_offset, 16);
-                format::print("{:>5}: {:016x} {:>5} NOTYPE   LOCAL   DEFAULT  {} {}\n",
-                              i,
-                              sym->value,
-                              sym->size,
-                              sym->section_ndx,
-                              name);
-            }
-        }
-
         static u0 fini() {
             name_map::free(g_elf_sys.section_names);
             name_map::free(g_elf_sys.segment_names);
@@ -136,8 +68,6 @@ namespace basecode::binfmt::io::elf {
             stopwatch::stop(timer);
             stopwatch::print_elapsed("binfmt ELF read time"_ss, 40, timer);
 
-            format_elf(elf);
-
             return status_t::ok;
         }
 
@@ -167,17 +97,15 @@ namespace basecode::binfmt::io::elf {
             u32 num_sections    {msc->sections.size + 1};
 
             for (auto section : msc->sections) {
-                const auto alignment = std::max<u32>(section->align, 8);
-                switch (section->type) {
-                    case section_type_t::data: {
-                        if (section->flags.init)
-                            data_size = align(data_size + section->size, alignment);
-                        break;
-                    }
-                    default:
-                        data_size = align(data_size + section->size, alignment);
-                        break;
+                if (section->size == 0
+                &&  section->type == section_type_t::data
+                &&  !section->flags.init) {
+                    // XXX: error::report::add
+                    return status_t::read_error;
                 }
+                const auto alignment = elf::section_alignment(section);
+                const auto size = elf::section_file_size(section);
+                data_size = align(data_size + size, alignment);
             }
 
             opts.header_offset = elf::file::header_size + data_size;

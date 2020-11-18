@@ -267,6 +267,7 @@ namespace basecode::binfmt {
 
     namespace section {
         enum class type_t : u8 {
+            none,
             code,
             data,
             rsrc,
@@ -301,10 +302,11 @@ namespace basecode::binfmt {
     }
 
     struct symbol_t final {
+        section_t*              section;
+        symbol_t*               next;
         u64                     size;
         u64                     value;
-        symbol_t*               next;
-        section_t*              section;
+        u32                     ndx;
         u32                     name_offset;
         symbol::type_t          type;
         symbol::scope_t         scope;
@@ -346,9 +348,9 @@ namespace basecode::binfmt {
     };
 
     struct reloc_t final {
+        symbol_t*               symbol;
         u64                     offset;
         s64                     addend;
-        symbol_t*               symbol;
         union {
             machine::x86_64::reloc::type_t  x86_64_type;
             machine::aarch64::reloc::type_t aarch64_type;

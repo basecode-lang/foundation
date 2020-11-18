@@ -42,10 +42,10 @@ namespace basecode::binfmt {
 
     namespace system {
         u0 fini() {
-            for (auto mod : g_binfmt_sys.modules)
-                module::free(*mod);
             for (auto section : g_binfmt_sys.sections)
                 section::free(*section);
+            for (auto mod : g_binfmt_sys.modules)
+                module::free(*mod);
             stable_array::free(g_binfmt_sys.modules);
             stable_array::free(g_binfmt_sys.sections);
             stable_array::free(g_binfmt_sys.symbols);
@@ -131,6 +131,9 @@ namespace basecode::binfmt {
                         array::free(import.symbols);
                     array::free(section.subclass.imports);
                     break;
+                case section::type_t::data:
+                    if (!section.flags.strings)
+                        break;
                 case section::type_t::strtab:
                     string_table::free(section.subclass.strtab);
                     break;
@@ -156,6 +159,12 @@ namespace basecode::binfmt {
             section->name_offset = opts.name_offset;
             switch (section->type) {
                 case section::type_t::data:
+                    if (section->flags.strings) {
+                        goto init_strtab;
+                    } else {
+                        section->subclass.data = {};
+                    }
+                    break;
                 case section::type_t::code:
                 case section::type_t::custom:
                     section->subclass.data = {};
@@ -170,7 +179,7 @@ namespace basecode::binfmt {
                     array::init(section->subclass.imports, section->alloc);
                     break;
                 case section::type_t::strtab:
-                    if (!opts.strtab.buf) {
+                init_strtab: if (!opts.strtab.buf) {
                         auto status = string_table::init(section->subclass.strtab);
                         if (!OK(status))
                             return status;
@@ -357,8 +366,12 @@ namespace basecode::binfmt {
         status_t reserve_sections(module_t& module, u32 num_sections) {
             auto msc = &module.subclass.object;
             array::resize(msc->sections, num_sections);
-            for (u32 i = 0; i < num_sections; ++i)
-                msc->sections[i] = &stable_array::append(g_binfmt_sys.sections);
+            for (u32 i = 0; i < num_sections; ++i) {
+                auto section = &stable_array::append(g_binfmt_sys.sections);
+                section->module = &module;
+                section->number = i + 1;
+                msc->sections[i] = section;
+            }
             return status_t::ok;
         }
 
@@ -435,6 +448,8 @@ namespace basecode::binfmt {
 
         symbol_t* make_symbol(symbol_table_t& symtab, const symbol_opts_t& opts) {
             auto next_symbol = &stable_array::append(g_binfmt_sys.symbols);
+            next_symbol->ndx = symtab.symbols.size;
+            array::append(symtab.symbols, next_symbol);
             next_symbol->next        = {};
             next_symbol->type        = opts.type;
             next_symbol->size        = opts.size;
