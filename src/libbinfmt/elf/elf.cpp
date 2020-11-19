@@ -51,6 +51,9 @@ namespace basecode::binfmt::io::elf {
         },
 
         [section::type::symtab]         = {
+            .flags = {
+                .dynamic = false,
+            },
             .type = binfmt::section::type_t::symtab,
             .status = section_map_status_t::ok
         },
@@ -98,7 +101,11 @@ namespace basecode::binfmt::io::elf {
         },
 
         [section::type::dynsym]         = {
-            .status = section_map_status_t::not_supported,
+            .flags = {
+                .dynamic = true,
+            },
+            .type = binfmt::section::type_t::symtab,
+            .status = section_map_status_t::ok,
         },
 
         [section::type::init_array]     = {
@@ -650,9 +657,64 @@ namespace basecode::binfmt::io::elf {
     namespace hashtab {
     }
 
+    namespace dynamic {
+        namespace type {
+            static str::slice_t s_names[] = {
+                [null]                  = "NULL"_ss,
+                [needed]                = "NEEDED"_ss,
+                [plt_rel_size]          = "PLTRELSZ"_ss,
+                [plt_got]               = "PLTGOT"_ss,
+                [hash]                  = "HASH"_ss,
+                [strtab]                = "STRTAB"_ss,
+                [symtab]                = "SYMTAB"_ss,
+                [rela]                  = "RELA"_ss,
+                [rela_size]             = "RELASZ"_ss,
+                [rela_ent_size]         = "RELAENT"_ss,
+                [str_size]              = "STRSZ"_ss,
+                [sym_ent_size]          = "SYMENT"_ss,
+                [init]                  = "INIT"_ss,
+                [fini]                  = "FINI"_ss,
+                [soname]                = "SONAME"_ss,
+                [rpath]                 = "RPATH"_ss,
+                [symbolic]              = "SYMBOLIC"_ss,
+                [rel]                   = "REL"_ss,
+                [rel_size]              = "RELSZ"_ss,
+                [rel_ent_size]          = "RELENT"_ss,
+                [plt_rel]               = "PLTREL"_ss,
+                [debug]                 = "DEBUG"_ss,
+                [text_rel]              = "TEXTREL"_ss,
+                [jmp_rel]               = "JMPREL"_ss,
+                [bind_now]              = "BIND_NOW"_ss,
+                [init_array]            = "INIT_ARRAY"_ss,
+                [fini_array]            = "FINI_ARRAY"_ss,
+                [init_array_size]       = "INIT_ARRAYSZ"_ss,
+                [fini_array_size]       = "FINI_ARRAYSZ"_ss,
+                [run_path]              = "RUNPATH"_ss,
+                [flags]                 = "FLAGS"_ss,
+                [pre_init_array]        = "PREINIT_ARRAY"_ss,
+                [pre_init_array_size]   = "PREINIT_ARRAYSZ"_ss,
+            };
+
+            str::slice_t name(u32 type) {
+                switch (type) {
+                    case null ... pre_init_array_size:
+                        return s_names[type];
+                    default:
+                        if (type >= low_os && type <= high_os) {
+                            return string::interned::fold(format::format("DT_LOOS+0x{:x}", type & 0x0fffffffU));
+                        } else if (type >= low_proc && type <= high_proc) {
+                            return string::interned::fold(format::format("DT_LOPROC+0x{:x}", type & 0x0fffffffU));
+                        }
+                        break;
+                }
+                return "UNKNOWN"_ss;
+            }
+        }
+    }
+
     namespace section {
         namespace type {
-            static str::slice_t s_type_names[] = {
+            static str::slice_t s_names[] = {
                 "NULL"_ss,
                 "PROGBITS"_ss,
                 "SYMTAB"_ss,
@@ -688,7 +750,7 @@ namespace basecode::binfmt::io::elf {
                     case gnu_ver_need:      return "GNU_VERNEED"_ss;
                     case gnu_ver_sym:       return "GNU_VERSYM"_ss;
                     case null ... symtab_shndx:
-                        return s_type_names[type];
+                        return s_names[type];
                     default: {
                         if (type >= low_os && type <= high_os) {
                             return string::interned::fold(format::format("LOOS+0x{:x}", type & 0x0fffffffU));
@@ -804,7 +866,7 @@ namespace basecode::binfmt::io::elf {
         }
 
         if (sect_type == binfmt::section::type_t::strtab
-        ||  sect_opts.flags.strings) {
+        || (sect_type == binfmt::section::type_t::data && sect_opts.flags.strings)) {
             sect_opts.strtab.buf           = buf + hdr.offset;
             sect_opts.strtab.size_in_bytes = hdr.size;
         }
@@ -1238,7 +1300,7 @@ namespace basecode::binfmt::io::elf {
                     break;
                 }
                 case section_type_t::symtab: {
-                    hdr.type        = section::type::symtab;
+                    hdr.type        = section->flags.dynamic ? section::type::dynsym : section::type::symtab;
                     hdr.entity_size = symtab::entity_size;
 
                     auto sym_data = (sym_t*) (buf + hdr.offset);

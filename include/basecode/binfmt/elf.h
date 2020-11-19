@@ -28,15 +28,6 @@
 #define ELF64_ST_VISIBILITY(o)      ((o) & u32(0x03))
 #define ELF64_ST_INFO(bind, type)   (((bind) << u32(4)) + ((type) & u32(0xf)))
 
-// XXX:
-//  STT_GNU_IFUNC?
-//
-//  - .common section?
-//  - .got section
-//  - .plt section
-//  - .gnu.version/.gnu.version.r
-//  - init/fini array symbols
-//
 namespace basecode::binfmt::io::elf {
    struct file_header_t final {
         u8                      magic[16];
@@ -423,31 +414,45 @@ namespace basecode::binfmt::io::elf {
 
     namespace dynamic {
         namespace type {
-            [[maybe_unused]] constexpr u8 null              = 0;
-            [[maybe_unused]] constexpr u8 needed            = 1;
-            [[maybe_unused]] constexpr u8 plt_rel_size      = 2;
-            [[maybe_unused]] constexpr u8 plt_got           = 3;
-            [[maybe_unused]] constexpr u8 hash              = 4;
-            [[maybe_unused]] constexpr u8 strtab            = 5;
-            [[maybe_unused]] constexpr u8 symtab            = 6;
-            [[maybe_unused]] constexpr u8 rela              = 7;
-            [[maybe_unused]] constexpr u8 rela_size         = 8;
-            [[maybe_unused]] constexpr u8 rela_ent          = 9;
-            [[maybe_unused]] constexpr u8 strsz             = 10;
-            [[maybe_unused]] constexpr u8 sym_ent           = 11;
-            [[maybe_unused]] constexpr u8 init              = 12;
-            [[maybe_unused]] constexpr u8 fini              = 13;
-            [[maybe_unused]] constexpr u8 soname            = 14;
-            [[maybe_unused]] constexpr u8 rpath             = 15;
-            [[maybe_unused]] constexpr u8 symbolic          = 16;
-            [[maybe_unused]] constexpr u8 rel               = 17;
-            [[maybe_unused]] constexpr u8 rel_size          = 18;
-            [[maybe_unused]] constexpr u8 rel_ent           = 19;
-            [[maybe_unused]] constexpr u8 plt_rel           = 20;
-            [[maybe_unused]] constexpr u8 debug             = 21;
-            [[maybe_unused]] constexpr u8 text_rel          = 22;
-            [[maybe_unused]] constexpr u8 jmp_rel           = 23;
-            [[maybe_unused]] constexpr u8 encoding          = 32;
+            [[maybe_unused]] constexpr u32 null                  = 0;
+            [[maybe_unused]] constexpr u32 needed                = 1;
+            [[maybe_unused]] constexpr u32 plt_rel_size          = 2;
+            [[maybe_unused]] constexpr u32 plt_got               = 3;
+            [[maybe_unused]] constexpr u32 hash                  = 4;
+            [[maybe_unused]] constexpr u32 strtab                = 5;
+            [[maybe_unused]] constexpr u32 symtab                = 6;
+            [[maybe_unused]] constexpr u32 rela                  = 7;
+            [[maybe_unused]] constexpr u32 rela_size             = 8;
+            [[maybe_unused]] constexpr u32 rela_ent_size         = 9;
+            [[maybe_unused]] constexpr u32 str_size              = 10;
+            [[maybe_unused]] constexpr u32 sym_ent_size          = 11;
+            [[maybe_unused]] constexpr u32 init                  = 12;
+            [[maybe_unused]] constexpr u32 fini                  = 13;
+            [[maybe_unused]] constexpr u32 soname                = 14;
+            [[maybe_unused]] constexpr u32 rpath                 = 15;
+            [[maybe_unused]] constexpr u32 symbolic              = 16;
+            [[maybe_unused]] constexpr u32 rel                   = 17;
+            [[maybe_unused]] constexpr u32 rel_size              = 18;
+            [[maybe_unused]] constexpr u32 rel_ent_size          = 19;
+            [[maybe_unused]] constexpr u32 plt_rel               = 20;
+            [[maybe_unused]] constexpr u32 debug                 = 21;
+            [[maybe_unused]] constexpr u32 text_rel              = 22;
+            [[maybe_unused]] constexpr u32 jmp_rel               = 23;
+            [[maybe_unused]] constexpr u32 bind_now              = 24;
+            [[maybe_unused]] constexpr u32 init_array            = 25;
+            [[maybe_unused]] constexpr u32 fini_array            = 26;
+            [[maybe_unused]] constexpr u32 init_array_size       = 27;
+            [[maybe_unused]] constexpr u32 fini_array_size       = 28;
+            [[maybe_unused]] constexpr u32 run_path              = 29;
+            [[maybe_unused]] constexpr u32 flags                 = 30;
+            [[maybe_unused]] constexpr u32 pre_init_array        = 32;
+            [[maybe_unused]] constexpr u32 pre_init_array_size   = 33;
+            [[maybe_unused]] constexpr u32 low_os                = 0x6000000d;
+            [[maybe_unused]] constexpr u32 high_os               = 0x6ffff000;
+            [[maybe_unused]] constexpr u32 low_proc              = 0x70000000;
+            [[maybe_unused]] constexpr u32 high_proc             = 0x7fffffff;
+
+            str::slice_t name(u32 type);
         }
     }
 

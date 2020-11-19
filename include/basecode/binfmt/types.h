@@ -297,7 +297,8 @@ namespace basecode::binfmt {
             u32                 strings:    1;
             u32                 exclude:    1;
             u32                 tls:        1;
-            u32                 pad:        22;
+            u32                 dynamic:    1;
+            u32                 pad:        21;
         };
     }
 
