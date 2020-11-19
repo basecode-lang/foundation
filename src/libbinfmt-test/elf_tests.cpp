@@ -148,13 +148,11 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
     REQUIRE(strtab_sect);
     REQUIRE(error::report::ok());
 
-    auto kernel32_str       = section::add_string(strtab_sect, "KERNEL32.DLL"_ss);
     auto read_file_str      = section::add_string(strtab_sect, "ReadFile"_ss);
     auto write_file_str     = section::add_string(strtab_sect, "WriteFile"_ss);
     auto get_std_handle_str = section::add_string(strtab_sect, "GetStdHandle"_ss);
 
-    REQUIRE(kernel32_str > 0);
-    REQUIRE(read_file_str > kernel32_str);
+    REQUIRE(read_file_str > 0);
     REQUIRE(write_file_str > read_file_str);
     REQUIRE(get_std_handle_str > write_file_str);
     REQUIRE(error::report::ok());
@@ -164,26 +162,23 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
     REQUIRE(symtab_sect);
     REQUIRE(error::report::ok());
 
-    auto read_file_sym = section::add_symbol(symtab_sect);
+    auto read_file_sym = section::add_symbol(symtab_sect, read_file_str);
     REQUIRE(read_file_sym);
-    read_file_sym->value       = 2;
-    read_file_sym->name_offset = read_file_str;
-    read_file_sym->type        = symbol::type_t::function;
-    read_file_sym->scope       = symbol::scope_t::global;
+    read_file_sym->type  = symbol::type_t::function;
+    read_file_sym->value = 2;
+    read_file_sym->scope = symbol::scope_t::global;
 
-    auto write_file_sym = section::add_symbol(symtab_sect);
+    auto write_file_sym = section::add_symbol(symtab_sect, write_file_str);
     REQUIRE(write_file_sym);
-    write_file_sym->value       = 3;
-    write_file_sym->name_offset = write_file_str;
-    write_file_sym->type        = symbol::type_t::function;
-    write_file_sym->scope       = symbol::scope_t::global;
+    write_file_sym->type  = symbol::type_t::function;
+    write_file_sym->value = 3;
+    write_file_sym->scope = symbol::scope_t::global;
 
-    auto get_std_handle_sym = section::add_symbol(symtab_sect);
+    auto get_std_handle_sym = section::add_symbol(symtab_sect, get_std_handle_str);
     REQUIRE(get_std_handle_sym);
-    get_std_handle_sym->value       = 4;
-    get_std_handle_sym->name_offset = get_std_handle_str;
-    get_std_handle_sym->type        = symbol::type_t::function;
-    get_std_handle_sym->scope       = symbol::scope_t::global;
+    get_std_handle_sym->type  = symbol::type_t::function;
+    get_std_handle_sym->value = 4;
+    get_std_handle_sym->scope = symbol::scope_t::global;
 
     /* .text section */ {
         auto text_sect = module::make_text(mod, (u8*) s_rot13_code, sizeof(s_rot13_code));

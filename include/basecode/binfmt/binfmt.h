@@ -46,6 +46,10 @@ namespace basecode::binfmt {
                       section::type_t type,
                       const section_opts_t& opts);
 
+        symbol_t* add_symbol(section_t* section,
+                             u32 name_offset,
+                             const symbol_opts_t& opts = {});
+
         u0 set_data(section_t* section, const u8* data);
 
         symbol_t* get_symbol(section_t* section, u32 idx);
@@ -53,8 +57,6 @@ namespace basecode::binfmt {
         u32 add_string(section_t* section, str::slice_t str);
 
         import_t* add_import(section_t* section, symbol_t* module_symbol);
-
-        symbol_t* add_symbol(section_t* section, const symbol_opts_t& opts = {});
     }
 
     namespace module {
@@ -94,7 +96,9 @@ namespace basecode::binfmt {
 
         status_t init(symbol_table_t& table);
 
-        symbol_t* make_symbol(symbol_table_t& symtab, const symbol_opts_t& opts);
+        symbol_t* make_symbol(symbol_table_t& symtab,
+                              u32 name_offset,
+                              const symbol_opts_t& opts);
     }
 
     namespace string_table {

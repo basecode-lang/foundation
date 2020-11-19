@@ -331,14 +331,14 @@ namespace basecode::binfmt::io::coff {
         const auto section = hdr.section;
         const auto& flags = section->flags;
 
-        if (!flags.code) {
-            if (flags.init)
-                hdr.flags |= section::data_init;
-            else
-                hdr.flags |= section::data_uninit;
-        } else {
+        if (section->type == binfmt::section::type_t::bss)
+            hdr.flags |= section::data_uninit;
+        else
+            hdr.flags |= section::data_init;
+
+        if (section->type == binfmt::section::type_t::text)
             hdr.flags |= section::content_code;
-        }
+
         if (flags.alloc)    hdr.flags |= section::memory_read;
         if (flags.write)    hdr.flags |= section::memory_write;
         if (flags.exec)     hdr.flags |= section::memory_execute;
@@ -809,7 +809,16 @@ namespace basecode::binfmt::io::coff {
         hdr.rva.size    = hdr.section->size;
 
         switch (hdr.section->type) {
-            case type_t::code:
+            case type_t::bss:
+                if (!coff.uninit_data.base)
+                    coff.uninit_data.base = hdr.rva.base;
+                coff.uninit_data.size += hdr.rva.size;
+                hdr.file.offset = 0;
+                hdr.file.size   = 0;
+                coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
+                coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
+                break;
+            case type_t::text:
                 if (!coff.code.base)
                     coff.code.base = hdr.rva.base;
                 coff.code.size += hdr.rva.size;
@@ -820,23 +829,13 @@ namespace basecode::binfmt::io::coff {
                 break;
             case type_t::data:
             case type_t::custom:
-                if (hdr.section->flags.init) {
-                    if (!coff.init_data.base)
-                        coff.init_data.base = hdr.rva.base;
-                    coff.init_data.size += hdr.rva.size;
-                    hdr.file.size   = align(hdr.rva.size, coff.align.file);
-                    coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
-                    coff.offset     = align(coff.offset + hdr.rva.size, coff.align.file);
-                    coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
-                } else {
-                    if (!coff.uninit_data.base)
-                        coff.uninit_data.base = hdr.rva.base;
-                    coff.uninit_data.size += hdr.rva.size;
-                    hdr.file.offset = 0;
-                    hdr.file.size   = 0;
-                    coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
-                    coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
-                }
+                if (!coff.init_data.base)
+                    coff.init_data.base = hdr.rva.base;
+                coff.init_data.size += hdr.rva.size;
+                hdr.file.size   = align(hdr.rva.size, coff.align.file);
+                coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
+                coff.offset     = align(coff.offset + hdr.rva.size, coff.align.file);
+                coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
                 break;
             case type_t::reloc:
             case type_t::group:
@@ -871,14 +870,14 @@ namespace basecode::binfmt::io::coff {
 
         const auto type = hdr.section->type;
 
-        if (type == type_t::data && !hdr.section->flags.init)
+        if (type == type_t::bss)
             return status_t::ok;
 
         const auto& sc = hdr.section->subclass;
         FILE_SEEK(hdr.file.offset);
 
         switch (type) {
-            case type_t::code:
+            case type_t::text:
             case type_t::data:
             case type_t::custom:
                 FILE_WRITE_STR(slice::make(sc.data, hdr.section->size));

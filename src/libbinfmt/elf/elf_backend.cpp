@@ -72,8 +72,6 @@ namespace basecode::binfmt::io::elf {
         }
 
         static status_t write(file_t& file) {
-            using section_type_t = binfmt::section::type_t;
-
             stopwatch_t timer{};
             stopwatch::start(timer);
 
@@ -97,12 +95,6 @@ namespace basecode::binfmt::io::elf {
             u32 num_sections    {msc->sections.size + 1};
 
             for (auto section : msc->sections) {
-                if (section->size == 0
-                &&  section->type == section_type_t::data
-                &&  !section->flags.init) {
-                    // XXX: error::report::add
-                    return status_t::read_error;
-                }
                 const auto alignment = elf::section_alignment(section);
                 const auto size = elf::section_file_size(section);
                 data_size = align(data_size + size, alignment);
@@ -146,28 +138,20 @@ namespace basecode::binfmt::io::elf {
             name_map::add(g_elf_sys.section_names,
                           type_t::init,
                           {
-                              .code = true,
-                              .init = true,
-                              .exec = false,
                               .write = true,
                           },
                           ".init"_ss);
 
             name_map::add(g_elf_sys.section_names,
-                          type_t::code,
+                          type_t::text,
                           {
-                              .code = true,
-                              .init = true,
                               .exec = true,
-                              .write = false,
                           },
                           ".text"_ss);
 
             name_map::add(g_elf_sys.section_names,
                           type_t::data,
                           {
-                              .code = false,
-                              .init = true,
                               .exec = false,
                               .write = true,
                           },
@@ -176,27 +160,18 @@ namespace basecode::binfmt::io::elf {
             name_map::add(g_elf_sys.section_names,
                           type_t::data,
                           {
-                              .code = false,
-                              .init = true,
                               .exec = false,
                               .write = false,
                           },
                           ".rodata"_ss);
 
             name_map::add(g_elf_sys.section_names,
-                          type_t::data,
+                          type_t::bss,
                           {
-                              .code = false,
-                              .init = false,
                               .exec = false,
                               .write = true,
                           },
                           ".bss"_ss);
-
-            name_map::add(g_elf_sys.section_names,
-                          type_t::reloc,
-                          {},
-                          ".rela"_ss);
 
             name_map::add(g_elf_sys.section_names,
                           type_t::reloc,
@@ -211,8 +186,6 @@ namespace basecode::binfmt::io::elf {
             name_map::add(g_elf_sys.section_names,
                           type_t::unwind,
                           {
-                              .code = false,
-                              .init = true,
                               .exec = false,
                               .write = false,
                           },
@@ -252,8 +225,6 @@ namespace basecode::binfmt::io::elf {
         name_flags_t flags{};
         flags.pad   = {};
         flags.exec  = section->flags.exec;
-        flags.code  = section->flags.code;
-        flags.init  = section->flags.init;
         flags.write = section->flags.write;
 
         switch (section->type) {
@@ -276,8 +247,6 @@ namespace basecode::binfmt::io::elf {
                     name = string::interned::fold(format::format("{}.custom", entry->name));
                 } else {
                     flags.exec  = linked_section->flags.exec;
-                    flags.code  = linked_section->flags.code;
-                    flags.init  = linked_section->flags.init;
                     flags.write = linked_section->flags.write;
                     const auto linked_entry = name_map::find(internal::g_elf_sys.section_names,
                                                              linked_section->type,

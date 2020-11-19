@@ -296,9 +296,8 @@ namespace basecode::binfmt::io::coff {
 //                          ".tls"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          type_t::code,
+                          type_t::text,
                           {
-                              .code = true,
                               .exec = true,
                               .write = false,
                           },
@@ -307,8 +306,6 @@ namespace basecode::binfmt::io::coff {
             name_map::add(g_coff_sys.section_names,
                           type_t::data,
                           {
-                              .code = false,
-                              .init = true,
                               .exec = false,
                               .write = true,
                           },
@@ -317,8 +314,6 @@ namespace basecode::binfmt::io::coff {
             name_map::add(g_coff_sys.section_names,
                           type_t::data,
                           {
-                              .code = false,
-                              .init = true,
                               .exec = false,
                               .write = false,
                           },
@@ -327,18 +322,14 @@ namespace basecode::binfmt::io::coff {
             name_map::add(g_coff_sys.section_names,
                           type_t::debug,
                           {
-                              .code = false,
-                              .init = true,
                               .exec = false,
                               .write = false,
                           },
                           ".debug"_ss);
 
             name_map::add(g_coff_sys.section_names,
-                          type_t::data,
+                          type_t::bss,
                           {
-                              .code = false,
-                              .init = false,
                               .exec = false,
                               .write = true,
                           },
@@ -347,8 +338,6 @@ namespace basecode::binfmt::io::coff {
             name_map::add(g_coff_sys.section_names,
                           type_t::import,
                           {
-                              .code = false,
-                              .init = true,
                               .exec = false,
                               .write = true,
                           },
@@ -357,8 +346,6 @@ namespace basecode::binfmt::io::coff {
             name_map::add(g_coff_sys.section_names,
                           type_t::export_,
                           {
-                              .code = false,
-                              .init = true,
                               .exec = false,
                               .write = false,
                           },
@@ -367,8 +354,6 @@ namespace basecode::binfmt::io::coff {
             name_map::add(g_coff_sys.section_names,
                           type_t::rsrc,
                           {
-                              .code = false,
-                              .init = true,
                               .exec = false,
                               .write = false,
                           },
@@ -377,8 +362,6 @@ namespace basecode::binfmt::io::coff {
             name_map::add(g_coff_sys.section_names,
                           type_t::unwind,
                           {
-                              .code = false,
-                              .init = true,
                               .exec = false,
                               .write = false,
                           },
@@ -414,8 +397,6 @@ namespace basecode::binfmt::io::coff {
         name_flags_t flags{};
         flags.pad   = {};
         flags.exec  = section->flags.exec;
-        flags.code  = section->flags.code;
-        flags.init  = section->flags.init;
         flags.write = section->flags.write;
 
         const auto entry = name_map::find(internal::g_coff_sys.section_names,

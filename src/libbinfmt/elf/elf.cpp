@@ -42,8 +42,7 @@ namespace basecode::binfmt::io::elf {
 
         [section::type::progbits]       = {
             .flags = {
-                .code = false,
-                .init = true,
+                .write = true,
                 .alloc = true,
             },
             .type = binfmt::section::type_t::data,
@@ -83,12 +82,10 @@ namespace basecode::binfmt::io::elf {
 
         [section::type::nobits]         = {
             .flags = {
-                .code = false,
-                .init = false,
                 .write = true,
                 .alloc = true,
             },
-            .type = binfmt::section::type_t::data,
+            .type = binfmt::section::type_t::bss,
             .status = section_map_status_t::ok,
         },
 
@@ -110,8 +107,6 @@ namespace basecode::binfmt::io::elf {
 
         [section::type::init_array]     = {
             .flags = {
-                .code = true,
-                .init = true,
                 .write = true,
                 .alloc = true,
             },
@@ -121,8 +116,6 @@ namespace basecode::binfmt::io::elf {
 
         [section::type::fini_array]     = {
             .flags = {
-                .code = true,
-                .init = true,
                 .write = true,
                 .alloc = true,
             },
@@ -132,8 +125,6 @@ namespace basecode::binfmt::io::elf {
 
         [section::type::pre_init_array] = {
             .flags = {
-                .code = true,
-                .init = true,
                 .write = true,
                 .alloc = true,
             },
@@ -155,8 +146,6 @@ namespace basecode::binfmt::io::elf {
 
         [30] = {
             .flags = {
-                .code = false,
-                .init = true,
                 .alloc = true,
             },
             .type = binfmt::section::type_t::unwind,
@@ -860,9 +849,9 @@ namespace basecode::binfmt::io::elf {
         sect_opts.flags.strings = (hdr.flags & section::flags::strings) != 0;
 
         if (hdr.flags & section::flags::exec_instr) {
-            sect_opts.flags.code  = true;
             sect_opts.flags.exec  = true;
-            sect_type = binfmt::section::type_t::code;
+            sect_opts.flags.write = false;
+            sect_type = binfmt::section::type_t::text;
         }
 
         if (sect_type == binfmt::section::type_t::strtab
@@ -884,14 +873,19 @@ namespace basecode::binfmt::io::elf {
         auto msc = &module->subclass.object;
 
         switch (section->type) {
+            case binfmt::section::type_t::bss: {
+                break;
+            }
+            case binfmt::section::type_t::text: {
+                section->subclass.data = buf + hdr.offset;
+                break;
+            }
             case binfmt::section::type_t::data: {
-                if (section->flags.init
-                &&  !section->flags.strings) {
+                if (!section->flags.strings) {
                     section->subclass.data = buf + hdr.offset;
                 }
                 break;
             }
-            case binfmt::section::type_t::code:
             case binfmt::section::type_t::init:
             case binfmt::section::type_t::fini:
             case binfmt::section::type_t::unwind:
@@ -963,11 +957,10 @@ namespace basecode::binfmt::io::elf {
                     auto sym = elf::symtab::get(elf, num, j);
 
                     binfmt::symbol_opts_t opts{};
-                    opts.size        = sym->size;
-                    opts.value       = sym->value;
-                    opts.section     = binfmt::module::get_section(*module, sym->section_ndx - 1);
-                    opts.name_offset = sym->name_offset;
-                    auto symbol = binfmt::section::add_symbol(section, opts);
+                    opts.size    = sym->size;
+                    opts.value   = sym->value;
+                    opts.section = binfmt::module::get_section(*module, sym->section_ndx - 1);
+                    auto symbol = binfmt::section::add_symbol(section, sym->name_offset, opts);
 
                     switch (ELF64_ST_TYPE(sym->info)) {
                         default:
@@ -1202,10 +1195,20 @@ namespace basecode::binfmt::io::elf {
             const auto alignment = hdr.addr_align;
 
             switch (section->type) {
+                case section_type_t::bss: {
+                    hdr.type = section::type::nobits;
+                    inc_vaddr = !is_obj;
+                    break;
+                }
+                case section_type_t::text: {
+                    hdr.type = section::type::progbits;
+                    std::memcpy(data, section->subclass.data, hdr.size);
+                    data_offset = align(data_offset + hdr.size, alignment);
+                    inc_vaddr   = !is_obj;
+                    break;
+                }
                 case section_type_t::data: {
-                    if (!section->flags.init) {
-                        hdr.type = section::type::nobits;
-                    } else if (section->flags.strings) {
+                    if (section->flags.strings) {
                         std::memcpy(data, section->subclass.strtab.buf.data, hdr.size);
                         hdr.type        = section::type::progbits;
                         hdr.entity_size = 1;
@@ -1228,13 +1231,6 @@ namespace basecode::binfmt::io::elf {
                 case section_type_t::fini: {
                     std::memcpy(data, section->subclass.data, hdr.size);
                     hdr.type = section::type::fini_array;
-                    data_offset = align(data_offset + hdr.size, alignment);
-                    inc_vaddr   = !is_obj;
-                    break;
-                }
-                case section_type_t::code: {
-                    std::memcpy(data, section->subclass.data, hdr.size);
-                    hdr.type = section::type::progbits;
                     data_offset = align(data_offset + hdr.size, alignment);
                     inc_vaddr   = !is_obj;
                     break;
@@ -1483,9 +1479,15 @@ namespace basecode::binfmt::io::elf {
         u32 alignment = section->align;
         if (alignment == 0) {
             switch (section->type) {
-                case section_type_t::code:
+                case section_type_t::data:
+                    alignment = section->flags.strings ? 1 : 8;
+                    break;
+                case section_type_t::text:
                     alignment = 16;
                     break;
+                case section_type_t::fini:
+                case section_type_t::init:
+                case section_type_t::note:
                 case section_type_t::group:
                     alignment = 4;
                     break;
@@ -1502,11 +1504,6 @@ namespace basecode::binfmt::io::elf {
 
     u32 section_file_size(const binfmt::section_t* section) {
         using section_type_t = binfmt::section::type_t;
-
-        if (section->type == section_type_t::data
-        &&  !section->flags.init) {
-            return 0;
-        }
 
         u32 size = section->size;
         if (size == 0) {

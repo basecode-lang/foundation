@@ -268,7 +268,8 @@ namespace basecode::binfmt {
     namespace section {
         enum class type_t : u8 {
             none,
-            code,
+            bss,
+            text,
             data,
             rsrc,
             note,
@@ -287,8 +288,7 @@ namespace basecode::binfmt {
         };
 
         struct flags_t final {
-            u32                 code:       1;
-            u32                 init:       1;
+            u32                 tls:        1;
             u32                 exec:       1;
             u32                 write:      1;
             u32                 alloc:      1;
@@ -296,9 +296,8 @@ namespace basecode::binfmt {
             u32                 merge:      1;
             u32                 strings:    1;
             u32                 exclude:    1;
-            u32                 tls:        1;
             u32                 dynamic:    1;
-            u32                 pad:        21;
+            u32                 pad:        23;
         };
     }
 
@@ -319,10 +318,9 @@ namespace basecode::binfmt {
     };
 
     struct symbol_opts_t final {
+        section_t*              section;
         u64                     size;
         u64                     value;
-        u32                     name_offset;
-        section_t*              section;
         symbol::type_t          type;
         symbol::scope_t         scope;
         symbol::visibility_t    visibility;
@@ -468,10 +466,5 @@ namespace basecode::binfmt {
         module_subclass_t       subclass;
         module_id               id;
         module_type_t           type;
-    };
-
-    struct result_t final {
-        u32                     id;
-        status_t                status;
     };
 }

@@ -414,7 +414,7 @@ namespace basecode::binfmt::io::pe {
 
     status_t write_section_data(file_t& file, pe_t& pe, coff::header_t& hdr) {
         const auto type = hdr.section->type;
-        if (type == section::type_t::data && !hdr.section->flags.init)
+        if (type == section::type_t::bss)
             return status_t::ok;
 
         FILE_SEEK(hdr.file.offset);

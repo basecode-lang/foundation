@@ -165,7 +165,7 @@ namespace basecode::binfmt {
                         section->subclass.data = {};
                     }
                     break;
-                case section::type_t::code:
+                case section::type_t::text:
                 case section::type_t::custom:
                     section->subclass.data = {};
                     break;
@@ -200,6 +200,16 @@ namespace basecode::binfmt {
             return status_t::ok;
         }
 
+        symbol_t* add_symbol(section_t* section,
+                             u32 name_offset,
+                             const symbol_opts_t& opts) {
+            if (!section || section->type != section::type_t::symtab) {
+                error::report::add(status_t::invalid_section_type, error_report_level_t::error);
+                return nullptr;
+            }
+            return symbol_table::make_symbol(section->subclass.symtab, name_offset, opts);
+        }
+
         u0 set_data(section_t* section, const u8* data) {
             section->subclass.data = data;
         }
@@ -229,14 +239,6 @@ namespace basecode::binfmt {
             array::init(import->symbols);
             return import;
         }
-
-        symbol_t* add_symbol(section_t* section, const symbol_opts_t& opts) {
-            if (!section || section->type != section::type_t::symtab) {
-                error::report::add(status_t::invalid_section_type, error_report_level_t::error);
-                return nullptr;
-            }
-            return symbol_table::make_symbol(section->subclass.symtab, opts);
-        }
     }
 
     namespace module {
@@ -259,8 +261,6 @@ namespace basecode::binfmt {
         section_t* make_import(module_t& module) {
             section_opts_t opts{};
             opts.flags = {
-                .code = false,
-                .init = true,
                 .write = true,
                 .alloc = true,
             };
@@ -270,13 +270,11 @@ namespace basecode::binfmt {
         section_t* make_bss(module_t& module, u32 size) {
             section_opts_t opts{};
             opts.flags = {
-                .code   = false,
-                .init   = false,
                 .write  = true,
                 .alloc  = true,
             };
             opts.size = size;
-            return make_section(module, section::type_t::data, opts);
+            return make_section(module, section::type_t::bss, opts);
         }
 
         section_t* get_section(const module_t& module, u32 idx) {
@@ -287,8 +285,6 @@ namespace basecode::binfmt {
         section_t* make_data(module_t& module, u8* data, u32 size) {
             section_opts_t opts{};
             opts.flags = {
-                .code   = false,
-                .init   = true,
                 .write  = true,
                 .alloc  = true,
             };
@@ -305,13 +301,11 @@ namespace basecode::binfmt {
         section_t* make_text(module_t& module, u8* data, u32 size) {
             section_opts_t opts{};
             opts.flags = {
-                .code   = true,
-                .init   = true,
                 .exec   = true,
                 .alloc  = true,
             };
             opts.size = size;
-            auto section = make_section(module, section::type_t::code, opts);
+            auto section = make_section(module, section::type_t::text, opts);
             if (!section) {
                 // XXX: need an error condition here
                 return nullptr;
@@ -348,8 +342,6 @@ namespace basecode::binfmt {
         section_t* make_rodata(module_t& module, u8* data, u32 size) {
             section_opts_t opts{};
             opts.flags = {
-                .code   = false,
-                .init   = true,
                 .write  = false,
                 .alloc  = true,
             };
@@ -446,7 +438,9 @@ namespace basecode::binfmt {
             return status_t::ok;
         }
 
-        symbol_t* make_symbol(symbol_table_t& symtab, const symbol_opts_t& opts) {
+        symbol_t* make_symbol(symbol_table_t& symtab,
+                              u32 name_offset,
+                              const symbol_opts_t& opts) {
             auto next_symbol = &stable_array::append(g_binfmt_sys.symbols);
             next_symbol->ndx = symtab.symbols.size;
             array::append(symtab.symbols, next_symbol);
@@ -457,8 +451,8 @@ namespace basecode::binfmt {
             next_symbol->scope       = opts.scope;
             next_symbol->section     = opts.section;
             next_symbol->visibility  = opts.visibility;
-            next_symbol->name_offset = opts.name_offset;
-            auto prev_symbol = hashtab::find(symtab.index, opts.name_offset);
+            next_symbol->name_offset = name_offset;
+            auto prev_symbol = hashtab::find(symtab.index, name_offset);
             if (prev_symbol) {
                 while (true) {
                     if (!prev_symbol->next)
@@ -467,7 +461,7 @@ namespace basecode::binfmt {
                 }
                 prev_symbol->next = next_symbol;
             } else {
-                hashtab::insert(symtab.index, opts.name_offset, next_symbol);
+                hashtab::insert(symtab.index, name_offset, next_symbol);
             }
             return next_symbol;
         }
