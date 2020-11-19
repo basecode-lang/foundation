@@ -97,10 +97,19 @@ namespace basecode {
             b8                      owner;
         }                           proxy;
         struct {
-            u0*                     buf;
-            u32                     offset;
-            u32                     buf_size;
-            u32                     resv_size;
+            u8*                     base_ptr;
+            u8*                     curr_ptr;
+            u8*                     next_page;
+            u8*                     max_ptr;
+            u8*                     node_state;
+            u8*                     node_order;
+            u0*                     buckets;
+            u32                     num_buckets;
+            u32                     bucket_limit;
+            u32                     heap_size;
+            u32                     heap_order;
+            u32                     reserved;
+            u32                     to_commit;
         }                           buddy;
     };
 
@@ -127,6 +136,8 @@ namespace basecode {
             u0 print_allocators();
 
             alloc_t* default_alloc();
+
+            usize os_alloc_granularity();
 
             inline alloc_header_t* header(u0* data) {
                 auto p = static_cast<u32*>(data);

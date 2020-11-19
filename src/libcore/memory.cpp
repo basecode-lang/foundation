@@ -37,6 +37,7 @@ namespace basecode::memory {
         alloc_t                 slab_alloc;
         array_t<alloc_t*>       allocators;
         usize                   os_page_size;
+        usize                   os_alloc_granularity;
     };
 
     static str::slice_t         s_status_names[] = {
@@ -87,6 +88,10 @@ namespace basecode::memory {
             return &t_system.default_alloc;
         }
 
+        usize os_alloc_granularity() {
+            return t_system.os_alloc_granularity;
+        }
+
         b8 set_page_executable(u0* ptr, usize size) {
             const auto page_size = t_system.os_page_size;
             u64 start, end;
@@ -118,7 +123,15 @@ namespace basecode::memory {
         }
 
         status_t init(alloc_type_t type, u32 heap_size, u0* base) {
-            t_system.os_page_size = sysconf(_SC_PAGE_SIZE);
+#ifdef _WIN32
+            SYSTEM_INFO system_info;
+            GetSystemInfo(&system_info);
+            t_system.os_page_size         = system_info.dwPageSize;
+            t_system.os_alloc_granularity = system_info.dwAllocationGranularity;
+#else
+            t_system.os_page_size         = sysconf(_SC_PAGE_SIZE);
+            t_system.os_alloc_granularity = t_system.os_page_size;
+#endif
             switch (type) {
                 case alloc_type_t::default_: {
                     auto status = memory::init(&t_system.default_alloc, alloc_type_t::default_);

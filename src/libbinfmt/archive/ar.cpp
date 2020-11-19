@@ -19,7 +19,6 @@
 #include <basecode/core/bits.h>
 #include <basecode/binfmt/ar.h>
 #include <basecode/core/numbers.h>
-#include <basecode/core/stopwatch.h>
 
 namespace basecode::binfmt::ar {
     struct sym_offset_t final {
@@ -278,17 +277,8 @@ namespace basecode::binfmt::ar {
     }
 
     status_t read(ar_t& ar, const path_t& path) {
-        {
-            stopwatch_t timer{};
-            stopwatch::start(timer);
-
-            auto status = buf::map_existing(ar.buf, path);
-            if (!OK(status))
-                return status_t::read_error;
-
-            stopwatch::stop(timer);
-            stopwatch::print_elapsed("ar buf::map time"_ss, 40, timer);
-        }
+        if (!OK(buf::map_existing(ar.buf, path)))
+            return status_t::read_error;
 
         buf_crsr_t c{};
         buf::cursor::init(c, ar.buf);

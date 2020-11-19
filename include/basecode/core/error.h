@@ -24,7 +24,7 @@
 
 namespace basecode {
     template <typename T>
-    concept Error_Id = std::is_enum_v<T> || same_as<T, u32>;
+    concept Error_Id = std::is_enum_v<T> || same_as<T, u32> || same_as<T, s32>;
 
     struct error_def_t final {
         str::slice_t            code;

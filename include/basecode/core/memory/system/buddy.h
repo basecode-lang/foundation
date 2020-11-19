@@ -23,6 +23,7 @@
 namespace basecode {
     struct buddy_config_t : alloc_config_t {
         alloc_t*                backing;
+        u32                     heap_size;
     };
 
     namespace memory::buddy {
