@@ -98,6 +98,7 @@ namespace basecode {
         }                           proxy;
         struct {
             u8*                     heap;
+            u32                     max_level;
             u32                     heap_size;
         }                           buddy;
     };

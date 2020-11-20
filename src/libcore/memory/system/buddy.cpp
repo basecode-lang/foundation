@@ -20,51 +20,50 @@
 #include <basecode/core/format.h>
 #include <basecode/core/memory/system/buddy.h>
 
-namespace basecode::memory::buddy {
-    struct buddy_t final {
-        u32                     level;
-        u8                      tree[1];
-    };
+#define HEAP_GROW(h)                    ((h) << 1U)
+#define HEAP_SHRINK(h)                  ((h) >> 1U)
+#define LEFT_CHILD(idx)                 ((u32(idx) << 1U) + 1)
+#define RIGHT_CHILD(idx)                ((u32(idx) << 1U) + 2)
+#define BUDDY_NODE(idx)                 ((idx) - 1 + ((u32(idx) & 1U) << 1U))
+#define PARENT_NODE(idx)                ((u32((idx) + 1) >> 1U) - 1)        // N.B. (idx + 1) / 2 - 1
+#define INDEX_OFFSET(idx, lvl, mlvl)    ((((idx) + 1) - (1U << u32(lvl))) << ((mlvl) - (lvl)))
 
+namespace basecode::memory::buddy {
     static constexpr u8 node_unused = 0;
     static constexpr u8 node_used   = 1;
     static constexpr u8 node_split  = 2;
     static constexpr u8 node_full   = 3;
 
-    static inline u32 index_offset(u32 index, u32 level, u32 max_level) {
-        return ((index + 1) - (1U << level)) << (max_level - level);
-    }
-
-    static u0 dump_node(buddy_t* b, s32 index, s32 level) {
-        switch (b->tree[index]) {
+    static u0 dump_node(alloc_t* alloc, s32 index, s32 level) {
+        auto sc = &alloc->subclass.buddy;
+        switch (sc->heap[index]) {
             case node_unused:
                 format::print("<{}:{}>",
-                              index_offset(index, level, b->level),
-                              1U << (b->level - level));
+                              INDEX_OFFSET(index, level, sc->max_level),
+                              1U << (sc->max_level - level));
                 break;
             case node_used:
                 format::print("[{}:{}]",
-                              index_offset(index, level, b->level),
-                              1U << (b->level - level));
+                              INDEX_OFFSET(index, level, sc->max_level),
+                              1U << (sc->max_level - level));
                 break;
             case node_full:
                 format::print("{{");
-                dump_node(b, index * 2 + 1, level + 1);
-                dump_node(b, index * 2 + 2, level + 1);
+                dump_node(alloc, LEFT_CHILD(index), level + 1);
+                dump_node(alloc, RIGHT_CHILD(index), level + 1);
                 format::print("}}");
                 break;
             default:
                 format::print("(");
-                dump_node(b, index * 2 + 1, level + 1);
-                dump_node(b, index * 2 + 2, level + 1);
+                dump_node(alloc, LEFT_CHILD(index), level + 1);
+                dump_node(alloc, RIGHT_CHILD(index), level + 1);
                 format::print(")");
                 break;
         }
     }
 
     u0 dump(alloc_t* alloc) {
-        auto sc = &alloc->subclass.buddy;
-        dump_node((buddy_t*) sc->heap, 0, 0);
+        dump_node(alloc, 0, 0);
         format::print("\n");
     }
 
@@ -74,57 +73,33 @@ namespace basecode::memory::buddy {
         return level;
     }
 
-    static u0 combine(buddy_t* b, s32 index) {
+    static u0 combine(alloc_t* alloc, s32 index) {
+        auto sc = &alloc->subclass.buddy;
         while (true) {
-            s32 buddy = index - 1 + (u32(index) & 1U) * 2;
+            s32 buddy = BUDDY_NODE(index);
             if (buddy < 0
-            ||  b->tree[buddy] != node_unused) {
-                b->tree[index] = node_unused;
-                while (((index = (index + 1) / 2 - 1) >= 0)
-                       && b->tree[index] == node_full) {
-                    b->tree[index] = node_split;
+            ||  sc->heap[buddy] != node_unused) {
+                sc->heap[index] = node_unused;
+                while (((index = PARENT_NODE(index)) >= 0)
+                       && sc->heap[index] == node_full) {
+                    sc->heap[index] = node_split;
                 }
                 return;
             }
-            index = (index + 1) / 2 - 1;
+            index = PARENT_NODE(index);
         }
     }
 
-    static u0 mark_parent(buddy_t* b, s32 index) {
+    static u0 mark_parent(alloc_t* alloc, s32 index) {
+        auto sc = &alloc->subclass.buddy;
         while (true) {
-            s32 buddy = index - 1 + (u32(index) & 1U) * 2;
+            s32 buddy = BUDDY_NODE(index);
             if (buddy > 0
-            && (b->tree[buddy] == node_used || b->tree[buddy] == node_full)) {
-                index = (index + 1) / 2 - 1;
-                b->tree[index] = node_full;
+            && (sc->heap[buddy] == node_used || sc->heap[buddy] == node_full)) {
+                index = PARENT_NODE(index);
+                sc->heap[index] = node_full;
             } else {
                 return;
-            }
-        }
-    }
-
-    static u32 buddy_size(buddy_t* b, u32 offset) {
-        u32 left   = 0;
-        u32 index  = 0;
-        u32 length = 1U << b->level;
-
-        while (true) {
-            switch (b->tree[index]) {
-                case node_used:
-                    assert(offset == left);
-                    return length;
-                case node_unused:
-                    assert(false);
-                    return length;
-                default:
-                    length /= 2;
-                    if (offset < left + length) {
-                        index = index * 2 + 1;
-                    } else {
-                        left += length;
-                        index = index * 2 + 2;
-                    }
-                    break;
             }
         }
     }
@@ -136,43 +111,37 @@ namespace basecode::memory::buddy {
         auto sc  = &alloc->subclass.buddy;
         sc->heap_size = is_power_of_two(cfg->heap_size) ? cfg->heap_size :
                         next_power_of_two(cfg->heap_size);
-        const auto heap_size = sizeof(buddy_t) + (sc->heap_size * 2 - 2);
-        sc->heap = (u8*) memory::alloc(alloc->backing,
-                                       heap_size,
-                                       alignof(buddy_t));
-
-        std::memset(sc->heap, 0, heap_size);
-        auto buddy = (buddy_t*) sc->heap;
-        buddy->level = level_for_size(sc->heap_size);
+        sc->heap = (u8*) memory::alloc(alloc->backing, sc->heap_size << 1U);
+        sc->max_level = level_for_size(sc->heap_size);
+        std::memset(sc->heap, 0, sc->heap_size << 1U);
     }
 
     static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
         auto sc = &alloc->subclass.buddy;
-        auto b  = (buddy_t*) sc->heap;
 
-        auto offset = (u8*) mem - (b->tree + sc->heap_size);
-        u32 left = 0;
-        u32 length = 1U << b->level;
-        u32 index = 0;
+        auto offset = (u8*) mem - (sc->heap + sc->heap_size);
+        u32 left      = 0;
+        u32 heap_size = sc->heap_size;
+        u32 index     = 0;
 
         while (true) {
-            switch (b->tree[index]) {
+            switch (sc->heap[index]) {
                 case node_used:
                     assert(offset == left);
-                    combine(b, index);
-                    freed_size = length;
-                    alloc->total_allocated -= length;
+                    combine(alloc, index);
+                    freed_size = heap_size;
+                    alloc->total_allocated -= heap_size;
                     return;
                 case node_unused:
                     assert(false);
                     return;
                 default:
-                    length /= 2;
-                    if (offset < left + length) {
-                        index = index * 2 + 1;
+                    heap_size = HEAP_SHRINK(heap_size);
+                    if (offset < left + heap_size) {
+                        index = LEFT_CHILD(index);
                     } else {
-                        left += length;
-                        index = index * 2 + 2;
+                        left += heap_size;
+                        index = RIGHT_CHILD(index);
                     }
                     break;
             }
@@ -194,9 +163,8 @@ namespace basecode::memory::buddy {
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
         UNUSED(align);
 
-        auto sc     = &alloc->subclass.buddy;
-        auto b      = (buddy_t*) sc->heap;
-        u32  length = 1U << b->level;
+        auto sc = &alloc->subclass.buddy;
+        u32 heap_size = sc->heap_size;
         alloc_size = 0;
 
         if (size == 0)
@@ -205,33 +173,33 @@ namespace basecode::memory::buddy {
             size = is_power_of_two(size) ? size : next_power_of_two(size);
         }
 
-        if (size > length)
+        if (size > heap_size)
             return nullptr;
 
         s32 index = 0;
         u32 level = 0;
 
         while (index >= 0) {
-            if (size == length) {
-                if (b->tree[index] == node_unused) {
-                    b->tree[index] = node_used;
-                    mark_parent(b, index);
+            if (size == heap_size) {
+                if (sc->heap[index] == node_unused) {
+                    sc->heap[index] = node_used;
+                    mark_parent(alloc, index);
                     alloc_size = size;
                     alloc->total_allocated += size;
-                    return (b->tree + sc->heap_size) + index_offset(index, level, b->level);
+                    return (sc->heap + sc->heap_size) + INDEX_OFFSET(index, level, sc->max_level);
                 }
             } else {
-                switch (b->tree[index]) {
+                switch (sc->heap[index]) {
                     case node_used:
                     case node_full:
                         break;
                     case node_unused:
-                        b->tree[index]         = node_split;
-                        b->tree[index * 2 + 1] = node_unused;
-                        b->tree[index * 2 + 2] = node_unused;
+                        sc->heap[index]              = node_split;
+                        sc->heap[LEFT_CHILD(index)]  = node_unused;
+                        sc->heap[RIGHT_CHILD(index)] = node_unused;
                     default:
-                        index = index * 2 + 1;
-                        length /= 2;
+                        index = LEFT_CHILD(index);
+                        heap_size = HEAP_SHRINK(heap_size);
                         level++;
                         continue;
                 }
@@ -242,8 +210,8 @@ namespace basecode::memory::buddy {
             }
             while (true) {
                 level--;
-                length *= 2;
-                index = (index + 1) / 2 - 1;
+                heap_size = HEAP_GROW(heap_size);
+                index = PARENT_NODE(index);
                 if (index < 0)
                     return nullptr;
                 if (u32(index) & 1U) {
@@ -276,8 +244,30 @@ namespace basecode::memory::buddy {
     }
 
     u32 allocated_size(alloc_t* alloc, u0* mem) {
-        auto sc  = &alloc->subclass.buddy;
-        auto b   = (buddy_t*) sc->heap;
-        return buddy_size(b, (u8*) mem - (b->tree + sc->heap_size));
+        auto sc     = &alloc->subclass.buddy;
+        u32  left   = 0;
+        u32 index     = 0;
+        u32 heap_size = sc->heap_size;
+        u32 offset    = (u8*) mem - (sc->heap + sc->heap_size);
+
+        while (true) {
+            switch (sc->heap[index]) {
+                case node_used:
+                    assert(offset == left);
+                    return heap_size;
+                case node_unused:
+                    assert(false);
+                    return heap_size;
+                default:
+                    heap_size = HEAP_SHRINK(heap_size);
+                    if (offset < left + heap_size) {
+                        index = LEFT_CHILD(index);
+                    } else {
+                        left += heap_size;
+                        index = RIGHT_CHILD(index);
+                    }
+                    break;
+            }
+        }
     }
 }
