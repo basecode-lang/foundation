@@ -72,6 +72,19 @@ TEST_CASE("basecode::error source formatted") {
 };
 )"_ss;
 
+    // N.B. in release builds passing literal str::slice_t (e.g. via "foo"_ss)
+    //      as a format argument to add or add_src can result in segfaults because
+    //      the compiler tries to be too clever and elide out the const
+    //      temporary.
+    //
+    //      passing a cstr literal is OK because the compiler doesn't optimize
+    //      these away if they're referenced anywhere.
+    //
+    //      in this case, hoisting the slices into local variables in a parent
+    //      scope solves the issue.
+    auto foo_arg = "foo"_ss;
+    auto defer_arg = "defer"_ss;
+
     buf_t buf{};
     buf::init(buf);
     defer(buf::free(buf));
@@ -83,7 +96,11 @@ TEST_CASE("basecode::error source formatted") {
         src_info.pos   = source_pos_t{150, 148};
         src_info.start = source_loc_t{7, 24};
         src_info.end   = source_loc_t{7, 26};
-        error::report::add_src(5000, error_report_level_t::error, &buf, src_info, "foo"_ss);
+        error::report::add_src(5000,
+                               error_report_level_t::error,
+                               &buf,
+                               src_info,
+                               foo_arg);        // N.B. beware format argument elision
     }
     auto start_id = error::report::count() - 1;
 
@@ -92,7 +109,11 @@ TEST_CASE("basecode::error source formatted") {
         src_info.pos   = source_pos_t{303, 211};
         src_info.start = source_loc_t{11, 8};
         src_info.end   = source_loc_t{13, 33};
-        error::report::add_src(5000, error_report_level_t::error, &buf, src_info, "defer"_ss);
+        error::report::add_src(5000,
+                               error_report_level_t::error,
+                               &buf,
+                               src_info,
+                               defer_arg);      // N.B. beware format argument elision
     }
 
     str_t fmt_buf{};

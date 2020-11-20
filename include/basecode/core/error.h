@@ -73,7 +73,8 @@ namespace basecode {
             namespace internal {
                 template <typename T>
                 u0 add_arg(error_report_t* report, const T& arg) {
-                    if (report->args_size == max_report_args_count - 1) return;
+                    if (report->args_size == max_report_args_count - 1)
+                        return;
                     report->args[report->args_size++] = fmt::detail::make_arg<fmt_ctx_t>(arg);
                 }
             }
