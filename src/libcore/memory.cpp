@@ -16,6 +16,11 @@
 //
 // ----------------------------------------------------------------------------
 
+#ifdef _WIN32
+#   ifndef _MSC_VER
+#       include <sysinfoapi.h>
+#   endif
+#endif
 #include <unistd.h>
 #include <sys/mman.h>
 #include <basecode/core/array.h>
