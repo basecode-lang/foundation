@@ -17,300 +17,249 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/bits.h>
+#include <basecode/core/format.h>
 #include <basecode/core/memory/system/buddy.h>
 
 namespace basecode::memory::buddy {
-    [[maybe_unused]] constexpr u32 min_alloc_log2   = 4;
-    [[maybe_unused]] constexpr u32 min_alloc_size   = (1U << min_alloc_log2);
-
-    struct list_t final {
-        list_t*                 prev;
-        list_t*                 next;
+    struct buddy_t final {
+        u32                     level;
+        u8                      tree[1];
     };
 
-    static u0* sbrk(alloc_t* alloc, intptr_t size) {
-        const auto page_size = memory::system::os_page_size();
+    static constexpr u8 node_unused = 0;
+    static constexpr u8 node_used   = 1;
+    static constexpr u8 node_split  = 2;
+    static constexpr u8 node_full   = 3;
+
+    static inline u32 index_offset(u32 index, u32 level, u32 max_level) {
+        return ((index + 1) - (1U << level)) << (max_level - level);
+    }
+
+    static u0 dump_node(buddy_t* b, s32 index, s32 level) {
+        switch (b->tree[index]) {
+            case node_unused:
+                format::print("<{}:{}>",
+                              index_offset(index, level, b->level),
+                              1U << (b->level - level));
+                break;
+            case node_used:
+                format::print("[{}:{}]",
+                              index_offset(index, level, b->level),
+                              1U << (b->level - level));
+                break;
+            case node_full:
+                format::print("{{");
+                dump_node(b, index * 2 + 1, level + 1);
+                dump_node(b, index * 2 + 2, level + 1);
+                format::print("}}");
+                break;
+            default:
+                format::print("(");
+                dump_node(b, index * 2 + 1, level + 1);
+                dump_node(b, index * 2 + 2, level + 1);
+                format::print(")");
+                break;
+        }
+    }
+
+    u0 dump(alloc_t* alloc) {
         auto sc = &alloc->subclass.buddy;
-        if (size < 0) {
-            // XXX: VirtualFree?
-            assert(false);
-        } else if (size > 0) {
-            assert(sc->reserved >= size);
+        dump_node((buddy_t*) sc->heap, 0, 0);
+        format::print("\n");
+    }
 
-            if (size > sc->to_commit) {
-                auto bytes_to_commit = u32(size - sc->to_commit + page_size - 1) & ~(page_size - 1);
-                auto p = VirtualAlloc((LPVOID) sc->next_page,
-                                      bytes_to_commit,
-                                      MEM_COMMIT,
-                                      PAGE_EXECUTE_READWRITE);
-                if (!p)
-                    return nullptr;
+    static u32 level_for_size(u32 size) {
+        u32 level = 0;
+        while ((1U << level) < size) ++level;
+        return level;
+    }
 
-                sc->next_page += bytes_to_commit;
-                sc->to_commit += bytes_to_commit;
+    static u0 combine(buddy_t* b, s32 index) {
+        while (true) {
+            s32 buddy = index - 1 + (u32(index) & 1U) * 2;
+            if (buddy < 0
+            ||  b->tree[buddy] != node_unused) {
+                b->tree[index] = node_unused;
+                while (((index = (index + 1) / 2 - 1) >= 0)
+                       && b->tree[index] == node_full) {
+                    b->tree[index] = node_split;
+                }
+                return;
             }
-
-            auto p = sc->curr_ptr;
-            sc->curr_ptr += size;
-            sc->to_commit -= size;
-            sc->reserved -= size;
-            return p;
+            index = (index + 1) / 2 - 1;
         }
-        return sc->curr_ptr;
     }
 
-    static s32 brk(alloc_t* alloc, u0* addr) {
-        auto sc = &alloc->subclass.buddy;
-        auto p = sbrk(alloc, ((u8*) addr - sc->max_ptr));
-        return p ? 0 : - 1;
-    }
-
-    static u0 list_init(list_t* list) {
-        list->prev = list;
-        list->next = list;
-    }
-
-    static u0 list_remove(list_t* entry) {
-        auto prev = entry->prev;
-        auto next = entry->next;
-        prev->next = next;
-        next->prev = prev;
-    }
-
-    static list_t* list_pop(list_t* list) {
-        auto back = list->prev;
-        if (back == list) return nullptr;
-        list_remove(back);
-        return back;
-    }
-
-    static u0 list_push(list_t* list, list_t* entry) {
-        auto prev = list->prev;
-        entry->prev = prev;
-        entry->next = list;
-        prev->next = entry;
-        list->prev = entry;
-    }
-
-    static b8 parent_is_split(alloc_t* alloc, u32 idx) {
-        auto sc = &alloc->subclass.buddy;
-        idx = (idx - 1) / 2;
-        return u32(sc->node_state[idx / 8] >> (idx % 8)) & 1U;
-    }
-
-    static b8 update_max_ptr(alloc_t* alloc, u8* new_value) {
-        auto sc = &alloc->subclass.buddy;
-        if (new_value > sc->max_ptr) {
-            if (brk(alloc, new_value))
-                return false;
-            sc->max_ptr = new_value;
-        }
-        return true;
-    }
-
-    static u0 flip_parent_is_split(alloc_t* alloc, u32 idx) {
-        auto sc = &alloc->subclass.buddy;
-        idx = (idx - 1) / 2;
-        sc->node_state[idx / 8] ^= 1U << (idx % 8);
-    }
-
-    static u32 order_for_size(u32 size) {
-        u32 order = 0;
-        while ((1U << order) < size) ++order;
-        return order;
-    }
-
-    static u32 bucket_for_request(alloc_t* alloc, u32 request) {
-        auto sc = &alloc->subclass.buddy;
-        u32 bucket = sc->num_buckets - 1;
-        u32 size = min_alloc_size;
-
-        while (size < request) {
-            --bucket;
-            size *= 2;
-        }
-
-        return bucket;
-    }
-
-    static u8* ptr_for_node(alloc_t* alloc, u32 idx, u32 bucket) {
-        auto sc = &alloc->subclass.buddy;
-        return sc->base_ptr + ((idx - (1U << bucket) + 1) << (sc->heap_order - bucket));
-    }
-
-    static u32 node_for_ptr(alloc_t* alloc, const u8* ptr, u32 bucket) {
-        auto sc = &alloc->subclass.buddy;
-        return (u64(ptr - sc->base_ptr) >> (sc->heap_order - bucket)) + (1U << bucket) - 1;
-    }
-
-    static b8 lower_bucket_limit(alloc_t* alloc, u32 bucket) {
-        auto sc = &alloc->subclass.buddy;
-        auto buckets = (list_t*) sc->buckets;
-        while (bucket < sc->bucket_limit) {
-            auto root = node_for_ptr(alloc, sc->base_ptr, sc->bucket_limit);
-
-            if (!parent_is_split(alloc, root)) {
-                list_remove((list_t*) sc->base_ptr);
-                list_init(&buckets[--sc->bucket_limit]);
-                list_push(&buckets[sc->bucket_limit], (list_t*) sc->base_ptr);
-                continue;
+    static u0 mark_parent(buddy_t* b, s32 index) {
+        while (true) {
+            s32 buddy = index - 1 + (u32(index) & 1U) * 2;
+            if (buddy > 0
+            && (b->tree[buddy] == node_used || b->tree[buddy] == node_full)) {
+                index = (index + 1) / 2 - 1;
+                b->tree[index] = node_full;
+            } else {
+                return;
             }
-
-            auto right_child = ptr_for_node(alloc, root + 1, sc->bucket_limit);
-            if (!update_max_ptr(alloc, right_child + sizeof(list_t)))
-                return false;
-
-            list_push(&buckets[sc->bucket_limit], (list_t*) right_child);
-            list_init(&buckets[--sc->bucket_limit]);
-
-            root = (root - 1) / 2;
-            if (root != 0)
-                flip_parent_is_split(alloc, root);
         }
-        return true;
+    }
+
+    static u32 buddy_size(buddy_t* b, u32 offset) {
+        u32 left   = 0;
+        u32 index  = 0;
+        u32 length = 1U << b->level;
+
+        while (true) {
+            switch (b->tree[index]) {
+                case node_used:
+                    assert(offset == left);
+                    return length;
+                case node_unused:
+                    assert(false);
+                    return length;
+                default:
+                    length /= 2;
+                    if (offset < left + length) {
+                        index = index * 2 + 1;
+                    } else {
+                        left += length;
+                        index = index * 2 + 2;
+                    }
+                    break;
+            }
+        }
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
-        const auto alloc_granularity = memory::system::os_alloc_granularity();
-        auto sc  = &alloc->subclass.buddy;
         auto cfg = (buddy_config_t*) config;
         alloc->backing = cfg->backing;
-        sc->heap_size = align(cfg->heap_size, alloc_granularity);
-        sc->reserved  = sc->heap_size;
-        sc->heap_order = order_for_size(sc->heap_size);
-        sc->to_commit = 0;
-        sc->base_ptr = (u8*) VirtualAlloc(nullptr,
-                                          sc->reserved,
-                                          MEM_RESERVE,
-                                          PAGE_NOACCESS);
-        sc->curr_ptr = sc->max_ptr = sc->next_page = sc->base_ptr;
 
-        sc->num_buckets = (sc->heap_order - min_alloc_log2) + 1;
-        const auto node_state_size = (1U << (sc->num_buckets - 1)) / 8;
-        sc->node_state = (u8*) memory::alloc(alloc->backing, node_state_size);
-        sc->node_order = (u8*) memory::alloc(alloc->backing, (1U << (sc->num_buckets - 1)));
-        sc->buckets = memory::alloc(alloc->backing,
-                                    sc->num_buckets * sizeof(list_t),
-                                    alignof(list_t));
-        auto buckets = (list_t*) sc->buckets;
-        sc->bucket_limit = sc->num_buckets - 1;
-        assert(update_max_ptr(alloc, sc->base_ptr + sizeof(list_t)));
-        list_init(&buckets[sc->num_buckets - 1]);
-        list_push(&buckets[sc->num_buckets - 1], (list_t*) sc->base_ptr);
+        auto sc  = &alloc->subclass.buddy;
+        sc->heap_size = is_power_of_two(cfg->heap_size) ? cfg->heap_size :
+                        next_power_of_two(cfg->heap_size);
+        const auto heap_size = sizeof(buddy_t) + (sc->heap_size * 2 - 2);
+        sc->heap = (u8*) memory::alloc(alloc->backing,
+                                       heap_size,
+                                       alignof(buddy_t));
+
+        std::memset(sc->heap, 0, heap_size);
+        auto buddy = (buddy_t*) sc->heap;
+        buddy->level = level_for_size(sc->heap_size);
     }
 
     static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
-        auto sc  = &alloc->subclass.buddy;
-        auto buckets = (list_t*) sc->buckets;
+        auto sc = &alloc->subclass.buddy;
+        auto b  = (buddy_t*) sc->heap;
 
-        if (!mem) {
-            freed_size = 0;
-            return;
+        auto offset = (u8*) mem - (b->tree + sc->heap_size);
+        u32 left = 0;
+        u32 length = 1U << b->level;
+        u32 index = 0;
+
+        while (true) {
+            switch (b->tree[index]) {
+                case node_used:
+                    assert(offset == left);
+                    combine(b, index);
+                    freed_size = length;
+                    alloc->total_allocated -= length;
+                    return;
+                case node_unused:
+                    assert(false);
+                    return;
+                default:
+                    length /= 2;
+                    if (offset < left + length) {
+                        index = index * 2 + 1;
+                    } else {
+                        left += length;
+                        index = index * 2 + 2;
+                    }
+                    break;
+            }
         }
-
-        auto bucket = bucket_for_request(alloc, freed_size);
-        auto i = node_for_ptr(alloc, (u8*) mem, bucket);
-
-        while (i != 0) {
-            flip_parent_is_split(alloc, i);
-
-            if (parent_is_split(alloc, i) || bucket == sc->bucket_limit)
-                break;
-
-            list_remove((list_t*) ptr_for_node(alloc, ((i - 1) ^ 1U) + 1, bucket));
-            i = (i - 1) / 2;
-            --bucket;
-        }
-
-        alloc->total_allocated -= freed_size;
-        list_push(&buckets[bucket], (list_t*) ptr_for_node(alloc, i, bucket));
     }
 
     static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
         u32 temp_freed{};
         u32 total_freed{};
+
         auto sc  = &alloc->subclass.buddy;
-        assert(VirtualFree(sc->base_ptr, 0, MEM_RELEASE));
-        sc->base_ptr = sc->curr_ptr = sc->next_page = sc->max_ptr = {};
-        sc->reserved = sc->to_commit = {};
-        memory::free(alloc->backing, sc->node_state, &temp_freed);
+        memory::free(alloc->backing, sc->heap, &temp_freed);
         total_freed += temp_freed;
-        memory::free(alloc->backing, sc->buckets, &temp_freed);
-        total_freed += temp_freed;
-        memory::free(alloc->backing, sc->node_order, &temp_freed);
-        total_freed += temp_freed;
+
         if (freed_size) *freed_size = total_freed;
         if (enforce) assert(alloc->total_allocated == 0);
     }
 
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
-        auto sc  = &alloc->subclass.buddy;
-        auto buckets = (list_t*) sc->buckets;
+        UNUSED(align);
 
-        if (size > sc->heap_size) {
-            alloc_size = 0;
-            return nullptr;
+        auto sc     = &alloc->subclass.buddy;
+        auto b      = (buddy_t*) sc->heap;
+        u32  length = 1U << b->level;
+        alloc_size = 0;
+
+        if (size == 0)
+            size = 1;
+        else {
+            size = is_power_of_two(size) ? size : next_power_of_two(size);
         }
 
-        auto bucket = bucket_for_request(alloc, size);
-        auto original_bucket = bucket;
+        if (size > length)
+            return nullptr;
 
-        while (bucket + 1 != 0) {
-            if (!lower_bucket_limit(alloc, bucket)) {
-                alloc_size = 0;
-                return nullptr;
-            }
+        s32 index = 0;
+        u32 level = 0;
 
-            auto ptr = (u8*) list_pop(&buckets[bucket]);
-            if (!ptr) {
-                if (bucket != sc->bucket_limit) {
-                    --bucket;
-                    continue;
+        while (index >= 0) {
+            if (size == length) {
+                if (b->tree[index] == node_unused) {
+                    b->tree[index] = node_used;
+                    mark_parent(b, index);
+                    alloc_size = size;
+                    alloc->total_allocated += size;
+                    return (b->tree + sc->heap_size) + index_offset(index, level, b->level);
                 }
-
-                if (!lower_bucket_limit(alloc, bucket - 1)) {
-                    alloc_size = 0;
+            } else {
+                switch (b->tree[index]) {
+                    case node_used:
+                    case node_full:
+                        break;
+                    case node_unused:
+                        b->tree[index]         = node_split;
+                        b->tree[index * 2 + 1] = node_unused;
+                        b->tree[index * 2 + 2] = node_unused;
+                    default:
+                        index = index * 2 + 1;
+                        length /= 2;
+                        level++;
+                        continue;
+                }
+            }
+            if (u32(index) & 1U) {
+                ++index;
+                continue;
+            }
+            while (true) {
+                level--;
+                length *= 2;
+                index = (index + 1) / 2 - 1;
+                if (index < 0)
                     return nullptr;
-                }
-
-                ptr = (u8*) list_pop(&buckets[bucket]);
-                if (!ptr) {
-                    alloc_size = 0;
-                    return nullptr;
+                if (u32(index) & 1U) {
+                    ++index;
+                    break;
                 }
             }
-
-            auto bucket_size  = 1U << (sc->heap_order - bucket);
-            auto bytes_needed = bucket < original_bucket ? bucket_size / 2 + sizeof(list_t) : bucket_size;
-            if (!update_max_ptr(alloc, ptr + bytes_needed)) {
-                list_push(&buckets[bucket], (list_t*) ptr);
-                alloc_size = 0;
-                return nullptr;
-            }
-
-            auto i = node_for_ptr(alloc, ptr, bucket);
-            if (i != 0) {
-                flip_parent_is_split(alloc, i);
-            }
-
-            while (bucket < original_bucket) {
-                i = i * 2 + 1;
-                ++bucket;
-                flip_parent_is_split(alloc, i);
-                list_push(&buckets[bucket],
-                          (list_t*) ptr_for_node(alloc, i + 1, bucket));
-            }
-
-            alloc_size = size;
-            alloc->total_allocated += size;
-            return ptr;
         }
 
         return nullptr;
     }
 
     static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size) {
-        return nullptr;
+        buddy::free(alloc, mem, old_size);
+        u32 alloc_size{};
+        return buddy::alloc(alloc, size, align, alloc_size);
     }
 
     alloc_system_t g_system{
@@ -324,5 +273,11 @@ namespace basecode::memory::buddy {
 
     alloc_system_t* system() {
         return &g_system;
+    }
+
+    u32 allocated_size(alloc_t* alloc, u0* mem) {
+        auto sc  = &alloc->subclass.buddy;
+        auto b   = (buddy_t*) sc->heap;
+        return buddy_size(b, (u8*) mem - (b->tree + sc->heap_size));
     }
 }

@@ -97,19 +97,8 @@ namespace basecode {
             b8                      owner;
         }                           proxy;
         struct {
-            u8*                     base_ptr;
-            u8*                     curr_ptr;
-            u8*                     next_page;
-            u8*                     max_ptr;
-            u8*                     node_state;
-            u8*                     node_order;
-            u0*                     buckets;
-            u32                     num_buckets;
-            u32                     bucket_limit;
+            u8*                     heap;
             u32                     heap_size;
-            u32                     heap_order;
-            u32                     reserved;
-            u32                     to_commit;
         }                           buddy;
     };
 

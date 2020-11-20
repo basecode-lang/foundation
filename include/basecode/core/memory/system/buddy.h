@@ -27,6 +27,10 @@ namespace basecode {
     };
 
     namespace memory::buddy {
+        u0 dump(alloc_t* alloc);
+
         alloc_system_t* system();
+
+        u32 allocated_size(alloc_t* alloc, u0* mem);
     }
 }
