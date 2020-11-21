@@ -310,4 +310,32 @@ namespace basecode::memory::buddy {
     alloc_system_t* system() {
         return &g_system;
     }
+
+    u32 available(alloc_t* alloc) {
+        u32 available = 0;
+        u32 blocks_available;
+
+        auto sc = &alloc->subclass.buddy;
+
+        for (u32 level = 0; level < sc->max_level + 1; ++level) {
+            blocks_available = 0;
+            for (buddy_block_t* cursor = sc->free_blocks[level].next;
+                    cursor != &sc->free_blocks[level];
+                    cursor = cursor->next) {
+                ++blocks_available;
+            }
+            available += blocks_available << (sc->total_levels - level);
+        }
+
+        return available;
+    }
+
+    u32 largest_available(alloc_t* alloc) {
+        auto sc = &alloc->subclass.buddy;
+        for (u32 level = 0; level < sc->max_level + 1; ++level)
+            if (!list_empty(&sc->free_blocks[level]))
+                return sc->size >> level;
+
+        return 0;
+    }
 }

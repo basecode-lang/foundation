@@ -33,5 +33,9 @@ namespace basecode {
 
     namespace memory::buddy {
         alloc_system_t* system();
+
+        u32 available(alloc_t* alloc);
+
+        u32 largest_available(alloc_t* alloc);
     }
 }
