@@ -20,133 +20,251 @@
 #include <basecode/core/format.h>
 #include <basecode/core/memory/system/buddy.h>
 
-#define HEAP_GROW(h)                    ((h) << 1U)
-#define HEAP_SHRINK(h)                  ((h) >> 1U)
-#define LEFT_CHILD(idx)                 ((u32(idx) << 1U) + 1)
-#define RIGHT_CHILD(idx)                ((u32(idx) << 1U) + 2)
-#define BUDDY_NODE(idx)                 ((idx) - 1 + ((u32(idx) & 1U) << 1U))
-#define PARENT_NODE(idx)                ((u32((idx) + 1) >> 1U) - 1)        // N.B. (idx + 1) / 2 - 1
-#define INDEX_OFFSET(idx, lvl, mlvl)    ((((idx) + 1) - (1U << u32(lvl))) << ((mlvl) - (lvl)))
+#define BIT_ARRAY_NUM_BITS                              (u32(8 * sizeof(u32)))
+#define BIT_ARRAY_INDEX_SHIFT                           (u32(__builtin_ctzl(BIT_ARRAY_NUM_BITS)))
+#define BIT_ARRAY_INDEX_MASK                            (BIT_ARRAY_NUM_BITS - 1UL)
+
+#define BUDDY_ILOG2(value)                              ((BUDDY_NUM_BITS - 1UL) - __builtin_clzl(value))
+#define BUDDY_NUM_BITS                                  (u32(8 * sizeof(u32)))
+#define BUDDY_MIN_LEAF_SIZE                             (sizeof(u0*) << 1UL)
+#define BUDDY_LEAF_LEVEL_OFFSET                         (BUDDY_ILOG2(BUDDY_MIN_LEAF_SIZE))
+#define BUDDY_MAX_LEVELS(total_size, min_size)          (BUDDY_ILOG2(total_size) - BUDDY_ILOG2(min_size))
+#define BUDDY_MAX_INDEXES(total_size, min_size)         (1UL << (BUDDY_MAX_LEVELS(total_size, min_size) + 1))
+#define BUDDY_BLOCK_INDEX_SIZE(total_size, min_size)    ((BUDDY_MAX_INDEXES(total_size, min_size) + (BUDDY_NUM_BITS - 1)) / BUDDY_NUM_BITS)
+#define BUDDY_SIZEOF_METADATA(total_size, min_size)     ((sizeof(buddy_block_t) * (BUDDY_MAX_LEVELS(total_size, min_size) + 1)) + \
+                                                        BUDDY_BLOCK_INDEX_SIZE(total_size, min_size) * (BUDDY_NUM_BITS >> 3U))
 
 namespace basecode::memory::buddy {
-    static constexpr u8 node_unused = 0;
-    static constexpr u8 node_used   = 1;
-    static constexpr u8 node_split  = 2;
-    static constexpr u8 node_full   = 3;
+    static inline u0 bit_array_set(u32* bit_array, u32 index) {
+        bit_array[index >> BIT_ARRAY_INDEX_SHIFT] |= (1UL << (index & BIT_ARRAY_INDEX_MASK));
+    }
 
-    static u0 dump_node(alloc_t* alloc, s32 index, s32 level) {
-        auto sc = &alloc->subclass.buddy;
-        switch (sc->heap[index]) {
-            case node_unused:
-                format::print("<{}:{}>",
-                              INDEX_OFFSET(index, level, sc->max_level),
-                              1U << (sc->max_level - level));
-                break;
-            case node_used:
-                format::print("[{}:{}]",
-                              INDEX_OFFSET(index, level, sc->max_level),
-                              1U << (sc->max_level - level));
-                break;
-            case node_full:
-                format::print("{{");
-                dump_node(alloc, LEFT_CHILD(index), level + 1);
-                dump_node(alloc, RIGHT_CHILD(index), level + 1);
-                format::print("}}");
-                break;
-            default:
-                format::print("(");
-                dump_node(alloc, LEFT_CHILD(index), level + 1);
-                dump_node(alloc, RIGHT_CHILD(index), level + 1);
-                format::print(")");
-                break;
+    static inline u0 bit_array_not(u32* bit_array, u32 index) {
+        u32 array_index = index >> BIT_ARRAY_INDEX_SHIFT;
+        u32 bit_value   = (1UL << (index & BIT_ARRAY_INDEX_MASK));
+
+        if (bit_array[array_index] & bit_value)
+            bit_array[array_index] &= ~bit_value;
+        else
+            bit_array[array_index] |= bit_value;
+    }
+
+    static inline u0 bit_array_clear(u32* bit_array, u32 index) {
+        bit_array[index >> BIT_ARRAY_INDEX_SHIFT] &= ~(1UL << (index & BIT_ARRAY_INDEX_MASK));
+    }
+
+    static inline b8 bit_array_is_set(const u32* bit_array, u32 index) {
+        return (bit_array[index >> BIT_ARRAY_INDEX_SHIFT] & (1UL << (index & BIT_ARRAY_INDEX_MASK))) != 0;
+    }
+
+    static inline u0 list_init(buddy_block_t* list) {
+        list->next = list;
+        list->prev = list;
+    }
+
+    static inline b8 list_empty(buddy_block_t* list) {
+        return list->next == list;
+    }
+
+    static inline u0 list_remove(buddy_block_t* list) {
+        list->next->prev = list->prev;
+        list->prev->next = list->next;
+        list->next       = list;
+        list->prev       = list;
+    }
+
+    static inline buddy_block_t* list_pop(buddy_block_t* list) {
+        buddy_block_t* front = nullptr;
+        if (!list_empty(list)) {
+            front = list->next;
+            list_remove(front);
         }
+        return front;
     }
 
-    u0 dump(alloc_t* alloc) {
-        dump_node(alloc, 0, 0);
-        format::print("\n");
+    static inline u32 free_index(const alloc_t* alloc, u32 index) {
+        UNUSED(alloc);
+        return (index - 1) >> 1U;
     }
 
-    static u32 level_for_size(u32 size) {
-        u32 level = 0;
-        while ((1U << level) < size) ++level;
-        return level;
+    static inline u32 size_to_level(const alloc_t* alloc, size_t size) {
+        auto sc  = &alloc->subclass.buddy;
+
+        if (size < sc->min_allocation)
+            return sc->max_level;
+
+        size = 1U << (BUDDY_NUM_BITS - __builtin_clzl(size - 1));
+
+        return sc->total_levels - BUDDY_ILOG2(size);
     }
 
-    static u0 combine(alloc_t* alloc, s32 index) {
+    static inline u0 list_add(buddy_block_t* list, buddy_block_t* node) {
+        node->next       = list;
+        node->prev       = list->prev;
+        list->prev->next = node;
+        list->prev       = node;
+    }
+
+    static inline u32 index_of(const alloc_t* alloc, const u0* ptr, u32 level) {
         auto sc = &alloc->subclass.buddy;
-        while (true) {
-            s32 buddy = BUDDY_NODE(index);
-            if (buddy < 0
-            ||  sc->heap[buddy] != node_unused) {
-                sc->heap[index] = node_unused;
-                while (((index = PARENT_NODE(index)) >= 0)
-                       && sc->heap[index] == node_full) {
-                    sc->heap[index] = node_split;
-                }
-                return;
+        const usize offset = (u8*) ptr - (u8*) sc->heap;
+        return (1UL << level) + (offset >> u32(sc->total_levels - level)) - 1UL;
+    }
+
+    static inline u32 split_index(const alloc_t* alloc, u32 index) {
+        auto sc = &alloc->subclass.buddy;
+        return index + (sc->max_indexes >> 1U);
+    }
+
+    static inline u0* to_buddy(const alloc_t* alloc, const u0* ptr, u32 level) {
+        auto sc = &alloc->subclass.buddy;
+        const size_t offset = (const u8*) ptr - (const u8*) sc->heap;
+        return (offset ^ (sc->size >> level)) + (u8*) sc->heap;
+    }
+
+    static u0* buddy_alloc_from_level(alloc_t* alloc, u32 level) {
+        auto sc = &alloc->subclass.buddy;
+        buddy_block_t* block_ptr        {};
+        buddy_block_t* buddy_block_ptr;
+        s32            block_at_level;
+        s32            index;
+
+        for (block_at_level = level; block_at_level >= 0; --block_at_level) {
+            if (!list_empty(&sc->free_blocks[block_at_level])) {
+                block_ptr = list_pop(&sc->free_blocks[block_at_level]);
+                break;
             }
-            index = PARENT_NODE(index);
         }
-    }
 
-    static u0 mark_parent(alloc_t* alloc, s32 index) {
-        auto sc = &alloc->subclass.buddy;
-        while (true) {
-            s32 buddy = BUDDY_NODE(index);
-            if (buddy > 0
-            && (sc->heap[buddy] == node_used || sc->heap[buddy] == node_full)) {
-                index = PARENT_NODE(index);
-                sc->heap[index] = node_full;
-            } else {
-                return;
+        if (!block_ptr)
+            return block_ptr;
+
+        index = index_of(alloc, block_ptr, block_at_level);
+
+        if (block_at_level != level) {
+            while (block_at_level < level) {
+                bit_array_set(sc->block_index, split_index(alloc, index));
+                if (block_at_level > 0)
+                    bit_array_not(sc->block_index, free_index(alloc, index));
+                buddy_block_ptr = (buddy_block_t*) to_buddy(alloc, block_ptr, block_at_level + 1);
+                list_add(&sc->free_blocks[block_at_level + 1], buddy_block_ptr);
+                index = (u32(index) << 1U) + 1;
+                ++block_at_level;
             }
         }
+
+        if (level > 0) {
+            bit_array_not(sc->block_index, free_index(alloc, index));
+            alloc->total_allocated += 1U << (sc->total_levels - level);
+        } else {
+            alloc->total_allocated += sc->size;
+        }
+
+        return block_ptr;
+    }
+
+    static u0 buddy_release_at_level(alloc_t* alloc, u0* ptr, u32 level) {
+        u0* buddy_ptr = to_buddy(alloc, ptr, level);
+        u32  index = index_of(alloc, ptr, level);
+        auto sc    = &alloc->subclass.buddy;
+
+        if (level > 0) {
+            bit_array_not(sc->block_index, free_index(alloc, index));
+            const auto size = 1U << (sc->total_levels - level);
+            assert(size <= alloc->total_allocated);
+            alloc->total_allocated -= size;
+        } else {
+            alloc->total_allocated -= (sc->size - sc->metadata_size);
+        }
+
+        while (level > 0
+              && !bit_array_is_set(sc->block_index, free_index(alloc, index))) {
+            bit_array_clear(sc->block_index, split_index(alloc, index));
+            list_remove((buddy_block_t*) buddy_ptr);
+            index = (index - 1) >> 1U;
+            --level;
+            if (buddy_ptr < ptr)
+                ptr = buddy_ptr;
+            buddy_ptr = to_buddy(alloc, ptr, level);
+            if (level > 0)
+                bit_array_not(sc->block_index, free_index(alloc, index));
+        }
+
+        bit_array_clear(sc->block_index, split_index(alloc, index));
+        list_add(&sc->free_blocks[level], (buddy_block_t*) ptr);
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto cfg = (buddy_config_t*) config;
         alloc->backing = cfg->backing;
-
         auto sc  = &alloc->subclass.buddy;
-        sc->heap_size = is_power_of_two(cfg->heap_size) ? cfg->heap_size :
-                        next_power_of_two(cfg->heap_size);
-        sc->heap = (u8*) memory::alloc(alloc->backing, sc->heap_size << 1U);
-        sc->max_level = level_for_size(sc->heap_size);
-        std::memset(sc->heap, 0, sc->heap_size << 1U);
-    }
+        sc->size = cfg->heap_size;
 
-    static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
-        auto sc = &alloc->subclass.buddy;
+        u8* heap = (u8*) memory::alloc(alloc->backing, sc->size, alignof(buddy_block_t));
+        sc->heap = heap;
 
-        auto offset = (u8*) mem - (sc->heap + sc->heap_size);
-        u32 left      = 0;
-        u32 heap_size = sc->heap_size;
-        u32 index     = 0;
+        sc->extra_metadata = nullptr;
+        sc->min_allocation = BUDDY_MIN_LEAF_SIZE;
+        sc->total_levels   = BUDDY_ILOG2(sc->size);
+        sc->max_indexes    = BUDDY_MAX_INDEXES(sc->size, sc->min_allocation);
+        sc->max_level      = BUDDY_MAX_LEVELS(sc->size, sc->min_allocation);
+        sc->metadata_size  = align(BUDDY_SIZEOF_METADATA(sc->size, BUDDY_MIN_LEAF_SIZE),
+                                           alignof(buddy_block_t));
+        u8* initial_metadata = (heap + sc->size) - sc->metadata_size;
+        auto initial_free_blocks = (buddy_block_t*) initial_metadata;
+        auto initial_block_index = (u32*) (initial_metadata + (sizeof(buddy_block_t) * (sc->max_level + 1)));
+        sc->free_blocks = initial_free_blocks;
+        sc->block_index = initial_block_index;
 
-        while (true) {
-            switch (sc->heap[index]) {
-                case node_used:
-                    assert(offset == left);
-                    combine(alloc, index);
-                    freed_size = heap_size;
-                    alloc->total_allocated -= heap_size;
-                    return;
-                case node_unused:
-                    assert(false);
-                    return;
-                default:
-                    heap_size = HEAP_SHRINK(heap_size);
-                    if (offset < left + heap_size) {
-                        index = LEFT_CHILD(index);
-                    } else {
-                        left += heap_size;
-                        index = RIGHT_CHILD(index);
-                    }
-                    break;
+        for (u32 i = 0; i < sc->max_level + 1; ++i) {
+            list_init(&sc->free_blocks[i]);
+        }
+
+        const auto max_indexes = (sc->max_indexes + (BUDDY_NUM_BITS - 1)) / BUDDY_NUM_BITS;
+        for (u32 i = 0; i < max_indexes; ++i) {
+            sc->block_index[i] = 0;
+        }
+
+        list_add(&sc->free_blocks[0], (buddy_block_t*) heap);
+
+        const auto num_blocks = (sc->metadata_size + (BUDDY_MIN_LEAF_SIZE - 1)) / BUDDY_MIN_LEAF_SIZE;
+        for (u32 i = 0; i < num_blocks; ++i)
+            buddy_alloc_from_level(alloc, sc->max_level);
+
+        sc->free_blocks = (buddy_block_t*) heap;
+        sc->block_index = (u32*) (heap + (sizeof(buddy_block_t) * (sc->max_level + 1)));
+
+        for (u32 i = 0; i < max_indexes; ++i)
+            sc->block_index[i] = initial_block_index[i];
+
+        for (u32 level = 0; level < sc->max_level + 1; ++level) {
+            list_init(&sc->free_blocks[level]);
+            if (!list_empty(&initial_free_blocks[level])) {
+                sc->free_blocks[level].next = initial_free_blocks[level].next;
+                sc->free_blocks[level].prev = initial_free_blocks[level].prev;
+
+                sc->free_blocks[level].next->prev = &sc->free_blocks[level];
+                sc->free_blocks[level].prev->next = &sc->free_blocks[level];
             }
         }
     }
+
+    static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
+        if (!mem)
+            return;
+        auto sc = &alloc->subclass.buddy;
+        auto index = index_of(alloc, mem, sc->max_level);
+        for (u32 level = sc->max_level; level > 0; --level) {
+            index = (index - 1) >> 1U;
+            if (bit_array_is_set(sc->block_index, split_index(alloc, index))) {
+                freed_size = 1U << (sc->total_levels - level);
+                buddy_release_at_level(alloc, mem, level);
+                return;
+            }
+        }
+        freed_size = sc->size;
+        buddy_release_at_level(alloc, mem, 0);
+   }
 
     static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
         u32 temp_freed{};
@@ -155,6 +273,8 @@ namespace basecode::memory::buddy {
         auto sc  = &alloc->subclass.buddy;
         memory::free(alloc->backing, sc->heap, &temp_freed);
         total_freed += temp_freed;
+        total_freed += sc->metadata_size;
+        alloc->total_allocated -= sc->metadata_size;
 
         if (freed_size) *freed_size = total_freed;
         if (enforce) assert(alloc->total_allocated == 0);
@@ -162,65 +282,13 @@ namespace basecode::memory::buddy {
 
     static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
         UNUSED(align);
-
-        auto sc = &alloc->subclass.buddy;
-        u32 heap_size = sc->heap_size;
+        u32 level = size_to_level(alloc, size);
+        auto p = buddy_alloc_from_level(alloc, level);
+        if (p){
+            alloc_size = 1U << (alloc->subclass.buddy.total_levels - level);
+            return p;
+        }
         alloc_size = 0;
-
-        if (size == 0)
-            size = 1;
-        else {
-            size = is_power_of_two(size) ? size : next_power_of_two(size);
-        }
-
-        if (size > heap_size)
-            return nullptr;
-
-        s32 index = 0;
-        u32 level = 0;
-
-        while (index >= 0) {
-            if (size == heap_size) {
-                if (sc->heap[index] == node_unused) {
-                    sc->heap[index] = node_used;
-                    mark_parent(alloc, index);
-                    alloc_size = size;
-                    alloc->total_allocated += size;
-                    return (sc->heap + sc->heap_size) + INDEX_OFFSET(index, level, sc->max_level);
-                }
-            } else {
-                switch (sc->heap[index]) {
-                    case node_used:
-                    case node_full:
-                        break;
-                    case node_unused:
-                        sc->heap[index]              = node_split;
-                        sc->heap[LEFT_CHILD(index)]  = node_unused;
-                        sc->heap[RIGHT_CHILD(index)] = node_unused;
-                    default:
-                        index = LEFT_CHILD(index);
-                        heap_size = HEAP_SHRINK(heap_size);
-                        level++;
-                        continue;
-                }
-            }
-            if (u32(index) & 1U) {
-                ++index;
-                continue;
-            }
-            while (true) {
-                level--;
-                heap_size = HEAP_GROW(heap_size);
-                index = PARENT_NODE(index);
-                if (index < 0)
-                    return nullptr;
-                if (u32(index) & 1U) {
-                    ++index;
-                    break;
-                }
-            }
-        }
-
         return nullptr;
     }
 
@@ -241,33 +309,5 @@ namespace basecode::memory::buddy {
 
     alloc_system_t* system() {
         return &g_system;
-    }
-
-    u32 allocated_size(alloc_t* alloc, u0* mem) {
-        auto sc     = &alloc->subclass.buddy;
-        u32  left   = 0;
-        u32 index     = 0;
-        u32 heap_size = sc->heap_size;
-        u32 offset    = (u8*) mem - (sc->heap + sc->heap_size);
-
-        while (true) {
-            switch (sc->heap[index]) {
-                case node_used:
-                    assert(offset == left);
-                    return heap_size;
-                case node_unused:
-                    assert(false);
-                    return heap_size;
-                default:
-                    heap_size = HEAP_SHRINK(heap_size);
-                    if (offset < left + heap_size) {
-                        index = LEFT_CHILD(index);
-                    } else {
-                        left += heap_size;
-                        index = RIGHT_CHILD(index);
-                    }
-                    break;
-            }
-        }
     }
 }

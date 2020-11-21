@@ -21,16 +21,17 @@
 #include <basecode/core/memory.h>
 
 namespace basecode {
+    struct buddy_block_t final {
+        buddy_block_t*          next;
+        buddy_block_t*          prev;
+    };
+
     struct buddy_config_t : alloc_config_t {
         alloc_t*                backing;
         u32                     heap_size;
     };
 
     namespace memory::buddy {
-        u0 dump(alloc_t* alloc);
-
         alloc_system_t* system();
-
-        u32 allocated_size(alloc_t* alloc, u0* mem);
     }
 }

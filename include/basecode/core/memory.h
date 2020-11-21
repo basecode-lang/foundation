@@ -29,6 +29,7 @@ namespace basecode {
     struct slab_t;
     struct alloc_t;
     struct proxy_pair_t;
+    struct buddy_block_t;
     struct page_header_t;
     struct alloc_config_t {};
 
@@ -96,10 +97,17 @@ namespace basecode {
             proxy_pair_t*           pair;
             b8                      owner;
         }                           proxy;
-        struct {
-            u8*                     heap;
+        struct buddy_t {
+            u0*                     heap;
+            u0*                     extra_metadata;
+            u32*                    block_index;
+            buddy_block_t*          free_blocks;
+            u32                     size;
             u32                     max_level;
-            u32                     heap_size;
+            u32                     max_indexes;
+            u32                     total_levels;
+            u32                     metadata_size;
+            u32                     min_allocation;
         }                           buddy;
     };
 

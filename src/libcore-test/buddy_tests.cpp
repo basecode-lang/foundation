@@ -23,14 +23,13 @@
 
 using namespace basecode;
 
-static u8 s_zeros[32];
-
 TEST_CASE("basecode::memory::buddy basics") {
     buddy_config_t config{};
     config.backing = context::top()->alloc;
     config.heap_size = 256 * 1024;
 
     auto buddy_alloc = memory::system::make(alloc_type_t::buddy, &config);
+    const auto working_heap_size = buddy_alloc->subclass.buddy.size - buddy_alloc->subclass.buddy.metadata_size;
 
     // N.B. catch is *slow*!  i want to time allocating the blocks
     //      from the buddy allocator without adding any unnecessary overhead.
@@ -39,33 +38,25 @@ TEST_CASE("basecode::memory::buddy basics") {
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    const auto num_blocks = config.heap_size / 32;
+    const auto block_size = 32;
+    const auto num_blocks = working_heap_size / block_size;
     u0* blocks[num_blocks];
     for (u32 i = 0; i < num_blocks; ++i)
-        blocks[i] = memory::alloc(buddy_alloc, 32);
+        blocks[i] = memory::alloc(buddy_alloc, block_size);
 
     stopwatch::stop(timer);
-    format::print("buddy alloc: heap_size = {}, block size = {}, # blocks = {}\n", config.heap_size, 32, num_blocks);
+    format::print("buddy alloc: heap_size = {}, block size = {}, # blocks = {}\n",
+                  working_heap_size,
+                  block_size,
+                  num_blocks);
     stopwatch::print_elapsed("buddy alloc time"_ss, 40, timer);
 
     // N.B. this allocation should return nullptr
-    REQUIRE(!memory::alloc(buddy_alloc, 32));
-    REQUIRE(buddy_alloc->total_allocated == config.heap_size);
+    REQUIRE(!memory::alloc(buddy_alloc, block_size));
+    REQUIRE(buddy_alloc->total_allocated > working_heap_size);
 
     for (u32 i = 0; i < num_blocks; ++i) {
         REQUIRE(blocks[i]);
-        auto is_block_zero = std::memcmp(s_zeros, blocks[i], 32) == 0;
-        if (!is_block_zero) {
-            format::print("block {} non-zero!\n", i);
-            format::print_hex_dump(blocks[i], 32);
-            format::print("\n");
-        }
-        REQUIRE(is_block_zero);
-#if 0
-        format::print("block: {}, valid: {}\n", i, is_block_zero);
-        format::print_hex_dump(blocks[i], 32);
-        format::print("\n");
-#endif
     }
 
     stopwatch::start(timer);
@@ -76,7 +67,7 @@ TEST_CASE("basecode::memory::buddy basics") {
     stopwatch::stop(timer);
     stopwatch::print_elapsed("buddy free time"_ss, 40, timer);
 
-    REQUIRE(buddy_alloc->total_allocated == 0);
+    REQUIRE(buddy_alloc->total_allocated == buddy_alloc->subclass.buddy.metadata_size);
 
     u32 freed_size{};
     memory::system::free(buddy_alloc, true, &freed_size);
