@@ -38,6 +38,8 @@ configure_file(
 set(
     VM_SOURCES
 
+    bytecode.cpp ${INC_DIR}/bytecode.h
+
     vm.cpp ${INC_DIR}/vm.h
 )
 add_library(${LIBRARY_TARGET} ${VM_SOURCES})

@@ -16,16 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/vm/vm.h>
+#include <basecode/vm/bytecode.h>
 
 namespace basecode::vm {
-    u0 free(vm_t& vm) {
-    }
-
-    status_t init(vm_t& vm, const vm_opts_t& opts, alloc_t* alloc) {
-        vm.alloc      = alloc;
-        vm.heap_size  = opts.heap_size;
-        vm.stack_size = opts.stack_size;
-        return status_t::ok;
-    }
 }
