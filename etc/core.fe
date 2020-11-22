@@ -3,16 +3,51 @@
 ;; support macros / functions
 ;;
 ;; -------------------------------------------------------------
+(= append (fn (l m)
+    (if (not l)
+        '()
+        (cons (car l) (append (cdr l) m)))))
+
 (= for (mac (item lst . body)
-  (list 'do
-    (list 'let 'for-iter lst)
-    (list 'while 'for-iter
-      (list 'let item '(car for-iter))
-      '(= for-iter (cdr for-iter))
-      (cons 'do body)
-    )
-  )
-))
+    (list 'do
+        (list 'let 'for-iter lst)
+        (list 'while 'for-iter
+            (list 'let item '(car for-iter))
+            '(= for-iter (cdr for-iter))
+            (cons 'do body)))))
+
+(= test-suite (mac (title . body)
+    (list 'do
+        (list 'let 'pass-count 0)
+        (list 'let 'fail-count 0)
+        (list 'let 'sys-print 'print)
+        (list 'let 'print '(fn (args)
+                               (sys-print " "
+                                          (car args)
+                                          (car (cdr args)))))
+        (list 'sys-print "TEST SUITE:" title)
+        (list 'sys-print "----------------------------------------------------")
+        (list 'sys-print " PASS | FAIL | Assert Expression                    ")
+        (list 'sys-print "----------------------------------------------------")
+
+        (list 'let 'results (cons 'list body))
+        (list 'for 'x 'results
+            (list 'if 'x
+                '(= pass-count (+ 1 pass-count))
+                '(= fail-count (+ 1 fail-count))))
+
+        (list 'sys-print "====================================================")
+        (list 'sys-print "PASS:" 'pass-count " FAIL:" 'fail-count)
+        (list 'sys-print ""))))
+
+(= assert (mac (expr)
+    (list 'if (car (cdr expr))
+        (list 'do
+            (list 'print (list 'list " P          " expr))
+            #t)
+        (list 'do
+            (list 'print (list 'list "        F   " expr))
+            #f))))
 
 ;; -------------------------------------------------------------
 ;;
@@ -165,6 +200,12 @@
 
 (= core-tests (fn ()
     (do
+        (do
+            (let i 0)
+            (for arg (current-command-line)
+                (print i "=" arg)
+                (= i (+ i 1))))
+
         (localized-string 5000 'en_US "US: test localized string: 0={} 1={} 2={}")
         (localized-string 5001 'en_US "duplicate cvar")
         (localized-string 5002 'en_US "cvar not found")
@@ -174,33 +215,39 @@
         (let str:undecl-msg (localized-string 5005 'en_US "undeclared identifier: {}"))
         (localized-error 5000 'en_US 'BC001 str:undecl-msg)
 
-        (do
-            (log-info "product-name        = {}" (cvar-ref cvar:product-name))
-            (log-info "version-major       = {}" (cvar-ref cvar:version-major))
-            (log-info "version-minor       = {}" (cvar-ref cvar:version-minor))
-            (log-info "version-revision    = {}" (cvar-ref cvar:version-revision))
-            (log-info "build-type          = {}" (cvar-ref cvar:build-type))
-            (log-info "platform            = {}" (cvar-ref cvar:platform))
-            (log-info "test-runner         = {}" (cvar-ref cvar:test-runner))
+        ; basic assertions around fe scheme terp
+        (test-suite "fe scheme terp basic assertions"
+            (assert '(is 2 2))
+            (assert '(not (> 2 9)))
+            (assert '(>= 2 2))
+            (assert '(is 0 (mod 10 2))))
 
-            (let print-cvars (fn ()
-                (print "enable-console-color =" (cvar-ref cvar:enable-console-color))
-                (print "log-path             =" (cvar-ref cvar:log-path))
-                (print "magick-weight        =" (cvar-ref cvar:magick-weight))))
+        (test-suite "fe + config module integration"
+            (assert '(is "Basecode Foundation Core Library" (cvar-ref cvar:product-name)))
+            (assert '(is 0 (cvar-ref cvar:version-major)))
+            (assert '(is 1 (cvar-ref cvar:version-minor)))
+            (assert '(is 0 (cvar-ref cvar:version-revision)))
+            (assert '(do
+                        (let build-type (cvar-ref cvar:build-type))
+                        (or (is "Debug" build-type)
+                            (is "Release" build-type))))
+            (assert '(do
+                        (let platform (cvar-ref cvar:platform))
+                        (or (is "Windows" platform)
+                            (is "Linux" platform))))
+            (assert '(is #t (cvar-ref cvar:test-runner)))
 
-            (do
-                (let i 0)
-                (for arg (current-command-line)
-                    (print i "=" arg)
-                    (= i (+ i 1))))
-
-            (print-cvars)
+            (assert '(is #t (cvar-ref cvar:enable-console-color)))
+            (assert '(is "/var/log" (cvar-ref cvar:log-path)))
+            (assert '(is 47 (cvar-ref cvar:magick-weight)))
 
             (cvar-set! cvar:enable-console-color    nil)
             (cvar-set! cvar:log-path                "/var/log/basecode")
             (cvar-set! cvar:magick-weight           12.6566)
 
-            (print-cvars))
+            (assert '(is #f (cvar-ref cvar:enable-console-color)))
+            (assert '(is "/var/log/basecode" (cvar-ref cvar:log-path)))
+            (assert '(is 12.6566 (cvar-ref cvar:magick-weight))))
 
         (do
             (let parent-logger (current-logger))
@@ -210,7 +257,9 @@
                            'local0))
             (let basic-file-logger (log-create-basic-file "test.log"))
             (let daily-file-logger (log-create-daily-file "daily.log" 23 0))
-            (let rotating-file-logger (log-create-rotating-file "rotating.log" (* 256 1024) 256))
+            (let rotating-file-logger (log-create-rotating-file "rotating.log"
+                                                                (* 256 1024)
+                                                                256))
 
             (logger-append-child parent-logger color-logger)
             (logger-append-child parent-logger basic-file-logger)
@@ -221,6 +270,7 @@
             (log-info "example log message!")
             (log-warn "oh, shit!")
             (log-error "this should really stick out")))))
+
 (if (cvar-ref cvar:test-runner)
     (do
         (let product-name (cvar-ref cvar:product-name))

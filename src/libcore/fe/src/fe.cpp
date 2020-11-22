@@ -46,11 +46,16 @@
 #define GC_STACK_SIZE           (1024U)
 #define NATIVE_PTR_SIZE         (256U)
 #define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env, nullptr)
-#define ARITH_OP(op)            SAFE_SCOPE(                                                     \
-                                    number_t x = to_number(ctx, EVAL_ARG());                    \
-                                    while (!IS_NIL(arg)) {                                      \
-                                        x = x op to_number(ctx, EVAL_ARG());                    \
-                                    }                                                           \
+#define ARITH_INT_OP(op)        SAFE_SCOPE(                                                     \
+                                    u32 x = INTEGER(EVAL_ARG());                                \
+                                    while (!IS_NIL(arg))                                        \
+                                        x = x op INTEGER(EVAL_ARG());                           \
+                                    res = make_number(ctx, x);                                  \
+                                )
+#define ARITH_NUM_OP(op)        SAFE_SCOPE(                                                     \
+                                    number_t x = NUMBER(EVAL_ARG());                            \
+                                    while (!IS_NIL(arg))                                        \
+                                        x = x op NUMBER(EVAL_ARG());                            \
                                     res = make_number(ctx, x);                                  \
                                 )
 #define NUM_CMP_OP(op)          SAFE_SCOPE(                                                     \
@@ -81,12 +86,15 @@ namespace basecode::fe {
         is,
         atom,
         print,
+        gt,
+        gte,
         lt,
         lte,
         add,
         sub,
         mul,
         div,
+        mod,
         max
     };
 
@@ -111,12 +119,15 @@ namespace basecode::fe {
         "is",
         "atom",
         "print",
+        ">",
+        ">=",
         "<",
         "<=",
         "+",
         "-",
         "*",
-        "/"
+        "/",
+        "mod"
     };
 
     static const s8* s_type_names[] = {
@@ -559,6 +570,14 @@ namespace basecode::fe {
                         printf("\n");
                         break;
 
+                    case prim_type_t::gt:
+                        NUM_CMP_OP(>);
+                        break;
+
+                    case prim_type_t::gte:
+                        NUM_CMP_OP(>=);
+                        break;
+
                     case prim_type_t::lt:
                         NUM_CMP_OP(<);
                         break;
@@ -568,19 +587,23 @@ namespace basecode::fe {
                         break;
 
                     case prim_type_t::add:
-                        ARITH_OP(+);
+                        ARITH_NUM_OP(+);
                         break;
 
                     case prim_type_t::sub:
-                        ARITH_OP(-);
+                        ARITH_NUM_OP(-);
                         break;
 
                     case prim_type_t::mul:
-                        ARITH_OP(*);
+                        ARITH_NUM_OP(*);
                         break;
 
                     case prim_type_t::div:
-                        ARITH_OP(/);
+                        ARITH_NUM_OP(/);
+                        break;
+
+                    case prim_type_t::mod:
+                        ARITH_INT_OP(%);
                         break;
 
                     default:
