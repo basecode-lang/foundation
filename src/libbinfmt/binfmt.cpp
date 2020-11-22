@@ -71,7 +71,7 @@ namespace basecode::binfmt {
                 if (!OK(status))
                     return status;
             }
-            fe_Object* result{};
+            fe::obj_t* result{};
             {
                 auto status = config::eval(config_path, &result);
                 if (!OK(status))
