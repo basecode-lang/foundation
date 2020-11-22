@@ -28,14 +28,14 @@
 #include <basecode/core/log/system/syslog.h>
 
 namespace basecode::config {
-    constexpr u32 max_cvar_count = 256;
+    constexpr u32 max_cvar_size = 256;
 
     using arg_map_t             = symtab_t<fe::obj_t*>;
 
     struct system_t final {
         alloc_t*                alloc;
         fe::ctx_t*              ctx;
-        cvar_t                  vars[max_cvar_count];
+        cvar_t                  vars[max_cvar_size];
         str_t                   buf;
         u32                     heap_size;
     };
@@ -129,23 +129,15 @@ namespace basecode::config {
         return -1;
     }
 
-    static fe::obj_t* next_arg_no_chk(fe::ctx_t* ctx, fe::obj_t** arg) {
-        fe::obj_t* a = *arg;
-        if (fe::type(ctx, a) != fe::obj_type_t::pair)
-            return fe::nil();
-        *arg = fe::cdr(ctx, a);
-        return fe::car(ctx, a);
-    }
-
     static u32 make_arg_map(fe::ctx_t* ctx, fe::obj_t* arg, arg_map_t& args) {
         u32 pos = 1;
         while (true) {
-            auto obj = next_arg_no_chk(ctx, &arg);
+            auto obj = fe::next_arg_no_chk(ctx, &arg);
             auto type = fe::type(ctx, obj);
             if (type == fe::obj_type_t::nil) {
                 break;
             } else if (type == fe::obj_type_t::keyword) {
-                auto value_obj = next_arg_no_chk(ctx, &arg);
+                auto value_obj = fe::next_arg_no_chk(ctx, &arg);
                 type = fe::type(ctx, value_obj);
                 if (type == fe::obj_type_t::nil)
                     fe::error(ctx, "keyword parameter requires value");
@@ -173,7 +165,7 @@ namespace basecode::config {
         defer(str_array::free(strs));
 
         while (true) {
-            auto obj = next_arg_no_chk(ctx, &arg);
+            auto obj = fe::next_arg_no_chk(ctx, &arg);
             if (fe::type(ctx, obj) == fe::obj_type_t::nil)
                 break;
             str_array::append(strs, to_str(ctx, obj));
@@ -201,7 +193,7 @@ namespace basecode::config {
         auto id = fe::next_arg(ctx, &arg);
         if (fe::type(ctx, id) != fe::obj_type_t::number)
             fe::error(ctx, "id: expected a number");
-        auto native_id = u32(fe::to_number(ctx, id));
+        auto native_id = fe::to_integer(ctx, id);
 
         cvar_t* cvar{};
         if (!OK(cvar::get(native_id, &cvar))) {
@@ -254,19 +246,19 @@ namespace basecode::config {
 
     static fe::obj_t* log_warn(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::warn(vlog(ctx, arg));
-        return fe::nil();
+        return fe::nil(ctx);
     }
 
     static fe::obj_t* log_info(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::info(vlog(ctx, arg));
-        return fe::nil();
+        return fe::nil(ctx);
     }
 
     static fe::obj_t* cvar_ref(fe::ctx_t* ctx, fe::obj_t* arg) {
         auto id = fe::next_arg(ctx, &arg);
         if (fe::type(ctx, id) != fe::obj_type_t::number)
             fe::error(ctx, "id: expected a number");
-        auto native_id = u32(fe::to_number(ctx, id));
+        auto native_id = fe::to_integer(ctx, id);
 
         cvar_t* cvar{};
         if (!OK(cvar::get(native_id, &cvar))) {
@@ -283,52 +275,52 @@ namespace basecode::config {
             case cvar_type_t::string:
                 return fe::make_string(ctx, (const s8*) cvar->value.ptr);
             case cvar_type_t::pointer:
-                return fe::make_ptr(ctx, (u0*) cvar->value.ptr);
+                return fe::make_user_ptr(ctx, (u0*) cvar->value.ptr);
             default:
                 fe::error(ctx, "invalid cvar type");
         }
 
-        return fe::nil();
+        return fe::nil(ctx);
     }
 
     static fe::obj_t* log_alert(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::alert(vlog(ctx, arg));
-        return fe::nil();
+        return fe::nil(ctx);
     }
 
     static fe::obj_t* log_debug(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::debug(vlog(ctx, arg));
-        return fe::nil();
+        return fe::nil(ctx);
     }
 
     static fe::obj_t* log_error(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::error(vlog(ctx, arg));
-        return fe::nil();
+        return fe::nil(ctx);
     }
 
     static fe::obj_t* log_notice(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::notice(vlog(ctx, arg));
-        return fe::nil();
+        return fe::nil(ctx);
     }
 
     static fe::obj_t* current_user(fe::ctx_t* ctx, fe::obj_t* arg) {
         UNUSED(arg);
-        return fe::make_ptr(ctx, context::top()->user);
+        return fe::make_user_ptr(ctx, context::top()->user);
     }
 
     static fe::obj_t* log_critical(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::critical(vlog(ctx, arg));
-        return fe::nil();
+        return fe::nil(ctx);
     }
 
     static fe::obj_t* log_emergency(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::emergency(vlog(ctx, arg));
-        return fe::nil();
+        return fe::nil(ctx);
     }
 
     static fe::obj_t* current_alloc(fe::ctx_t* ctx, fe::obj_t* arg) {
         UNUSED(arg);
-        return fe::make_ptr(ctx, context::top()->alloc);
+        return fe::make_user_ptr(ctx, context::top()->alloc);
     }
 
     static fe::obj_t* syslog_create(fe::ctx_t* ctx, fe::obj_t* arg) {
@@ -357,7 +349,7 @@ namespace basecode::config {
         if (fe::type(ctx, opts) != fe::obj_type_t::pair)
             fe::error(ctx, "opts argument must be a list");
         while (true) {
-            auto obj = next_arg_no_chk(ctx, &opts);
+            auto obj = fe::next_arg_no_chk(ctx, &opts);
             auto type = fe::type(ctx, obj);
             if (type == fe::obj_type_t::nil)
                 break;
@@ -383,12 +375,12 @@ namespace basecode::config {
         if (!OK(status))
             fe::error(ctx, "failed to create syslog logger");
 
-        return fe::make_ptr(ctx, logger);
+        return fe::make_user_ptr(ctx, logger);
     }
 
     static fe::obj_t* current_logger(fe::ctx_t* ctx, fe::obj_t* arg) {
         UNUSED(arg);
-        return fe::make_ptr(ctx, context::top()->logger);
+        return fe::make_user_ptr(ctx, context::top()->logger);
     }
 
     static fe::obj_t* localized_error(fe::ctx_t* ctx, fe::obj_t* arg) {
@@ -415,8 +407,8 @@ namespace basecode::config {
         if (fe::type(ctx, str_id) != fe::obj_type_t::number)
             fe::error(ctx, "str_id: expected number");
 
-        error::localized::add(u32(fe::to_number(ctx, id)),
-                              u32(fe::to_number(ctx, str_id)),
+        error::localized::add(fe::to_integer(ctx, id),
+                              fe::to_integer(ctx, str_id),
                               locale_str,
                               code_str);
 
@@ -443,7 +435,7 @@ namespace basecode::config {
             fe::error(ctx, "value: expected string");
         auto value_str = string::interned::fold(to_str(ctx, value));
 
-        string::localized::add(u32(fe::to_number(ctx, id)), locale_str, value_str);
+        string::localized::add(fe::to_integer(ctx, id), locale_str, value_str);
 
         return id;
     }
@@ -491,7 +483,7 @@ namespace basecode::config {
         if (!OK(status))
             fe::error(ctx, "failed to create color logger");
 
-        return fe::make_ptr(ctx, logger);
+        return fe::make_user_ptr(ctx, logger);
     }
 
     static u0 adjust_log_path(path_t& log_path, str::slice_t file_name) {
@@ -519,9 +511,9 @@ namespace basecode::config {
         auto child = fe::next_arg(ctx, &arg);
         if (fe::type(ctx, child) != fe::obj_type_t::ptr)
             fe::error(ctx, "child: expected pointer argument");
-        log::append_child((logger_t*) fe::to_ptr(ctx, parent),
-                          (logger_t*) fe::to_ptr(ctx, child));
-        return fe::nil();
+        log::append_child((logger_t*) fe::to_user_ptr(ctx, parent),
+                          (logger_t*) fe::to_user_ptr(ctx, child));
+        return fe::nil(ctx);
     }
 
     static fe::obj_t* current_command_line(fe::ctx_t* ctx, fe::obj_t* arg) {
@@ -574,7 +566,7 @@ namespace basecode::config {
         if (!OK(status))
             fe::error(ctx, "failed to create basic file logger");
 
-        return fe::make_ptr(ctx, logger);
+        return fe::make_user_ptr(ctx, logger);
     }
 
     static fe::obj_t* log_create_daily_file(fe::ctx_t* ctx, fe::obj_t* arg) {
@@ -612,12 +604,12 @@ namespace basecode::config {
         auto hour = get_map_arg(args, 1);
         if (fe::type(ctx, hour) != fe::obj_type_t::number)
             fe::error(ctx, "hour: expected number");
-        config.hour = u32(fe::to_number(ctx, hour));
+        config.hour = fe::to_integer(ctx, hour);
 
         auto minute = get_map_arg(args, 1);
         if (fe::type(ctx, minute) != fe::obj_type_t::number)
             fe::error(ctx, "minute: expected number");
-        config.minute = u32(fe::to_number(ctx, minute));
+        config.minute = fe::to_integer(ctx, minute);
 
         logger_t* logger{};
         auto status = log::system::make(&logger,
@@ -627,7 +619,7 @@ namespace basecode::config {
         if (!OK(status))
             fe::error(ctx, "failed to create daily file logger");
 
-        return fe::make_ptr(ctx, logger);
+        return fe::make_user_ptr(ctx, logger);
     }
 
     static fe::obj_t* log_create_rotating_file(fe::ctx_t* ctx, fe::obj_t* arg) {
@@ -665,12 +657,12 @@ namespace basecode::config {
         auto max_size = get_map_arg(args, 1);
         if (fe::type(ctx, max_size) != fe::obj_type_t::number)
             fe::error(ctx, "max_size: expected number");
-        config.max_size  = u32(fe::to_number(ctx, max_size));
+        config.max_size  = fe::to_integer(ctx, max_size);
 
         auto max_files = get_map_arg(args, 2);
         if (fe::type(ctx, max_files)!= fe::obj_type_t::number)
             fe::error(ctx, "max_files: expected number");
-        config.max_files = u32(fe::to_number(ctx, max_files));
+        config.max_files = fe::to_integer(ctx, max_files);
 
         logger_t* logger{};
         auto status = log::system::make(&logger,
@@ -680,7 +672,7 @@ namespace basecode::config {
         if (!OK(status))
             fe::error(ctx, "failed to create rotating file logger");
 
-        return fe::make_ptr(ctx, logger);
+        return fe::make_user_ptr(ctx, logger);
     }
 
     static kernel_func_t s_kernel_funcs[] = {
@@ -728,14 +720,14 @@ namespace basecode::config {
             str::init(g_cfg_sys.buf, g_cfg_sys.alloc);
             str::reserve(g_cfg_sys.buf, 8192);
 
-            fe::make(g_cfg_sys.ctx, g_cfg_sys.heap_size);
+            fe::init(g_cfg_sys.ctx, g_cfg_sys.heap_size);
             for (u32 i = 0; s_kernel_funcs[i].symbol != nullptr; ++i) {
                 auto symbol = fe::make_symbol(g_cfg_sys.ctx, s_kernel_funcs[i].symbol);
                 auto func = fe::make_native_func(g_cfg_sys.ctx, s_kernel_funcs[i].func);
                 fe::set(g_cfg_sys.ctx, symbol, func);
             }
 
-            std::memset(g_cfg_sys.vars, 0, sizeof(cvar_t) * max_cvar_count);
+            std::memset(g_cfg_sys.vars, 0, sizeof(cvar_t) * max_cvar_size);
 
             cvar_t* cvar{};
             auto status = config::cvar::add(var_t::test_runner,
@@ -824,7 +816,7 @@ namespace basecode::config {
         static u0 remove_binding(cvar_t* cvar) {
             auto sym_name = format::format("cvar:{}", cvar->name);
             auto symbol = fe::make_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
-            fe::set(g_cfg_sys.ctx, symbol, fe::nil());
+            fe::set(g_cfg_sys.ctx, symbol, fe::nil(g_cfg_sys.ctx));
         }
 
         u0 clear() {
@@ -838,7 +830,7 @@ namespace basecode::config {
         }
 
         status_t remove(u32 id) {
-            if (id > (max_cvar_count - 1))
+            if (id > (max_cvar_size - 1))
                 return status_t::cvar_id_out_of_range;
             auto cvar = &g_cfg_sys.vars[id];
             if (cvar->type == cvar_type_t::none)
@@ -851,7 +843,7 @@ namespace basecode::config {
 
         status_t get(u32 id, cvar_t** var) {
             *var = nullptr;
-            if (id > (max_cvar_count - 1))
+            if (id > (max_cvar_size - 1))
                 return status_t::cvar_id_out_of_range;
             auto cvar = &g_cfg_sys.vars[id];
             if (cvar->type == cvar_type_t::none)
@@ -861,7 +853,7 @@ namespace basecode::config {
         }
 
         status_t add(u32 id, const s8* name, cvar_type_t type, s32 len) {
-            if (id > (max_cvar_count - 1))
+            if (id > (max_cvar_size - 1))
                 return status_t::cvar_id_out_of_range;
             auto cvar = &g_cfg_sys.vars[id];
             if (cvar->type != cvar_type_t::none)
@@ -900,7 +892,7 @@ namespace basecode::config {
         defer(fclose(file));
         auto expr = fe::read_fp(g_cfg_sys.ctx, file);
         if (!expr) {
-            *obj = fe::nil();
+            *obj = fe::nil(g_cfg_sys.ctx);
             return status_t::ok;
         }
         *obj = fe::eval(g_cfg_sys.ctx, expr);

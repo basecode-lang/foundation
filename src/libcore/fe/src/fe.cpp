@@ -24,19 +24,27 @@
 #include <basecode/core/error.h>
 #include <basecode/core/string.h>
 
-#define CAR(x)                  ((x)->car.o)
-#define CDR(x)                  ((x)->cdr.o)
-#define TAG(x)                  ((x)->car.c)
-#define IS_NIL(x)               ((x) == &s_nil)
-#define TYPE(x)                 (obj_type_t((TAG(x) & 0x1U ? TAG(x) >> 2U : u32(obj_type_t::pair))))
-#define SET_TYPE(x, t)          (TAG(x) = u32((t)) << 2U | 1U)
-#define NUMBER(x)               ((x)->cdr.n)
-#define PRIM(x)                 ((x)->cdr.c)
-#define CFUNC(x)                ((x)->cdr.f)
-#define GC_MARK_BIT             (0x2U)
+#define OBJ_AT(idx)             (&ctx->objects[(idx)])
+#define OBJ_IDX(x)              ((x) - ctx->objects)
+#define CAR(x)                  (&ctx->objects[(x)->pair.car_idx])
+#define SET_CAR(x, o)           ((x)->pair.car_idx = OBJ_IDX(o))
+#define CDR(x)                  (&ctx->objects[(x)->pair.cdr_idx])
+#define SET_CDR(x, o)           ((x)->pair.cdr_idx = OBJ_IDX(o))
+#define IS_NIL(x)               ((x) == ctx->nil)
+#define TYPE(x)                 (obj_type_t((x)->hdr.type))
+#define IS_GC_MARKED(x)         ((x)->hdr.gc_mark)
+#define SET_GC_MARK(x, v)       ((x)->hdr.gc_mark = (v))
+#define SET_TYPE(x, t)          ((x)->hdr.type = u8((t)))
+#define INTEGER(x)              (u32((x)->number.value))
+#define NUMBER(x)               (f32((x)->number.value))
+#define SET_NUMBER(x, v)        ((x)->number.value = u32((v)))
+#define PRIM(x)                 (prim_type_t((x)->prim.code))
+#define SET_PRIM(x, p)          ((x)->prim.code = u32(p))
+#define NATIVE_PTR(x)           (ctx->native_ptrs[(x)->number.value])
 #define CLOSERS_SIZE            (256U)
 #define SCRATCH_SIZE            (1024U)
 #define GC_STACK_SIZE           (1024U)
+#define NATIVE_PTR_SIZE         (256U)
 #define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env, nullptr)
 #define ARITH_OP(op)            SAFE_SCOPE(                                                     \
                                     number_t x = to_number(ctx, EVAL_ARG());                    \
@@ -52,34 +60,34 @@
                                 )
 
 namespace basecode::fe {
-    enum {
-        P_LET,
-        P_SET,
-        P_IF,
-        P_FN,
-        P_MAC,
-        P_WHILE,
-        P_QUOTE,
-        P_AND,
-        P_OR,
-        P_DO,
-        P_CONS,
-        P_CAR,
-        P_CDR,
-        P_SETCAR,
-        P_SETCDR,
-        P_LIST,
-        P_NOT,
-        P_IS,
-        P_ATOM,
-        P_PRINT,
-        P_LT,
-        P_LTE,
-        P_ADD,
-        P_SUB,
-        P_MUL,
-        P_DIV,
-        P_MAX
+    enum class prim_type_t : u8 {
+        let,
+        set,
+        if_,
+        fn,
+        mac,
+        while_,
+        quote,
+        and_,
+        or_,
+        do_,
+        cons,
+        car,
+        cdr,
+        setcar,
+        setcdr,
+        list,
+        not_,
+        is,
+        atom,
+        print,
+        lt,
+        lte,
+        add,
+        sub,
+        mul,
+        div,
+        max
     };
 
     static const s8* s_prim_names[] = {
@@ -127,32 +135,56 @@ namespace basecode::fe {
 
     static const s8* s_delims   = " \n\t\r()[];";
 
-    union value_t {
-        obj_t*                  o;
-        native_func_t           f;
-        number_t                n;
-        u8                      c;
-    };
-
     struct obj_t {
-        value_t                 car;
-        value_t                 cdr;
+        union {
+            struct {
+                u64             type:       5;
+                u64             gc_mark:    1;
+                u64             pad:        58;
+            }                   hdr;
+            struct {
+                u64             type:       5;
+                u64             gc_mark:    1;
+                u64             code:       32;
+                u64             pad:        26;
+            }                   prim;
+            struct {
+                u64             type:       5;
+                u64             gc_mark:    1;
+                u64             car_idx:    29;
+                u64             cdr_idx:    29;
+            }                   pair;
+            struct {
+                u64             type:       5;
+                u64             gc_mark:    1;
+                u64             value:      32;
+                u64             pad:        26;
+            }                   number;
+            u64                 full;
+        };
     };
+    static_assert(sizeof(obj_t) == 8, "obj_t is no longer 8 bytes!");
 
     struct ctx_t {
         handlers_t              handlers;
+        u0*                     native_ptrs[NATIVE_PTR_SIZE];
         obj_t*                  gc_stack[GC_STACK_SIZE];
         obj_t*                  closers[CLOSERS_SIZE];
         obj_t*                  objects;
         obj_t*                  sym_list;
-        obj_t*                  str_list;
         obj_t*                  call_list;
         obj_t*                  free_list;
+        obj_t*                  nil;
+        obj_t*                  dot;
+        obj_t*                  true_;
+        obj_t*                  rbrac;
+        obj_t*                  rparen;
         s8                      scratch[SCRATCH_SIZE];
         u32                     closer_idx;
         u32                     object_used;
         u32                     gc_stack_idx;
         u32                     object_count;
+        u32                     native_ptr_idx;
         s8                      next_chr;
     };
 
@@ -160,15 +192,6 @@ namespace basecode::fe {
         s8*                     p;
         u32                     n;
     };
-
-    static obj_t*               s_dot;
-    static obj_t*               s_true;
-    static obj_t                s_nil = {
-        {(obj_t*) (u32(obj_type_t::nil) << 2U | 1U)},
-        {nullptr}
-    };
-    static obj_t                s_rbrac;
-    static obj_t                s_rparen;
 
     static obj_t* eval(ctx_t* ctx,
                        obj_t* obj,
@@ -188,7 +211,7 @@ namespace basecode::fe {
             // XXX: this should be comparing the diff with EPSILON
             return NUMBER(a) == NUMBER(b);
         } else if (TYPE(a) == obj_type_t::string) {
-            return u32(NUMBER(a)) == u32(NUMBER(b));
+            return INTEGER(a) == INTEGER(b);
         }
         return false;
     }
@@ -208,7 +231,7 @@ namespace basecode::fe {
     }
 
     static b8 str_eq(obj_t* obj, u32 str_id) {
-        auto obj_rc = string::interned::get(NUMBER(obj));
+        auto obj_rc = string::interned::get(INTEGER(obj));
         if (!OK(obj_rc.status))
             return false;
         return obj_rc.id == str_id;
@@ -235,7 +258,7 @@ namespace basecode::fe {
     }
 
     static obj_t* do_list(ctx_t* ctx, obj_t* lst, obj_t* env) {
-        obj_t* res = &s_nil;
+        obj_t* res = ctx->nil;
         u32 save = save_gc(ctx);
         while (!IS_NIL(lst)) {
             restore_gc(ctx, save);
@@ -267,46 +290,52 @@ namespace basecode::fe {
                 return read_(ctx, fn, udata);
 
             case ']':
-                if (ctx->closers[ctx->closer_idx++] == &s_rparen)
+                if (ctx->closers[ctx->closer_idx++] == ctx->rparen)
                     error(ctx, "expected closing paren but found closing bracket");
-                return &s_rbrac;
+                return ctx->rbrac;
 
             case ')':
-                if (ctx->closers[ctx->closer_idx++] == &s_rbrac)
+                if (ctx->closers[ctx->closer_idx++] == ctx->rbrac)
                     error(ctx, "expected closing bracket but found closing paren");
-                return &s_rparen;
+                return ctx->rparen;
 
             case '[':
-                ctx->closers[--ctx->closer_idx] = &s_rbrac;
+                ctx->closers[--ctx->closer_idx] = ctx->rbrac;
                 goto _skip;
 
             case '(':
-                ctx->closers[--ctx->closer_idx] = &s_rparen;
+                ctx->closers[--ctx->closer_idx] = ctx->rparen;
             _skip: {
-                obj_t*  res  = &s_nil;
-                obj_t** tail = &res;
+                obj_t* head = ctx->nil;
+                obj_t* tail = head;
                 auto gc = save_gc(ctx);
                 /* to cause error on too-deep nesting */
-                push_gc(ctx, res);
+                push_gc(ctx, head);
                 while (true) {
                     v = read_(ctx, fn, udata);
-                    if (v == &s_rparen || v == &s_rbrac)
+                    if (v == ctx->rparen || v == ctx->rbrac)
                         break;
                     if (v == nullptr) {
                         error(ctx, "unclosed list");
                     }
-                    if (v == s_dot) {
+                    if (v == ctx->dot) {
                         /* dotted pair */
-                        *tail = read(ctx, fn, udata);
+                        SET_CDR(tail, read(ctx, fn, udata));
                     } else {
                         /* proper pair */
-                        *tail = cons(ctx, v, &s_nil);
-                        tail = &CDR(*tail);
+                        v = cons(ctx, v, ctx->nil);
+                        if (IS_NIL(tail)) {
+                            head = v;
+                            tail = head;
+                        } else {
+                            SET_CDR(tail, v);
+                            tail = v;
+                        }
                     }
                     restore_gc(ctx, gc);
-                    push_gc(ctx, res);
+                    push_gc(ctx, head);
                 }
-                return res;
+                return head;
             }
 
             case '\'': {
@@ -316,7 +345,7 @@ namespace basecode::fe {
                 }
                 return cons(ctx,
                             make_symbol(ctx, "quote", 5),
-                            cons(ctx, v, &s_nil));
+                            cons(ctx, v, ctx->nil));
             }
 
             case '"': {
@@ -367,15 +396,21 @@ namespace basecode::fe {
     }
 
     static obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env) {
-        obj_t* res   = &s_nil;
-        obj_t** tail = &res;
+        obj_t* head = ctx->nil;
+        obj_t* tail = head;
         while (!IS_NIL(lst)) {
-            *tail = cons(ctx,
+            auto r = cons(ctx,
                          eval(ctx, next_arg(ctx, &lst), env, nullptr),
-                         &s_nil);
-            tail = &CDR(*tail);
+                         ctx->nil);
+            if (IS_NIL(tail)) {
+                head = r;
+                tail = head;
+            } else {
+                SET_CDR(tail, r);
+                tail = r;
+            }
         }
-        return res;
+        return head;
     }
 
     static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type) {
@@ -396,41 +431,39 @@ namespace basecode::fe {
         obj_t* res;
         obj_t* va;
         obj_t* vb;
-        obj_t cl{};
         u32   n;
         u32   gc;
 
-        if (TYPE(obj) == obj_type_t::symbol) {
+        if (TYPE(obj) == obj_type_t::symbol)
             return CDR(get(ctx, obj, env));
-        }
-        if (TYPE(obj) != obj_type_t::pair) {
-            return obj;
-        }
 
-        CAR(&cl) = obj, CDR(&cl) = ctx->call_list;
-        ctx->call_list = &cl;
+        if (TYPE(obj) != obj_type_t::pair)
+            return obj;
+
+        auto cl = cons(ctx, obj, ctx->call_list);
+        ctx->call_list = cl;
 
         gc  = save_gc(ctx);
         fn  = eval(ctx, CAR(obj), env, nullptr);
         arg = CDR(obj);
-        res = &s_nil;
+        res = ctx->nil;
 
         switch (TYPE(fn)) {
             case obj_type_t::prim:
                 switch (PRIM(fn)) {
-                    case P_LET:
+                    case prim_type_t::let:
                         va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
                         if (new_env) {
                             *new_env = cons(ctx, cons(ctx, va, EVAL_ARG()), env);
                         }
                         break;
 
-                    case P_SET:
+                    case prim_type_t::set:
                         va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
-                        CDR(get(ctx, va, env)) = EVAL_ARG();
+                        SET_CDR(get(ctx, va, env), EVAL_ARG());
                         break;
 
-                    case P_IF:
+                    case prim_type_t::if_:
                         while (!IS_NIL(arg)) {
                             va = EVAL_ARG();
                             if (!IS_NIL(va)) {
@@ -442,16 +475,16 @@ namespace basecode::fe {
                         }
                         break;
 
-                    case P_FN:
-                    case P_MAC:
+                    case prim_type_t::fn:
+                    case prim_type_t::mac:
                         va = cons(ctx, env, arg);
                         next_arg(ctx, &arg);
                         res = make_object(ctx);
-                        SET_TYPE(res, PRIM(fn) == P_FN ? obj_type_t::func : obj_type_t::macro);
-                        CDR(res) = va;
+                        SET_TYPE(res, PRIM(fn) == prim_type_t::fn ? obj_type_t::func : obj_type_t::macro);
+                        SET_CDR(res, va);
                         break;
 
-                    case P_WHILE:
+                    case prim_type_t::while_:
                         va = next_arg(ctx, &arg);
                         n  = save_gc(ctx);
                         while (!IS_NIL(eval(ctx, va, env, nullptr))) {
@@ -460,63 +493,63 @@ namespace basecode::fe {
                         }
                         break;
 
-                    case P_QUOTE:
+                    case prim_type_t::quote:
                         res = next_arg(ctx, &arg);
                         break;
 
-                    case P_AND:
+                    case prim_type_t::and_:
                         while (!IS_NIL(arg) && !IS_NIL(res = EVAL_ARG()));
                         break;
 
-                    case P_OR:
+                    case prim_type_t::or_:
                         while (!IS_NIL(arg) && IS_NIL(res = EVAL_ARG()));
                         break;
 
-                    case P_DO:
+                    case prim_type_t::do_:
                         res = do_list(ctx, arg, env);
                         break;
 
-                    case P_CONS:
+                    case prim_type_t::cons:
                         va  = EVAL_ARG();
                         res = cons(ctx, va, EVAL_ARG());
                         break;
 
-                    case P_CAR:
+                    case prim_type_t::car:
                         res = car(ctx, EVAL_ARG());
                         break;
 
-                    case P_CDR:
+                    case prim_type_t::cdr:
                         res = cdr(ctx, EVAL_ARG());
                         break;
 
-                    case P_SETCAR:
+                    case prim_type_t::setcar:
                         va = check_type(ctx, EVAL_ARG(), obj_type_t::pair);
-                        CAR(va) = EVAL_ARG();
+                        SET_CAR(va, EVAL_ARG());
                         break;
 
-                    case P_SETCDR:
+                    case prim_type_t::setcdr:
                         va = check_type(ctx, EVAL_ARG(), obj_type_t::pair);
-                        CDR(va) = EVAL_ARG();
+                        SET_CDR(va, EVAL_ARG());
                         break;
 
-                    case P_LIST:
+                    case prim_type_t::list:
                         res = eval_list(ctx, arg, env);
                         break;
 
-                    case P_NOT:
+                    case prim_type_t::not_:
                         res = make_bool(ctx, IS_NIL(EVAL_ARG()));
                         break;
 
-                    case P_IS:
+                    case prim_type_t::is:
                         va  = EVAL_ARG();
                         res = make_bool(ctx, equal(va, EVAL_ARG()));
                         break;
 
-                    case P_ATOM:
+                    case prim_type_t::atom:
                         res = make_bool(ctx, type(ctx, EVAL_ARG()) != obj_type_t::pair);
                         break;
 
-                    case P_PRINT:
+                    case prim_type_t::print:
                         while (!IS_NIL(arg)) {
                             write_fp(ctx, EVAL_ARG(), stdout);
                             if (!IS_NIL(arg)) {
@@ -526,35 +559,40 @@ namespace basecode::fe {
                         printf("\n");
                         break;
 
-                    case P_LT:
+                    case prim_type_t::lt:
                         NUM_CMP_OP(<);
                         break;
 
-                    case P_LTE:
+                    case prim_type_t::lte:
                         NUM_CMP_OP(<=);
                         break;
 
-                    case P_ADD:
+                    case prim_type_t::add:
                         ARITH_OP(+);
                         break;
 
-                    case P_SUB:
+                    case prim_type_t::sub:
                         ARITH_OP(-);
                         break;
 
-                    case P_MUL:
+                    case prim_type_t::mul:
                         ARITH_OP(*);
                         break;
 
-                    case P_DIV:
+                    case prim_type_t::div:
                         ARITH_OP(/);
+                        break;
+
+                    default:
                         break;
                 }
                 break;
 
-            case obj_type_t::cfunc:
-                res = CFUNC(fn)(ctx, eval_list(ctx, arg, env));
+            case obj_type_t::cfunc: {
+                auto func = (native_func_t) NATIVE_PTR(fn);
+                res = func(ctx, eval_list(ctx, arg, env));
                 break;
+            }
 
             case obj_type_t::func:
                 arg  = eval_list(ctx, arg, env);
@@ -569,7 +607,7 @@ namespace basecode::fe {
                 /* replace caller object with code generated by macro and re-eval */
                 *obj = *do_list(ctx, CDR(vb), args_to_env(ctx, CAR(vb), arg, CAR(va)));
                 restore_gc(ctx, gc);
-                ctx->call_list = CDR(&cl);
+                ctx->call_list = CDR(cl);
                 return eval(ctx, obj, env, nullptr);
 
             default:
@@ -578,7 +616,7 @@ namespace basecode::fe {
 
         restore_gc(ctx, gc);
         push_gc(ctx, res);
-        ctx->call_list = CDR(&cl);
+        ctx->call_list = CDR(cl);
         return res;
     }
 
@@ -600,15 +638,14 @@ namespace basecode::fe {
         return env;
     }
 
-    obj_t* nil() {
-        return &s_nil;
-    }
-
     u0 free(ctx_t* ctx) {
         ctx->gc_stack_idx = 0;
-        ctx->str_list     = &s_nil;
-        ctx->sym_list     = &s_nil;
+        ctx->sym_list     = ctx->nil;
         collect_garbage(ctx);
+    }
+
+    obj_t* nil(ctx_t* ctx) {
+        return ctx->nil;
     }
 
     u32 save_gc(ctx_t* ctx) {
@@ -623,73 +660,79 @@ namespace basecode::fe {
         for (u32 i = 0; i < ctx->gc_stack_idx; i++)
             mark(ctx, ctx->gc_stack[i]);
         mark(ctx, ctx->sym_list);
-        mark(ctx, ctx->str_list);
         for (u32 i = 0; i < ctx->object_count; i++) {
             obj_t* obj = &ctx->objects[i];
-            if (TYPE(obj) == obj_type_t::free) {
+            if (TYPE(obj) == obj_type_t::free)
                 continue;
-            }
-            if (~ (u32) TAG(obj) & GC_MARK_BIT) {
+            if (!IS_GC_MARKED(obj)) {
                 if (TYPE(obj) == obj_type_t::ptr
                 &&  ctx->handlers.gc) {
                     ctx->handlers.gc(ctx, obj);
                 }
                 SET_TYPE(obj, obj_type_t::free);
-                CDR(obj) = ctx->free_list;
+                SET_CDR(obj, ctx->free_list);
                 ctx->free_list = obj;
                 --ctx->object_used;
             } else {
-                TAG(obj) &= ~GC_MARK_BIT;
+                SET_GC_MARK(obj, false);
             }
         }
     }
 
-    ctx_t* make(u0* ptr, u32 size) {
-        /* init context struct */
+    ctx_t* init(u0* ptr, u32 size) {
+        // init context struct
         auto ctx = (ctx_t*) ptr;
         std::memset(ctx, 0, sizeof(ctx_t));
         ptr = (u8*) ptr + sizeof(ctx_t);
         size -= sizeof(ctx_t);
 
-        /* init objects memory region */
+        // init objects memory region
         ctx->objects      = (obj_t*) ptr;
         ctx->object_used  = 0;
         ctx->object_count = size / sizeof(obj_t);
 
-        /* init lists */
-        ctx->sym_list  = &s_nil;
-        ctx->str_list  = &s_nil;
-        ctx->call_list = &s_nil;
-        ctx->free_list = &s_nil;
+        // the nil object is a special case that
+        // we manually allocate from the heap
+        ctx->nil       = &ctx->objects[ctx->object_used++];
+        ctx->nil->full = 0;
+        SET_TYPE(ctx->nil, obj_type_t::nil);
 
-        /* populate freelist */
-        for (u32 i = 0; i < ctx->object_count; i++) {
+        // init lists
+        ctx->sym_list  = ctx->nil;
+        ctx->call_list = ctx->nil;
+        ctx->free_list = ctx->nil;
+
+        // populate freelist
+        for (u32 i = ctx->object_used; i < ctx->object_count; i++) {
             obj_t* obj = &ctx->objects[i];
             SET_TYPE(obj, obj_type_t::free);
-            CDR(obj) = ctx->free_list;
+            SET_CDR(obj, ctx->free_list);
             ctx->free_list = obj;
         }
 
-        /* init objects */
+        // init objects
         auto save = save_gc(ctx);
-        s_dot  = make_symbol(ctx, ".", 1);
-        s_true = make_symbol(ctx, "#t", 2);
-        set(ctx, s_dot, s_dot);
-        set(ctx, s_true, s_true);
-        set(ctx, make_symbol(ctx, "#f", 2), &s_nil);
-        set(ctx, make_symbol(ctx, "nil", 3), &s_nil);
+        ctx->rbrac  = make_object(ctx);
+        ctx->rparen = make_object(ctx);
+        ctx->dot    = make_symbol(ctx, ".", 1);
+        ctx->true_  = make_symbol(ctx, "#t", 2);
+        set(ctx, ctx->dot, ctx->dot);
+        set(ctx, ctx->true_, ctx->true_);
+        set(ctx, make_symbol(ctx, "#f", 2), ctx->nil);
+        set(ctx, make_symbol(ctx, "nil", 3), ctx->nil);
         restore_gc(ctx, save);
 
-        /* register built in primitives */
-        for (u32 i = 0; i < P_MAX; i++) {
+        // register built in primitives
+        for (u32 i = 0; i < u32(prim_type_t::max); i++) {
             obj_t* v = make_object(ctx);
             SET_TYPE(v, obj_type_t::prim);
-            PRIM(v) = i;
+            SET_PRIM(v, i);
             set(ctx, make_symbol(ctx, s_prim_names[i]), v);
             restore_gc(ctx, save);
         }
 
-        ctx->closer_idx = CLOSERS_SIZE - 1;
+        ctx->native_ptr_idx = 0;
+        ctx->closer_idx     = CLOSERS_SIZE - 1;
 
         return ctx;
     }
@@ -697,12 +740,11 @@ namespace basecode::fe {
     u0 mark(ctx_t* ctx, obj_t* obj) {
         obj_t* car;
     begin:
-        if (TAG(obj) & GC_MARK_BIT) {
+        if (IS_GC_MARKED(obj))
             return;
-        }
-        /* store car before modifying it with GCMARKBIT */
+
         car = CAR(obj);
-        TAG(obj) |= GC_MARK_BIT;
+        SET_GC_MARK(obj, true);
 
         switch (TYPE(obj)) {
             case obj_type_t::string:
@@ -744,22 +786,19 @@ namespace basecode::fe {
 
     b8 is_true(ctx_t* ctx, obj_t* obj) {
         UNUSED(ctx);
-        return s_true == obj;
+        return ctx->true_ == obj;
     }
 
     u32 length(ctx_t* ctx, obj_t* obj) {
         switch (TYPE(obj)) {
             case obj_type_t::pair: {
                 u32 len = 0;
-                for (obj_t* pair = obj; !IS_NIL(pair); pair = CDR(pair)) {
-//                    auto intern_rc = string::interned::get(NUMBER(CAR(pair)));
-//                    format::print("id = {}, slice = {}\n", intern_rc.id, intern_rc.slice);
+                for (obj_t* pair = obj; !IS_NIL(pair); pair = CDR(pair))
                     ++len;
-                }
                 return len;
             }
             case obj_type_t::string: {
-                auto str_rc = string::interned::get(NUMBER(obj));
+                auto str_rc = string::interned::get(INTEGER(obj));
                 if (!OK(str_rc.status))
                     error(ctx, "unable to find interned string");
                 return str_rc.slice.length;
@@ -777,10 +816,6 @@ namespace basecode::fe {
         ctx->gc_stack[ctx->gc_stack_idx++] = obj;
     }
 
-    u0* to_ptr(ctx_t* ctx, obj_t* obj) {
-        return CDR(check_type(ctx, obj, obj_type_t::ptr));
-    }
-
     obj_t* car(ctx_t* ctx, obj_t* obj) {
         if (IS_NIL(obj)) {
             return obj;
@@ -796,12 +831,12 @@ namespace basecode::fe {
     }
 
     obj_t* eval(ctx_t* ctx, obj_t* obj) {
-        return eval(ctx, obj, &s_nil, nullptr);
+        return eval(ctx, obj, ctx->nil, nullptr);
     }
 
     u0 error(ctx_t* ctx, const s8* msg) {
         obj_t* cl = ctx->call_list;
-        ctx->call_list = &s_nil;
+        ctx->call_list = ctx->nil;
         if (ctx->handlers.error) {
             ctx->handlers.error(ctx, msg, cl);
         }
@@ -814,20 +849,17 @@ namespace basecode::fe {
         exit(EXIT_FAILURE);
     }
 
-    obj_t* make_ptr(ctx_t* ctx, u0* ptr) {
-        obj_t* obj = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::ptr);
-        CDR(obj) = (obj_t*) ptr;
-        return obj;
-    }
-
     obj_t* read_fp(ctx_t* ctx, FILE* fp) {
         return read(ctx, read_fp, fp);
     }
 
+    u32 to_integer(ctx_t* ctx, obj_t* obj) {
+        return INTEGER(check_type(ctx, obj, obj_type_t::number));
+    }
+
     obj_t* make_bool(ctx_t* ctx, b8 value) {
         UNUSED(ctx);
-        return value ? s_true : &s_nil;
+        return value ? ctx->true_ : ctx->nil;
     }
 
     obj_type_t type(ctx_t* ctx, obj_t* obj) {
@@ -835,27 +867,40 @@ namespace basecode::fe {
         return TYPE(obj);
     }
 
+    u0* to_user_ptr(ctx_t* ctx, obj_t* obj) {
+        return ctx->native_ptrs[INTEGER(check_type(ctx, obj, obj_type_t::ptr))];
+    }
+
     u0 set(ctx_t* ctx, obj_t* sym, obj_t* v) {
         UNUSED(ctx);
-        CDR(get(ctx, sym, &s_nil)) = v;
+        sym = get(ctx, sym, ctx->nil);
+        SET_CDR(sym, v);
     }
 
     obj_t* next_arg(ctx_t* ctx, obj_t** arg) {
         obj_t* a = *arg;
         if (TYPE(a) != obj_type_t::pair) {
-            if (IS_NIL(a)) {
+            if (IS_NIL(a))
                 error(ctx, "too few arguments");
-            }
             error(ctx, "dotted pair in argument list");
         }
         *arg = CDR(a);
         return CAR(a);
     }
 
+    obj_t* make_user_ptr(ctx_t* ctx, u0* ptr) {
+        obj_t* obj = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::ptr);
+        SET_NUMBER(obj, ctx->native_ptr_idx);
+        NATIVE_PTR(obj) = ptr;
+        ++ctx->native_ptr_idx;
+        return obj;
+    }
+
     obj_t* make_number(ctx_t* ctx, number_t n) {
         obj_t* obj  = make_object(ctx);
         SET_TYPE(obj, obj_type_t::number);
-        NUMBER(obj) = n;
+        SET_NUMBER(obj, n);
         return obj;
     }
 
@@ -878,26 +923,35 @@ namespace basecode::fe {
         return CDR(sym);
     }
 
+    obj_t* next_arg_no_chk(ctx_t* ctx, obj_t** arg) {
+        obj_t* a = *arg;
+        if (TYPE(a) != fe::obj_type_t::pair)
+            return ctx->nil;
+        *arg = CDR(a);
+        return CAR(a);
+    }
+
     obj_t* cons(ctx_t* ctx, obj_t* car, obj_t* cdr) {
         obj_t* obj = make_object(ctx);
-        CAR(obj)   = car;
-        CDR(obj)   = cdr;
+        SET_TYPE(obj, obj_type_t::pair);
+        SET_CAR(obj, car);
+        SET_CDR(obj, cdr);
         return obj;
     }
 
     obj_t* read(ctx_t* ctx, read_func_t fn, u0* udata) {
         obj_t* obj = read_(ctx, fn, udata);
-        if (obj == &s_rparen) {
+        if (obj == ctx->rparen) {
             error(ctx, "stray ')'");
         }
-        if (obj == &s_rbrac) {
+        if (obj == ctx->rbrac) {
             error(ctx, "stray ']'");
         }
         return obj;
     }
 
     obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size) {
-        obj_t* res = &s_nil;
+        obj_t* res = ctx->nil;
         while (size--)
             res = cons(ctx, objs[size], res);
         return res;
@@ -906,7 +960,9 @@ namespace basecode::fe {
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn) {
         obj_t* obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::cfunc);
-        CFUNC(obj) = fn;
+        SET_NUMBER(obj, ctx->native_ptr_idx);
+        NATIVE_PTR(obj) = (u0*) fn;
+        ++ctx->native_ptr_idx;
         return obj;
     }
 
@@ -914,14 +970,9 @@ namespace basecode::fe {
         auto intern_rc = string::interned::fold_for_result(str, len);
         if (!OK(intern_rc.status))
             error(ctx, "make_string unable to intern string");
-//        for (obj_t* obj = ctx->str_list; !IS_NIL(obj); obj = CDR(obj)) {
-//            if (str_eq(CAR(obj), intern_rc.id))
-//                return CAR(obj);
-//        }
         obj_t* obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::string);
-        NUMBER(obj) = number_t(intern_rc.id);
-//        ctx->str_list = cons(ctx, obj, ctx->str_list);
+        SET_NUMBER(obj, number_t(intern_rc.id));
         return obj;
     }
 
@@ -934,7 +985,7 @@ namespace basecode::fe {
             if (str_eq(str, name_rc.id))
                 return CAR(obj);
         }
-        return &s_nil;
+        return ctx->nil;
     }
 
     obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len) {
@@ -943,7 +994,7 @@ namespace basecode::fe {
             return obj;
         obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::symbol);
-        CDR(obj) = cons(ctx, make_string(ctx, name, len), &s_nil);
+        SET_CDR(obj, cons(ctx, make_string(ctx, name, len), ctx->nil));
         ctx->sym_list = cons(ctx, obj, ctx->sym_list);
         return obj;
     }
@@ -954,7 +1005,7 @@ namespace basecode::fe {
             return obj;
         obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::keyword);
-        CDR(obj) = cons(ctx, make_string(ctx, name, len), &s_nil);
+        SET_CDR(obj, cons(ctx, make_string(ctx, name, len), ctx->nil));
         ctx->sym_list = cons(ctx, obj, ctx->sym_list);
         return obj;
     }
@@ -1008,7 +1059,7 @@ namespace basecode::fe {
                 if (qt) {
                     fn(ctx, udata, '"');
                 }
-                auto intern_rc = string::interned::get(NUMBER(obj));
+                auto intern_rc = string::interned::get(INTEGER(obj));
                 if (!OK(intern_rc.status)) {
                     error(ctx, "unable to find interned string");
                 }
@@ -1020,7 +1071,7 @@ namespace basecode::fe {
             }
 
             case obj_type_t::prim:
-                if (obj == s_true) {
+                if (obj == ctx->true_) {
                     write_str(ctx, fn, udata, "#t");
                     break;
                 }

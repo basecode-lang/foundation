@@ -15,7 +15,7 @@ namespace basecode::fe {
     struct obj_t;
     struct ctx_t;
 
-    using number_t              = f64;
+    using number_t              = f32;
 
     using read_func_t           = s8 (*)(ctx_t*, u0*);
     using error_func_t          = u0 (*)(ctx_t*, const s8*, obj_t*);
@@ -43,9 +43,9 @@ namespace basecode::fe {
         keyword
     };
 
-    obj_t* nil();
-
     u0 free(ctx_t* ctx);
+
+    obj_t* nil(ctx_t* ctx);
 
     u32 save_gc(ctx_t* ctx);
 
@@ -53,7 +53,7 @@ namespace basecode::fe {
 
     u0 collect_garbage(ctx_t* ctx);
 
-    ctx_t* make(u0* ptr, u32 size);
+    ctx_t* init(u0* ptr, u32 size);
 
     u0 mark(ctx_t* ctx, obj_t* obj);
 
@@ -69,8 +69,6 @@ namespace basecode::fe {
 
     u0 restore_gc(ctx_t* ctx, u32 idx);
 
-    u0* to_ptr(ctx_t* ctx, obj_t* obj);
-
     obj_t* car(ctx_t* ctx, obj_t* obj);
 
     obj_t* cdr(ctx_t* ctx, obj_t* obj);
@@ -81,15 +79,19 @@ namespace basecode::fe {
 
     obj_t* read_fp(ctx_t* ctx, FILE* fp);
 
-    obj_t* make_ptr(ctx_t* ctx, u0* ptr);
-
     obj_t* make_bool(ctx_t* ctx, b8 value);
+
+    u32 to_integer(ctx_t* ctx, obj_t* obj);
+
+    u0* to_user_ptr(ctx_t* ctx, obj_t* obj);
 
     obj_type_t type(ctx_t* ctx, obj_t* obj);
 
     u0 set(ctx_t* ctx, obj_t* sym, obj_t* v);
 
     obj_t* next_arg(ctx_t* ctx, obj_t** arg);
+
+    obj_t* make_user_ptr(ctx_t* ctx, u0* ptr);
 
     number_t to_number(ctx_t* ctx, obj_t* obj);
 
@@ -98,6 +100,8 @@ namespace basecode::fe {
     u0 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp);
 
     obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env);
+
+    obj_t* next_arg_no_chk(ctx_t* ctx, obj_t** arg);
 
     obj_t* cons(ctx_t* ctx, obj_t* car, obj_t* cdr);
 

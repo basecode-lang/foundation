@@ -26,14 +26,14 @@
 using namespace basecode;
 
 static u0 validate_cvar(fe::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
-    auto binding = fe::get(ctx, fe::make_symbol(ctx, name), fe::nil());
+    auto binding = fe::get(ctx, fe::make_symbol(ctx, name), fe::nil(ctx));
     auto cvar_value = fe::cdr(ctx, binding);
     if (expected) {
         REQUIRE(fe::type(ctx, cvar_value) == fe::obj_type_t::number);
         auto native_value = u32(fe::to_number(ctx, cvar_value));
         REQUIRE(native_value == id);
     } else {
-        REQUIRE(cvar_value == fe::nil());
+        REQUIRE(cvar_value == fe::nil(ctx));
     }
 
     auto source = format::format("(if (is {} {}) #t #f)", id, name);
