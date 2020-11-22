@@ -17,10 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/log.h>
-#include <basecode/core/array.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/error.h>
-#include <basecode/core/format.h>
 #include <basecode/core/config.h>
 #include <basecode/core/symtab.h>
 #include <basecode/core/string.h>
@@ -32,27 +30,27 @@
 namespace basecode::config {
     constexpr u32 max_cvar_count = 256;
 
-    using arg_map_t             = symtab_t<fe_Object*>;
+    using arg_map_t             = symtab_t<fe::obj_t*>;
 
     struct system_t final {
         alloc_t*                alloc;
-        fe_Context*             ctx;
+        fe::ctx_t*              ctx;
         cvar_t                  vars[max_cvar_count];
         str_t                   buf;
         u32                     heap_size;
     };
 
-    system_t                    g_cfg_sys;
-
     struct kernel_func_t final {
         const s8*               symbol;
-        fe_CFunc                func;
+        fe::native_func_t       func;
     };
 
     struct named_flag_t final {
         const s8*               name;
         s32                     value;
     };
+
+    system_t                    g_cfg_sys;
 
     static named_flag_t s_log_level_map[] = {
         {"emergency", s32(log_level_t::emergency)},
@@ -105,6 +103,23 @@ namespace basecode::config {
         return -1;
     }
 
+    static str_t& to_str(fe::ctx_t* ctx, fe::obj_t* obj) {
+        str::reset(g_cfg_sys.buf);
+        g_cfg_sys.buf.length = fe::to_string(ctx,
+                                             obj,
+                                             (s8*) g_cfg_sys.buf.data,
+                                             g_cfg_sys.buf.capacity);
+        return g_cfg_sys.buf;
+    }
+
+    static fe::obj_t* get_map_arg(arg_map_t& args, u32 pos) {
+        fe::obj_t* arg;
+        ++pos;
+        if (symtab::find(args, slice::make((const u8*) &pos, sizeof(u32)), arg))
+            return arg;
+        return nullptr;
+    }
+
     static s32 find_syslog_facility_value(const str_t& name) {
         for (u32 i = 0; s_syslog_facilities[i].name != nullptr; ++i) {
             if (name == s_syslog_facilities[i].name) {
@@ -114,45 +129,28 @@ namespace basecode::config {
         return -1;
     }
 
-    static str_t& to_str(fe_Context* ctx, fe_Object* obj) {
-        str::reset(g_cfg_sys.buf);
-        g_cfg_sys.buf.length = fe_tostring(ctx,
-                                           obj,
-                                           (s8*) g_cfg_sys.buf.data,
-                                           g_cfg_sys.buf.capacity);
-        return g_cfg_sys.buf;
+    static fe::obj_t* next_arg_no_chk(fe::ctx_t* ctx, fe::obj_t** arg) {
+        fe::obj_t* a = *arg;
+        if (fe::type(ctx, a) != fe::obj_type_t::pair)
+            return fe::nil();
+        *arg = fe::cdr(ctx, a);
+        return fe::car(ctx, a);
     }
 
-    static fe_Object* get_map_arg(arg_map_t& args, u32 pos) {
-        fe_Object* arg;
-        ++pos;
-        if (symtab::find(args, slice::make((const u8*) &pos, sizeof(u32)), arg))
-            return arg;
-        return nullptr;
-    }
-
-    static fe_Object* next_arg(fe_Context* ctx, fe_Object** arg) {
-        fe_Object* a = *arg;
-        if (fe_type(ctx, a) != FE_TPAIR)
-            return fe_nil();
-        *arg = fe_cdr(ctx, a);
-        return fe_car(ctx, a);
-    }
-
-    static u32 make_arg_map(fe_Context* ctx, fe_Object* arg, arg_map_t& args) {
+    static u32 make_arg_map(fe::ctx_t* ctx, fe::obj_t* arg, arg_map_t& args) {
         u32 pos = 1;
         while (true) {
-            auto obj = next_arg(ctx, &arg);
-            auto type = fe_type(ctx, obj);
-            if (type == FE_TNIL) {
+            auto obj = next_arg_no_chk(ctx, &arg);
+            auto type = fe::type(ctx, obj);
+            if (type == fe::obj_type_t::nil) {
                 break;
-            } else if (type == FE_TKEYWORD) {
-                auto value_obj = next_arg(ctx, &arg);
-                type = fe_type(ctx, value_obj);
-                if (type == FE_TNIL)
-                    fe_error(ctx, "keyword parameter requires value");
-                else if (type == FE_TKEYWORD)
-                    fe_error(ctx, "keyword parameter value cannot be another keyword");
+            } else if (type == fe::obj_type_t::keyword) {
+                auto value_obj = next_arg_no_chk(ctx, &arg);
+                type = fe::type(ctx, value_obj);
+                if (type == fe::obj_type_t::nil)
+                    fe::error(ctx, "keyword parameter requires value");
+                else if (type == fe::obj_type_t::keyword)
+                    fe::error(ctx, "keyword parameter value cannot be another keyword");
                 else
                     symtab::insert(args, to_str(ctx, obj), value_obj);
             } else {
@@ -163,11 +161,11 @@ namespace basecode::config {
         return pos;
     }
 
-    static const s8* vlog(fe_Context* ctx, fe_Object* arg) {
+    static const s8* vlog(fe::ctx_t* ctx, fe::obj_t* arg) {
         using fmt_ctx = fmt::format_context;
         using fmt_arg = fmt::basic_format_arg<fmt_ctx>;
 
-        auto fmt_str_arg = to_str(ctx, fe_nextarg(ctx, &arg));
+        auto fmt_str_arg = to_str(ctx, fe::next_arg(ctx, &arg));
         const auto fmt_str = (const s8*) string::interned::fold(fmt_str_arg).data;
 
         str_array_t strs{};
@@ -175,8 +173,8 @@ namespace basecode::config {
         defer(str_array::free(strs));
 
         while (true) {
-            auto obj = next_arg(ctx, &arg);
-            if (fe_type(ctx, obj) == FE_TNIL)
+            auto obj = next_arg_no_chk(ctx, &arg);
+            if (fe::type(ctx, obj) == fe::obj_type_t::nil)
                 break;
             str_array::append(strs, to_str(ctx, obj));
         }
@@ -199,44 +197,301 @@ namespace basecode::config {
         return str::c_str(g_cfg_sys.buf);
     }
 
-    static fe_Object* log_warn(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* cvar_set(fe::ctx_t* ctx, fe::obj_t* arg) {
+        auto id = fe::next_arg(ctx, &arg);
+        if (fe::type(ctx, id) != fe::obj_type_t::number)
+            fe::error(ctx, "id: expected a number");
+        auto native_id = u32(fe::to_number(ctx, id));
+
+        cvar_t* cvar{};
+        if (!OK(cvar::get(native_id, &cvar))) {
+            fe::error(ctx, "XXX: unable to find cvar");
+        }
+
+        auto value = fe::next_arg(ctx, &arg);
+        auto value_type = fe::type(ctx, value);
+        switch (cvar->type) {
+            case cvar_type_t::flag: {
+                if (fe::is_true(ctx, value))
+                    cvar->value.flag = true;
+                else if (fe::is_nil(ctx, value))
+                    cvar->value.flag = false;
+                else
+                    fe::error(ctx, "invalid cvar value: flag must be #t or nil");
+                break;
+            }
+            case cvar_type_t::real: {
+                if (value_type != fe::obj_type_t::number)
+                    fe::error(ctx, "invalid cvar value: must be a valid number");
+                cvar->value.real = fe::to_number(ctx, value);
+                break;
+            }
+            case cvar_type_t::integer: {
+                if (value_type != fe::obj_type_t::number)
+                    fe::error(ctx, "invalid cvar value: must be a valid number");
+                cvar->value.integer = u64(fe::to_number(ctx, value));
+                break;
+            }
+            case cvar_type_t::string: {
+                if (value_type != fe::obj_type_t::string
+                &&  value_type != fe::obj_type_t::symbol) {
+                    fe::error(ctx, "invalid cvar value: must be a string or symbol");
+                }
+                auto str = to_str(ctx, value);
+                cvar->value.ptr = string::interned::fold(str).data;
+                break;
+            }
+            case cvar_type_t::pointer: {
+                fe::error(ctx, "invalid cvar value: cannot directly set pointer type");
+            }
+            default: {
+                fe::error(ctx, "invalid cvar type");
+            }
+        }
+
+        return fe::make_bool(ctx, true);
+    }
+
+    static fe::obj_t* log_warn(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::warn(vlog(ctx, arg));
-        return fe_nil();
+        return fe::nil();
     }
 
-    static fe_Object* log_info(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* log_info(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::info(vlog(ctx, arg));
-        return fe_nil();
+        return fe::nil();
     }
 
-    static fe_Object* log_alert(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* cvar_ref(fe::ctx_t* ctx, fe::obj_t* arg) {
+        auto id = fe::next_arg(ctx, &arg);
+        if (fe::type(ctx, id) != fe::obj_type_t::number)
+            fe::error(ctx, "id: expected a number");
+        auto native_id = u32(fe::to_number(ctx, id));
+
+        cvar_t* cvar{};
+        if (!OK(cvar::get(native_id, &cvar))) {
+            fe::error(ctx, "XXX: unable to find cvar");
+        }
+
+        switch (cvar->type) {
+            case cvar_type_t::flag:
+                return fe::make_bool(ctx, cvar->value.flag);
+            case cvar_type_t::real:
+                return fe::make_number(ctx, cvar->value.real);
+            case cvar_type_t::integer:
+                return fe::make_number(ctx, cvar->value.integer);
+            case cvar_type_t::string:
+                return fe::make_string(ctx, (const s8*) cvar->value.ptr);
+            case cvar_type_t::pointer:
+                return fe::make_ptr(ctx, (u0*) cvar->value.ptr);
+            default:
+                fe::error(ctx, "invalid cvar type");
+        }
+
+        return fe::nil();
+    }
+
+    static fe::obj_t* log_alert(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::alert(vlog(ctx, arg));
-        return fe_nil();
+        return fe::nil();
     }
 
-    static fe_Object* log_debug(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* log_debug(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::debug(vlog(ctx, arg));
-        return fe_nil();
+        return fe::nil();
     }
 
-    static fe_Object* log_error(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* log_error(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::error(vlog(ctx, arg));
-        return fe_nil();
+        return fe::nil();
     }
 
-    static fe_Object* log_notice(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* log_notice(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::notice(vlog(ctx, arg));
-        return fe_nil();
+        return fe::nil();
     }
 
-    static fe_Object* log_critical(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* current_user(fe::ctx_t* ctx, fe::obj_t* arg) {
+        UNUSED(arg);
+        return fe::make_ptr(ctx, context::top()->user);
+    }
+
+    static fe::obj_t* log_critical(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::critical(vlog(ctx, arg));
-        return fe_nil();
+        return fe::nil();
     }
 
-    static fe_Object* log_emergency(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* log_emergency(fe::ctx_t* ctx, fe::obj_t* arg) {
         log::emergency(vlog(ctx, arg));
-        return fe_nil();
+        return fe::nil();
+    }
+
+    static fe::obj_t* current_alloc(fe::ctx_t* ctx, fe::obj_t* arg) {
+        UNUSED(arg);
+        return fe::make_ptr(ctx, context::top()->alloc);
+    }
+
+    static fe::obj_t* syslog_create(fe::ctx_t* ctx, fe::obj_t* arg) {
+        arg_map_t args{};
+        symtab::init(args, g_cfg_sys.alloc);
+        defer(symtab::free(args));
+        make_arg_map(ctx, arg, args);
+
+        log_level_t mask = log_level_t::debug;
+        syslog_config_t config{};
+        config.name = string::interned::fold("syslog"_ss);
+        config.opts = {};
+
+        auto ident_str = to_str(ctx, get_map_arg(args, 0));
+        config.ident = (const s8*) string::interned::fold(ident_str).data;
+
+        fe::obj_t* maskv;
+        if (symtab::find(args, "#:mask"_ss, maskv)) {
+            auto ll = find_log_level(to_str(ctx, maskv));
+            if (ll == -1)
+                fe::error(ctx, "#:mask invalid log level symbol");
+            mask = log_level_t(ll);
+        }
+
+        auto opts = get_map_arg(args, 1);
+        if (fe::type(ctx, opts) != fe::obj_type_t::pair)
+            fe::error(ctx, "opts argument must be a list");
+        while (true) {
+            auto obj = next_arg_no_chk(ctx, &opts);
+            auto type = fe::type(ctx, obj);
+            if (type == fe::obj_type_t::nil)
+                break;
+            else if (type != fe::obj_type_t::symbol)
+                fe::error(ctx, "syslog opts list may only contain symbols");
+            auto opt_value = find_syslog_opt_value(to_str(ctx, obj));
+            if (opt_value == -1)
+                fe::error(ctx, "invalid syslog opt flag");
+            config.opts |= opt_value;
+        }
+
+        auto facility = find_syslog_facility_value(to_str(ctx,
+                                                          get_map_arg(args, 2)));
+        if (facility == -1)
+            fe::error(ctx, "invalid syslog facility value");
+        config.facility = facility;
+
+        logger_t* logger{};
+        auto status = log::system::make(&logger,
+                                        logger_type_t::syslog,
+                                        &config,
+                                        mask);
+        if (!OK(status))
+            fe::error(ctx, "failed to create syslog logger");
+
+        return fe::make_ptr(ctx, logger);
+    }
+
+    static fe::obj_t* current_logger(fe::ctx_t* ctx, fe::obj_t* arg) {
+        UNUSED(arg);
+        return fe::make_ptr(ctx, context::top()->logger);
+    }
+
+    static fe::obj_t* localized_error(fe::ctx_t* ctx, fe::obj_t* arg) {
+        arg_map_t args{};
+        symtab::init(args, g_cfg_sys.alloc);
+        defer(symtab::free(args));
+        make_arg_map(ctx, arg, args);
+
+        auto id = get_map_arg(args, 0);
+        if (fe::type(ctx, id) != fe::obj_type_t::number)
+            fe::error(ctx, "id: expected number");
+
+        auto locale = get_map_arg(args, 1);
+        if (fe::type(ctx, locale) != fe::obj_type_t::symbol)
+            fe::error(ctx, "locale: expected symbol");
+        auto locale_str = string::interned::fold(to_str(ctx, locale));
+
+        auto code = get_map_arg(args, 2);
+        if (fe::type(ctx, code) != fe::obj_type_t::symbol)
+            fe::error(ctx, "code: expected symbol");
+        auto code_str = string::interned::fold(to_str(ctx, code));
+
+        auto str_id = get_map_arg(args, 3);
+        if (fe::type(ctx, str_id) != fe::obj_type_t::number)
+            fe::error(ctx, "str_id: expected number");
+
+        error::localized::add(u32(fe::to_number(ctx, id)),
+                              u32(fe::to_number(ctx, str_id)),
+                              locale_str,
+                              code_str);
+
+        return fe::make_bool(ctx, true);
+    }
+
+    static fe::obj_t* localized_string(fe::ctx_t* ctx, fe::obj_t* arg) {
+        arg_map_t args{};
+        symtab::init(args, g_cfg_sys.alloc);
+        defer(symtab::free(args));
+        make_arg_map(ctx, arg, args);
+
+        auto id = get_map_arg(args, 0);
+        if (fe::type(ctx, id) != fe::obj_type_t::number)
+            fe::error(ctx, "id: expected number");
+
+        auto locale = get_map_arg(args, 1);
+        if (fe::type(ctx, locale) != fe::obj_type_t::symbol)
+            fe::error(ctx, "locale: expected symbol");
+        auto locale_str = string::interned::fold(to_str(ctx, locale));
+
+        auto value = get_map_arg(args, 2);
+        if (fe::type(ctx, value) != fe::obj_type_t::string)
+            fe::error(ctx, "value: expected string");
+        auto value_str = string::interned::fold(to_str(ctx, value));
+
+        string::localized::add(u32(fe::to_number(ctx, id)), locale_str, value_str);
+
+        return id;
+    }
+
+    static fe::obj_t* log_create_color(fe::ctx_t* ctx, fe::obj_t* arg) {
+        arg_map_t args{};
+        symtab::init(args, g_cfg_sys.alloc);
+        defer(symtab::free(args));
+        make_arg_map(ctx, arg, args);
+
+        log_level_t mask = log_level_t::debug;
+        spdlog_color_config_t config{};
+        fe::obj_t* name;
+        if (symtab::find(args, "#:name"_ss, name))
+            config.name = string::interned::fold(to_str(ctx, name));
+        else
+            config.name = string::interned::fold("console"_ss);
+
+        fe::obj_t* pattern;
+        if (symtab::find(args, "#:pattern"_ss, pattern))
+            config.pattern = string::interned::fold(to_str(ctx, pattern));
+
+        fe::obj_t* maskv;
+        if (symtab::find(args, "#:mask"_ss, maskv)) {
+            auto ll = find_log_level(to_str(ctx, maskv));
+            if (ll == -1)
+                fe::error(ctx, "#:mask invalid log level symbol");
+            mask = log_level_t(ll);
+        }
+
+        auto color_type = to_str(ctx, get_map_arg(args, 0));
+        if (color_type == "out") {
+            config.color_type = spdlog_color_type_t::out;
+        } else if (color_type == "err") {
+            config.color_type = spdlog_color_type_t::err;
+        } else {
+            fe::error(ctx, "invalid color-type value; expected: 'out or 'err");
+        }
+
+        logger_t* logger{};
+        auto status = log::system::make(&logger,
+                                        logger_type_t::spdlog,
+                                        &config,
+                                        mask);
+        if (!OK(status))
+            fe::error(ctx, "failed to create color logger");
+
+        return fe::make_ptr(ctx, logger);
     }
 
     static u0 adjust_log_path(path_t& log_path, str::slice_t file_name) {
@@ -257,40 +512,59 @@ namespace basecode::config {
         }
     }
 
-    static fe_Object* log_create_color(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* logger_append_child(fe::ctx_t* ctx, fe::obj_t* arg) {
+        auto parent = fe::next_arg(ctx, &arg);
+        if (fe::type(ctx, parent) != fe::obj_type_t::ptr)
+            fe::error(ctx, "parent: expected pointer argument");
+        auto child = fe::next_arg(ctx, &arg);
+        if (fe::type(ctx, child) != fe::obj_type_t::ptr)
+            fe::error(ctx, "child: expected pointer argument");
+        log::append_child((logger_t*) fe::to_ptr(ctx, parent),
+                          (logger_t*) fe::to_ptr(ctx, child));
+        return fe::nil();
+    }
+
+    static fe::obj_t* current_command_line(fe::ctx_t* ctx, fe::obj_t* arg) {
+        UNUSED(arg);
+        const auto argc = context::top()->argc;
+        const auto argv = context::top()->argv;
+        fe::obj_t* objs[argc];
+        for (u32 i = 0; i < argc; ++i)
+            objs[i] = fe::make_string(ctx, argv[i]);
+        return fe::make_list(ctx, &objs[0], argc);
+    }
+
+    static fe::obj_t* log_create_basic_file(fe::ctx_t* ctx, fe::obj_t* arg) {
         arg_map_t args{};
         symtab::init(args, g_cfg_sys.alloc);
         defer(symtab::free(args));
         make_arg_map(ctx, arg, args);
 
         log_level_t mask = log_level_t::debug;
-        spdlog_color_config_t config{};
-        fe_Object* name;
+        spdlog_basic_file_config_t config{};
+        fe::obj_t* name;
         if (symtab::find(args, "#:name"_ss, name))
             config.name = string::interned::fold(to_str(ctx, name));
         else
-            config.name = string::interned::fold("console"_ss);
+            config.name = string::interned::fold("basic-file"_ss);
 
-        fe_Object* pattern;
+        fe::obj_t* pattern;
         if (symtab::find(args, "#:pattern"_ss, pattern))
             config.pattern = string::interned::fold(to_str(ctx, pattern));
 
-        fe_Object* maskv;
+        fe::obj_t* maskv;
         if (symtab::find(args, "#:mask"_ss, maskv)) {
             auto ll = find_log_level(to_str(ctx, maskv));
             if (ll == -1)
-                fe_error(ctx, "#:mask invalid log level symbol");
+                fe::error(ctx, "#:mask invalid log level symbol");
             mask = log_level_t(ll);
         }
 
-        auto color_type = to_str(ctx, get_map_arg(args, 0));
-        if (color_type == "out") {
-            config.color_type = spdlog_color_type_t::out;
-        } else if (color_type == "err") {
-            config.color_type = spdlog_color_type_t::err;
-        } else {
-            fe_error(ctx, "invalid color-type value; expected: 'out or 'err");
-        }
+        auto file_name = to_str(ctx, get_map_arg(args, 0));
+        path_t log_path{};
+        adjust_log_path(log_path, slice::make(file_name));
+        defer(path::free(log_path));
+        config.file_name = string::interned::fold(log_path.str);
 
         logger_t* logger{};
         auto status = log::system::make(&logger,
@@ -298,12 +572,12 @@ namespace basecode::config {
                                         &config,
                                         mask);
         if (!OK(status))
-            fe_error(ctx, "failed to create color logger");
+            fe::error(ctx, "failed to create basic file logger");
 
-        return fe_ptr(ctx, logger);
+        return fe::make_ptr(ctx, logger);
     }
 
-    static fe_Object* log_create_daily_file(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* log_create_daily_file(fe::ctx_t* ctx, fe::obj_t* arg) {
         arg_map_t args{};
         symtab::init(args, g_cfg_sys.alloc);
         defer(symtab::free(args));
@@ -311,21 +585,21 @@ namespace basecode::config {
 
         log_level_t mask = log_level_t::debug;
         spdlog_daily_file_config_t config{};
-        fe_Object* name;
+        fe::obj_t* name;
         if (symtab::find(args, "#:name"_ss, name))
             config.name = string::interned::fold(to_str(ctx, name));
         else
             config.name = string::interned::fold("daily-file"_ss);
 
-        fe_Object* pattern;
+        fe::obj_t* pattern;
         if (symtab::find(args, "#:pattern"_ss, pattern))
             config.pattern = string::interned::fold(to_str(ctx, pattern));
 
-        fe_Object* maskv;
+        fe::obj_t* maskv;
         if (symtab::find(args, "#:mask"_ss, maskv)) {
             auto ll = find_log_level(to_str(ctx, maskv));
             if (ll == -1)
-                fe_error(ctx, "#:mask invalid log level symbol");
+                fe::error(ctx, "#:mask invalid log level symbol");
             mask = log_level_t(ll);
         }
 
@@ -336,14 +610,14 @@ namespace basecode::config {
         config.file_name = string::interned::fold(log_path.str);
 
         auto hour = get_map_arg(args, 1);
-        if (fe_type(ctx, hour) != FE_TNUMBER)
-            fe_error(ctx, "hour: expected number");
-        config.hour = u32(fe_tonumber(ctx, hour));
+        if (fe::type(ctx, hour) != fe::obj_type_t::number)
+            fe::error(ctx, "hour: expected number");
+        config.hour = u32(fe::to_number(ctx, hour));
 
         auto minute = get_map_arg(args, 1);
-        if (fe_type(ctx, minute) != FE_TNUMBER)
-            fe_error(ctx, "minute: expected number");
-        config.minute = u32(fe_tonumber(ctx, minute));
+        if (fe::type(ctx, minute) != fe::obj_type_t::number)
+            fe::error(ctx, "minute: expected number");
+        config.minute = u32(fe::to_number(ctx, minute));
 
         logger_t* logger{};
         auto status = log::system::make(&logger,
@@ -351,55 +625,12 @@ namespace basecode::config {
                                         &config,
                                         mask);
         if (!OK(status))
-            fe_error(ctx, "failed to create daily file logger");
+            fe::error(ctx, "failed to create daily file logger");
 
-        return fe_ptr(ctx, logger);
+        return fe::make_ptr(ctx, logger);
     }
 
-    static fe_Object* log_create_basic_file(fe_Context* ctx, fe_Object* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
-
-        log_level_t mask = log_level_t::debug;
-        spdlog_basic_file_config_t config{};
-        fe_Object* name;
-        if (symtab::find(args, "#:name"_ss, name))
-            config.name = string::interned::fold(to_str(ctx, name));
-        else
-            config.name = string::interned::fold("basic-file"_ss);
-
-        fe_Object* pattern;
-        if (symtab::find(args, "#:pattern"_ss, pattern))
-            config.pattern = string::interned::fold(to_str(ctx, pattern));
-
-        fe_Object* maskv;
-        if (symtab::find(args, "#:mask"_ss, maskv)) {
-            auto ll = find_log_level(to_str(ctx, maskv));
-            if (ll == -1)
-                fe_error(ctx, "#:mask invalid log level symbol");
-            mask = log_level_t(ll);
-        }
-
-        auto file_name = to_str(ctx, get_map_arg(args, 0));
-        path_t log_path{};
-        adjust_log_path(log_path, slice::make(file_name));
-        defer(path::free(log_path));
-        config.file_name = string::interned::fold(log_path.str);
-
-        logger_t* logger{};
-        auto status = log::system::make(&logger,
-                                        logger_type_t::spdlog,
-                                        &config,
-                                        mask);
-        if (!OK(status))
-            fe_error(ctx, "failed to create basic file logger");
-
-        return fe_ptr(ctx, logger);
-    }
-
-    static fe_Object* log_create_rotating_file(fe_Context* ctx, fe_Object* arg) {
+    static fe::obj_t* log_create_rotating_file(fe::ctx_t* ctx, fe::obj_t* arg) {
         arg_map_t args{};
         symtab::init(args, g_cfg_sys.alloc);
         defer(symtab::free(args));
@@ -407,21 +638,21 @@ namespace basecode::config {
 
         log_level_t mask = log_level_t::debug;
         spdlog_rotating_file_config_t config{};
-        fe_Object* name;
+        fe::obj_t* name;
         if (symtab::find(args, "#:name"_ss, name))
             config.name = string::interned::fold(to_str(ctx, name));
         else
             config.name = string::interned::fold("rotating-file"_ss);
 
-        fe_Object* pattern;
+        fe::obj_t* pattern;
         if (symtab::find(args, "#:pattern"_ss, pattern))
             config.pattern = string::interned::fold(to_str(ctx, pattern));
 
-        fe_Object* maskv;
+        fe::obj_t* maskv;
         if (symtab::find(args, "#:mask"_ss, maskv)) {
             auto ll = find_log_level(to_str(ctx, maskv));
             if (ll == -1)
-                fe_error(ctx, "#:mask invalid log level symbol");
+                fe::error(ctx, "#:mask invalid log level symbol");
             mask = log_level_t(ll);
         }
 
@@ -432,14 +663,14 @@ namespace basecode::config {
         config.file_name = string::interned::fold(log_path.str);
 
         auto max_size = get_map_arg(args, 1);
-        if (fe_type(ctx, max_size) != FE_TNUMBER)
-            fe_error(ctx, "max_size: expected number");
-        config.max_size  = u32(fe_tonumber(ctx, max_size));
+        if (fe::type(ctx, max_size) != fe::obj_type_t::number)
+            fe::error(ctx, "max_size: expected number");
+        config.max_size  = u32(fe::to_number(ctx, max_size));
 
         auto max_files = get_map_arg(args, 2);
-        if (fe_type(ctx, max_files)!= FE_TNUMBER)
-            fe_error(ctx, "max_files: expected number");
-        config.max_files = u32(fe_tonumber(ctx, max_files));
+        if (fe::type(ctx, max_files)!= fe::obj_type_t::number)
+            fe::error(ctx, "max_files: expected number");
+        config.max_files = u32(fe::to_number(ctx, max_files));
 
         logger_t* logger{};
         auto status = log::system::make(&logger,
@@ -447,238 +678,9 @@ namespace basecode::config {
                                         &config,
                                         mask);
         if (!OK(status))
-            fe_error(ctx, "failed to create rotating file logger");
+            fe::error(ctx, "failed to create rotating file logger");
 
-        return fe_ptr(ctx, logger);
-    }
-
-    static fe_Object* syslog_create(fe_Context* ctx, fe_Object* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
-
-        log_level_t mask = log_level_t::debug;
-        syslog_config_t config{};
-        config.name = string::interned::fold("syslog"_ss);
-        config.opts = {};
-
-        auto ident_str = to_str(ctx, get_map_arg(args, 0));
-        config.ident = (const s8*) string::interned::fold(ident_str).data;
-
-        fe_Object* maskv;
-        if (symtab::find(args, "#:mask"_ss, maskv)) {
-            auto ll = find_log_level(to_str(ctx, maskv));
-            if (ll == -1)
-                fe_error(ctx, "#:mask invalid log level symbol");
-            mask = log_level_t(ll);
-        }
-
-        auto opts = get_map_arg(args, 1);
-        if (fe_type(ctx, opts) != FE_TPAIR)
-            fe_error(ctx, "opts argument must be a list");
-        while (true) {
-            auto obj = next_arg(ctx, &opts);
-            auto type = fe_type(ctx, obj);
-            if (type == FE_TNIL)
-                break;
-            else if (type != FE_TSYMBOL)
-                fe_error(ctx, "syslog opts list may only contain symbols");
-            auto opt_value = find_syslog_opt_value(to_str(ctx, obj));
-            if (opt_value == -1)
-                fe_error(ctx, "invalid syslog opt flag");
-            config.opts |= opt_value;
-        }
-
-        auto facility = find_syslog_facility_value(to_str(ctx, get_map_arg(args, 2)));
-        if (facility == -1)
-            fe_error(ctx, "invalid syslog facility value");
-        config.facility = facility;
-
-        logger_t* logger{};
-        auto status = log::system::make(&logger,
-                                        logger_type_t::syslog,
-                                        &config,
-                                        mask);
-        if (!OK(status))
-            fe_error(ctx, "failed to create syslog logger");
-
-        return fe_ptr(ctx, logger);
-    }
-
-    static fe_Object* current_user(fe_Context* ctx, fe_Object* arg) {
-        UNUSED(arg);
-        return fe_ptr(ctx, context::top()->user);
-    }
-
-    static fe_Object* current_alloc(fe_Context* ctx, fe_Object* arg) {
-        UNUSED(arg);
-        return fe_ptr(ctx, context::top()->alloc);
-    }
-
-    static fe_Object* current_logger(fe_Context* ctx, fe_Object* arg) {
-        UNUSED(arg);
-        return fe_ptr(ctx, context::top()->logger);
-    }
-
-    static fe_Object* logger_append_child(fe_Context* ctx, fe_Object* arg) {
-        auto parent = fe_nextarg(ctx, &arg);
-        if (fe_type(ctx, parent) != FE_TPTR)
-            fe_error(ctx, "parent: expected pointer argument");
-        auto child = fe_nextarg(ctx, &arg);
-        if (fe_type(ctx, child) != FE_TPTR)
-            fe_error(ctx, "child: expected pointer argument");
-        log::append_child((logger_t*) fe_toptr(ctx, parent), (logger_t*) fe_toptr(ctx, child));
-        return fe_nil();
-    }
-
-    static fe_Object* current_command_line(fe_Context* ctx, fe_Object* arg) {
-        UNUSED(arg);
-        const auto argc = context::top()->argc;
-        const auto argv = context::top()->argv;
-        fe_Object* objs[argc];
-        for (u32 i = 0; i < argc; ++i)
-            objs[i] = fe_string(ctx, argv[i]);
-        return fe_list(ctx, &objs[0], argc);
-    }
-
-    static fe_Object* cvar_set(fe_Context* ctx, fe_Object* arg) {
-        auto id = fe_nextarg(ctx, &arg);
-        if (fe_type(ctx, id) != FE_TNUMBER)
-            fe_error(ctx, "id: expected a number");
-        auto native_id = u32(fe_tonumber(ctx, id));
-
-        cvar_t* cvar{};
-        if (!OK(cvar::get(native_id, &cvar))) {
-            fe_error(ctx, "XXX: unable to find cvar");
-        }
-
-        auto value = fe_nextarg(ctx, &arg);
-        auto value_type = fe_type(ctx, value);
-        switch (cvar->type) {
-            case cvar_type_t::flag: {
-                if (fe_istrue(ctx, value))
-                    cvar->value.flag = true;
-                else if (fe_isnil(ctx, value))
-                    cvar->value.flag = false;
-                else
-                    fe_error(ctx, "invalid cvar value: flag must be #t or nil");
-                break;
-            }
-            case cvar_type_t::real: {
-                if (value_type != FE_TNUMBER)
-                    fe_error(ctx, "invalid cvar value: must be a valid number");
-                cvar->value.real = fe_tonumber(ctx, value);
-                break;
-            }
-            case cvar_type_t::integer: {
-                if (value_type != FE_TNUMBER)
-                    fe_error(ctx, "invalid cvar value: must be a valid number");
-                cvar->value.integer = u64(fe_tonumber(ctx, value));
-                break;
-            }
-            case cvar_type_t::string: {
-                if (value_type != FE_TSTRING && value_type != FE_TSYMBOL)
-                    fe_error(ctx, "invalid cvar value: must be a string or symbol");
-                auto str = to_str(ctx, value);
-                cvar->value.ptr = string::interned::fold(str).data;
-                break;
-            }
-            case cvar_type_t::pointer: {
-                fe_error(ctx, "invalid cvar value: cannot directly set pointer type");
-            }
-            default: {
-                fe_error(ctx, "invalid cvar type");
-            }
-        }
-
-        return fe_bool(ctx, true);
-    }
-
-    static fe_Object* cvar_ref(fe_Context* ctx, fe_Object* arg) {
-        auto id = fe_nextarg(ctx, &arg);
-        if (fe_type(ctx, id) != FE_TNUMBER)
-            fe_error(ctx, "id: expected a number");
-        auto native_id = u32(fe_tonumber(ctx, id));
-
-        cvar_t* cvar{};
-        if (!OK(cvar::get(native_id, &cvar))) {
-            fe_error(ctx, "XXX: unable to find cvar");
-        }
-
-        switch (cvar->type) {
-            case cvar_type_t::flag:
-                return fe_bool(ctx, cvar->value.flag);
-            case cvar_type_t::real:
-                return fe_number(ctx, cvar->value.real);
-            case cvar_type_t::integer:
-                return fe_number(ctx, cvar->value.integer);
-            case cvar_type_t::string:
-                return fe_string(ctx, (const s8*) cvar->value.ptr);
-            case cvar_type_t::pointer:
-                return fe_ptr(ctx, (u0*) cvar->value.ptr);
-            default:
-                fe_error(ctx, "invalid cvar type");
-        }
-
-        return fe_nil();
-    }
-
-    static fe_Object* localized_string(fe_Context* ctx, fe_Object* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
-
-        auto id = get_map_arg(args, 0);
-        if (fe_type(ctx, id) != FE_TNUMBER)
-            fe_error(ctx, "id: expected number");
-
-        auto locale = get_map_arg(args, 1);
-        if (fe_type(ctx, locale) != FE_TSYMBOL)
-            fe_error(ctx, "locale: expected symbol");
-        auto locale_str = string::interned::fold(to_str(ctx, locale));
-
-        auto value = get_map_arg(args, 2);
-        if (fe_type(ctx, value) != FE_TSTRING)
-            fe_error(ctx, "value: expected string");
-        auto value_str = string::interned::fold(to_str(ctx, value));
-
-        string::localized::add(u32(fe_tonumber(ctx, id)), locale_str, value_str);
-
-        return id;
-    }
-
-    static fe_Object* localized_error(fe_Context* ctx, fe_Object* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
-
-        auto id = get_map_arg(args, 0);
-        if (fe_type(ctx, id) != FE_TNUMBER)
-            fe_error(ctx, "id: expected number");
-
-        auto locale = get_map_arg(args, 1);
-        if (fe_type(ctx, locale) != FE_TSYMBOL)
-            fe_error(ctx, "locale: expected symbol");
-        auto locale_str = string::interned::fold(to_str(ctx, locale));
-
-        auto code = get_map_arg(args, 2);
-        if (fe_type(ctx, code) != FE_TSYMBOL)
-            fe_error(ctx, "code: expected symbol");
-        auto code_str = string::interned::fold(to_str(ctx, code));
-
-        auto str_id = get_map_arg(args, 3);
-        if (fe_type(ctx, str_id) != FE_TNUMBER)
-            fe_error(ctx, "str_id: expected number");
-
-        error::localized::add(u32(fe_tonumber(ctx, id)),
-                              u32(fe_tonumber(ctx, str_id)),
-                              locale_str,
-                              code_str);
-
-        return fe_bool(ctx, true);
+        return fe::make_ptr(ctx, logger);
     }
 
     static kernel_func_t s_kernel_funcs[] = {
@@ -709,28 +711,28 @@ namespace basecode::config {
 
     namespace system {
         u0 fini() {
-            fe_close(g_cfg_sys.ctx);
+            fe::free(g_cfg_sys.ctx);
             str::free(g_cfg_sys.buf);
             memory::free(g_cfg_sys.alloc, g_cfg_sys.ctx);
         }
 
-        fe_Context* context() {
+        fe::ctx_t* context() {
             return g_cfg_sys.ctx;
         }
 
         status_t init(const config_settings_t& settings, alloc_t* alloc) {
             g_cfg_sys.alloc     = alloc;
             g_cfg_sys.heap_size = settings.heap_size;
-            g_cfg_sys.ctx       = (fe_Context*) memory::alloc(g_cfg_sys.alloc, g_cfg_sys.heap_size);
+            g_cfg_sys.ctx       = (fe::ctx_t*) memory::alloc(g_cfg_sys.alloc, g_cfg_sys.heap_size);
 
             str::init(g_cfg_sys.buf, g_cfg_sys.alloc);
             str::reserve(g_cfg_sys.buf, 8192);
 
-            fe_open(g_cfg_sys.ctx, g_cfg_sys.heap_size);
+            fe::make(g_cfg_sys.ctx, g_cfg_sys.heap_size);
             for (u32 i = 0; s_kernel_funcs[i].symbol != nullptr; ++i) {
-                auto symbol = fe_symbol(g_cfg_sys.ctx, s_kernel_funcs[i].symbol);
-                auto func = fe_cfunc(g_cfg_sys.ctx, s_kernel_funcs[i].func);
-                fe_set(g_cfg_sys.ctx, symbol, func);
+                auto symbol = fe::make_symbol(g_cfg_sys.ctx, s_kernel_funcs[i].symbol);
+                auto func = fe::make_native_func(g_cfg_sys.ctx, s_kernel_funcs[i].func);
+                fe::set(g_cfg_sys.ctx, symbol, func);
             }
 
             std::memset(g_cfg_sys.vars, 0, sizeof(cvar_t) * max_cvar_count);
@@ -815,14 +817,14 @@ namespace basecode::config {
     namespace cvar {
         static u0 add_binding(cvar_t* cvar) {
             auto sym_name = format::format("cvar:{}", cvar->name);
-            auto symbol = fe_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
-            fe_set(g_cfg_sys.ctx, symbol, fe_number(g_cfg_sys.ctx, cvar->id));
+            auto symbol = fe::make_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
+            fe::set(g_cfg_sys.ctx, symbol, fe::make_number(g_cfg_sys.ctx, cvar->id));
         }
 
         static u0 remove_binding(cvar_t* cvar) {
             auto sym_name = format::format("cvar:{}", cvar->name);
-            auto symbol = fe_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
-            fe_set(g_cfg_sys.ctx, symbol, fe_nil());
+            auto symbol = fe::make_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
+            fe::set(g_cfg_sys.ctx, symbol, fe::nil());
         }
 
         u0 clear() {
@@ -832,7 +834,7 @@ namespace basecode::config {
                 remove_binding(&cvar);
                 cvar.type = cvar_type_t::none;
             }
-            fe_collectgarbage(g_cfg_sys.ctx);
+            fe::collect_garbage(g_cfg_sys.ctx);
         }
 
         status_t remove(u32 id) {
@@ -843,7 +845,7 @@ namespace basecode::config {
                 return status_t::cvar_not_found;
             remove_binding(cvar);
             cvar->type = cvar_type_t::none;
-            fe_collectgarbage(g_cfg_sys.ctx);
+            fe::collect_garbage(g_cfg_sys.ctx);
             return status_t::ok;
         }
 
@@ -873,35 +875,35 @@ namespace basecode::config {
         }
     }
 
-    status_t eval(const path_t& path, fe_Object** obj) {
+    status_t eval(const path_t& path, fe::obj_t** obj) {
         auto file = fopen(path::c_str(path), "r");
         if (!file) return status_t::bad_input;
-        auto gc = fe_savegc(g_cfg_sys.ctx);
+        auto gc = fe::save_gc(g_cfg_sys.ctx);
         defer(
-            fe_restoregc(g_cfg_sys.ctx, gc);
+            fe::restore_gc(g_cfg_sys.ctx, gc);
             fclose(file)
         );
         while (true) {
-            auto expr = fe_readfp(g_cfg_sys.ctx, file);
+            auto expr = fe::read_fp(g_cfg_sys.ctx, file);
             if (!expr) break;
-            *obj = fe_eval(g_cfg_sys.ctx, expr);
-            fe_restoregc(g_cfg_sys.ctx, gc);
+            *obj = fe::eval(g_cfg_sys.ctx, expr);
+            fe::restore_gc(g_cfg_sys.ctx, gc);
         }
         return status_t::ok;
     }
 
-    status_t eval(const u8* source, u32 len, fe_Object** obj) {
-        auto gc = fe_savegc(g_cfg_sys.ctx);
-        defer(fe_restoregc(g_cfg_sys.ctx, gc));
+    status_t eval(const u8* source, u32 len, fe::obj_t** obj) {
+        auto gc = fe::save_gc(g_cfg_sys.ctx);
+        defer(fe::restore_gc(g_cfg_sys.ctx, gc));
         auto file = ::fmemopen((u0*) source, len, "r");
         if (!file) return status_t::bad_input;
         defer(fclose(file));
-        auto expr = fe_readfp(g_cfg_sys.ctx, file);
+        auto expr = fe::read_fp(g_cfg_sys.ctx, file);
         if (!expr) {
-            *obj = fe_nil();
+            *obj = fe::nil();
             return status_t::ok;
         }
-        *obj = fe_eval(g_cfg_sys.ctx, expr);
+        *obj = fe::eval(g_cfg_sys.ctx, expr);
         return status_t::ok;
     }
 }

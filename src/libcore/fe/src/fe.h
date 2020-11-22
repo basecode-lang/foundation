@@ -5,62 +5,117 @@
 ** under the terms of the MIT license. See `fe.c` for details.
 */
 
-#ifndef FE_H
-#define FE_H
+#pragma once
 
-#include <stdlib.h>
-#include <stdio.h>
+#include <basecode/core/types.h>
 
-#define FE_VERSION "1.0"
+#define FE_VERSION              "1.0"
 
-typedef float fe_Number;
-typedef struct fe_Object fe_Object;
-typedef struct fe_Context fe_Context;
-typedef fe_Object* (*fe_CFunc)(fe_Context *ctx, fe_Object *args);
-typedef void (*fe_ErrorFn)(fe_Context *ctx, const char *err, fe_Object *cl);
-typedef void (*fe_WriteFn)(fe_Context *ctx, void *udata, char chr);
-typedef char (*fe_ReadFn)(fe_Context *ctx, void *udata);
-typedef struct { fe_ErrorFn error; fe_CFunc mark, gc; } fe_Handlers;
+namespace basecode::fe {
+    struct obj_t;
+    struct ctx_t;
 
-enum {
-  FE_TPAIR, FE_TFREE, FE_TNIL, FE_TNUMBER, FE_TSYMBOL, FE_TSTRING,
-  FE_TFUNC, FE_TMACRO, FE_TPRIM, FE_TCFUNC, FE_TPTR, FE_TKEYWORD
-};
+    using number_t              = f64;
 
-fe_Context* fe_open(void *ptr, int size);
-void fe_close(fe_Context *ctx);
-fe_Handlers* fe_handlers(fe_Context *ctx);
-void fe_error(fe_Context *ctx, const char *msg);
-fe_Object* fe_nextarg(fe_Context *ctx, fe_Object **arg);
-int fe_type(fe_Context *ctx, fe_Object *obj);
-int fe_isnil(fe_Context *ctx, fe_Object *obj);
-int fe_istrue(fe_Context *ctx, fe_Object *obj);
-void fe_pushgc(fe_Context *ctx, fe_Object *obj);
-void fe_restoregc(fe_Context *ctx, int idx);
-int fe_savegc(fe_Context *ctx);
-void fe_mark(fe_Context *ctx, fe_Object *obj);
-void fe_collectgarbage(fe_Context *ctx);
-fe_Object* fe_nil();
-fe_Object* fe_cons(fe_Context *ctx, fe_Object *car, fe_Object *cdr);
-fe_Object* fe_bool(fe_Context *ctx, int b);
-fe_Object* fe_number(fe_Context *ctx, fe_Number n);
-fe_Object* fe_string(fe_Context *ctx, const char *str);
-fe_Object* fe_symbol(fe_Context *ctx, const char *name);
-fe_Object* fe_keyword(fe_Context *ctx, const char *name);
-fe_Object* fe_cfunc(fe_Context *ctx, fe_CFunc fn);
-fe_Object* fe_ptr(fe_Context *ctx, void *ptr);
-fe_Object* fe_list(fe_Context *ctx, fe_Object **objs, int n);
-fe_Object* fe_car(fe_Context *ctx, fe_Object *obj);
-fe_Object* fe_cdr(fe_Context *ctx, fe_Object *obj);
-void fe_write(fe_Context *ctx, fe_Object *obj, fe_WriteFn fn, void *udata, int qt);
-void fe_writefp(fe_Context *ctx, fe_Object *obj, FILE *fp);
-int fe_tostring(fe_Context *ctx, fe_Object *obj, char *dst, int size);
-fe_Number fe_tonumber(fe_Context *ctx, fe_Object *obj);
-void* fe_toptr(fe_Context *ctx, fe_Object *obj);
-fe_Object* fe_get(fe_Context *ctx, fe_Object *sym, fe_Object *env);
-void fe_set(fe_Context *ctx, fe_Object *sym, fe_Object *v);
-fe_Object* fe_read(fe_Context *ctx, fe_ReadFn fn, void *udata);
-fe_Object* fe_readfp(fe_Context *ctx, FILE *fp);
-fe_Object* fe_eval(fe_Context *ctx, fe_Object *obj);
+    using read_func_t           = s8 (*)(ctx_t*, u0*);
+    using error_func_t          = u0 (*)(ctx_t*, const s8*, obj_t*);
+    using write_func_t          = u0 (*)(ctx_t*, u0*, s8);
+    using native_func_t         = obj_t* (*)(ctx_t*, obj_t*);
 
-#endif
+    struct handlers_t {
+        error_func_t            error;
+        native_func_t           mark;
+        native_func_t           gc;
+    };
+
+    enum class obj_type_t : u32 {
+        pair,
+        free,
+        nil,
+        number,
+        symbol,
+        string,
+        func,
+        macro,
+        prim,
+        cfunc,
+        ptr,
+        keyword
+    };
+
+    obj_t* nil();
+
+    u0 free(ctx_t* ctx);
+
+    u32 save_gc(ctx_t* ctx);
+
+    obj_t* pop_gc(ctx_t* ctx);
+
+    u0 collect_garbage(ctx_t* ctx);
+
+    ctx_t* make(u0* ptr, u32 size);
+
+    u0 mark(ctx_t* ctx, obj_t* obj);
+
+    handlers_t* handlers(ctx_t* ctx);
+
+    b8 is_nil(ctx_t* ctx, obj_t* obj);
+
+    b8 is_true(ctx_t* ctx, obj_t* obj);
+
+    u32 length(ctx_t* ctx, obj_t* obj);
+
+    u0 push_gc(ctx_t* ctx, obj_t* obj);
+
+    u0 restore_gc(ctx_t* ctx, u32 idx);
+
+    u0* to_ptr(ctx_t* ctx, obj_t* obj);
+
+    obj_t* car(ctx_t* ctx, obj_t* obj);
+
+    obj_t* cdr(ctx_t* ctx, obj_t* obj);
+
+    obj_t* eval(ctx_t* ctx, obj_t* obj);
+
+    u0 error(ctx_t* ctx, const s8* msg);
+
+    obj_t* read_fp(ctx_t* ctx, FILE* fp);
+
+    obj_t* make_ptr(ctx_t* ctx, u0* ptr);
+
+    obj_t* make_bool(ctx_t* ctx, b8 value);
+
+    obj_type_t type(ctx_t* ctx, obj_t* obj);
+
+    u0 set(ctx_t* ctx, obj_t* sym, obj_t* v);
+
+    obj_t* next_arg(ctx_t* ctx, obj_t** arg);
+
+    number_t to_number(ctx_t* ctx, obj_t* obj);
+
+    obj_t* make_number(ctx_t* ctx, number_t n);
+
+    u0 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp);
+
+    obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env);
+
+    obj_t* cons(ctx_t* ctx, obj_t* car, obj_t* cdr);
+
+    obj_t* read(ctx_t* ctx, read_func_t fn, u0* udata);
+
+    obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size);
+
+    obj_t* make_native_func(ctx_t* ctx, native_func_t fn);
+
+    u32 to_string(ctx_t* ctx, obj_t* obj, s8* dst, u32 size);
+
+    obj_t* make_string(ctx_t* ctx, const s8* str, s32 len = -1);
+
+    obj_t* find_symbol(ctx_t* ctx, const s8* name, s32 len = -1);
+
+    obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len = -1);
+
+    obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len = -1);
+
+    u0 write(ctx_t* ctx, obj_t* obj, write_func_t fn, u0* udata, u32 qt);
+}

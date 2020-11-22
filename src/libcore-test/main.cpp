@@ -107,7 +107,7 @@ s32 main(s32 argc, const s8** argv) {
     auto core_config_path = "../etc/core.fe"_path;
     path_t config_path{};
     filesys::bin_rel_path(config_path, core_config_path);
-    fe_Object* result{};
+    fe::obj_t* result{};
     if (!OK(config::eval(config_path, &result))) return 1;
 
     if (!OK(profiler::init()))          return 1;

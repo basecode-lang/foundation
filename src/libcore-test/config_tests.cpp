@@ -25,26 +25,26 @@
 
 using namespace basecode;
 
-static u0 validate_cvar(fe_Context* ctx, const s8* name, u32 id, b8 expected) {
-    auto binding = fe_get(ctx, fe_symbol(ctx, name), fe_nil());
-    auto cvar_value = fe_cdr(ctx, binding);
+static u0 validate_cvar(fe::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
+    auto binding = fe::get(ctx, fe::make_symbol(ctx, name), fe::nil());
+    auto cvar_value = fe::cdr(ctx, binding);
     if (expected) {
-        REQUIRE(fe_type(ctx, cvar_value) == FE_TNUMBER);
-        auto native_value = u32(fe_tonumber(ctx, cvar_value));
+        REQUIRE(fe::type(ctx, cvar_value) == fe::obj_type_t::number);
+        auto native_value = u32(fe::to_number(ctx, cvar_value));
         REQUIRE(native_value == id);
     } else {
-        REQUIRE(cvar_value == fe_nil());
+        REQUIRE(cvar_value == fe::nil());
     }
 
     auto source = format::format("(if (is {} {}) #t #f)", id, name);
-    fe_Object* obj{};
+    fe::obj_t* obj{};
     config::eval(source, &obj);
     REQUIRE(obj);
 
     str_t buf{};
     str::init(buf);
     str::reserve(buf, 64);
-    buf.length = fe_tostring(ctx, obj, (s8*) buf.data, buf.capacity);
+    buf.length = fe::to_string(ctx, obj, (s8*) buf.data, buf.capacity);
     if (expected)
         REQUIRE(buf == "#t");
     else
@@ -57,7 +57,7 @@ TEST_CASE("basecode::config cvar add & remove") {
     const auto internal_enable_console_color = "cvar:enable-console-color";
 
     REQUIRE(OK(config::cvar::add(cvar_id, enable_console_color, cvar_type_t::flag)));
-    fe_Context* ctx = config::system::context();
+    fe::ctx_t* ctx = config::system::context();
     validate_cvar(ctx, internal_enable_console_color, cvar_id, true);
 
     cvar_t* cvar{};
@@ -104,13 +104,13 @@ TEST_CASE("basecode::config terp eval") {
     result)
 )"_ss;
 
-    fe_Object* obj{};
-    fe_Context* ctx = config::system::context();
+    fe::obj_t* obj{};
+    fe::ctx_t* ctx = config::system::context();
 
     config::eval(source, &obj);
     REQUIRE(obj);
-    REQUIRE(fe_type(ctx, obj) == FE_TNUMBER);
-    auto value = fe_tonumber(ctx, obj);
+    REQUIRE(fe::type(ctx, obj) == fe::obj_type_t::number);
+    auto value = fe::to_number(ctx, obj);
     REQUIRE(value == 50);
 
     stopwatch::stop(time);

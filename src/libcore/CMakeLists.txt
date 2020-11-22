@@ -85,7 +85,7 @@ set(
 
     event.cpp ${CORE_INC_DIR}/event.h
 
-    fe/src/fe.c fe/src/fe.h
+    fe/src/fe.cpp fe/src/fe.h
 
     filesys.cpp ${CORE_INC_DIR}/filesys.h
 

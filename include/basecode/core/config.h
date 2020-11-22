@@ -18,9 +18,7 @@
 
 #pragma once
 
-extern "C" {
-    #include <fe.h>
-}
+#include <fe.h>
 #include <basecode/core/path.h>
 #include <basecode/core/types.h>
 #include <basecode/core/context.h>
@@ -82,7 +80,7 @@ namespace basecode {
         namespace system {
             u0 fini();
 
-            fe_Context* context();
+            fe::ctx_t* context();
 
             status_t init(const config_settings_t& settings, alloc_t* alloc = context::top()->alloc);
         }
@@ -101,11 +99,11 @@ namespace basecode {
             }
         }
 
-        status_t eval(const path_t& path, fe_Object** obj);
+        status_t eval(const path_t& path, fe::obj_t** obj);
 
-        status_t eval(const u8* source, u32 len, fe_Object** obj);
+        status_t eval(const u8* source, u32 len, fe::obj_t** obj);
 
-        status_t eval(const String_Concept auto& source, fe_Object** obj) {
+        status_t eval(const String_Concept auto& source, fe::obj_t** obj) {
             return eval(source.data, source.length, obj);
         }
     }
