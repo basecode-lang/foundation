@@ -25,11 +25,13 @@ namespace basecode::vm {
             &&exit,
         };
 
-        instruction_t*  inst;
-        operand_data_t* opers;
-        u64*            qword_ptr   {(u64*) vm.heap};
-        u64             inst_data   {};
-        status_t        status      {};
+        u8*                 heap_ptr    {(u8*) vm.heap};
+        instruction_t*      inst        {};
+        operand_encoding_t* oper_enc    {};
+        operand_data_t      oper_data   {};
+        u64                 inst_data   {};
+        status_t            status      {};
+        u8                  enc_data    {};
 
         while (true) {
             VM_NEXT(vm);

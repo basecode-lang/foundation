@@ -31,7 +31,7 @@ namespace basecode {
         u8                      rn:         1;  // 6
         u8                      rm:         1;  // 6
         u8                      ra:         1;  // 6
-        u8                      pad:        1;
+        u8                      post_inc:   1;
     };
 
     struct operand_data_t final {
@@ -155,6 +155,20 @@ namespace basecode {
                 constexpr u8 gt         = 4;
                 constexpr u8 ge         = 5;
             }
+        }
+
+        namespace operand {
+            //                              iii
+            //                              mmm
+            //                              mmm
+            //                              123rrrr_
+            //                              242dnma_
+            constexpr u8 rd_rm          = 0b00010100;
+            constexpr u8 rd_imm32       = 0b00110000;
+            constexpr u8 rd_rn_imm24    = 0b01011000;
+            constexpr u8 rd_rn_rm_ra    = 0b00011110;
+            constexpr u8 rd_imm24_imm12 = 0b11010000;
+            constexpr u8 rd_rn_rm_imm12 = 0b10011100;
         }
 
         namespace register_file {

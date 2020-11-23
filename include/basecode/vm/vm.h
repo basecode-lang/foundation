@@ -22,13 +22,15 @@
 #include <basecode/vm/bytecode.h>
 #include <basecode/vm/configure.h>
 
-#define VM_INC_PC(v)            ((v).gp[register_file::pc].qw++)
+#define VM_INC_PC(v)            ((v).gp[register_file::pc].qw += sizeof(instruction_t))
 #define VM_GET_PC(v)            ((v).gp[register_file::pc].qw)
 #define VM_SET_PC(v, a)         ((v).gp[register_file::pc].qw = (a))
 #define VM_NEXT(v)              SAFE_SCOPE(                                     \
-        inst      = (instruction_t*) qword_ptr[VM_INC_PC((v))];                 \
+        VM_INC_PC(v);                                                           \
+        inst      = (instruction_t*) (heap_ptr + VM_GET_PC((v)));               \
         inst_data = inst->data;                                                 \
-        opers     = (operand_data_t*) &inst_data;                               \
+        enc_data  = inst->encoding;                                             \
+        oper_enc  = (operand_encoding_t*) &enc_data;                            \
         goto *s_micro_op[0];                                                    \
     )
 
