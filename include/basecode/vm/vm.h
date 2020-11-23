@@ -19,33 +19,42 @@
 #pragma once
 
 #include <basecode/core/memory.h>
+#include <basecode/vm/bytecode.h>
 #include <basecode/vm/configure.h>
+
+#define VM_INC_PC(v)            ((v).gp[register_file::pc].qw++)
+#define VM_GET_PC(v)            ((v).gp[register_file::pc].qw)
+#define VM_SET_PC(v, a)         ((v).gp[register_file::pc].qw = (a))
+#define VM_NEXT(v)              SAFE_SCOPE(                                     \
+        inst      = (instruction_t*) qword_ptr[VM_INC_PC((v))];                 \
+        inst_data = inst->data;                                                 \
+        opers     = (operand_data_t*) &inst_data;                               \
+        goto *s_micro_op[0];                                                    \
+    )
 
 namespace basecode {
     struct vm_t;
-    struct register_t;
+    struct gp_register_t;
     struct flag_register_t;
 
-    constexpr u32 reg_file_size = 32;
+    constexpr u32 reg_file_size = 36;
 
-    union register_alias_t final {
-        u8                      b;
-        s8                      sb;
-        u16                     w;
-        s16                     sw;
-        u32                     dw;
-        s32                     sdw;
-        f32                     fdw;
-        u64                     qw;
-        s64                     sqw;
-        f64                     fqw;
+    struct gp_register_t final {
+        union {
+            u8                  b;
+            s8                  sb;
+            u16                 w;
+            s16                 sw;
+            u32                 dw;
+            s32                 sdw;
+            f32                 fdw;
+            u64                 qw;
+            s64                 sqw;
+            f64                 fqw;
+        };
     };
 
-    struct register_t final {
-        register_alias_t        alias;
-    };
-
-    struct flag_register_t final {
+    struct fr_register_t final {
         u64                     n:      1;
         u64                     z:      1;
         u64                     c:      1;
@@ -62,11 +71,8 @@ namespace basecode {
     struct vm_t final {
         alloc_t*                alloc;
         u0*                     heap;
-        register_t              pc;
-        register_t              sp;
-        register_t              lr;
-        flag_register_t         fr;
-        register_t              gp[reg_file_size];
+        fr_register_t           fr;
+        gp_register_t           gp[reg_file_size];
         u32                     stack_size;
         u32                     heap_size;
     };
@@ -74,11 +80,20 @@ namespace basecode {
     namespace vm {
         enum class status_t : u32 {
             ok,
-            error               = 30000
+            error                       = 30000,
+            exited,
+            suspend,
+            unaligned_bytecode_address,
         };
 
         u0 free(vm_t& vm);
 
-        status_t init(vm_t& vm, const vm_opts_t& opts = {}, alloc_t* alloc = context::top()->alloc);
+        status_t init(vm_t& vm,
+                      const vm_opts_t& opts = {},
+                      alloc_t* alloc = context::top()->alloc);
+
+        status_t resume(vm_t& vm);
+
+        status_t execute(vm_t& vm, u32 address);
     }
 }

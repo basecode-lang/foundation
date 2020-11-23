@@ -19,7 +19,49 @@
 #include <basecode/vm/vm.h>
 
 namespace basecode::vm {
+    static status_t decode_and_execute(vm_t& vm) {
+        static u0* s_micro_op[] = {
+            &&nop,
+            &&exit,
+        };
+
+        instruction_t*  inst;
+        operand_data_t* opers;
+        u64*            qword_ptr   {(u64*) vm.heap};
+        u64             inst_data   {};
+        status_t        status      {};
+
+        while (true) {
+            VM_NEXT(vm);
+
+            nop:
+            {
+                VM_NEXT(vm);
+            }
+            exit:
+            {
+                status = status_t::exited;
+                break;
+            }
+        }
+
+        return status;
+    }
+
     u0 free(vm_t& vm) {
+    }
+
+    status_t resume(vm_t& vm) {
+        if ((VM_GET_PC(vm) % sizeof(instruction_t)) != 0)
+            return status_t::unaligned_bytecode_address;
+        return decode_and_execute(vm);
+    }
+
+    status_t execute(vm_t& vm, u32 address) {
+        if ((address % sizeof(instruction_t)) != 0)
+            return status_t::unaligned_bytecode_address;
+        VM_SET_PC(vm, address);
+        return decode_and_execute(vm);
     }
 
     status_t init(vm_t& vm, const vm_opts_t& opts, alloc_t* alloc) {
