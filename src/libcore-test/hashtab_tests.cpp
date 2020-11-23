@@ -18,8 +18,6 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/buf.h>
-#include <basecode/core/str.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/str_array.h>
@@ -36,23 +34,27 @@ TEST_CASE("basecode::hashtab names") {
     hashtab_t<str::slice_t, baby_name_t> table{};
     hashtab::init(table, context::top()->alloc, 0.7f);
 
+    array_t<str::slice_t> fields{};
+    array::init(fields);
+
     array_t<name_record_t> records{};
     array::init(records);
+
     defer({
-              path::free(path);
-              for (auto& record : records)
-                  array::free(record.fields);
-              array::free(records);
               buf::free(buf);
+              path::free(path);
+              array::free(fields);
+              array::free(records);
               hashtab::free(table);
           });
 
     buf::each_line(
         buf,
-        [&records](const str::slice_t& line) {
+        [&fields, &records](const str::slice_t& line) {
             auto& record = array::append(records);
-            array::init(record.fields);
-            slice::to_fields(line, record.fields);
+            record.idx = fields.size;
+            slice::to_fields(line, fields);
+            record.len = fields.size - record.idx;
             return true;
         });
 
@@ -60,18 +62,18 @@ TEST_CASE("basecode::hashtab names") {
     stopwatch::start(emplace_time);
 
     for (const auto& rec : records) {
-        auto name = hashtab::find(table, rec.fields[3]);
+        auto name = hashtab::find(table, fields[rec.idx + 3]);
         if (name) continue;
-        name = hashtab::emplace(table, rec.fields[3]);
-        name->sex = rec.fields[1][0];
-        std::memcpy(name->year, rec.fields[2].data, 4);
+        name = hashtab::emplace(table, fields[rec.idx + 3]);
+        name->sex = fields[rec.idx + 1][0];
+        std::memcpy(name->year, fields[rec.idx + 2].data, 4);
         name->year[4] = '\0';
-        std::memcpy(name->state, rec.fields[0].data, 2);
+        std::memcpy(name->state, fields[rec.idx + 0].data, 2);
         name->state[2] = '\0';
     }
 
     stopwatch::stop(emplace_time);
-    format::print("table.size = {}, table.capcaity = {}\n", table.size, table.capacity);
+    format::print("table.size = {}, table.capacity = {}\n", table.size, table.capacity);
     stopwatch::print_elapsed("total hashtab emplace time"_ss, 40, emplace_time);
 }
 

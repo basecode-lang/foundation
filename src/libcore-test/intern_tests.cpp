@@ -89,9 +89,9 @@ TEST_CASE("basecode::intern") {
 
     for (u32 i = 0; i < expected_intern_count; ++i) {
         auto r = intern::fold(pool, strings[i]);
-        REQUIRE(r.status == intern::status_t::ok);
-        REQUIRE(r.slice.data);
-        REQUIRE(r.slice.length > 0);
+        if (r.status != intern::status_t::ok)   REQUIRE(false);
+        if (!r.slice.data)                      REQUIRE(false);
+        if (r.slice.length == 0)                REQUIRE(false);
         array::append(interned_list, r);
     }
 
@@ -111,17 +111,17 @@ TEST_CASE("basecode::intern") {
 
     u32 last_id{};
     for (const auto& r : interned_list) {
-        REQUIRE(last_id <= r.id);
+        if (last_id > r.id) REQUIRE(false);
         auto existing_slice = intern::fold(pool, r.slice);
-        REQUIRE(existing_slice.slice == r.slice);
+        if (existing_slice.slice != r.slice) REQUIRE(false);
         last_id = r.id;
     }
 
     for (const auto& r : interned_list) {
         auto get_result = intern::get(pool, r.id);
-        REQUIRE(get_result.status == intern::status_t::ok);
-        REQUIRE(get_result.id == r.id);
-        REQUIRE(get_result.hash == r.hash);
-        REQUIRE(get_result.slice == r.slice);
+        if (get_result.status != intern::status_t::ok)  REQUIRE(false);
+        if (get_result.id != r.id)                      REQUIRE(false);
+        if (get_result.hash != r.hash)                  REQUIRE(false);
+        if (get_result.slice != r.slice)                REQUIRE(false);
     }
 }

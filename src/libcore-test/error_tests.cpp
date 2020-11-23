@@ -19,9 +19,7 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/buf.h>
 #include <basecode/core/error.h>
-#include <basecode/core/config.h>
 #include <basecode/core/string.h>
-#include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 

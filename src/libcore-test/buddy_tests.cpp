@@ -56,7 +56,8 @@ TEST_CASE("basecode::memory::buddy basics") {
     REQUIRE(buddy_alloc->total_allocated > working_heap_size);
 
     for (u32 i = 0; i < num_blocks; ++i) {
-        REQUIRE(blocks[i]);
+        if (!blocks[i])
+            REQUIRE(false);
     }
 
     stopwatch::start(timer);

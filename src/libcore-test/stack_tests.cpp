@@ -70,7 +70,8 @@ TEST_CASE("basecode::stack force grow multiple times") {
     auto n = 999;
     while (!stack::empty(numbers)) {
         auto top = *stack::top(numbers);
-        REQUIRE(top == n--);
+        if (top != n--)
+            REQUIRE(false);
         stack::pop(numbers);
     }
 
@@ -84,7 +85,8 @@ TEST_CASE("basecode::stack force grow multiple times") {
     n = 300;
     while (!stack::empty(numbers)) {
         auto top = *stack::top(numbers);
-        REQUIRE(top == n);
+        if (top != n)
+            REQUIRE(false);
         n -= 100;
         stack::pop(numbers);
     }

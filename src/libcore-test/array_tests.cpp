@@ -98,11 +98,19 @@ TEST_CASE("array_t reserve space; fill") {
             return lhs > rhs;
         });
 
-    for (s32 i = 0; i < 4096; i++)
-        REQUIRE(numbers[i] == 4095 - i);
+    // N.B. catch2 is unbelievably slow. instead of
+    //      invoking REQUIRE 4096 times, it's far faster
+    //      to wrap it in an if and treat REQUIRE more
+    //      like an assert if the condition fails.
+    for (s32 i = 0; i < 4096; i++) {
+        if (numbers[i] != 4095 - i)
+            REQUIRE(false);
+    }
 
+    // N.B. same as above. catch2 is too slow.
     for (s32 i = 4095; i > 2048; i--) {
-        REQUIRE(array::contains(numbers, i) == 4095 - i);
+        if (array::contains(numbers, i) != 4095 - i)
+            REQUIRE(false);
     }
 }
 

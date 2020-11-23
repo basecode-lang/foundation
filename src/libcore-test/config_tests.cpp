@@ -29,26 +29,31 @@ static u0 validate_cvar(fe::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
     auto binding = fe::get(ctx, fe::make_symbol(ctx, name), fe::nil(ctx));
     auto cvar_value = fe::cdr(ctx, binding);
     if (expected) {
-        REQUIRE(fe::type(ctx, cvar_value) == fe::obj_type_t::number);
+        if (fe::type(ctx, cvar_value) != fe::obj_type_t::number)
+            REQUIRE(false);
         auto native_value = u32(fe::to_number(ctx, cvar_value));
-        REQUIRE(native_value == id);
+        if (native_value != id)
+            REQUIRE(false);
     } else {
-        REQUIRE(cvar_value == fe::nil(ctx));
+        if (cvar_value != fe::nil(ctx))
+            REQUIRE(false);
     }
 
     auto source = format::format("(if (is {} {}) #t #f)", id, name);
     fe::obj_t* obj{};
     config::eval(source, &obj);
-    REQUIRE(obj);
+    if (!obj)
+        REQUIRE(false);
 
     str_t buf{};
     str::init(buf);
     str::reserve(buf, 64);
     buf.length = fe::to_string(ctx, obj, (s8*) buf.data, buf.capacity);
-    if (expected)
-        REQUIRE(buf == "#t");
-    else
-        REQUIRE(buf == "nil");
+    if (expected) {
+        if (buf != "#t") REQUIRE(false);
+    } else {
+        if (buf != "nil") REQUIRE(false);
+    }
 }
 
 TEST_CASE("basecode::config cvar add & remove") {
@@ -56,42 +61,62 @@ TEST_CASE("basecode::config cvar add & remove") {
     const auto enable_console_color          = "enable-console-color"_ss;
     const auto internal_enable_console_color = "cvar:enable-console-color";
 
-    REQUIRE(OK(config::cvar::add(cvar_id, enable_console_color, cvar_type_t::flag)));
+    if (!OK(config::cvar::add(cvar_id, enable_console_color, cvar_type_t::flag)))
+        REQUIRE(false);
     fe::ctx_t* ctx = config::system::context();
     validate_cvar(ctx, internal_enable_console_color, cvar_id, true);
 
     cvar_t* cvar{};
-    REQUIRE(OK(config::cvar::get(cvar_id, &cvar)));
-    REQUIRE(cvar != nullptr);
+    if (!OK(config::cvar::get(cvar_id, &cvar)))
+        REQUIRE(false);
+    if (cvar == nullptr)
+        REQUIRE(false);
 
-    REQUIRE(OK(config::cvar::remove(cvar_id)));
+    if (!OK(config::cvar::remove(cvar_id)))
+        REQUIRE(false);
     validate_cvar(ctx, internal_enable_console_color, cvar_id, false);
 
-    REQUIRE(config::cvar::get(cvar_id, &cvar) == config::status_t::cvar_not_found);
-    REQUIRE(!cvar);
+    if (config::cvar::get(cvar_id, &cvar) != config::status_t::cvar_not_found)
+        REQUIRE(false);
+    if (cvar)
+        REQUIRE(false);
 }
 
 TEST_CASE("basecode::config find localized strings") {
     str::slice_t* value{};
-    REQUIRE(OK(string::localized::find(0, &value)));
-    REQUIRE(*value == "ok"_ss);
 
-    REQUIRE(OK(string::localized::find(5000, &value)));
-    REQUIRE(*value == "US: test localized string: 0={} 1={} 2={}"_ss);
+    if (!OK(string::localized::find(0, &value)))
+        REQUIRE(false);
+    if (*value != "ok"_ss)
+        REQUIRE(false);
 
-    REQUIRE(OK(string::localized::find(5001, &value)));
-    REQUIRE(*value == "duplicate cvar"_ss);
+    if (!OK(string::localized::find(5000, &value)))
+        REQUIRE(false);
+    if (*value != "US: test localized string: 0={} 1={} 2={}"_ss)
+        REQUIRE(false);
 
-    REQUIRE(OK(string::localized::find(5002, &value)));
-    REQUIRE(*value == "cvar not found"_ss);
+    if (!OK(string::localized::find(5001, &value)))
+        REQUIRE(false);
+    if (*value != "duplicate cvar"_ss)
+        REQUIRE(false);
 
-    REQUIRE(OK(string::localized::find(5003, &value)));
-    REQUIRE(*value == "invalid modification of constant: {}"_ss);
+    if (!OK(string::localized::find(5002, &value)))
+        REQUIRE(false);
+    if (*value != "cvar not found"_ss)
+        REQUIRE(false);
 
-    REQUIRE(OK(string::localized::find(5004, &value, "en_GB"_ss)));
-    REQUIRE(*value == "GB: test localized string: 0={} 1={} 2={}"_ss);
+    if (!OK(string::localized::find(5003, &value)))
+        REQUIRE(false);
+    if (*value != "invalid modification of constant: {}"_ss)
+        REQUIRE(false);
 
-    REQUIRE(string::localized::find(0, &value, "es_MX"_ss) == string::status_t::localized_not_found);
+    if (!OK(string::localized::find(5004, &value, "en_GB"_ss)))
+        REQUIRE(false);
+    if (*value != "GB: test localized string: 0={} 1={} 2={}"_ss)
+        REQUIRE(false);
+
+    if (string::localized::find(0, &value, "es_MX"_ss) != string::status_t::localized_not_found)
+        REQUIRE(false);
 }
 
 TEST_CASE("basecode::config terp eval") {
@@ -108,10 +133,10 @@ TEST_CASE("basecode::config terp eval") {
     fe::ctx_t* ctx = config::system::context();
 
     config::eval(source, &obj);
-    REQUIRE(obj);
-    REQUIRE(fe::type(ctx, obj) == fe::obj_type_t::number);
+    if (!obj) REQUIRE(false);
+    if (fe::type(ctx, obj) != fe::obj_type_t::number) REQUIRE(false);
     auto value = fe::to_number(ctx, obj);
-    REQUIRE(value == 50);
+    if (value != 50) REQUIRE(false);
 
     stopwatch::stop(time);
     stopwatch::print_elapsed("fe test program"_ss, 40, time);

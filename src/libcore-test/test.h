@@ -36,7 +36,8 @@ namespace basecode {
     };
 
     struct name_record_t final {
-        array_t<str::slice_t>   fields;
+        u32                     idx;
+        u32                     len;
     };
 }
 

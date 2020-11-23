@@ -85,23 +85,26 @@ TEST_CASE("basecode::symtab_t names") {
     symtab_t<baby_name_t> symbols{};
     symtab::init(symbols);
 
+    array_t<str::slice_t> fields{};
+    array::init(fields);
+
     array_t<name_record_t> records{};
     array::init(records);
     defer({
-              path::free(path);
-              for (auto& record : records)
-                  array::free(record.fields);
-              array::free(records);
               buf::free(buf);
+              path::free(path);
+              array::free(fields);
+              array::free(records);
               symtab::free(symbols);
           });
 
     buf::each_line(
         buf,
-        [&records](const str::slice_t& line) {
+        [&fields, &records](const str::slice_t& line) {
             auto& record = array::append(records);
-            array::init(record.fields);
-            slice::to_fields(line, record.fields);
+            record.idx = fields.size;
+            slice::to_fields(line, fields);
+            record.len = fields.size - record.idx;
             return true;
         });
 
@@ -109,12 +112,12 @@ TEST_CASE("basecode::symtab_t names") {
     stopwatch::start(emplace_time);
 
     for (const auto& rec : records) {
-        const auto& key   = rec.fields[3];
+        const auto& key = fields[rec.idx + 3];
         baby_name_t* name{};
         if (symtab::emplace(symbols, key, &name)) {
-            const auto& state = rec.fields[0];
-            const auto& year  = rec.fields[2];
-            name->sex = rec.fields[1][0];
+            const auto& state = fields[rec.idx + 0];
+            const auto& year  = fields[rec.idx + 2];
+            name->sex = fields[rec.idx + 1][0];
             name->year[0]  = year.data[0];
             name->year[1]  = year.data[1];
             name->year[2]  = year.data[2];
