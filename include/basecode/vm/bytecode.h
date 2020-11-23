@@ -49,16 +49,22 @@ namespace basecode {
         u64                     micro_op:   4;
         u64                     oper_size:  2;
         u64                     cond_code:  3;
-        u64                     float_:     1;
-        u64                     signed_:    1;
-        u64                     extend:     1;
+        u64                     num_type:   3;
         u64                     encoding:   8;
         u64                     data:       41;
     };
     static_assert(sizeof(instruction_t) <= 8, "instruction_t is now greater than 8 bytes!");
 
     namespace vm {
-        namespace micro_op {
+        // num_unit * num_micro_op * size * cond_code
+        namespace bytecode {
+            namespace size {
+                constexpr u8 qword      = 0;
+                constexpr u8 dword      = 1;
+                constexpr u8 word       = 2;
+                constexpr u8 byte       = 3;
+            }
+
             namespace unit {
                 constexpr u8 alu        = 0;
                 constexpr u8 cond       = 1;
@@ -66,13 +72,6 @@ namespace basecode {
                 constexpr u8 memory     = 3;
                 constexpr u8 branch     = 4;
                 constexpr u8 logical    = 5;
-            }
-
-            namespace size {
-                constexpr u8 qword      = 0;
-                constexpr u8 dword      = 1;
-                constexpr u8 word       = 2;
-                constexpr u8 byte       = 3;
             }
 
             namespace alu {
@@ -147,13 +146,22 @@ namespace basecode {
                 constexpr u8 and_       = 12;
             }
 
+            namespace num_type {
+                constexpr u8 unsigned_  = 0;
+                constexpr u8 signed_    = 1;
+                constexpr u8 float_     = 2;
+                constexpr u8 zero_ext   = 3;
+                constexpr u8 sign_ext   = 4;
+            }
+
             namespace cond_code {
-                constexpr u8 eq         = 0;
-                constexpr u8 ne         = 1;
-                constexpr u8 lt         = 2;
-                constexpr u8 le         = 3;
-                constexpr u8 gt         = 4;
-                constexpr u8 ge         = 5;
+                constexpr u8 none       = 0;
+                constexpr u8 eq         = 1;
+                constexpr u8 ne         = 2;
+                constexpr u8 lt         = 3;
+                constexpr u8 le         = 4;
+                constexpr u8 gt         = 5;
+                constexpr u8 ge         = 6;
             }
         }
 

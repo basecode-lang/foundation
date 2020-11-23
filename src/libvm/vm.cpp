@@ -33,18 +33,15 @@ namespace basecode::vm {
         status_t            status      {};
         u8                  enc_data    {};
 
-        while (true) {
-            VM_NEXT(vm);
+        VM_NEXT(vm);
 
-            nop:
-            {
-                VM_NEXT(vm);
-            }
-            exit:
-            {
-                status = status_t::exited;
-                break;
-            }
+        nop:
+        {
+            VM_NEXT(vm);
+        }
+        exit:
+        {
+            status = status_t::exited;
         }
 
         return status;
