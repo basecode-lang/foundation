@@ -36,8 +36,9 @@
 #define SET_GC_MARK(x, v)       ((x)->hdr.gc_mark = (v))
 #define SET_TYPE(x, t)          ((x)->hdr.type = u8((t)))
 #define INTEGER(x)              (u32((x)->number.value))
-#define NUMBER(x)               (f32((x)->number.value))
-#define SET_NUMBER(x, v)        ((x)->number.value = u32((v)))
+#define NUMBER(x)               (numeric_alias_t{.dw = ((x)->number.value)}.fdw)
+#define SET_NUMBER(x, v)        ((x)->number.value = numeric_alias_t{.fdw = (v)}.dw)
+#define SET_INTEGER(x, v)       ((x)->number.value = u32(v))
 #define PRIM(x)                 (prim_type_t((x)->prim.code))
 #define SET_PRIM(x, p)          ((x)->prim.code = u32(p))
 #define NATIVE_PTR(x)           (ctx->native_ptrs[(x)->number.value])
@@ -47,9 +48,9 @@
 #define NATIVE_PTR_SIZE         (256U)
 #define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env, nullptr)
 #define ARITH_INT_OP(op)        SAFE_SCOPE(                                                     \
-                                    u32 x = INTEGER(EVAL_ARG());                                \
+                                    u32 x = NUMBER(EVAL_ARG());                                 \
                                     while (!IS_NIL(arg))                                        \
-                                        x = x op INTEGER(EVAL_ARG());                           \
+                                        x = x op u32(NUMBER(EVAL_ARG()));                       \
                                     res = make_number(ctx, x);                                  \
                                 )
 #define ARITH_NUM_OP(op)        SAFE_SCOPE(                                                     \
@@ -219,8 +220,9 @@ namespace basecode::fe {
             return false;
         }
         if (TYPE(a) == obj_type_t::number) {
-            // XXX: this should be comparing the diff with EPSILON
-            return NUMBER(a) == NUMBER(b);
+            const auto e = std::numeric_limits<number_t>::epsilon();
+            auto d = NUMBER(b) - NUMBER(a);
+            return d <= e;
         } else if (TYPE(a) == obj_type_t::string) {
             return INTEGER(a) == INTEGER(b);
         }
@@ -643,9 +645,13 @@ namespace basecode::fe {
         return res;
     }
 
-    static u0 write_str(ctx_t* ctx, write_func_t fn, u0* udata, const s8* s) {
-        while (*s)
+    static u32 write_str(ctx_t* ctx, write_func_t fn, u0* udata, const s8* s) {
+        u32 len{};
+        while (*s) {
             fn(ctx, udata, *s++);
+            ++len;
+        }
+        return len;
     }
 
     static obj_t* args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg, obj_t* env) {
@@ -865,9 +871,8 @@ namespace basecode::fe {
         }
         fprintf(stderr, "error: %s\n", msg);
         for (; !IS_NIL(cl); cl = CDR(cl)) {
-            s8 buf[64];
-            to_string(ctx, CAR(cl), buf, sizeof(buf));
-            fprintf(stderr, "=> %s\n", buf);
+            to_string(ctx, CAR(cl), ctx->scratch, sizeof(ctx->scratch));
+            fprintf(stderr, "=> %s\n", ctx->scratch);
         }
         exit(EXIT_FAILURE);
     }
@@ -877,7 +882,7 @@ namespace basecode::fe {
     }
 
     u32 to_integer(ctx_t* ctx, obj_t* obj) {
-        return INTEGER(check_type(ctx, obj, obj_type_t::number));
+        return u32(NUMBER(check_type(ctx, obj, obj_type_t::number)));
     }
 
     obj_t* make_bool(ctx_t* ctx, b8 value) {
@@ -914,7 +919,7 @@ namespace basecode::fe {
     obj_t* make_user_ptr(ctx_t* ctx, u0* ptr) {
         obj_t* obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::ptr);
-        SET_NUMBER(obj, ctx->native_ptr_idx);
+        SET_INTEGER(obj, ctx->native_ptr_idx);
         NATIVE_PTR(obj) = ptr;
         ++ctx->native_ptr_idx;
         return obj;
@@ -931,8 +936,8 @@ namespace basecode::fe {
         return NUMBER(check_type(ctx, obj, obj_type_t::number));
     }
 
-    u0 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp) {
-        write(ctx, obj, write_fp, fp, 0);
+    u32 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp) {
+        return write(ctx, obj, write_fp, fp, 0);
     }
 
     obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env) {
@@ -983,7 +988,7 @@ namespace basecode::fe {
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn) {
         obj_t* obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::cfunc);
-        SET_NUMBER(obj, ctx->native_ptr_idx);
+        SET_INTEGER(obj, ctx->native_ptr_idx);
         NATIVE_PTR(obj) = (u0*) fn;
         ++ctx->native_ptr_idx;
         return obj;
@@ -995,7 +1000,7 @@ namespace basecode::fe {
             error(ctx, "make_string unable to intern string");
         obj_t* obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::string);
-        SET_NUMBER(obj, number_t(intern_rc.id));
+        SET_INTEGER(obj, intern_rc.id);
         return obj;
     }
 
@@ -1042,23 +1047,22 @@ namespace basecode::fe {
         return size - x.n - 1;
     }
 
-    u0 write(ctx_t* ctx, obj_t* obj, write_func_t fn, u0* udata, u32 qt) {
+    u32 write(ctx_t* ctx, obj_t* obj, write_func_t fn, u0* udata, u32 qt) {
         s8 buf[32];
 
         switch (TYPE(obj)) {
             case obj_type_t::nil:
-                write_str(ctx, fn, udata, "nil");
-                break;
+                return write_str(ctx, fn, udata, "nil");
 
             case obj_type_t::number:
                 sprintf(buf, "%.7g", NUMBER(obj));
-                write_str(ctx, fn, udata, buf);
-                break;
+                return write_str(ctx, fn, udata, buf);
 
-            case obj_type_t::pair:
+            case obj_type_t::pair: {
+                u32 len = 2;
                 fn(ctx, udata, '(');
                 for (;;) {
-                    write(ctx, CAR(obj), fn, udata, 1);
+                    len += write(ctx, CAR(obj), fn, udata, 1);
                     obj = CDR(obj);
                     if (TYPE(obj) != obj_type_t::pair) {
                         break;
@@ -1066,17 +1070,17 @@ namespace basecode::fe {
                     fn(ctx, udata, ' ');
                 }
                 if (!IS_NIL(obj)) {
-                    write_str(ctx, fn, udata, " . ");
-                    write(ctx, obj, fn, udata, 1);
+                    len += write_str(ctx, fn, udata, " . ");
+                    len += write(ctx, obj, fn, udata, 1);
                 }
                 fn(ctx, udata, ')');
-                break;
+                return len;
+            }
 
             case obj_type_t::keyword:
                 write_str(ctx, fn, udata, "#:");
             case obj_type_t::symbol:
-                write(ctx, CAR(CDR(obj)), fn, udata, 0);
-                break;
+                return write(ctx, CAR(CDR(obj)), fn, udata, 0) + 2;
 
             case obj_type_t::string: {
                 if (qt) {
@@ -1086,11 +1090,11 @@ namespace basecode::fe {
                 if (!OK(intern_rc.status)) {
                     error(ctx, "unable to find interned string");
                 }
-                write_str(ctx, fn, udata, (s8*) intern_rc.slice.data);
+                auto len = write_str(ctx, fn, udata, (s8*) intern_rc.slice.data);
                 if (qt) {
                     fn(ctx, udata, '"');
                 }
-                break;
+                return len + 2;
             }
 
             case obj_type_t::prim:
@@ -1101,10 +1105,14 @@ namespace basecode::fe {
                 // N.B. fallthrough intentional
 
             default:
-                sprintf(buf, "[%s %p]", s_type_names[u32(TYPE(obj))], (u0*) obj);
-                write_str(ctx, fn, udata, buf);
-                break;
+                sprintf(buf,
+                        "[%s %p]",
+                        s_type_names[u32(TYPE(obj))],
+                        (u0*) obj);
+                return write_str(ctx, fn, udata, buf);
         }
+
+        return 0;
     }
 }
 

@@ -97,7 +97,7 @@ namespace basecode::fe {
 
     obj_t* make_number(ctx_t* ctx, number_t n);
 
-    u0 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp);
+    u32 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp);
 
     obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env);
 
@@ -121,5 +121,5 @@ namespace basecode::fe {
 
     obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len = -1);
 
-    u0 write(ctx_t* ctx, obj_t* obj, write_func_t fn, u0* udata, u32 qt);
+    u32 write(ctx_t* ctx, obj_t* obj, write_func_t fn, u0* udata, u32 qt);
 }

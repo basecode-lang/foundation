@@ -91,6 +91,19 @@ namespace basecode {
 
     struct alloc_t;
 
+    union numeric_alias_t final {
+        u8                      b;
+        s8                      sb;
+        u16                     w;
+        s16                     sw;
+        u32                     dw;
+        s32                     sdw;
+        u64                     qw;
+        s64                     sqw;
+        f32                     fdw;
+        f64                     qdw;
+    };
+
     union u16_bytes_t final {
         u16                     value;
         u8                      bytes[2];

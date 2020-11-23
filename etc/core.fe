@@ -237,9 +237,11 @@
                             (is "Linux" platform))))
             (assert '(is #t (cvar-ref cvar:test-runner)))
 
+            ; N.B. these initial values come from libcore-test's main.cpp
+            ;       when it sets up the test runner.
             (assert '(is #t (cvar-ref cvar:enable-console-color)))
             (assert '(is "/var/log" (cvar-ref cvar:log-path)))
-            (assert '(is 47 (cvar-ref cvar:magick-weight)))
+            (assert '(is 47.314 (cvar-ref cvar:magick-weight)))
 
             (cvar-set! cvar:enable-console-color    nil)
             (cvar-set! cvar:log-path                "/var/log/basecode")
