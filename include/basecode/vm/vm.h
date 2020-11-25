@@ -30,7 +30,6 @@
         inst      = (instruction_t*) (heap_ptr + VM_GET_PC((v)));               \
         inst_data = inst->data;                                                 \
         enc_data  = inst->encoding;                                             \
-        oper_enc  = (operand_encoding_t*) &enc_data;                            \
         goto *s_micro_op[0];                                                    \
     )
 

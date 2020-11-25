@@ -5,6 +5,7 @@ add_executable(
     ${PROJECT_NAME}
 
     main.cpp
+    bytecode_tests.cpp
 )
 target_link_libraries(${PROJECT_NAME} basecode-core basecode-vm basecode-binfmt)
 if (NOT MSVC)

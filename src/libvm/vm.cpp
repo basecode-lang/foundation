@@ -27,7 +27,6 @@ namespace basecode::vm {
 
         u8*                 heap_ptr    {(u8*) vm.heap};
         instruction_t*      inst        {};
-        operand_encoding_t* oper_enc    {};
         operand_data_t      oper_data   {};
         u64                 inst_data   {};
         status_t            status      {};

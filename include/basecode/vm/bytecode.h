@@ -18,21 +18,26 @@
 
 #pragma once
 
+#include <basecode/core/str.h>
 #include <basecode/core/types.h>
+
+#define UOP(g, op, s, cc, t, e) (inst_encoding_t((g), (op), (s), (cc), (t), (e)).data)
+#define MASK(t)                 (u16(1U << (t)))
+#define TST_MASK(m, t)          ((m) & u16(1U << (t)))
 
 namespace basecode {
     struct gp_register_t;
 
-    union operand_encoding_t final {
-        u8                      imm12:      1;  // 12
-        u8                      imm24:      1;  // 24
-        u8                      imm32:      1;  // 32
-        u8                      rd:         1;  // 6
-        u8                      rn:         1;  // 6
-        u8                      rm:         1;  // 6
-        u8                      ra:         1;  // 6
-        u8                      post_inc:   1;
-    };
+//    union operand_encoding_t final {
+//        u8                      imm12:      1;  // 12
+//        u8                      imm24:      1;  // 24
+//        u8                      imm32:      1;  // 32
+//        u8                      rd:         1;  // 6
+//        u8                      rn:         1;  // 6
+//        u8                      rm:         1;  // 6
+//        u8                      ra:         1;  // 6
+//        u8                      post_inc:   1;
+//    };
 
     struct operand_data_t final {
         gp_register_t*          rd;
@@ -44,34 +49,53 @@ namespace basecode {
         u32                     imm32;
     };
 
+    union inst_encoding_t final {
+        struct {
+            u32                 group:      3;
+            u32                 micro_op:   4;
+            u32                 oper_size:  2;
+            u32                 cond_code:  3;
+            u32                 num_type:   3;
+            u32                 encoding:   4;
+            u32                 pad:        13;
+        }                       fields;
+        u32                     data;
+
+        inst_encoding_t(u8 group,
+                        u8 micro_op,
+                        u8 oper_size,
+                        u8 cond_code,
+                        u8 num_type,
+                        u8 encoding) : fields({group,
+                                               micro_op,
+                                               oper_size,
+                                               cond_code,
+                                               num_type,
+                                               encoding,
+                                               0}) {
+        }
+    };
+
     struct instruction_t final {
-        u64                     unit:       3;
+        u64                     group:      3;
         u64                     micro_op:   4;
         u64                     oper_size:  2;
         u64                     cond_code:  3;
         u64                     num_type:   3;
-        u64                     encoding:   8;
-        u64                     data:       41;
+        u64                     encoding:   4;
+        u64                     data:       45;
     };
     static_assert(sizeof(instruction_t) <= 8, "instruction_t is now greater than 8 bytes!");
 
     namespace vm {
-        // num_unit * num_micro_op * size * cond_code
         namespace bytecode {
             namespace size {
                 constexpr u8 qword      = 0;
                 constexpr u8 dword      = 1;
                 constexpr u8 word       = 2;
                 constexpr u8 byte       = 3;
-            }
 
-            namespace unit {
-                constexpr u8 alu        = 0;
-                constexpr u8 cond       = 1;
-                constexpr u8 system     = 2;
-                constexpr u8 memory     = 3;
-                constexpr u8 branch     = 4;
-                constexpr u8 logical    = 5;
+                str::slice_t name(u8 size);
             }
 
             namespace alu {
@@ -87,6 +111,16 @@ namespace basecode {
                 constexpr u8 pow        = 8;
                 constexpr u8 mod        = 9;
                 constexpr u8 neg        = 10;
+
+                u16 valid_sizes(u8 op);
+
+                str::slice_t name(u8 op);
+
+                u16 valid_operands(u8 op);
+
+                u16 valid_cond_codes(u8 op);
+
+                u16 valid_number_types(u8 op);
             }
 
             namespace cond {
@@ -98,6 +132,29 @@ namespace basecode {
                 constexpr u8 clr        = 5;
                 constexpr u8 neg        = 6;
                 constexpr u8 inv        = 7;
+
+                u16 valid_sizes(u8 op);
+
+                str::slice_t name(u8 op);
+
+                u16 valid_operands(u8 op);
+
+                u16 valid_cond_codes(u8 op);
+
+                u16 valid_number_types(u8 op);
+            }
+
+            namespace group {
+                constexpr u8 alu        = 0;
+                constexpr u8 cond       = 1;
+                constexpr u8 system     = 2;
+                constexpr u8 memory     = 3;
+                constexpr u8 branch     = 4;
+                constexpr u8 logical    = 5;
+
+                u8 group_size(u8 group);
+
+                str::slice_t name(u8 group);
             }
 
             namespace system {
@@ -108,6 +165,16 @@ namespace basecode {
                 constexpr u8 dsb        = 4;    // data sync barrier
                 constexpr u8 isb        = 5;    // inst. sync barrier
                 constexpr u8 svc        = 6;
+
+                u16 valid_sizes(u8 op);
+
+                str::slice_t name(u8 op);
+
+                u16 valid_operands(u8 op);
+
+                u16 valid_cond_codes(u8 op);
+
+                u16 valid_number_types(u8 op);
             }
 
             namespace memory {
@@ -117,6 +184,16 @@ namespace basecode {
                 constexpr u8 cas        = 3;
                 constexpr u8 lda        = 4;
                 constexpr u8 sta        = 5;
+
+                u16 valid_sizes(u8 op);
+
+                str::slice_t name(u8 op);
+
+                u16 valid_operands(u8 op);
+
+                u16 valid_cond_codes(u8 op);
+
+                u16 valid_number_types(u8 op);
             }
 
             namespace branch {
@@ -128,6 +205,16 @@ namespace basecode {
                 constexpr u8 bcc        = 5;
                 constexpr u8 cbcc       = 6;
                 constexpr u8 tbcc       = 7;
+
+                u16 valid_sizes(u8 op);
+
+                str::slice_t name(u8 op);
+
+                u16 valid_operands(u8 op);
+
+                u16 valid_cond_codes(u8 op);
+
+                u16 valid_number_types(u8 op);
             }
 
             namespace logical {
@@ -144,6 +231,16 @@ namespace basecode {
                 constexpr u8 tst        = 10;
                 constexpr u8 inv        = 11;   // N.B. like not
                 constexpr u8 and_       = 12;
+
+                u16 valid_sizes(u8 op);
+
+                str::slice_t name(u8 op);
+
+                u16 valid_operands(u8 op);
+
+                u16 valid_cond_codes(u8 op);
+
+                u16 valid_number_types(u8 op);
             }
 
             namespace num_type {
@@ -152,31 +249,38 @@ namespace basecode {
                 constexpr u8 float_     = 2;
                 constexpr u8 zero_ext   = 3;
                 constexpr u8 sign_ext   = 4;
+
+                str::slice_t name(u8 type);
             }
 
             namespace cond_code {
-                constexpr u8 none       = 0;
+                constexpr u8 always     = 0;
                 constexpr u8 eq         = 1;
                 constexpr u8 ne         = 2;
                 constexpr u8 lt         = 3;
                 constexpr u8 le         = 4;
                 constexpr u8 gt         = 5;
                 constexpr u8 ge         = 6;
-            }
-        }
 
-        namespace operand {
-            //                              iii
-            //                              mmm
-            //                              mmm
-            //                              123rrrr_
-            //                              242dnma_
-            constexpr u8 rd_rm          = 0b00010100;
-            constexpr u8 rd_imm32       = 0b00110000;
-            constexpr u8 rd_rn_imm24    = 0b01011000;
-            constexpr u8 rd_rn_rm_ra    = 0b00011110;
-            constexpr u8 rd_imm24_imm12 = 0b11010000;
-            constexpr u8 rd_rn_rm_imm12 = 0b10011100;
+                str::slice_t name(u8 code);
+            }
+
+            namespace operand {
+                constexpr u8 none           = 0;
+                constexpr u8 imm32          = 1;
+                constexpr u8 rd_rm          = 2;
+                constexpr u8 rd_rn_rm       = 3;
+                constexpr u8 rm_imm32       = 4;
+                constexpr u8 rd_imm32       = 5;
+                constexpr u8 rd_rn_imm24    = 6;
+                constexpr u8 rd_rn_rm_ra    = 7;
+                constexpr u8 rd_imm24_imm12 = 8;
+                constexpr u8 rd_rn_rm_imm12 = 9;
+                constexpr u8 rd_rm_imm12    = 10;
+                constexpr u8 rd             = 11;
+
+                str::slice_t name(u8 type);
+            }
         }
 
         namespace register_file {
