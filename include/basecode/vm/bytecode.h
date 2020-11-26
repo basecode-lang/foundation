@@ -28,17 +28,6 @@
 namespace basecode {
     struct gp_register_t;
 
-//    union operand_encoding_t final {
-//        u8                      imm12:      1;  // 12
-//        u8                      imm24:      1;  // 24
-//        u8                      imm32:      1;  // 32
-//        u8                      rd:         1;  // 6
-//        u8                      rn:         1;  // 6
-//        u8                      rm:         1;  // 6
-//        u8                      ra:         1;  // 6
-//        u8                      post_inc:   1;
-//    };
-
     struct operand_data_t final {
         gp_register_t*          rd;
         gp_register_t*          rn;
@@ -151,6 +140,7 @@ namespace basecode {
                 constexpr u8 memory     = 3;
                 constexpr u8 branch     = 4;
                 constexpr u8 logical    = 5;
+                constexpr u8 max        = 6;
 
                 u8 group_size(u8 group);
 
@@ -219,7 +209,6 @@ namespace basecode {
 
             namespace logical {
                 constexpr u8 mov        = 0;
-                constexpr u8 movn       = 1;
                 constexpr u8 lsl        = 2;
                 constexpr u8 lsr        = 3;
                 constexpr u8 rol        = 4;
@@ -229,7 +218,7 @@ namespace basecode {
                 constexpr u8 or_        = 8;
                 constexpr u8 eor        = 9;
                 constexpr u8 tst        = 10;
-                constexpr u8 inv        = 11;   // N.B. like not
+                constexpr u8 not_       = 11;
                 constexpr u8 and_       = 12;
 
                 u16 valid_sizes(u8 op);
@@ -280,6 +269,8 @@ namespace basecode {
                 constexpr u8 rd             = 11;
 
                 str::slice_t name(u8 type);
+
+                str::slice_t var_name(u8 type);
             }
         }
 

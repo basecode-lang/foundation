@@ -76,9 +76,17 @@ namespace basecode::vm::bytecode {
         };
 
         static u16 s_cond_codes[] = {
-            MASK(0), MASK(0), MASK(0), MASK(0),
-            MASK(0), MASK(0), MASK(0), MASK(0),
-            MASK(0), MASK(0), MASK(0)
+            MASK(cond_code::always),
+            MASK(cond_code::always),
+            MASK(cond_code::always),
+            MASK(cond_code::always),
+            MASK(cond_code::always),
+            MASK(cond_code::always),
+            MASK(cond_code::always),
+            MASK(cond_code::always),
+            MASK(cond_code::always),
+            MASK(cond_code::always),
+            MASK(cond_code::always)
         };
 
         static u16 s_num_types[] = {
@@ -205,7 +213,7 @@ namespace basecode::vm::bytecode {
         };
 
         static u32 s_sizes[] = {
-            11, 8, 7, 6, 7, 13,
+            11, 8, 7, 6, 7, 12,
         };
 
         u8 group_size(u8 group) {
@@ -309,7 +317,7 @@ namespace basecode::vm::bytecode {
         };
 
         static u16 s_operands[] = {
-            MASK(operand::rd_imm32) | MASK(operand::rd_rn_imm24),
+            MASK(operand::rd_imm32),
             MASK(operand::rd_rm) | MASK(operand::rd_rn_rm_ra) | MASK(operand::rd_rn_imm24),
             MASK(operand::rd_rm) | MASK(operand::rd_rn_rm_ra) | MASK(operand::rd_rn_imm24),
             MASK(operand::rd_rm),
@@ -318,12 +326,12 @@ namespace basecode::vm::bytecode {
         };
 
         static u16 s_num_types[] = {
+            MASK(num_type::signed_),
             MASK(num_type::unsigned_),
-            MASK(num_type::unsigned_) | MASK(num_type::signed_) | MASK(num_type::zero_ext) | MASK(num_type::sign_ext),
-            MASK(num_type::unsigned_) | MASK(num_type::signed_) | MASK(num_type::zero_ext) | MASK(num_type::sign_ext),
-            MASK(num_type::unsigned_) | MASK(num_type::signed_),
-            MASK(num_type::unsigned_) | MASK(num_type::signed_) | MASK(num_type::zero_ext) | MASK(num_type::sign_ext),
-            MASK(num_type::unsigned_) | MASK(num_type::signed_) | MASK(num_type::zero_ext) | MASK(num_type::sign_ext),
+            MASK(num_type::unsigned_),
+            MASK(num_type::unsigned_),
+            MASK(num_type::unsigned_),
+            MASK(num_type::unsigned_),
         };
 
         static u16 s_cond_codes[] = {
@@ -436,7 +444,6 @@ namespace basecode::vm::bytecode {
     namespace logical {
         static str::slice_t s_names[] = {
             "mov"_ss,
-            "movn"_ss,
             "lsl"_ss,
             "lsr"_ss,
             "rol"_ss,
@@ -446,7 +453,7 @@ namespace basecode::vm::bytecode {
             "or"_ss,
             "eor"_ss,
             "tst"_ss,
-            "inv"_ss,
+            "not"_ss,
             "and"_ss,
         };
 
@@ -463,11 +470,9 @@ namespace basecode::vm::bytecode {
             MASK(size::qword) | MASK(size::dword) | MASK(size::word) | MASK(size::byte),
             MASK(size::qword) | MASK(size::dword) | MASK(size::word) | MASK(size::byte),
             MASK(size::qword) | MASK(size::dword) | MASK(size::word) | MASK(size::byte),
-            MASK(size::qword) | MASK(size::dword) | MASK(size::word) | MASK(size::byte),
         };
 
         static u16 s_operands[] = {
-            MASK(operand::rd_rn_rm) | MASK(operand::rd_imm32),
             MASK(operand::rd_rn_rm) | MASK(operand::rd_imm32),
             MASK(operand::rd_rn_rm) | MASK(operand::rd_rm_imm12),
             MASK(operand::rd_rn_rm) | MASK(operand::rd_rm_imm12),
@@ -479,12 +484,11 @@ namespace basecode::vm::bytecode {
             MASK(operand::rd_rn_rm) | MASK(operand::rd_rm_imm12),
             MASK(operand::rd_rn_rm) | MASK(operand::rd_rm_imm12),
             MASK(operand::rd_rm),
-            MASK(operand::rd_rn_rm),
+            MASK(operand::rd_rn_rm) | MASK(operand::rd_rm_imm12),
         };
 
         static u16 s_num_types[] = {
-            MASK(num_type::unsigned_) | MASK(num_type::signed_) | MASK(num_type::zero_ext) | MASK(num_type::sign_ext),
-            MASK(num_type::unsigned_) | MASK(num_type::signed_) | MASK(num_type::zero_ext) | MASK(num_type::sign_ext),
+            MASK(num_type::unsigned_) | MASK(num_type::zero_ext) | MASK(num_type::sign_ext),
             MASK(num_type::unsigned_),
             MASK(num_type::unsigned_),
             MASK(num_type::unsigned_),
@@ -499,7 +503,6 @@ namespace basecode::vm::bytecode {
         };
 
         static u16 s_cond_codes[] = {
-            MASK(cond_code::always),
             MASK(cond_code::always),
             MASK(cond_code::always),
             MASK(cond_code::always),
@@ -565,8 +568,27 @@ namespace basecode::vm::bytecode {
             "rd"_ss,
         };
 
+        static str::slice_t s_var_names[] = {
+            "none"_ss,
+            "imm32"_ss,
+            "rd_rm"_ss,
+            "rd_rn_rm"_ss,
+            "rm_imm32"_ss,
+            "rd_imm32"_ss,
+            "rd_rn_imm24"_ss,
+            "rd_rn_rm_ra"_ss,
+            "rd_imm24_imm12"_ss,
+            "rd_rn_rm_imm12"_ss,
+            "rd_rm_imm12"_ss,
+            "rd"_ss,
+        };
+
         str::slice_t name(u8 type) {
             return s_names[type];
+        }
+
+        str::slice_t var_name(u8 type) {
+            return s_var_names[type];
         }
     }
 

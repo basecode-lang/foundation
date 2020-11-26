@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
+#include <basecode/core/array.h>
 #include <basecode/vm/bytecode.h>
 #include <basecode/core/format.h>
 
@@ -25,13 +26,38 @@ using namespace basecode;
 TEST_CASE("basecode::vm::bytecode encoding") {
     using namespace basecode::vm;
 
-    format::print("static u16 s_decode_table[] = {{\n");
+    struct op_t final {
+        str_t                   desc        {};
+        str::slice_t            const_name  {};
+        str::slice_t            operands    {};
+        u32                     uop         {};
+        u16                     idx         {};
+    };
+
+    struct op_idx_t final {
+        str_t                   name    {};
+        u16                     idx     {};
+    };
+
+    struct group_t final {
+        str::slice_t            name    {};
+        array_t<op_t>           ops     {};
+        u32                     num_ops {};
+    };
+
+    array_t<op_idx_t> op_constants{};
+    array::init(op_constants);
+
+    group_t groups[bytecode::group::max]{};
 
     u32 op_idx{};
-    for (u8 i = 0; i < bytecode::group::logical; ++i) {
-        format::print("    /* {} */\n", bytecode::group::name(i));
-        const u8 num_ops = bytecode::group::group_size(i);
-        for (u8 j = 0; j < num_ops; ++j) {
+    for (u8 i = 0; i < bytecode::group::max; ++i) {
+        auto& group = groups[i];
+        array::init(group.ops);
+        group.num_ops = bytecode::group::group_size(i);
+        group.name    = bytecode::group::name(i);
+
+        for (u32 j = 0; j < group.num_ops; ++j) {
             u16 valid_sizes       {};
             u16 valid_operands    {};
             u16 valid_num_types   {};
@@ -103,25 +129,76 @@ TEST_CASE("basecode::vm::bytecode encoding") {
                         for (u16 n = 0; n < 16; ++n) {
                             if (!TST_MASK(valid_operands, n))
                                 continue;
-                            auto uop     = UOP(i, j, k, m, l, n);
-                            auto op_name = format::format("{}{}{}{}{}{}",
-                                                          uop_name,
-                                                          l > 0 ? bytecode::num_type::name(l) : ""_ss,
-                                                          k > 0 ? "." : "",
-                                                          k > 0 ? bytecode::size::name(k) : ""_ss,
-                                                                  m > 0 ? "." : "",
-                                                                  m > 0 ? bytecode::cond_code::name(m) : ""_ss);
-                            format::print("    [0x{:08x}] = 0x{:04x}, /* {:<10} {:<32} */\n",
-                                          uop,
-                                          op_idx++,
-                                          op_name,
-                                          bytecode::operand::name(n));
+                            auto& op_const = array::append(op_constants);
+                            op_const.idx = op_idx;
+                            op_const.name = format::format("{}{}{}{}{}{}_{}",
+                                                     uop_name,
+                                                     l > 0 ? bytecode::num_type::name(l) : ""_ss,
+                                                     k > 0 ? "_" : "",
+                                                     k > 0 ? bytecode::size::name(k) : ""_ss,
+                                                     m > 0 ? "_" : "",
+                                                     m > 0 ? bytecode::cond_code::name(m) : ""_ss,
+                                                     bytecode::operand::var_name(n));
+
+                            auto& op = array::append(group.ops);
+                            op.idx        = op_idx++;
+                            op.uop        = UOP(i, j, k, m, l, n);
+                            op.desc       = format::format("{}{}{}{}{}{}",
+                                                           uop_name,
+                                                           l > 0 ? bytecode::num_type::name(l) : ""_ss,
+                                                           k > 0 ? "." : "",
+                                                           k > 0 ? bytecode::size::name(k) : ""_ss,
+                                                           m > 0 ? "." : "",
+                                                           m > 0 ? bytecode::cond_code::name(m) : ""_ss);
+                            op.const_name = (str::slice_t) op_const.name;
+                            op.operands   = bytecode::operand::name(n);
                         }
                     }
                 }
             }
         }
+
+        std::sort(
+            std::begin(group.ops),
+            std::end(group.ops),
+            [](auto lhs, auto rhs) {
+                return lhs.uop < rhs.uop;
+            });
     }
 
+    for (const auto& constant : op_constants){
+        format::print("constexpr u16 {:<32} = 0x{:04x};\n", constant.name, constant.idx);
+    }
+
+    format::print("\n");
+
+    format::print("static u16 s_decode_table[] = {{\n");
+    u32 max_uop{};
+    for (const auto& group : groups) {
+        format::print("    /* {} */\n", group.name);
+        for (const auto& op : group.ops) {
+            format::print("    [0x{:08x}] = {:<32}, /* {:<10} {:<32} */\n",
+                          op.uop,
+                          op.const_name,
+                          op.desc,
+                          op.operands);
+            if (op.uop > max_uop)
+                max_uop = op.uop;
+        }
+    }
     format::print("}};\n");
+    format::print("// max_uop = {}\n", max_uop);
+
+    for (auto& group : groups) {
+        for (auto& op : group.ops) {
+            str::free(op.desc);
+            str::free(op.const_name);
+        }
+        array::free(group.ops);
+    }
+
+    for (auto& constant : op_constants) {
+        str::free(constant.name);
+    }
+    array::free(op_constants);
 }
