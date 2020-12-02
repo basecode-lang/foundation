@@ -1,26 +1,46 @@
-/*
-** Copyright (c) 2020 rxi
-**
-** Permission is hereby granted, free of charge, to any person obtaining a copy
-** of this software and associated documentation files (the "Software"), to
-** deal in the Software without restriction, including without limitation the
-** rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
-** sell copies of the Software, and to permit persons to whom the Software is
-** furnished to do so, subject to the following conditions:
-**
-** The above copyright notice and this permission notice shall be included in
-** all copies or substantial portions of the Software.
-**
-** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-** IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-** FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-** AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-** LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-** FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-** IN THE SOFTWARE.
-*/
+// ----------------------------------------------------------------------------
+// ____                               _
+// |  _\                             | |
+// | |_)| __ _ ___  ___  ___ ___   __| | ___ TM
+// |  _< / _` / __|/ _ \/ __/ _ \ / _` |/ _ \
+// | |_)| (_| \__ \  __/ (_| (_) | (_| |  __/
+// |____/\__,_|___/\___|\___\___/ \__,_|\___|
+//
+//      F O U N D A T I O N   P R O J E C T
+//
+// Copyright (C) 2020 Jeff Panici
+// All rights reserved.
+//
+// This software source file is licensed under the terms of MIT license.
+// For details, please read the LICENSE file.
+//
+// ----------------------------------------------------------------------------
+//
+// Based on the *fe* scheme interpreter at https://github.com/rxi/fe
+//
+// Copyright (c) 2020 rxi
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to
+// deal in the Software without restriction, including without limitation the
+// rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+// sell copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+// FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+// IN THE SOFTWARE.
+//
+// ----------------------------------------------------------------------------
 
-#include "fe.h"
+#include <basecode/core/scm.h>
 #include <basecode/core/error.h>
 #include <basecode/core/string.h>
 
@@ -65,7 +85,7 @@
                                     res = make_bool(ctx, NUMBER(va) op NUMBER(vb));             \
                                 )
 
-namespace basecode::fe {
+namespace basecode::scm {
     enum class prim_type_t : u8 {
         let,
         set,
@@ -953,7 +973,7 @@ namespace basecode::fe {
 
     obj_t* next_arg_no_chk(ctx_t* ctx, obj_t** arg) {
         obj_t* a = *arg;
-        if (TYPE(a) != fe::obj_type_t::pair)
+        if (TYPE(a) != obj_type_t::pair)
             return ctx->nil;
         *arg = CDR(a);
         return CAR(a);
@@ -1115,47 +1135,3 @@ namespace basecode::fe {
         return 0;
     }
 }
-
-#ifdef FE_STANDALONE
-
-#include <setjmp.h>
-
-static jmp_buf toplevel;
-static char buf[64000];
-
-static void onerror(fe_Context *ctx, const char *msg, fe_Object *cl) {
-  unused(ctx), unused(cl);
-  fprintf(stderr, "error: %s\n", msg);
-  longjmp(toplevel, -1);
-}
-
-
-int main(int argc, char **argv) {
-  int gc;
-  fe_Object *obj;
-  FILE *volatile fp = stdin;
-  fe_Context *ctx = fe_open(buf, sizeof(buf));
-
-  /* init input file */
-  if (argc > 1) {
-    fp = fopen(argv[1], "rb");
-    if (!fp) { fe_error(ctx, "could not open input file"); }
-  }
-
-  if (fp == stdin) { fe_handlers(ctx)->error = onerror; }
-  gc = fe_savegc(ctx);
-  setjmp(toplevel);
-
-  /* re(p)l */
-  for (;;) {
-    fe_restoregc(ctx, gc);
-    if (fp == stdin) { printf("> "); }
-    if (!(obj = fe_readfp(ctx, fp))) { break; }
-    obj = fe_eval(ctx, obj);
-    if (fp == stdin) { fe_writefp(ctx, obj, stdout); printf("\n"); }
-  }
-
-  return EXIT_SUCCESS;
-}
-
-#endif

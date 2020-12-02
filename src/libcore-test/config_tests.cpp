@@ -25,22 +25,22 @@
 
 using namespace basecode;
 
-static u0 validate_cvar(fe::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
-    auto binding = fe::get(ctx, fe::make_symbol(ctx, name), fe::nil(ctx));
-    auto cvar_value = fe::cdr(ctx, binding);
+static u0 validate_cvar(scm::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
+    auto binding = scm::get(ctx, scm::make_symbol(ctx, name), scm::nil(ctx));
+    auto cvar_value = scm::cdr(ctx, binding);
     if (expected) {
-        if (fe::type(ctx, cvar_value) != fe::obj_type_t::number)
+        if (scm::type(ctx, cvar_value) != scm::obj_type_t::number)
             REQUIRE(false);
-        auto native_value = u32(fe::to_number(ctx, cvar_value));
+        auto native_value = u32(scm::to_number(ctx, cvar_value));
         if (native_value != id)
             REQUIRE(false);
     } else {
-        if (cvar_value != fe::nil(ctx))
+        if (cvar_value != scm::nil(ctx))
             REQUIRE(false);
     }
 
     auto source = format::format("(if (is {} {}) #t #f)", id, name);
-    fe::obj_t* obj{};
+    scm::obj_t* obj{};
     config::eval(source, &obj);
     if (!obj)
         REQUIRE(false);
@@ -48,7 +48,7 @@ static u0 validate_cvar(fe::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
     str_t buf{};
     str::init(buf);
     str::reserve(buf, 64);
-    buf.length = fe::to_string(ctx, obj, (s8*) buf.data, buf.capacity);
+    buf.length = scm::to_string(ctx, obj, (s8*) buf.data, buf.capacity);
     if (expected) {
         if (buf != "#t") REQUIRE(false);
     } else {
@@ -63,7 +63,7 @@ TEST_CASE("basecode::config cvar add & remove") {
 
     if (!OK(config::cvar::add(cvar_id, enable_console_color, cvar_type_t::flag)))
         REQUIRE(false);
-    fe::ctx_t* ctx = config::system::context();
+    scm::ctx_t* ctx = config::system::context();
     validate_cvar(ctx, internal_enable_console_color, cvar_id, true);
 
     cvar_t* cvar{};
@@ -129,13 +129,13 @@ TEST_CASE("basecode::config terp eval") {
     result)
 )"_ss;
 
-    fe::obj_t* obj{};
-    fe::ctx_t* ctx = config::system::context();
+    scm::obj_t* obj{};
+    scm::ctx_t* ctx = config::system::context();
 
     config::eval(source, &obj);
     if (!obj) REQUIRE(false);
-    if (fe::type(ctx, obj) != fe::obj_type_t::number) REQUIRE(false);
-    auto value = fe::to_number(ctx, obj);
+    if (scm::type(ctx, obj) != scm::obj_type_t::number) REQUIRE(false);
+    auto value = scm::to_number(ctx, obj);
     if (value != 50) REQUIRE(false);
 
     stopwatch::stop(time);

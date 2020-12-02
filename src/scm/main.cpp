@@ -16,31 +16,77 @@
 //
 // ----------------------------------------------------------------------------
 
-#define CATCH_CONFIG_RUNNER
-#include <catch2/catch.hpp>
+#include <setjmp.h>
 #include <basecode/core/log.h>
 #include <basecode/core/ffi.h>
 #include <basecode/core/job.h>
+#include <basecode/core/scm.h>
 #include <basecode/core/term.h>
-#include <basecode/core/event.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/error.h>
 #include <basecode/core/locale.h>
 #include <basecode/core/config.h>
 #include <basecode/core/thread.h>
-#include <basecode/core/memory.h>
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/network.h>
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
-#include <basecode/core/configure.h>
-#include <basecode/core/log/system/spdlog.h>
-#include <basecode/core/log/system/syslog.h>
+#include <basecode/scm/configure.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
 
 using namespace basecode;
+
+static jmp_buf  s_top_level;
+static s8       s_buf[64000];
+
+static u0 on_error(scm::ctx_t* ctx, const s8* msg, scm::obj_t* cl) {
+    UNUSED(ctx);
+    UNUSED(cl);
+    fprintf(stderr, "error: %s\n", msg);
+    longjmp(s_top_level, -1);
+}
+
+static s32 repl(s32 argc, const s8** argv) {
+    FILE* fp = stdin;
+    auto ctx = scm::init(s_buf, sizeof(s_buf));
+
+    if (argc > 1) {
+        fp = fopen(argv[1], "rb");
+        if (!fp)
+            scm::error(ctx, "could not open input file");
+    }
+
+    if (fp == stdin)
+        scm::handlers(ctx)->error = on_error;
+
+    auto gc = scm::save_gc(ctx);
+
+    setjmp(s_top_level);
+
+    scm::obj_t* obj;
+
+    while (true) {
+        scm::restore_gc(ctx, gc);
+        if (fp == stdin) {
+            fprintf(stdout, "> ");
+            fflush(stdout);
+        }
+        obj = scm::read_fp(ctx, fp);
+        if (!obj)
+            break;
+        obj = scm::eval(ctx, obj);
+        if (fp == stdin) {
+            scm::write_fp(ctx, obj, stdout);
+            fprintf(stdout, "\n");
+            fflush(stdout);
+        }
+    }
+
+    scm::free(ctx);
+
+    return EXIT_SUCCESS;
+}
 
 s32 main(s32 argc, const s8** argv) {
     {
@@ -79,30 +125,17 @@ s32 main(s32 argc, const s8** argv) {
 
     {
         config_settings_t settings{};
-        settings.product_name  = string::interned::fold(CORE_PRODUCT_NAME);
-        settings.build_type    = string::interned::fold(CORE_BUILD_TYPE);
-        settings.version.major = CORE_VERSION_MAJOR;
-        settings.version.minor = CORE_VERSION_MINOR;
-        settings.test_runner   = true;
+        settings.product_name  = string::interned::fold(SCM_PRODUCT_NAME);
+        settings.build_type    = string::interned::fold(SCM_BUILD_TYPE);
+        settings.version.major = SCM_VERSION_MAJOR;
+        settings.version.minor = SCM_VERSION_MINOR;
+        settings.test_runner   = false;
         auto status = config::system::init(settings);
         if (!OK(status)) {
             format::print(stderr, "config::system::init error\n");
             return 1;
         }
     }
-
-    cvar_t* cvar{};
-    config::cvar::add(1, "enable-console-color", cvar_type_t::flag);
-    config::cvar::get(1, &cvar);
-    cvar->value.flag = true;
-
-    config::cvar::add(2, "log-path", cvar_type_t::string);
-    config::cvar::get(2, &cvar);
-    cvar->value.ptr = (u8*) string::interned::fold("/var/log"_ss).data;
-
-    config::cvar::add(3, "magick-weight", cvar_type_t::real);
-    config::cvar::get(3, &cvar);
-    cvar->value.real = 47.314f;
 
     auto core_config_path = "../etc/core.fe"_path;
     path_t config_path{};
@@ -119,9 +152,7 @@ s32 main(s32 argc, const s8** argv) {
     if (!OK(filesys::init()))           return 1;
     if (!OK(network::system::init()))   return 1;
 
-    auto rc = Catch::Session().run(argc, argv);
-
-    log::notice("shutdown test program");
+    s32 rc = repl(argc, argv);
 
     path::free(config_path);
     path::free(core_config_path);

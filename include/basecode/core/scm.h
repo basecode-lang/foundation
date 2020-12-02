@@ -1,17 +1,35 @@
-/*
-** Copyright (c) 2020 rxi
-**
-** This library is free software; you can redistribute it and/or modify it
-** under the terms of the MIT license. See `fe.c` for details.
-*/
+// ----------------------------------------------------------------------------
+// ____                               _
+// |  _\                             | |
+// | |_)| __ _ ___  ___  ___ ___   __| | ___ TM
+// |  _< / _` / __|/ _ \/ __/ _ \ / _` |/ _ \
+// | |_)| (_| \__ \  __/ (_| (_) | (_| |  __/
+// |____/\__,_|___/\___|\___\___/ \__,_|\___|
+//
+//      F O U N D A T I O N   P R O J E C T
+//
+// Copyright (C) 2020 Jeff Panici
+// All rights reserved.
+//
+// This software source file is licensed under the terms of MIT license.
+// For details, please read the LICENSE file.
+//
+// ----------------------------------------------------------------------------
+//
+// Based on the *fe* scheme interpreter at https://github.com/rxi/fe
+//
+// Copyright (c) 2020 rxi
+//
+// This library is free software; you can redistribute it and/or modify it
+// under the terms of the MIT license.
+//
+// ----------------------------------------------------------------------------
 
 #pragma once
 
 #include <basecode/core/types.h>
 
-#define FE_VERSION              "1.0"
-
-namespace basecode::fe {
+namespace basecode::scm {
     struct obj_t;
     struct ctx_t;
 

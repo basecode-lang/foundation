@@ -85,8 +85,6 @@ set(
 
     event.cpp ${CORE_INC_DIR}/event.h
 
-    fe/src/fe.cpp fe/src/fe.h
-
     filesys.cpp ${CORE_INC_DIR}/filesys.h
 
     ffi.cpp ${CORE_INC_DIR}/ffi.h
@@ -159,8 +157,11 @@ set(
 
     ${CORE_INC_DIR}/set.h
 
+    scm.cpp ${CORE_INC_DIR}/scm.h
+
     ${CORE_INC_DIR}/slice.h
     slice_utils.cpp ${CORE_INC_DIR}/slice_utils.h
+
     ${CORE_INC_DIR}/sql.h
 
     ${CORE_INC_DIR}/stack.h
