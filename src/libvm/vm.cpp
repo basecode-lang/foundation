@@ -26,11 +26,8 @@ namespace basecode::vm {
         };
 
         u8*                 heap_ptr    {(u8*) vm.heap};
-        instruction_t*      inst        {};
-        operand_data_t      oper_data   {};
-        u64                 inst_data   {};
-        status_t            status      {};
-        u8                  enc_data    {};
+        instruction_t*      inst;
+        status_t            status;
 
         VM_NEXT(vm);
 

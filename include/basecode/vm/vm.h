@@ -22,14 +22,12 @@
 #include <basecode/vm/bytecode.h>
 #include <basecode/vm/configure.h>
 
-#define VM_INC_PC(v)            ((v).gp[register_file::pc].qw += sizeof(instruction_t))
-#define VM_GET_PC(v)            ((v).gp[register_file::pc].qw)
-#define VM_SET_PC(v, a)         ((v).gp[register_file::pc].qw = (a))
+#define VM_INC_PC(v)            ((v).gp[bytecode::register_file::pc].qw += sizeof(instruction_t))
+#define VM_GET_PC(v)            ((v).gp[bytecode::register_file::pc].qw)
+#define VM_SET_PC(v, a)         ((v).gp[bytecode::register_file::pc].qw = (a))
 #define VM_NEXT(v)              SAFE_SCOPE(                                     \
         VM_INC_PC(v);                                                           \
         inst      = (instruction_t*) (heap_ptr + VM_GET_PC((v)));               \
-        inst_data = inst->data;                                                 \
-        enc_data  = inst->encoding;                                             \
         goto *s_micro_op[0];                                                    \
     )
 
@@ -38,7 +36,7 @@ namespace basecode {
     struct gp_register_t;
     struct flag_register_t;
 
-    constexpr u32 reg_file_size = 36;
+    constexpr u32 reg_file_size = 32;
 
     struct gp_register_t final {
         union {
@@ -56,10 +54,11 @@ namespace basecode {
     };
 
     struct fr_register_t final {
+        u64                     x:      1;
         u64                     n:      1;
         u64                     z:      1;
-        u64                     c:      1;
         u64                     v:      1;
+        u64                     c:      1;
         u64                     i:      1;
         u64                     pad:    58;
     };
