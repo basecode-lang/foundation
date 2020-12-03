@@ -117,5 +117,5 @@ TEST_CASE("basecode::error source formatted") {
     str_t fmt_buf{};
     str::init(fmt_buf);
     error::report::format_range(fmt_buf, start_id, start_id + 2);
-    format::print("{}", fmt_buf);
+//    format::print("{}", fmt_buf);
 }
