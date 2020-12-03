@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cstdio>
 #include <cstdint>
 #include <cstddef>
 #include <cstring>

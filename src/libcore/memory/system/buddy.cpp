@@ -17,14 +17,13 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/bits.h>
-#include <basecode/core/format.h>
 #include <basecode/core/memory/system/buddy.h>
 
 #define BIT_ARRAY_NUM_BITS                              (u32(8 * sizeof(u32)))
 #define BIT_ARRAY_INDEX_SHIFT                           (u32(__builtin_ctzl(BIT_ARRAY_NUM_BITS)))
 #define BIT_ARRAY_INDEX_MASK                            (BIT_ARRAY_NUM_BITS - 1UL)
 
-#define BUDDY_ILOG2(value)                              ((BUDDY_NUM_BITS - 1UL) - __builtin_clzl(value))
+#define BUDDY_ILOG2(value)                              (u32(BUDDY_NUM_BITS - 1UL) - __builtin_clz(value))
 #define BUDDY_NUM_BITS                                  (u32(8 * sizeof(u32)))
 #define BUDDY_MIN_LEAF_SIZE                             (sizeof(u0*) << 1UL)
 #define BUDDY_LEAF_LEVEL_OFFSET                         (BUDDY_ILOG2(BUDDY_MIN_LEAF_SIZE))

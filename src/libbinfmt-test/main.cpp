@@ -23,7 +23,6 @@
 #include <basecode/core/job.h>
 #include <basecode/core/term.h>
 #include <basecode/core/event.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/error.h>
 #include <basecode/core/locale.h>
 #include <basecode/core/config.h>
@@ -35,8 +34,6 @@
 #include <basecode/binfmt/binfmt.h>
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
-#include <basecode/core/log/system/spdlog.h>
-#include <basecode/core/log/system/syslog.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
 
@@ -94,7 +91,7 @@ s32 main(s32 argc, const s8** argv) {
     auto core_config_path = "../etc/core.fe"_path;
     path_t config_path{};
     filesys::bin_rel_path(config_path, core_config_path);
-    fe_Object* result{};
+    scm::obj_t* result{};
     if (!OK(config::eval(config_path, &result))) return 1;
 
     if (!OK(profiler::init()))          return 1;
