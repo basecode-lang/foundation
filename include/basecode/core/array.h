@@ -84,7 +84,9 @@ namespace basecode {
         u0 reset(Array_Concept auto& array) {
             using T = std::remove_reference_t<decltype(array)>;
             array.size = {};
-            std::memset(array.data, 0, array.capacity * sizeof(typename T::value_type));
+            std::memset(array.data,
+                        0,
+                        array.capacity * sizeof(typename T::value_type));
         }
 
         u0 clear(Array_Concept auto& array) {
@@ -124,7 +126,9 @@ namespace basecode {
             if (index >= array.size)
                 return;
             auto dest = array.data + index;
-            std::memcpy(dest, dest + 1, (array.size - index) * sizeof(typename T::value_type));
+            std::memcpy(dest,
+                        dest + 1,
+                        (array.size - index) * sizeof(typename T::value_type));
             --array.size;
         }
 
@@ -253,7 +257,9 @@ namespace basecode {
                 if (idx == -1) return false;
             }
             auto dest = array.data + idx;
-            std::memcpy(dest, dest + 1, (array.size - idx) * sizeof(typename T::value_type));
+            std::memcpy(dest,
+                        dest + 1,
+                        (array.size - idx) * sizeof(typename T::value_type));
             --array.size;
             return true;
         }
@@ -293,7 +299,9 @@ namespace basecode {
                 if (new_size > dest.capacity)
                     grow(dest, new_size);
             }
-            std::memcpy(dest.data + dest.size, src.data, src.size * sizeof(typename ST::value_type));
+            std::memcpy(dest.data + dest.size,
+                        src.data,
+                        src.size * sizeof(typename ST::value_type));
             dest.size += src.size;
         }
 
@@ -305,8 +313,11 @@ namespace basecode {
                 if (array.size + 1 > array.capacity)
                     grow(array);
             }
-            if (index < array.size)
-                std::memmove(array.data + index + 1, array.data + index, (array.size - index) * sizeof(typename T::value_type));
+            if (index < array.size) {
+                std::memmove(array.data + index + 1,
+                             array.data + index,
+                             (array.size - index) * sizeof(typename T::value_type));
+            }
             array.data[index] = value;
             ++array.size;
         }
@@ -323,7 +334,9 @@ namespace basecode {
                 if (src.size > dest.capacity)
                     grow(dest);
             }
-            std::memcpy(dest.data, src.data, src.size * sizeof(typename ST::value_type));
+            std::memcpy(dest.data,
+                        src.data,
+                        src.size * sizeof(typename ST::value_type));
             dest.size = src.size;
         }
 
@@ -332,7 +345,9 @@ namespace basecode {
 
             u32 i{};
 #if defined(__SSE4_2__) || defined(__SSE4_1__)
-            if constexpr (std::is_integral_v<typename T::value_type> || std::is_floating_point_v<typename T::value_type> || std::is_pointer_v<typename T::value_type>) {
+            if constexpr (std::is_integral_v<typename T::value_type>
+                    || std::is_floating_point_v<typename T::value_type>
+                    || std::is_pointer_v<typename T::value_type>) {
                 __m128i n;
                 if constexpr (T::size_per_16::value == 4) {
                     n = _mm_set1_epi32((s32) value);
@@ -384,7 +399,10 @@ namespace basecode {
                 return;
 
             new_capacity = std::max(array.size, new_capacity);
-            array.data = (typename T::value_type*) memory::realloc(array.alloc, array.data, new_capacity * sizeof(typename T::value_type), alignof(typename T::value_type));
+            array.data = (typename T::value_type*) memory::realloc(array.alloc,
+                                                                   array.data,
+                                                                   new_capacity * sizeof(typename T::value_type),
+                                                                   alignof(typename T::value_type));
             const auto data          = array.data + array.size;
             const auto size_to_clear = new_capacity > array.capacity ? new_capacity - array.capacity : 0;
             std::memset(data, 0, size_to_clear * sizeof(typename T::value_type));
@@ -399,8 +417,11 @@ namespace basecode {
                 if (array.size + 1 > array.capacity)
                     grow(array);
             }
-            if (index < array.size)
-                std::memmove(array.data + index + 1, array.data + index, (array.size - index) * sizeof(typename T::value_type));
+            if (index < array.size) {
+                std::memmove(array.data + index + 1,
+                             array.data + index,
+                             (array.size - index) * sizeof(typename T::value_type));
+            }
             array.data[index] = value;
             ++array.size;
         }

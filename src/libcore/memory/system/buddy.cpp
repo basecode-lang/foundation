@@ -121,7 +121,7 @@ namespace basecode::memory::buddy {
         return (offset ^ (sc->size >> level)) + (u8*) sc->heap;
     }
 
-    static u0* buddy_alloc_from_level(alloc_t* alloc, u32 level) {
+    static mem_result_t buddy_alloc_from_level(alloc_t* alloc, u32 level) {
         auto sc = &alloc->subclass.buddy;
         buddy_block_t* block_ptr        {};
         buddy_block_t* buddy_block_ptr;
@@ -136,7 +136,7 @@ namespace basecode::memory::buddy {
         }
 
         if (!block_ptr)
-            return block_ptr;
+            return mem_result_t{};
 
         index = index_of(alloc, block_ptr, block_at_level);
 
@@ -152,28 +152,31 @@ namespace basecode::memory::buddy {
             }
         }
 
+        mem_result_t r{};
+        r.mem = block_ptr;
+
         if (level > 0) {
             bit_array_not(sc->block_index, free_index(alloc, index));
-            alloc->total_allocated += 1U << (sc->total_levels - level);
+            r.size = 1U << (sc->total_levels - level);
         } else {
-            alloc->total_allocated += sc->size;
+            r.size = sc->size;
         }
 
-        return block_ptr;
+        return r;
     }
 
-    static u0 buddy_release_at_level(alloc_t* alloc, u0* ptr, u32 level) {
+    static u32 buddy_release_at_level(alloc_t* alloc, u0* ptr, u32 level) {
         u0* buddy_ptr = to_buddy(alloc, ptr, level);
-        u32  index = index_of(alloc, ptr, level);
         auto sc    = &alloc->subclass.buddy;
+        u32  index = index_of(alloc, ptr, level);
+        u32  size;
 
         if (level > 0) {
             bit_array_not(sc->block_index, free_index(alloc, index));
-            const auto size = 1U << (sc->total_levels - level);
+            size = 1U << (sc->total_levels - level);
             assert(size <= alloc->total_allocated);
-            alloc->total_allocated -= size;
         } else {
-            alloc->total_allocated -= (sc->size - sc->metadata_size);
+            size = sc->size - sc->metadata_size;
         }
 
         while (level > 0
@@ -191,6 +194,41 @@ namespace basecode::memory::buddy {
 
         bit_array_clear(sc->block_index, split_index(alloc, index));
         list_add(&sc->free_blocks[level], (buddy_block_t*) ptr);
+
+        return size;
+    }
+
+    static u32 fini(alloc_t* alloc) {
+        auto sc = &alloc->subclass.buddy;
+        memory::free(alloc->backing, sc->heap);
+        return sc->metadata_size;
+    }
+
+    static u32 free(alloc_t* alloc, u0* mem) {
+        if (!mem)
+            return {};
+        auto sc = &alloc->subclass.buddy;
+        auto index = index_of(alloc, mem, sc->max_level);
+        for (u32 level = sc->max_level; level > 0; --level) {
+            index = (index - 1) >> 1U;
+            if (bit_array_is_set(sc->block_index, split_index(alloc, index)))
+                return buddy_release_at_level(alloc, mem, level);
+        }
+        return buddy_release_at_level(alloc, mem, 0);
+    }
+
+    static u32 size(alloc_t* alloc, u0* mem) {
+        if (!mem)
+            return 0;
+        auto sc = &alloc->subclass.buddy;
+        auto index = index_of(alloc, mem, sc->max_level);
+        for (u32 level = sc->max_level; level > 0; --level) {
+            index = (index - 1) >> 1U;
+            if (bit_array_is_set(sc->block_index, split_index(alloc, index))) {
+                return 1U << (sc->total_levels - level);
+            }
+        }
+        return sc->size;
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
@@ -199,7 +237,9 @@ namespace basecode::memory::buddy {
         auto sc  = &alloc->subclass.buddy;
         sc->size = cfg->heap_size;
 
-        u8* heap = (u8*) memory::alloc(alloc->backing, sc->size, alignof(buddy_block_t));
+        u8* heap = (u8*) memory::alloc(alloc->backing,
+                                       sc->size,
+                                       alignof(buddy_block_t));
         sc->heap = heap;
 
         sc->extra_metadata = nullptr;
@@ -227,8 +267,10 @@ namespace basecode::memory::buddy {
         list_add(&sc->free_blocks[0], (buddy_block_t*) heap);
 
         const auto num_blocks = (sc->metadata_size + (BUDDY_MIN_LEAF_SIZE - 1)) / BUDDY_MIN_LEAF_SIZE;
-        for (u32 i = 0; i < num_blocks; ++i)
-            buddy_alloc_from_level(alloc, sc->max_level);
+        for (u32 i = 0; i < num_blocks; ++i) {
+            const auto r = buddy_alloc_from_level(alloc, sc->max_level);
+            alloc->total_allocated += r.size;
+        }
 
         sc->free_blocks = (buddy_block_t*) heap;
         sc->block_index = (u32*) (heap + (sizeof(buddy_block_t) * (sc->max_level + 1)));
@@ -248,56 +290,18 @@ namespace basecode::memory::buddy {
         }
     }
 
-    static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
-        if (!mem)
-            return;
-        auto sc = &alloc->subclass.buddy;
-        auto index = index_of(alloc, mem, sc->max_level);
-        for (u32 level = sc->max_level; level > 0; --level) {
-            index = (index - 1) >> 1U;
-            if (bit_array_is_set(sc->block_index, split_index(alloc, index))) {
-                freed_size = 1U << (sc->total_levels - level);
-                buddy_release_at_level(alloc, mem, level);
-                return;
-            }
-        }
-        freed_size = sc->size;
-        buddy_release_at_level(alloc, mem, 0);
-   }
-
-    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
-        u32 temp_freed{};
-        u32 total_freed{};
-
-        auto sc  = &alloc->subclass.buddy;
-        memory::free(alloc->backing, sc->heap, &temp_freed);
-        total_freed += temp_freed;
-        total_freed += sc->metadata_size;
-        alloc->total_allocated -= sc->metadata_size;
-
-        if (freed_size) *freed_size = total_freed;
-        if (enforce) assert(alloc->total_allocated == 0);
-    }
-
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
+    static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
         UNUSED(align);
-        u32 level = size_to_level(alloc, size);
-        auto p = buddy_alloc_from_level(alloc, level);
-        if (p){
-            alloc_size = 1U << (alloc->subclass.buddy.total_levels - level);
-            return p;
-        }
-        alloc_size = 0;
-        return nullptr;
+        return buddy_alloc_from_level(alloc, size_to_level(alloc, size));
     }
 
-    static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size) {
-        buddy::free(alloc, mem, old_size);
-        u32 alloc_size{};
-        return buddy::alloc(alloc, size, align, alloc_size);
+    static mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
+        buddy::free(alloc, mem);
+        return buddy::alloc(alloc, size, align);
     }
 
     alloc_system_t g_system{
+        .size       = size,
         .init       = init,
         .fini       = fini,
         .free       = free,

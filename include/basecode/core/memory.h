@@ -23,8 +23,7 @@
 #define IS_PROXY(a)     (a->system && a->system->type == alloc_type_t::proxy)
 
 namespace basecode {
-    static constexpr u32 header_pad_value   = 0xffffffffu;
-    using mspace                            = u0*;
+    using mspace                    = u0*;
 
     struct slab_t;
     struct alloc_t;
@@ -45,23 +44,26 @@ namespace basecode {
         dlmalloc,
     };
 
-    using alloc_init_callback_t     = u0  (*)(alloc_t*, alloc_config_t*);
-    using alloc_free_callback_t     = u0  (*)(alloc_t*, u0* mem, u32& freed_size);
-    using alloc_fini_callback_t     = u0  (*)(alloc_t*, b8 enforce, u32* freed_size);
-    using alloc_alloc_callback_t    = u0* (*)(alloc_t*, u32 size, u32 align, u32& allocated_size);
-    using alloc_realloc_callback_t  = u0* (*)(alloc_t*, u0* mem, u32 size, u32 align, u32& old_size);
+    struct mem_result_t final {
+        u0*                     mem;
+        s32                     size;
+    } __attribute__((aligned(16)));
+
+    using mem_fini_callback_t       = u32 (*)(alloc_t*);
+    using mem_size_callback_t       = u32 (*)(alloc_t*, u0* mem);
+    using mem_free_callback_t       = u32 (*)(alloc_t*, u0* mem);
+    using mem_init_callback_t       = u0  (*)(alloc_t*, alloc_config_t*);
+    using mem_alloc_callback_t      = mem_result_t (*)(alloc_t*, u32 size, u32 align);
+    using mem_realloc_callback_t    = mem_result_t (*)(alloc_t*, u0* mem, u32 size, u32 align);
 
     struct alloc_system_t final {
-        alloc_init_callback_t       init;
-        alloc_fini_callback_t       fini;
-        alloc_free_callback_t       free;
-        alloc_alloc_callback_t      alloc;
-        alloc_realloc_callback_t    realloc;
+        mem_size_callback_t         size;
+        mem_init_callback_t         init;
+        mem_fini_callback_t         fini;
+        mem_free_callback_t         free;
+        mem_alloc_callback_t        alloc;
+        mem_realloc_callback_t      realloc;
         alloc_type_t                type;
-    };
-
-    struct alloc_header_t final {
-        u32                         size;
     };
 
     union alloc_subclass_t final {
@@ -116,6 +118,7 @@ namespace basecode {
         alloc_t*                    backing;
         alloc_subclass_t            subclass;
         u32                         total_allocated;
+        u32                         pad;
     };
 
     namespace memory {
@@ -137,18 +140,9 @@ namespace basecode {
 
             usize os_alloc_granularity();
 
-            inline alloc_header_t* header(u0* data) {
-                auto p = static_cast<u32*>(data);
-                while (p[-1] == header_pad_value)
-                    --p;
-                return reinterpret_cast<alloc_header_t*>(p - 1);
-            }
-
             b8 set_page_executable(u0* ptr, usize size);
 
-            inline u32 size_with_padding(u32 size, u32 align) {
-                return size + align + sizeof(alloc_header_t);
-            }
+            u32 free(alloc_t* alloc, b8 enforce = true);
 
             inline u0* align_forward(u0* p, u32 align, u32& adjust) {
                 const auto pi = uintptr_t(p);
@@ -157,43 +151,30 @@ namespace basecode {
                 return (u0*) aligned;
             }
 
-            inline u0 fill(alloc_header_t* header, u0* data, u32 size) {
-                header->size = size;
-                auto p = (u32*) header + 1;
-                while (p < data)
-                    *p++ = header_pad_value;
-            }
-
-            inline u0* data_pointer(alloc_header_t* header, u32 align) {
-                u0* p = header + 1;
-                u32 adjust{};
-                return align_forward(p, align, adjust);
-            }
-
             alloc_t* make(alloc_type_t type, alloc_config_t* config = {});
-
-            u0 free(alloc_t* alloc, b8 enforce = true, u32* freed_size = {});
 
             status_t init(alloc_type_t type, u32 heap_size = 32 * 1024 * 1024, u0* base = {});
         }
 
+        u0* alloc(alloc_t* alloc);
+
         alloc_t* unwrap(alloc_t* alloc);
+
+        u32 size(alloc_t* alloc, u0* mem);
+
+        u32 free(alloc_t* alloc, u0* mem);
 
         str::slice_t type_name(alloc_type_t type);
 
         str::slice_t status_name(status_t status);
 
-        u0* alloc(alloc_t* alloc, u32* alloc_size = {});
+        u32 fini(alloc_t* alloc, b8 enforce = true);
 
-        u0 free(alloc_t* alloc, u0* mem, u32* freed_size = {});
+        u0* alloc(alloc_t* alloc, u32 size, u32 align = sizeof(u64));
 
-        u0 fini(alloc_t* alloc, b8 enforce = true, u32* freed_size = {});
-
-        u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align = sizeof(u32));
+        u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align = sizeof(u64));
 
         status_t init(alloc_t* alloc, alloc_type_t type, alloc_config_t* config = {});
-
-        u0* alloc(alloc_t* alloc, u32 size, u32 align = sizeof(u32), u32* alloc_size = {});
     }
 }
 

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#define FOOTERS         1
 #define MSPACES         1
 #define HAVE_MMAP       1
 #define USE_LOCKS       0

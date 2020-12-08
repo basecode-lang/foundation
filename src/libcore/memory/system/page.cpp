@@ -20,6 +20,35 @@
 #include <basecode/core/memory/system/page.h>
 
 namespace basecode::memory::page {
+    static u32 fini(alloc_t* alloc) {
+        auto backing   = alloc->backing->system;
+        auto sc        = &alloc->subclass.page;
+        auto curr_page = sc->head;
+        u32 total_freed{};
+        while (curr_page) {
+            auto prev_page = curr_page->prev;
+            total_freed += backing->free(alloc->backing, curr_page);
+            curr_page = prev_page;
+        }
+        return total_freed;
+    }
+
+    static u32 size(alloc_t* alloc, u0* mem) {
+        UNUSED(alloc);
+        UNUSED(mem);
+        return 0;
+    }
+
+    static u32 free(alloc_t* alloc, u0* mem) {
+        auto sc   = &alloc->subclass.page;
+        auto page = (page_header_t*) mem - 1;
+        if (page->next) page->next->prev = page->prev;
+        if (page->prev) page->prev->next = page->next;
+        if (sc->head == mem) sc->head    = page->next;
+        if (sc->tail == mem) sc->tail    = page->prev;
+        return alloc->backing->system->free(alloc->backing, mem);
+    }
+
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto cfg = (page_config_t*) config;
         auto sc  = &alloc->subclass.page;
@@ -27,38 +56,11 @@ namespace basecode::memory::page {
         alloc->backing = cfg->backing;
         sc->cursor     = sc->tail = sc->head = {};
         auto page_size = memory::system::os_page_size();
-        sc->page_size  = (page_size * std::max<u8>(1, cfg->num_pages)) - (sizeof(page_header_t) + sizeof(alloc_header_t));
+        sc->page_size  = (page_size * std::max<u8>(1, cfg->num_pages)) - sizeof(page_header_t);
         assert(alloc->backing);
     }
 
-    static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
-        auto sc   = &alloc->subclass.page;
-        auto page = (page_header_t*) mem - 1;
-        if (page->next) page->next->prev = page->prev;
-        if (page->prev) page->prev->next = page->next;
-        if (sc->head == mem) sc->head    = page->next;
-        if (sc->tail == mem) sc->tail    = page->prev;
-        alloc->backing->system->free(alloc->backing, mem, freed_size);
-        alloc->total_allocated -= freed_size;
-    }
-
-    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
-        auto backing   = alloc->backing->system;
-        auto sc        = &alloc->subclass.page;
-        auto curr_page = sc->head;
-        u32 temp_freed{}, total_freed{};
-        while (curr_page) {
-            auto prev_page = curr_page->prev;
-            backing->free(alloc->backing, curr_page, temp_freed);
-            alloc->total_allocated -= temp_freed;
-            total_freed += temp_freed;
-            curr_page = prev_page;
-        }
-        if (freed_size) *freed_size = total_freed;
-        if (enforce) assert(alloc->total_allocated == 0);
-    }
-
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
+    static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
         UNUSED(size); UNUSED(align);
         auto sc      = &alloc->subclass.page;
         auto backing = alloc->backing;
@@ -68,10 +70,14 @@ namespace basecode::memory::page {
             sc->cursor = sc->cursor->next;
         }
         if (!page) {
-            page = (page_header_t*) backing->system->alloc(backing, sc->page_size, alignof(page_header_t), alloc_size);
+            const auto r = backing->system->alloc(backing,
+                                                  sc->page_size,
+                                                  alignof(page_header_t));
+            page = (page_header_t*) r.mem;
             sc->count++;
-            alloc->total_allocated += alloc_size;
-            if (!sc->tail) sc->tail = page;
+            if (!sc->tail) {
+                sc->tail = page;
+            }
             if (sc->head) {
                 page->prev     = sc->head;
                 sc->head->next = page;
@@ -80,10 +86,11 @@ namespace basecode::memory::page {
             }
             sc->head = page;
         }
-        return ++page;
+        return mem_result_t{++page, s32(sc->page_size)};
     }
 
     alloc_system_t g_system{
+        .size       = size,
         .init       = init,
         .fini       = fini,
         .free       = free,

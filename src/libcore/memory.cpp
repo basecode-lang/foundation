@@ -83,9 +83,12 @@ namespace basecode::memory {
         }
 
         u0 print_allocators() {
-            format::print("g_system.allocators.size = {}\n", t_system.allocators.size);
+            format::print("g_system.allocators.size = {}\n",
+                          t_system.allocators.size);
             for (auto alloc : t_system.allocators) {
-                format::print("alloc = {}, alloc->system->type = {}\n", (u0*) alloc, type_name(alloc->system->type));
+                format::print("alloc = {}, alloc->system->type = {}\n",
+                              (u0*) alloc,
+                              type_name(alloc->system->type));
             }
         }
 
@@ -109,15 +112,13 @@ namespace basecode::memory {
                 PROT_READ | PROT_WRITE | PROT_EXEC) == 0;
         }
 
-        u0 free(alloc_t* alloc, b8 enforce, u32* freed_size) {
+        u32 free(alloc_t* alloc, b8 enforce) {
             if (!array::erase(t_system.allocators, alloc))
-                return;
-            u32 temp_freed{};
-            memory::fini(alloc, enforce, &temp_freed);
+                return {};
+            const auto all_freed = memory::fini(alloc, enforce);
             if (IS_PROXY(alloc))
                 memory::proxy::remove(alloc);
-            memory::free(&t_system.slab_alloc, alloc);
-            if (freed_size) *freed_size = temp_freed;
+            return memory::free(&t_system.slab_alloc, alloc) + all_freed;
         }
 
         alloc_t* make(alloc_type_t type, alloc_config_t* config) {
@@ -139,7 +140,8 @@ namespace basecode::memory {
 #endif
             switch (type) {
                 case alloc_type_t::default_: {
-                    auto status = memory::init(&t_system.default_alloc, alloc_type_t::default_);
+                    auto status = memory::init(&t_system.default_alloc,
+                                               alloc_type_t::default_);
                     if (!OK(status))
                         return status;
                     break;
@@ -148,7 +150,9 @@ namespace basecode::memory {
                     dl_config_t dl_config{};
                     dl_config.base = base;
                     dl_config.heap_size = heap_size;
-                    auto status = memory::init(&t_system.default_alloc, alloc_type_t::dlmalloc, &dl_config);
+                    auto status = memory::init(&t_system.default_alloc,
+                                               alloc_type_t::dlmalloc,
+                                               &dl_config);
                     if (!OK(status))
                         return status;
                     break;
@@ -171,10 +175,46 @@ namespace basecode::memory {
         }
     }
 
+    u0* alloc(alloc_t* alloc) {
+        if (!alloc->system || !alloc->system->alloc)
+            return {};
+        const auto r = alloc->system->alloc(alloc, 0, 0);
+        alloc->total_allocated += r.size;
+        return r.mem;
+    }
+
     alloc_t* unwrap(alloc_t* alloc) {
         while (alloc->system->type == alloc_type_t::proxy)
             alloc = alloc->backing;
         return alloc;
+    }
+
+    u32 size(alloc_t* alloc, u0* mem) {
+        if (!mem || !alloc || !alloc->system || !alloc->system->size)
+            return {};
+        return alloc->system->size(alloc, mem);
+    }
+
+    u32 free(alloc_t* alloc, u0* mem) {
+        if (!mem || !alloc->system || !alloc->system->free)
+            return {};
+        const auto size_freed = alloc->system->free(alloc, mem);
+        if (alloc->total_allocated >= size_freed)
+            alloc->total_allocated -= size_freed;
+        return size_freed;
+    }
+
+    u32 fini(alloc_t* alloc, b8 enforce) {
+        if (!alloc->system || !alloc->system->fini)
+            return {};
+        const auto size_freed = alloc->system->fini(alloc);
+        if (alloc->total_allocated >= size_freed)
+            alloc->total_allocated -= size_freed;
+        if (enforce)
+            assert(alloc->total_allocated == 0);
+        meta::untrack(alloc);
+        alloc->backing = {};
+        return size_freed;
     }
 
     str::slice_t type_name(alloc_type_t type) {
@@ -185,42 +225,20 @@ namespace basecode::memory {
         return s_status_names[(u32) status];
     }
 
-    u0* alloc(alloc_t* alloc, u32* alloc_size) {
-        if (!alloc->system || !alloc->system->alloc) return {};
-        u32 temp{};
-        auto mem = alloc->system->alloc(alloc, 0, 0, temp);
-        if (alloc_size) *alloc_size = temp;
-        return mem;
-    }
-
-    u0 free(alloc_t* alloc, u0* mem, u32* freed_size) {
-        if (!mem || !alloc->system || !alloc->system->free) return;
-        u32 temp{};
-        alloc->system->free(alloc, mem, temp);
-        if (freed_size) *freed_size = temp;
-    }
-
-    u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
-        if (!alloc->system || !alloc->system->fini) return;
-        u32 temp{};
-        alloc->system->fini(alloc, enforce, &temp);
-        meta::untrack(alloc);
-        alloc->backing = {};
-        if (freed_size) *freed_size = temp;
+    u0* alloc(alloc_t* alloc, u32 size, u32 align) {
+        if (!size || !alloc->system || !alloc->system->alloc)
+            return {};
+        const auto r = alloc->system->alloc(alloc, size, align);
+        alloc->total_allocated += r.size;
+        return r.mem;
     }
 
     u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
-        if (!alloc->system || !alloc->system->realloc) return {};
-        u32 old_size{};
-        return alloc->system->realloc(alloc, mem, size, align, old_size);
-    }
-
-    u0* alloc(alloc_t* alloc, u32 size, u32 align, u32* alloc_size) {
-        if (!size || !alloc->system || !alloc->system->alloc) return {};
-        u32 temp{};
-        auto mem = alloc->system->alloc(alloc, size, align, temp);
-        if (alloc_size) *alloc_size = temp;
-        return mem;
+        if (!alloc->system || !alloc->system->realloc)
+            return {};
+        const auto r = alloc->system->realloc(alloc, mem, size, align);
+        alloc->total_allocated += r.size;
+        return r.mem;
     }
 
     status_t init(alloc_t* alloc, alloc_type_t type, alloc_config_t* config) {

@@ -170,12 +170,12 @@ TEST_CASE("basecode::cxx example program") {
     auto& mod       = cxx::program::add_module(pgm, expected_filename, expected_revision);
     auto& top_level = module::get_scope(mod, mod.root_scope_idx);
 
-    auto int_ident_id       = scope::expr::ident(top_level, expected_int_ident);
-    auto int_type_id        = scope::type::s32_(top_level, int_ident_id);
-    auto char_ident_id      = scope::expr::ident(top_level, expected_char_ident);
-    auto char_type_id       = scope::type::s8_(top_level, char_ident_id);
-    auto char_ptr_id        = scope::type::ptr(top_level, char_type_id);
-    auto char_ptr_ptr_id    = scope::type::ptr(top_level, char_ptr_id);
+    auto int_ident_id    = scope::expr::ident(top_level, expected_int_ident);
+    auto int_type_id     = scope::type::s32_(top_level, int_ident_id);
+    auto char_ident_id   = scope::expr::ident(top_level, expected_char_ident);
+    auto char_type_id    = scope::type::s8_(top_level, char_ident_id);
+    auto char_ptr_id     = scope::type::ptr(top_level, char_type_id);
+    auto char_ptr_ptr_id = scope::type::ptr(top_level, char_ptr_id);
 
     //
     // int main(int argc, const char** argv) {
@@ -259,7 +259,12 @@ TEST_CASE("basecode::cxx example program") {
     scope::stmt::empty(top_level);
     scope::stmt::pp::include_system(top_level, "cstdio"_ss);
     scope::stmt::empty(top_level);
-    scope::stmt::def(top_level, scope::type::func(top_level, main_scope.id, int_type_id, main_ident_id, main_params_list_id));
+    scope::stmt::def(top_level,
+                     scope::type::func(top_level,
+                                       main_scope.id,
+                                       int_type_id,
+                                       main_ident_id,
+                                       main_params_list_id));
     scope::pop(top_level);
 
     REQUIRE(OK(cxx::program::finalize(pgm)));
@@ -294,13 +299,22 @@ TEST_CASE("basecode::cxx example program") {
         }
     }
 
+    REQUIRE(OK(status));
+
     memory::proxy::proxy_array_t proxies{};
     array::init(proxies);
     defer(array::free(proxies));
     memory::proxy::active(proxies);
-    for (auto proxy : proxies) {
-        format::print("{:<40} {:>10}\n", memory::proxy::name(proxy->alloc), proxy->alloc->total_allocated);
-    }
 
-    REQUIRE(OK(status));
+    str_t buf{};
+    str::init(buf);
+    {
+        str_buf_t fmt_buf(&buf);
+        for (auto proxy : proxies) {
+            format::format_to(fmt_buf, "{:<40} ", memory::proxy::name(proxy->alloc));
+            format::unitized_byte_size(fmt_buf, proxy->alloc->total_allocated);
+            format::format_to(fmt_buf, "\n");
+        }
+    }
+    format::print("{}\n", buf);
 }

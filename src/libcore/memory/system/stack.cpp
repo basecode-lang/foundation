@@ -19,22 +19,21 @@
 #include <basecode/core/memory/system/stack.h>
 
 namespace basecode::memory::stack {
-    static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
-        auto h = system::header(mem);
-        freed_size = h->size;
-        alloc->total_allocated -= freed_size;
+    static u32 free(alloc_t* alloc, u0* mem) {
+        UNUSED(alloc);
+        UNUSED(mem);
+        return 0;
     }
 
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
-        alloc_size = system::size_with_padding(size, align);
-        auto h = (alloc_header_t*) alloca(alloc_size);
-        auto p = system::data_pointer(h, align);
-        system::fill(h, p, alloc_size);
-        alloc->total_allocated += alloc_size;
-        return p;
+    static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
+        UNUSED(size);
+        UNUSED(align);
+        UNUSED(alloc);
+        return mem_result_t{alloca(size), s32(size)};
     }
 
     alloc_system_t                      g_stack_system{
+        .size                           = {},
         .init                           = {},
         .fini                           = {},
         .free                           = free,

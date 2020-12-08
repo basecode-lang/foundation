@@ -141,12 +141,15 @@ namespace basecode {
             storage.id    = 1;
             storage.alloc = memory::proxy::make(alloc, "bass"_ss);
 
-            array::init(storage.index, memory::proxy::make(storage.alloc, "bass::index"_ss));
+            array::init(storage.index,
+                        memory::proxy::make(storage.alloc, "bass::index"_ss));
 
             page_config_t page_config{};
             page_config.num_pages = num_pages;
             page_config.backing   = storage.alloc;
-            storage.page_alloc    = memory::proxy::make(memory::system::make(alloc_type_t::page, &page_config), "bass::page"_ss, true);
+            storage.page_alloc    = memory::proxy::make(memory::system::make(alloc_type_t::page, &page_config),
+                                                        "bass::page"_ss,
+                                                        true);
 
             bump_config_t bump_config{};
             bump_config.type          = bump_type_t::allocator;
@@ -182,9 +185,9 @@ namespace basecode {
             cursor.header->value = record_size;
             cursor.header->kind  = kind::header;
 
-            ++cursor.storage->index.size;
             if (cursor.storage->index.capacity <= cursor.id)
                 array::grow(cursor.storage->index);
+            ++cursor.storage->index.size;
             auto& index  = cursor.storage->index[cursor.id - 1];
             index.page   = cursor.page;
             index.offset = cursor.offset;

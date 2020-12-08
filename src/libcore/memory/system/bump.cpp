@@ -20,32 +20,35 @@
 #include <basecode/core/memory/system/bump.h>
 
 namespace basecode::memory::bump {
+    static u32 fini(alloc_t* alloc) {
+        auto sc = &alloc->subclass.bump;
+        sc->buf    = {};
+        sc->offset = sc->end_offset = {};
+        return alloc->total_allocated;
+    }
+
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
-        auto cfg   = (bump_config_t*) config;
-        auto sc    = &alloc->subclass.bump;
+        auto cfg = (bump_config_t*) config;
+        auto sc  = &alloc->subclass.bump;
         switch (cfg->type) {
-            case bump_type_t::existing: sc->buf         = cfg->backing.buf;                             break;
-            case bump_type_t::allocator:alloc->backing  = cfg->backing.alloc; assert(alloc->backing);   break;
+            case bump_type_t::existing:
+                sc->buf = cfg->backing.buf;
+                break;
+            case bump_type_t::allocator:
+                alloc->backing  = cfg->backing.alloc;
+                assert(alloc->backing);
+                break;
         }
         sc->offset = sc->end_offset = {};
     }
 
-    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
-        UNUSED(enforce);
-        auto sc = &alloc->subclass.bump;
-        if (freed_size) *freed_size = alloc->total_allocated;
-        sc->buf                = {};
-        alloc->total_allocated = {};
-        sc->offset             = sc->end_offset = {};
-    }
-
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
+    static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
         u32 temp_size{};
-        alloc_size = 0;
         auto sc  = &alloc->subclass.bump;
         if (!sc->buf || sc->offset + (size + align) > sc->end_offset) {
             if (alloc->backing) {
-                sc->buf = alloc->backing->system->alloc(alloc->backing, size, align, temp_size);
+                const auto r = alloc->backing->system->alloc(alloc->backing, size, align);
+                sc->buf = r.mem;
             } else {
                 // XXX:
                 assert(false);
@@ -54,12 +57,15 @@ namespace basecode::memory::bump {
             sc->end_offset = temp_size;
         }
         u32  align_adjust{};
-        auto mem = memory::system::align_forward((u8*) sc->buf + sc->offset, align, align_adjust);
+        auto mem = memory::system::align_forward((u8*) sc->buf + sc->offset,
+                                                 align,
+                                                 align_adjust);
         sc->offset += size + align_adjust;
-        return mem;
+        return mem_result_t{mem, s32(size + align_adjust)};
     }
 
     alloc_system_t g_system{
+        .size       = {},
         .init       = init,
         .fini       = fini,
         .free       = {},

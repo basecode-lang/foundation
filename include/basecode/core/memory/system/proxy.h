@@ -64,4 +64,9 @@ namespace basecode {
     }
 }
 
-FORMAT_TYPE(basecode::proxy_pair_t, format_to(ctx.out(), "[alloc: {}, name_id: {}, paid_id: {}]", (basecode::u0*) data.alloc, data.name_id, data.pair_id));
+FORMAT_TYPE(basecode::proxy_pair_t,
+            format_to(ctx.out(),
+                      "[alloc: {}, name_id: {}, paid_id: {}]",
+                      (basecode::u0*) data.alloc,
+                      data.name_id,
+                      data.pair_id));

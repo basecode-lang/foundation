@@ -67,13 +67,16 @@ namespace basecode::memory::slab {
         return sc->head;
     }
 
-    static slab_t* grow(alloc_t* alloc, u32& alloc_size) {
-        auto sc   = &alloc->subclass.slab;
-        auto mem  = (u8*) memory::alloc(alloc->backing, sc->page_size, 8, &alloc_size);
+    static std::tuple<slab_t*, u32> grow(alloc_t* alloc) {
+        auto       sc  = &alloc->subclass.slab;
+        const auto r   = alloc->backing->system->alloc(alloc->backing, sc->page_size, 8);
+        auto       mem = (u8*) r.mem;
         sc->count++;
 
         u32  align_adjust{};
-        auto slab = (slab_t*) system::align_forward(mem + sc->page_size - slab_size, alignof(slab_t), align_adjust);
+        auto slab = (slab_t*) system::align_forward(mem + sc->page_size - slab_size,
+                                                    alignof(slab_t),
+                                                    align_adjust);
         slab->buf_count = {};
         slab->page      = mem;
         slab->free_list = mem;
@@ -84,7 +87,24 @@ namespace basecode::memory::slab {
         for (auto p  = mem; p < last_buf; p += eff_size)
             *((u0**) p) = p + eff_size;
 
-        return move_front(alloc, slab);
+        return {move_front(alloc, slab), r.size};
+    }
+
+    static u32 fini(alloc_t* alloc) {
+        auto sc   = &alloc->subclass.slab;
+        auto curr = sc->head;
+        u32 total_freed{};
+        while (curr) {
+            total_freed += memory::free(alloc->backing, curr->page);
+            curr = curr->next;
+        }
+        return total_freed;
+    }
+
+    static u32 size(alloc_t* alloc, u0* mem) {
+        UNUSED(alloc);
+        UNUSED(mem);
+        return 0;
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
@@ -97,15 +117,14 @@ namespace basecode::memory::slab {
         sc->buf_align  = std::max<u8>(cfg->buf_align, alignof
             (u0*));
         sc->buf_size   = std::max<u32>(cfg->buf_size, sizeof(u0*));
-        const auto page_overhead = sc->buf_align < 8 ? 8 :
-                                   sc->buf_align + sizeof(alloc_header_t);
+        const auto page_overhead = sc->buf_align < 8 ? 8 : sc->buf_align;
         sc->page_size     = (system::os_page_size() - page_overhead) *
                             sc->num_pages;
         sc->buf_max_count = (sc->page_size - slab_size) /
                             sc->buf_size;
     }
 
-    static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
+    static u32 free(alloc_t* alloc, u0* mem) {
         auto sc = &alloc->subclass.slab;
 
         auto curr = sc->head;
@@ -118,60 +137,49 @@ namespace basecode::memory::slab {
         }
 
         if (!curr || !curr->page)
-            return;
+            return {};
 
         u32 align_adjust{};
-        auto slab = (slab_t*) system::align_forward((u8*) curr->page + sc->page_size - slab_size, alignof(slab_t), align_adjust);
+        auto slab = (slab_t*) system::align_forward((u8*) curr->page + sc->page_size - slab_size,
+                                                    alignof(slab_t),
+                                                    align_adjust);
         *((u0**) mem) = slab->free_list;
         slab->free_list = mem;
         --slab->buf_count;
 
+        u32 freed_size{};
         if (slab->buf_count == 0) {
             remove(alloc, slab);
-            memory::free(alloc->backing, slab->page, &freed_size);
-            alloc->total_allocated -= freed_size;
-        } else {
-            freed_size = {};
+            freed_size = memory::free(alloc->backing, slab->page);
         }
 
         if (slab->buf_count == sc->buf_max_count - 1)
             move_front(alloc, slab);
+
+        return freed_size;
     }
 
-    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
-        auto sc   = &alloc->subclass.slab;
-        auto curr = sc->head;
-        u32 temp_size{}, total_freed{};
-        while (curr) {
-            memory::free(alloc->backing, curr->page, &temp_size);
-            total_freed += temp_size;
-            curr = curr->next;
-        }
-        alloc->total_allocated -= total_freed;
-        if (freed_size) *freed_size = total_freed;
-        if (enforce) assert(alloc->total_allocated == 0);
-    }
-
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
+    static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
         UNUSED(size);
         UNUSED(align);
+        mem_result_t r{};
         auto sc        = &alloc->subclass.slab;
         auto head_slab = sc->head;
         if (!head_slab || head_slab->buf_count == sc->buf_max_count) {
-            head_slab = grow(alloc, alloc_size);
-        } else {
-            alloc_size = {};
+            auto [slab_mem, slab_size] = grow(alloc);
+            head_slab = slab_mem;
+            r.size = slab_size;
         }
-        u0* buf = head_slab->free_list;
-        head_slab->free_list = *((u0**) buf);
+        r.mem = head_slab->free_list;
+        head_slab->free_list = *((u0**) r.mem);
         ++head_slab->buf_count;
         if (head_slab->buf_count == sc->buf_max_count)
             move_back(alloc, head_slab);
-        alloc->total_allocated += alloc_size;
-        return buf;
+        return r;
     }
 
     alloc_system_t g_alloc_system{
+        .size       = size,
         .init       = init,
         .fini       = fini,
         .free       = free,

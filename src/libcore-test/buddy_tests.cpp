@@ -53,6 +53,8 @@ TEST_CASE("basecode::memory::buddy basics") {
 
     // N.B. this allocation should return nullptr
     REQUIRE(!memory::alloc(buddy_alloc, block_size));
+
+    // N.B. we may not be able to perfectly utilize the entire heap
     REQUIRE(buddy_alloc->total_allocated > working_heap_size);
 
     for (u32 i = 0; i < num_blocks; ++i) {
@@ -62,14 +64,13 @@ TEST_CASE("basecode::memory::buddy basics") {
 
     stopwatch::start(timer);
 
-    for (auto block : blocks)
-        memory::free(buddy_alloc, block);
+    for (u32 i = 0; i < num_blocks; ++i)
+        memory::free(buddy_alloc, blocks[i]);
 
     stopwatch::stop(timer);
     stopwatch::print_elapsed("buddy free time"_ss, 40, timer);
 
     REQUIRE(buddy_alloc->total_allocated == buddy_alloc->subclass.buddy.metadata_size);
 
-    u32 freed_size{};
-    memory::system::free(buddy_alloc, true, &freed_size);
+    memory::system::free(buddy_alloc, true);
 }
