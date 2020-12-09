@@ -74,6 +74,11 @@ namespace basecode {
         }                           dl;
         struct {
             u0*                     buf;
+            u0*                     free;
+            u32                     max_size;
+        }                           stack;
+        struct {
+            u0*                     buf;
             u32                     offset;
             u32                     end_offset;
         }                           bump;

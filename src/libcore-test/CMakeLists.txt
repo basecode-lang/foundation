@@ -31,6 +31,7 @@ add_executable(
     bitset_tests.cpp
     string_tests.cpp
     symtab_tests.cpp
+    memory_tests.cpp
     filesys_tests.cpp
     gap_buf_tests.cpp
     bintree_tests.cpp

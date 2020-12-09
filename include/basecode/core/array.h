@@ -26,10 +26,11 @@
 #include <basecode/core/memory.h>
 
 namespace basecode {
-    template <typename T, u32 Capacity = 8> struct static_array_t final {
-        using value_type    = T;
-        using is_static     = std::integral_constant<b8, true>;
-        using size_per_16   = std::integral_constant<u32, 16 / sizeof(T)>;
+    template <typename T, u32 Capacity = 8>
+    struct static_array_t final {
+        using Value_Type    = T;
+        using Is_Static     = std::integral_constant<b8, true>;
+        using Size_Per_16   = std::integral_constant<u32, 16 / sizeof(T)>;
 
         T                   data[Capacity];
         u32                 size{};
@@ -47,10 +48,11 @@ namespace basecode {
         const T& operator[](u32 index) const    { return data[index];       }
     };
 
-    template<typename T> struct array_t final {
-        using value_type    = T;
-        using is_static     = std::integral_constant<b8, false>;
-        using size_per_16   = std::integral_constant<u32, 16 / sizeof(T)>;
+    template<typename T>
+    struct array_t final {
+        using Value_Type    = T;
+        using Is_Static     = std::integral_constant<b8, false>;
+        using Size_Per_16   = std::integral_constant<u32, 16 / sizeof(T)>;
 
         T*                  data;
         alloc_t*            alloc;
@@ -72,10 +74,15 @@ namespace basecode {
 
     namespace array {
         u0 free(Array_Concept auto& array);
+
         u0 reserve(Dynamic_Array_Concept auto& array, u32 new_capacity);
+
         u0 grow(Dynamic_Array_Concept auto& array, u32 new_capacity = 8);
+
         u0 init(Array_Concept auto& array, alloc_t* alloc = context::top()->alloc);
-        template <typename T> array_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc);
+
+        template <typename T>
+        array_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc);
 
         u0 pop(Array_Concept auto& array) {
             --array.size;
@@ -86,7 +93,7 @@ namespace basecode {
             array.size = {};
             std::memset(array.data,
                         0,
-                        array.capacity * sizeof(typename T::value_type));
+                        array.capacity * sizeof(typename T::Value_Type));
         }
 
         u0 clear(Array_Concept auto& array) {
@@ -95,7 +102,7 @@ namespace basecode {
 
         auto& append(Array_Concept auto& array) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(array.size + 1 < array.capacity);
             } else {
                 if (array.size + 1 > array.capacity)
@@ -110,7 +117,7 @@ namespace basecode {
 
         u0 free(Array_Concept auto& array) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (!T::is_static::value) {
+            if constexpr (!T::Is_Static::value) {
                 memory::free(array.alloc, array.data);
                 array.data = {};
             }
@@ -128,13 +135,13 @@ namespace basecode {
             auto dest = array.data + index;
             std::memcpy(dest,
                         dest + 1,
-                        (array.size - index) * sizeof(typename T::value_type));
+                        (array.size - index) * sizeof(typename T::Value_Type));
             --array.size;
         }
 
         decltype(auto) back(Array_Concept auto& array) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (std::is_pointer_v<typename T::value_type>) {
+            if constexpr (std::is_pointer_v<typename T::Value_Type>) {
                 return array.size == 0 ? nullptr : array.data[array.size - 1];
             } else {
                 return array.size == 0 ? nullptr : &array.data[array.size - 1];
@@ -143,7 +150,7 @@ namespace basecode {
 
         decltype(auto) front(Array_Concept auto& array) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (std::is_pointer_v<typename T::value_type>) {
+            if constexpr (std::is_pointer_v<typename T::Value_Type>) {
                 return array.size == 0 ? nullptr : array.data[0];
             } else {
                 return array.size == 0 ? nullptr : &array.data[0];
@@ -152,7 +159,7 @@ namespace basecode {
 
         u0 append(Array_Concept auto& array, auto&& value) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(array.size + 1 < array.capacity);
             } else {
                 if (array.size + 1 > array.capacity)
@@ -163,7 +170,7 @@ namespace basecode {
 
         u0 init(Array_Concept auto& array, alloc_t* alloc) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (!T::is_static::value) {
+            if constexpr (!T::Is_Static::value) {
                 array.data     = {};
                 array.alloc    = alloc;
                 array.capacity = {};
@@ -177,7 +184,7 @@ namespace basecode {
 
         decltype(auto) back(const Array_Concept auto& array) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (std::is_pointer_v<typename T::value_type>) {
+            if constexpr (std::is_pointer_v<typename T::Value_Type>) {
                 return array.size == 0 ? nullptr : array.data[array.size - 1];
             } else {
                 return array.size == 0 ? nullptr : &array.data[array.size - 1];
@@ -192,7 +199,7 @@ namespace basecode {
 
         decltype(auto) front(const Array_Concept auto& array) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (std::is_pointer_v<typename T::value_type>) {
+            if constexpr (std::is_pointer_v<typename T::Value_Type>) {
                 return array.size == 0 ? nullptr : array.data[0];
             } else {
                 return array.size == 0 ? nullptr : &array.data[0];
@@ -205,27 +212,27 @@ namespace basecode {
             s32 idx = -1;
             u32 i{};
 #if defined(__SSE4_2__) || defined(__SSE4_1__)
-            if constexpr (std::is_integral_v<typename T::value_type>
-                        || std::is_floating_point_v<typename T::value_type>
-                        || std::is_pointer_v<typename T::value_type>) {
+            if constexpr (std::is_integral_v<typename T::Value_Type>
+                        || std::is_floating_point_v<typename T::Value_Type>
+                        || std::is_pointer_v<typename T::Value_Type>) {
                 __m128i n{};
-                if constexpr (T::size_per_16::value == 4) {
+                if constexpr (T::Size_Per_16::value == 4) {
                     n = _mm_set1_epi32((s32) value);
-                } else if constexpr (T::size_per_16::value == 2) {
+                } else if constexpr (T::Size_Per_16::value == 2) {
                     n = _mm_set1_epi64x((s64) value);
                 }
                 m128i_bytes_t dqw{};
-                while (i + T::size_per_16::value < array.capacity) {
+                while (i + T::Size_Per_16::value < array.capacity) {
                     dqw.value = _mm_loadu_si128((const __m128i*) (array.data + i));
                     __m128i cmp{};
-                    if constexpr (T::size_per_16::value == 4) {
+                    if constexpr (T::Size_Per_16::value == 4) {
                         cmp = _mm_cmpeq_epi32(dqw.value, n);
-                    } else if constexpr (T::size_per_16::value == 2) {
+                    } else if constexpr (T::Size_Per_16::value == 2) {
                         cmp = _mm_cmpeq_epi64(dqw.value, n);
                     }
                     u16 mask = _mm_movemask_epi8(cmp);
                     if (!mask) {
-                        i += T::size_per_16::value;
+                        i += T::Size_Per_16::value;
                     } else {
                         switch (mask) {
                             // 32-bit values matching
@@ -238,7 +245,9 @@ namespace basecode {
                             case 0xff:              break;
                             case 0xff00:++i;        break;
 
-                            default:    i += T::size_per_16::value;  continue;
+                            default:
+                                i += T::Size_Per_16::value;
+                                continue;
                         }
                         if (i >= array.size)    return false;
                         idx = i;
@@ -259,14 +268,14 @@ namespace basecode {
             auto dest = array.data + idx;
             std::memcpy(dest,
                         dest + 1,
-                        (array.size - idx) * sizeof(typename T::value_type));
+                        (array.size - idx) * sizeof(typename T::Value_Type));
             --array.size;
             return true;
         }
 
         u0 append(Array_Concept auto& array, const auto& value) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(array.size + 1 < array.capacity);
             } else {
                 if (array.size + 1 > array.capacity)
@@ -289,10 +298,10 @@ namespace basecode {
         u0 append(Array_Concept auto& dest, Array_Concept auto& src) {
             using DT = std::remove_reference_t<decltype(dest)>;
             using ST = std::remove_reference_t<decltype(src)>;
-            if constexpr (!same_as<typename ST::value_type, typename DT::value_type>) {
+            if constexpr (!same_as<typename ST::Value_Type, typename DT::Value_Type>) {
                 static_assert("array::append array-to-array only supported between equivalent types");
             }
-            if constexpr (DT::is_static::value) {
+            if constexpr (DT::Is_Static::value) {
                 assert(dest.size + src.size < dest.capacity);
             } else {
                 const auto new_size = dest.size + src.size;
@@ -301,13 +310,13 @@ namespace basecode {
             }
             std::memcpy(dest.data + dest.size,
                         src.data,
-                        src.size * sizeof(typename ST::value_type));
+                        src.size * sizeof(typename ST::Value_Type));
             dest.size += src.size;
         }
 
         u0 insert(Array_Concept auto& array, u32 index, auto&& value) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(array.size + 1 < array.capacity);
             } else {
                 if (array.size + 1 > array.capacity)
@@ -316,7 +325,7 @@ namespace basecode {
             if (index < array.size) {
                 std::memmove(array.data + index + 1,
                              array.data + index,
-                             (array.size - index) * sizeof(typename T::value_type));
+                             (array.size - index) * sizeof(typename T::Value_Type));
             }
             array.data[index] = value;
             ++array.size;
@@ -325,10 +334,10 @@ namespace basecode {
         u0 copy(Array_Concept auto& dest, const Array_Concept auto& src) {
             using DT = std::remove_reference_t<decltype(dest)>;
             using ST = std::remove_reference_t<decltype(src)>;
-            if constexpr (!same_as<typename ST::value_type, typename DT::value_type>) {
+            if constexpr (!same_as<typename ST::Value_Type, typename DT::Value_Type>) {
                 static_assert("array::copy only supported between equivalent types");
             }
-            if constexpr (DT::is_static::value) {
+            if constexpr (DT::Is_Static::value) {
                 assert(src.size <= dest.capacity);
             } else {
                 if (src.size > dest.capacity)
@@ -336,7 +345,7 @@ namespace basecode {
             }
             std::memcpy(dest.data,
                         src.data,
-                        src.size * sizeof(typename ST::value_type));
+                        src.size * sizeof(typename ST::Value_Type));
             dest.size = src.size;
         }
 
@@ -345,34 +354,36 @@ namespace basecode {
 
             u32 i{};
 #if defined(__SSE4_2__) || defined(__SSE4_1__)
-            if constexpr (std::is_integral_v<typename T::value_type>
-                    || std::is_floating_point_v<typename T::value_type>
-                    || std::is_pointer_v<typename T::value_type>) {
+            if constexpr (std::is_integral_v<typename T::Value_Type>
+                    || std::is_floating_point_v<typename T::Value_Type>
+                    || std::is_pointer_v<typename T::Value_Type>) {
                 __m128i n;
-                if constexpr (T::size_per_16::value == 4) {
+                if constexpr (T::Size_Per_16::value == 4) {
                     n = _mm_set1_epi32((s32) value);
-                } else if constexpr (T::size_per_16::value == 2) {
+                } else if constexpr (T::Size_Per_16::value == 2) {
                     n = _mm_set1_epi64x((s64) value);
                 }
                 m128i_bytes_t dqw{};
-                while (i + T::size_per_16::value < array.capacity) {
+                while (i + T::Size_Per_16::value < array.capacity) {
                     dqw.value = _mm_loadu_si128((const __m128i*) (array.data + i));
                     __m128i cmp;
-                    if constexpr (T::size_per_16::value == 4) {
+                    if constexpr (T::Size_Per_16::value == 4) {
                         cmp = _mm_cmpeq_epi32(dqw.value, n);
-                    } else if constexpr (T::size_per_16::value == 2) {
+                    } else if constexpr (T::Size_Per_16::value == 2) {
                         cmp = _mm_cmpeq_epi64(dqw.value, n);
                     }
                     u16 mask = _mm_movemask_epi8(cmp);
                     if (!mask) {
-                        i += T::size_per_16::value;
+                        i += T::Size_Per_16::value;
                     } else {
                         switch (mask) {
                             case 0xf:               break;
                             case 0xf0:  ++i;        break;
                             case 0xf00: i += 2;     break;
                             case 0xf000:i += 3;     break;
-                            default:    i += T::size_per_16::value; continue;
+                            default:
+                                i += T::Size_Per_16::value;
+                                continue;
                         }
                         if (i >= array.size)    return -1;
                         return i;
@@ -399,19 +410,19 @@ namespace basecode {
                 return;
 
             new_capacity = std::max(array.size, new_capacity);
-            array.data = (typename T::value_type*) memory::realloc(array.alloc,
+            array.data = (typename T::Value_Type*) memory::realloc(array.alloc,
                                                                    array.data,
-                                                                   new_capacity * sizeof(typename T::value_type),
-                                                                   alignof(typename T::value_type));
+                                                                   new_capacity * sizeof(typename T::Value_Type),
+                                                                   alignof(typename T::Value_Type));
             const auto data          = array.data + array.size;
             const auto size_to_clear = new_capacity > array.capacity ? new_capacity - array.capacity : 0;
-            std::memset(data, 0, size_to_clear * sizeof(typename T::value_type));
+            std::memset(data, 0, size_to_clear * sizeof(typename T::Value_Type));
             array.capacity = new_capacity;
         }
 
         u0 insert(Array_Concept auto& array, u32 index, const auto& value) {
             using T = std::remove_reference_t<decltype(array)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(array.size + 1 < array.capacity);
             } else {
                 if (array.size + 1 > array.capacity)
@@ -420,13 +431,14 @@ namespace basecode {
             if (index < array.size) {
                 std::memmove(array.data + index + 1,
                              array.data + index,
-                             (array.size - index) * sizeof(typename T::value_type));
+                             (array.size - index) * sizeof(typename T::Value_Type));
             }
             array.data[index] = value;
             ++array.size;
         }
 
-        template <typename T> array_t<T> make(std::initializer_list<T> elements, alloc_t* alloc) {
+        template <typename T>
+        array_t<T> make(std::initializer_list<T> elements, alloc_t* alloc) {
             array_t<T> array;
             init(array, alloc);
             reserve(array, elements.size());
@@ -438,11 +450,13 @@ namespace basecode {
 }
 
 namespace basecode::slice {
-    template <typename T> inline slice_t<T> make(const Array_Concept auto& array) {
+    template <typename T>
+    inline slice_t<T> make(const Array_Concept auto& array) {
         return slice_t{.data = array.data, .length = array.size};
     }
 
-    template <typename T> inline slice_t<T> make(const Array_Concept auto& array, u32 start, u32 end) {
+    template <typename T>
+    inline slice_t<T> make(const Array_Concept auto& array, u32 start, u32 end) {
         return slice_t{.data = array.data + start, .length = end - start};
     }
 }

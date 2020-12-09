@@ -21,6 +21,11 @@
 #include <basecode/core/memory.h>
 
 namespace basecode {
+    struct stack_config_t : alloc_config_t {
+        alloc_t*                backing;
+        u32                     max_size;
+    };
+
     namespace memory::stack {
         alloc_system_t* system();
     }
