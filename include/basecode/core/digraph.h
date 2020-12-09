@@ -22,14 +22,16 @@
 #include <basecode/core/memory.h>
 
 namespace basecode {
-    template <typename W, typename V> struct digraph_edge_t final {
-        V                           value;
-        W                           weight;
-        u32                         dest;
-        u32                         src;
+    template <typename W, typename V>
+    struct digraph_edge_t final {
+        V                       value;
+        W                       weight;
+        u32                     dest;
+        u32                     src;
     };
 
-    template <typename T> struct digraph_t final {
-        alloc_t*                    alloc;
+    template <typename T>
+    struct digraph_t final {
+        alloc_t*                alloc;
     };
 }

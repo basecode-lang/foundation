@@ -21,8 +21,9 @@
 #include <basecode/core/array.h>
 
 namespace basecode {
-    template <typename T> struct queue_t final {
-        using value_type        = T;
+    template <typename T>
+    struct queue_t final {
+        using Value_Type        = T;
 
         array_t<T>              items;
         u32                     size;
@@ -40,7 +41,9 @@ namespace basecode {
                 array::resize(queue.items, new_capacity);
                 if (queue.offset + queue.size > end) {
                     u32 end_items = end - queue.offset;
-                    std::memmove(queue.items.begin() + new_capacity - end_items, queue.items.begin() + queue.offset, end_items * sizeof(T));
+                    std::memmove(queue.items.begin() + new_capacity - end_items,
+                                 queue.items.begin() + queue.offset,
+                                 end_items * sizeof(T));
                     queue.offset += new_capacity - end;
                 }
             }

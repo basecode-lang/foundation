@@ -29,7 +29,8 @@
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode {
-    template<typename T> struct stable_array_t final {
+    template<typename T>
+    struct stable_array_t final {
         T**                     data;
         alloc_t*                alloc;
         alloc_t*                slab_alloc;

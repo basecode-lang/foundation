@@ -31,54 +31,54 @@ struct GLFWwindow;
 
 namespace basecode {
     struct size_t final {
-        f32             w;
-        f32             h;
+        f32                     w;
+        f32                     h;
     };
 
     struct point_t final {
-        f32             x;
-        f32             y;
+        f32                     x;
+        f32                     y;
     };
 
     struct rect_t final {
-        f32             x;
-        f32             y;
-        f32             w;
-        f32             h;
+        f32                     x;
+        f32                     y;
+        f32                     w;
+        f32                     h;
     };
 
     struct vector3_t final {
-        f32             x;
-        f32             y;
-        f32             z;
+        f32                     x;
+        f32                     y;
+        f32                     z;
     };
 
     struct vector4_t final {
-        f32             x;
-        f32             y;
-        f32             z;
-        f32             w;
+        f32                     x;
+        f32                     y;
+        f32                     z;
+        f32                     w;
     };
 
     struct color_t final {
-        u8              r;
-        u8              g;
-        u8              b;
-        u8              a;
+        u8                      r;
+        u8                      g;
+        u8                      b;
+        u8                      a;
 
         explicit operator u32() const { return COL32(r, g, b, a); }
     };
 
     struct window_t final {
-        GLFWwindow*     window{};
-        s32             x = -1;
-        s32             y = -1;
-        s32             width = 1280;
-        s32             height = 1024;
-        s32             iconified = 0;
-        s32             maximized = 0;
-        s32             min_width = 800;
-        s32             min_height = 600;
+        GLFWwindow*             window      {};
+        s32                     x           = -1;
+        s32                     y           = -1;
+        s32                     width       = 1280;
+        s32                     height      = 1024;
+        s32                     iconified   = 0;
+        s32                     maximized   = 0;
+        s32                     min_width   = 800;
+        s32                     min_height  = 600;
     };
 
     namespace gfx {

@@ -43,22 +43,24 @@ namespace basecode {
 
     template <typename Proc, typename... Args>
     struct thread_proc_t final : public proc_base_t {
-        static constexpr b8 is_void = std::is_void_v<std::invoke_result_t<Proc, Args...>>;
+        static constexpr b8     Is_Void = std::is_void_v<std::invoke_result_t<Proc, Args...>>;
 
-        using proc_t        = Proc;
-        using args_t        = std::tuple<Args...>;
-        using return_t      = typename std::conditional<is_void, int, std::invoke_result_t<Proc, Args...>>::type;
+        using proc_t            = Proc;
+        using args_t            = std::tuple<Args...>;
+        using return_t          = typename std::conditional<Is_Void, int, std::invoke_result_t<Proc, Args...>>::type;
 
-        thread_t*           thread;
-        proc_t              proc;
-        args_t              args;
-        return_t            ret_val;
+        thread_t*               thread;
+        proc_t                  proc;
+        args_t                  args;
+        return_t                ret_val;
 
-        thread_proc_t(thread_t* thread, proc_t proc, args_t args) : thread(thread), proc(proc), args(std::move(args)) {
+        thread_proc_t(thread_t* thread, proc_t proc, args_t args) : thread(thread),
+                                                                    proc(proc),
+                                                                    args(std::move(args)) {
         }
 
         u0* invoke() override {
-            if constexpr (is_void) {
+            if constexpr (Is_Void) {
                 std::apply(proc, args);
                 ret_val = {};
                 return nullptr;
@@ -72,16 +74,16 @@ namespace basecode {
     };
 
     struct thread_t final {
-        pthread_t           handle;
-        proc_base_t*        proc;
-        str::slice_t        name;
-        thread_state_t      state;
-        u8                  joined:     1;
-        u8                  detached:   1;
-        u8                  joinable:   1;
-        u8                  canceled:   1;
-        u8                  cancelable: 1;
-        u8                  pad:        3;
+        pthread_t               handle;
+        proc_base_t*            proc;
+        str::slice_t            name;
+        thread_state_t          state;
+        u8                      joined:     1;
+        u8                      detached:   1;
+        u8                      joinable:   1;
+        u8                      canceled:   1;
+        u8                      cancelable: 1;
+        u8                      pad:        3;
 
         b8 operator==(const thread_t& other) const {
             return pthread_equal(handle, other.handle) != 0;
@@ -145,6 +147,15 @@ namespace basecode {
             return status;
         }
 
+        template <typename Proc, typename... Args>
+        status_t start(thread_t& thread, Proc proc, Args&&... args) {
+            if (thread.state != thread_state_t::created)
+                return status_t::invalid_state;
+            auto mem = system::alloc_proc();
+            thread.proc = new (mem) thread_proc_t(&thread, proc, std::forward_as_tuple(args...));
+            return system::start(thread);
+        }
+
         status_t init(thread_t& thread, const String_Concept auto& name) {
             if (name.length > 15)
                 return status_t::name_too_long;
@@ -158,14 +169,6 @@ namespace basecode {
             thread.name       = (str::slice_t) name;
             thread.state      = thread_state_t::created;
             return status_t::ok;
-        }
-
-        template <typename Proc, typename... Args> status_t start(thread_t& thread, Proc proc, Args&&... args) {
-            if (thread.state != thread_state_t::created)
-                return status_t::invalid_state;
-            auto mem = system::alloc_proc();
-            thread.proc = new (mem) thread_proc_t(&thread, proc, std::forward_as_tuple(args...));
-            return system::start(thread);
         }
     }
 }

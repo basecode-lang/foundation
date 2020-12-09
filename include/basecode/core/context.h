@@ -49,9 +49,14 @@ namespace basecode {
     struct alloc_t;
     struct logger_t;
 
+    namespace scm {
+        struct ctx_t;
+    }
+
     struct context_t {
         alloc_t*            alloc;
         logger_t*           logger;
+        scm::ctx_t*         scm_ctx;
         u0*                 user;
         const s8**          argv;
         s32                 argc;

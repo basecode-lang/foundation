@@ -142,22 +142,22 @@ namespace basecode {
 
     template <typename T, typename U> concept same_as = same_helper<T, U> && same_helper<U, T>;
 
-    template <typename T> concept Slice_Concept = same_as<typename T::is_static, std::true_type> && requires(const T& t) {
+    template <typename T> concept Slice_Concept = same_as<typename T::Is_Static, std::true_type> && requires(const T& t) {
         {t.data}        -> same_as<const u8*>;
         {t.length}      -> same_as<u32>;
     };
 
-    template <typename T> concept Static_Stack_Concept = same_as<typename T::is_static, std::true_type> && requires(const T& t) {
-        typename        T::value_type;
-        {t.data}        -> same_as<typename T::value_type*>;
+    template <typename T> concept Static_Stack_Concept = same_as<typename T::Is_Static, std::true_type> && requires(const T& t) {
+        typename        T::Value_Type;
+        {t.data}        -> same_as<typename T::Value_Type*>;
         {t.size}        -> same_as<u32>;
         {t.capacity}    -> same_as<u32>;
     };
 
-    template <typename T> concept Dynamic_Stack_Concept = same_as<typename T::is_static, std::false_type> && requires(const T& t) {
-        typename        T::value_type;
+    template <typename T> concept Dynamic_Stack_Concept = same_as<typename T::Is_Static, std::false_type> && requires(const T& t) {
+        typename        T::Value_Type;
         {t.alloc}       -> same_as<alloc_t*>;
-        {t.data}        -> same_as<typename T::value_type*>;
+        {t.data}        -> same_as<typename T::Value_Type*>;
         {t.size}        -> same_as<u32>;
         {t.capacity}    -> same_as<u32>;
     };
@@ -177,13 +177,13 @@ namespace basecode {
         {t.capacity}    -> same_as<u32>;
     };
 
-    template <typename T> concept Static_String_Concept  = same_as<typename T::is_static, std::true_type> && requires(const T& t) {
+    template <typename T> concept Static_String_Concept  = same_as<typename T::Is_Static, std::true_type> && requires(const T& t) {
         {t.data}        -> same_as<u8*>;
         {t.length}      -> same_as<u32>;
         {t.capacity}    -> same_as<u32>;
     };
 
-    template <typename T> concept Dynamic_String_Concept  = same_as<typename T::is_static, std::false_type> && requires(const T& t) {
+    template <typename T> concept Dynamic_String_Concept  = same_as<typename T::Is_Static, std::false_type> && requires(const T& t) {
         {t.alloc}       -> same_as<alloc_t*>;
         {t.data}        -> same_as<u8*>;
         {t.length}      -> same_as<u32>;

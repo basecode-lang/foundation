@@ -22,18 +22,18 @@
 
 namespace basecode {
     struct gap_t final {
-        u32                 start;
-        u32                 end;
+        u32                     start;
+        u32                     end;
     };
 
     struct gap_buf_t final {
-        alloc_t*            alloc;
-        u8*                 data;
-        gap_t               gap;
-        u32                 size;
-        u32                 caret;
-        u32                 capacity;
-        u32                 gap_size;
+        alloc_t*                alloc;
+        u8*                     data;
+        gap_t                   gap;
+        u32                     size;
+        u32                     caret;
+        u32                     capacity;
+        u32                     gap_size;
     };
 
     namespace gap_buf {
@@ -76,7 +76,8 @@ namespace basecode {
         u0 caret_insert(gap_buf_t& buf, const String_Concept auto& value) {
             gap_to_caret(buf);
             auto length = value.length;
-            if (length > gap_size(buf)) gap_expand(buf, length);
+            if (length > gap_size(buf))
+                gap_expand(buf, length);
             u32 i{};
             while (i < length)
                 caret_put(buf, value[i++]);

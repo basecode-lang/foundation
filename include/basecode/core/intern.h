@@ -53,11 +53,11 @@ namespace basecode {
         };
 
         struct result_t final {
-            u64                         hash        {};
-            str::slice_t                slice       {};
-            intern_id                   id          {};
-            status_t                    status      {};
-            b8                          new_value   {};
+            u64                 hash        {};
+            str::slice_t        slice       {};
+            intern_id           id          {};
+            status_t            status      {};
+            b8                  new_value   {};
 
             b8 operator==(const result_t& other) const {
                 return id == other.id;

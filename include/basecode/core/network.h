@@ -36,8 +36,8 @@
 
 namespace basecode {
     struct ip_address_t final {
-        u32                         number;
-        s8                          text[17];
+        u32                     number;
+        s8                      text[17];
     };
 
     struct socket_t;
@@ -46,14 +46,14 @@ namespace basecode {
     using socket_close_callback_t   = u0 (*)(socket_t&);
 
     struct socket_t final {
-        alloc_t*                    alloc;
-        u8*                         buf;
-        u8*                         buf_cur;
-        u0*                         user;
-        socket_close_callback_t     close_cb;
-        SOCKET                      socket;
-        u32                         buf_free;
-        u32                         buf_size;
+        alloc_t*                alloc;
+        u8*                     buf;
+        u8*                     buf_cur;
+        u0*                     user;
+        socket_close_callback_t close_cb;
+        SOCKET                  socket;
+        u32                     buf_free;
+        u32                     buf_size;
     };
 
     namespace network {
@@ -79,6 +79,13 @@ namespace basecode {
         }
 
         namespace tcp {
+            b8 read(socket_t& sock,
+                    u0* buf,
+                    s32 len,
+                    s32 timeout,
+                    socket_read_callback_t read_cb,
+                    u0* user = {});
+
             s32 send(socket_t& sock, const u0* buf, s32 len);
 
             status_t listen(socket_t& sock, u16 port, s32 backlog);
@@ -88,8 +95,6 @@ namespace basecode {
             status_t connect(socket_t& sock, str::slice_t addr, u16 port);
 
             b8 accept(socket_t& listen_sock, socket_t& client_sock, s32 timeout = 10);
-
-            b8 read(socket_t& sock, u0* buf, s32 len, s32 timeout, socket_read_callback_t read_cb, u0* user = {});
         }
 
         namespace system {
@@ -99,6 +104,11 @@ namespace basecode {
         }
 
         namespace socket {
+            u0 init(socket_t& sock,
+                    u32 buf_size = 2 * 1024,
+                    socket_close_callback_t close_cb = {},
+                    alloc_t* alloc = context::top()->alloc);
+
             u0 free(socket_t& sock);
 
             b8 has_data(socket_t& sock);
@@ -106,8 +116,6 @@ namespace basecode {
             status_t close(socket_t& sock);
 
             s32 send_buf_size(socket_t& sock);
-
-            u0 init(socket_t& sock, u32 buf_size = 2 * 1024, socket_close_callback_t close_cb = {}, alloc_t* alloc = context::top()->alloc);
         }
 
         namespace ip_address {

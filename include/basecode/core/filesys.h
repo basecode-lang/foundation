@@ -24,8 +24,8 @@
 
 namespace basecode {
     struct glob_result_t final {
-        glob_t                      buf;
-        array_t<str_t>              paths;
+        glob_t                  buf;
+        array_t<str_t>          paths;
     };
     static_assert(sizeof(glob_result_t) <= 112, "glob_result_t is now bigger than 112 bytes!");
 

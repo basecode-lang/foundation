@@ -40,9 +40,19 @@ namespace basecode {
 
     b8 is_power_of_two(s64 x);
 
+    template <typename T>
+    T twos_complement(T value) {
+        return ~value + 1;
+    }
+
     u32 next_power_of_two(u32 n);
 
     u64 next_power_of_two(u64 n);
+
+    template <typename T>
+    b8 is_sign_bit_set(T value) {
+        return (value & (T(1) << ((sizeof(T) * CHAR_BIT) - 1))) != 0;
+    }
 
     b8 is_platform_little_endian();
 
@@ -58,17 +68,13 @@ namespace basecode {
 
     u64 endian_swap_qword(u64 value);
 
+    template <typename T, unsigned B>
+    inline T sign_extend(const T x) {
+        struct {T x:B;} s;
+        return s.x = x;
+    }
+
     u8 lnybble(u8 original, u8 value);
 
     u8 unybble(u8 original, u8 value);
-
-    u64 sign_extend(s64 value, u32 bits);
-
-    template <typename T> T twos_complement(T value) {
-        return ~value + 1;
-    }
-
-    template <typename T> b8 is_sign_bit_set(T value) {
-        return (value & (T(1) << ((sizeof(T) * CHAR_BIT) - 1))) != 0;
-    }
 }

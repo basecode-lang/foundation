@@ -38,10 +38,10 @@ namespace basecode::cxx {
     struct module_t;
     struct program_t;
 
-    using id_array_t        = array_t<u32>;
-    using scope_array_t     = array_t<scope_t>;
-    using scope_stack_t     = stack_t<u32>;
-    using module_array_t    = array_t<module_t>;
+    using id_array_t            = array_t<u32>;
+    using scope_array_t         = array_t<scope_t>;
+    using scope_stack_t         = stack_t<u32>;
+    using module_array_t        = array_t<module_t>;
 
     enum class status_t : u8 {
         ok                      = 0,
@@ -68,14 +68,14 @@ namespace basecode::cxx {
     };
 
     enum class revision_t : u8 {
-        c99                 = 1,
+        c99                     = 1,
         c11,
         cpp17,
         cpp20,
     };
 
     enum class meta_type_t : u8 {
-        none                = 1,
+        none                    = 1,
         alias,
         void_,
         array,
@@ -91,7 +91,7 @@ namespace basecode::cxx {
     };
 
     enum class aggregate_type_t : u8 {
-        enum_               = 1,
+        enum_                   = 1,
         union_,
         class_,
         struct_,
@@ -99,7 +99,7 @@ namespace basecode::cxx {
     };
 
     enum class integral_size_t : u8 {
-        zero                = 1,
+        zero                    = 1,
         byte,
         word,
         dword,
@@ -107,7 +107,7 @@ namespace basecode::cxx {
     };
 
     enum class statement_type_t : u8 {
-        empty               = 1,
+        empty                   = 1,
         pp,
         raw,
         if_,
@@ -134,7 +134,7 @@ namespace basecode::cxx {
     };
 
     enum class preprocessor_type_t : u8 {
-        if_                 = 1,
+        if_                     = 1,
         pragma,
         define,
         endif_,
@@ -143,7 +143,7 @@ namespace basecode::cxx {
     };
 
     enum class expression_type_t : u8 {
-        raw                 = 1,
+        raw                     = 1,
         unary,
         binary,
         assignment,
@@ -151,12 +151,12 @@ namespace basecode::cxx {
     };
 
     enum class initializer_type_t : u8 {
-        direct              = 1,
+        direct                  = 1,
         list,
     };
 
     enum class assignment_type_t : u8 {
-        direct              = 1,
+        direct                  = 1,
         bor,
         sum,
         shl,
@@ -170,7 +170,7 @@ namespace basecode::cxx {
     };
 
     enum class unary_op_type_t : u8 {
-        neg                 = 1,
+        neg                     = 1,
         inc,
         dec,
         lnot,
@@ -187,7 +187,7 @@ namespace basecode::cxx {
     };
 
     enum class binary_op_type_t : u8 {
-        eq                  = 1,
+        eq                      = 1,
         lt,
         gt,
         lor,

@@ -257,13 +257,6 @@ namespace basecode::job {
         return status_t::ok;
     }
 
-    u0 all(array_t<const job_t*>& list) {
-        scoped_lock_t lock(&g_job_sys.jobs_mutex);
-        array::reset(list);
-        for (const auto job : g_job_sys.jobs)
-            array::append(list, job);
-    }
-
     str::slice_t label(job_id id) {
         scoped_lock_t lock(&g_job_sys.jobs_mutex);
         if (id == 0 || id > g_job_sys.jobs.size)
@@ -271,6 +264,13 @@ namespace basecode::job {
         const auto& job = g_job_sys.jobs[id - 1];
         auto result = string::interned::get(job.label_id);
         return OK(result.status) ? result.slice : string::localized::status_name(result.status);
+    }
+
+    u0 all(array_t<const job_t*>& list) {
+        scoped_lock_t lock(&g_job_sys.jobs_mutex);
+        array::reset(list);
+        for (const auto job : g_job_sys.jobs)
+            array::append(list, job);
     }
 
     status_t get(job_id id, job_t** job) {
@@ -300,12 +300,12 @@ namespace basecode::job {
     }
 
     u0 init(job_t& job, job_id id, u32 label_id, job_id parent_id) {
-        job.id         = id;
-        job.task       = {};
-        job.label_id   = label_id;
-        job.parent     = parent_id;
-        job.finished   = event::make();
-        job.state      = job_state_t::created;
+        job.id       = id;
+        job.task     = {};
+        job.label_id = label_id;
+        job.parent   = parent_id;
+        job.finished = event::make();
+        job.state    = job_state_t::created;
         stopwatch::init(job.time);
         array::init(job.children, g_job_sys.alloc);
     }

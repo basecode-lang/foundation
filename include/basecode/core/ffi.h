@@ -129,13 +129,16 @@ namespace basecode {
         }
 
         namespace param {
+            u0 free(param_t* param);
+
+            param_t* make(str::slice_t name,
+                          param_type_t type,
+                          b8 rest = {},
+                          param_alias_t* dft_val = {});
+
             inline param_type_t make_type(param_cls_t cls, param_size_t size) {
                 return param_type_t{.cls = cls, .size = size};
             }
-
-            u0 free(param_t* param);
-
-            param_t* make(str::slice_t name, param_type_t type, b8 rest = {}, param_alias_t* dft_val = {});
         }
 
         namespace proto {

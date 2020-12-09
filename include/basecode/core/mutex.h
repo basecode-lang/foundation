@@ -49,12 +49,12 @@ namespace basecode {
     }
 
     struct mutex_t final {
-        pthread_mutex_t             handle;
-        b8                          locked;
+        pthread_mutex_t         handle;
+        b8                      locked;
     };
 
     struct scoped_lock_t final {
-        mutex_t*                    mutex;
+        mutex_t*                mutex;
 
         explicit scoped_lock_t(mutex_t* m) : mutex(m)   { mutex::lock(*mutex);   }
         ~scoped_lock_t()                                { mutex::unlock(*mutex); }

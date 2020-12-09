@@ -43,7 +43,7 @@ namespace basecode {
     }
 
     struct str_t final {
-        using is_static         = std::integral_constant<b8, false>;
+        using Is_Static         = std::integral_constant<b8, false>;
 
         alloc_t*                alloc{};
         u8*                     data{};
@@ -161,7 +161,7 @@ namespace basecode {
 
         u0 free(String_Concept auto& str) {
             using T = std::remove_reference_t<decltype(str)>;
-            if constexpr (!T::is_static::value) {
+            if constexpr (!T::Is_Static::value) {
                 memory::free(str.alloc, str.data);
                 str.data     = {};
                 str.capacity = {};
@@ -174,11 +174,18 @@ namespace basecode {
         }
 
         u0 ltrim(String_Concept auto& str) {
-            erase(str, *str.begin(), *std::find_if(str.begin(), str.end(), [](u8 c) { return !std::isspace(c); }));
+            erase(str,
+                  *str.begin(),
+                  *std::find_if(str.begin(),
+                                str.end(),
+                                [](u8 c) { return !std::isspace(c); }));
         }
 
         u0 rtrim(String_Concept auto& str) {
-            erase(str, *std::find_if(str.rbegin(), str.rend(), [](u8 c) { return !std::isspace(c); }), *str.end());
+            erase(str,
+                  *std::find_if(str.rbegin(),
+                                str.rend(),
+                                [](u8 c) { return !std::isspace(c); }), *str.end());
         }
 
         u0 reset(String_Concept auto& str) {
@@ -203,7 +210,7 @@ namespace basecode {
 
         const s8* c_str(String_Concept auto& str) {
             using T = std::remove_reference_t<decltype(str)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(str.length + 1 < str.capacity);
             } else {
                 if (str.length + 1 > str.capacity)
@@ -215,7 +222,7 @@ namespace basecode {
 
         u0 append(String_Concept auto& str, u8 value) {
             using T = std::remove_reference_t<decltype(str)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(str.length + 1 < str.capacity);
             } else {
                 if (str.length + 1 > str.capacity)
@@ -231,7 +238,7 @@ namespace basecode {
 
         u0 init(String_Concept auto& str, alloc_t* alloc) {
             using T = std::remove_reference_t<decltype(str)>;
-            if constexpr (!T::is_static::value) {
+            if constexpr (!T::Is_Static::value) {
                 str.data     = {};
                 str.capacity = {};
                 str.alloc    = alloc;
@@ -244,8 +251,11 @@ namespace basecode {
         }
 
         b8 erase(String_Concept auto& str, u32 pos, u32 len) {
-            if (pos + len < str.length)
-                std::memmove(str.data + pos, str.data + pos + 1, len * sizeof(u8));
+            if (pos + len < str.length) {
+                std::memmove(str.data + pos,
+                             str.data + pos + 1,
+                             len * sizeof(u8));
+            }
             str.length -= len;
             return true;
         }
@@ -265,7 +275,9 @@ namespace basecode {
                 return;
             }
 
-            str.data = (u8*) memory::realloc(str.alloc, str.data, new_capacity * sizeof(u8));
+            str.data = (u8*) memory::realloc(str.alloc,
+                                             str.data,
+                                             new_capacity * sizeof(u8));
             str.capacity = new_capacity;
             if (new_capacity < str.length)
                 str.length = new_capacity;
@@ -286,7 +298,7 @@ namespace basecode {
             using T = std::remove_reference_t<decltype(str)>;
             if (len == 0) return;
             const auto n = len != -1 ? len : strlen((const char*) value);
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(str.length + n < str.capacity);
             } else {
                 if (str.length + n > str.capacity)
@@ -306,7 +318,7 @@ namespace basecode {
             if (len == 0) return;
             auto const n = len == -1 ? strlen((const char*) value) : len;
             const auto offset = (ptrdiff_t) str.data + pos;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(str.length + n < str.capacity);
             } else {
                 if (str.length + n > str.capacity)

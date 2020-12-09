@@ -53,7 +53,8 @@ namespace basecode {
     };
 
 
-    template <typename V> struct symtab_t final {
+    template <typename V>
+    struct symtab_t final {
         using Value_Type        = V;
         using Pair_Array        = assoc_array_t<std::remove_pointer_t<V>*>;
 

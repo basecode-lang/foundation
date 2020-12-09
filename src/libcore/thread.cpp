@@ -27,7 +27,7 @@
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode::thread {
-    thread_local thread_t*          t_self{};
+    thread_local thread_t*      t_self{};
 
     static u0* bootstrap(u0* arg) {
         auto* proc = (proc_base_t*) arg;
@@ -43,12 +43,12 @@ namespace basecode::thread {
 
     namespace system {
         struct system_t final {
-            alloc_t*                alloc;
-            alloc_t*                proc_pool;
-            u32                     num_cores;
+            alloc_t*            alloc;
+            alloc_t*            proc_pool;
+            u32                 num_cores;
         };
 
-        system_t                    g_system{};
+        system_t                g_system{};
 
         u0 fini() {
             memory::system::free(g_system.proc_pool);
@@ -150,7 +150,8 @@ namespace basecode::thread {
     }
 
     status_t detach(thread_t& thread) {
-        if (thread.detached) return status_t::already_detached;
+        if (thread.detached)
+            return status_t::already_detached;
         auto rc = pthread_detach(thread.handle);
         if (rc == 0)
             thread.detached = true;

@@ -26,9 +26,10 @@
 #include <basecode/core/context.h>
 
 namespace basecode {
-    template <typename T, u32 Size = 8> struct fixed_stack_t final {
-        using value_type        = T;
-        using is_static         = std::integral_constant<b8, true>;
+    template <typename T, u32 Size = 8>
+    struct fixed_stack_t final {
+        using Value_Type        = T;
+        using Is_Static         = std::integral_constant<b8, true>;
 
         T                       data[Size];
         u32                     size;
@@ -43,9 +44,10 @@ namespace basecode {
         }
     };
 
-    template<typename T> struct stack_t final {
-        using value_type        = T;
-        using is_static         = std::integral_constant<b8, false>;
+    template<typename T>
+    struct stack_t final {
+        using Value_Type        = T;
+        using Is_Static         = std::integral_constant<b8, false>;
 
         alloc_t*                alloc;
         T*                      data;
@@ -64,17 +66,26 @@ namespace basecode {
 
     namespace stack {
         u0 free(Stack_Concept auto& stack);
+
         inline decltype(auto) top(Stack_Concept auto& stack);
+
+        template <typename T>
+        stack_t<T> make(alloc_t* alloc = context::top()->alloc);
+
         inline decltype(auto) top(const Stack_Concept auto& stack);
+
         u0 reserve(Dynamic_Stack_Concept auto& stack, u32 new_capacity);
+
         u0 grow(Dynamic_Stack_Concept auto& stack, u32 min_capacity = 8);
+
         u0 init(Stack_Concept auto& stack, alloc_t* alloc = context::top()->alloc);
-        template <typename T> stack_t<T> make(alloc_t* alloc = context::top()->alloc);
-        template <typename T> stack_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc);
+
+        template <typename T>
+        stack_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc);
 
         u0 free(Stack_Concept auto& stack) {
             using T = std::remove_reference_t<decltype(stack)>;
-            if constexpr (!T::is_static::value) {
+            if constexpr (!T::Is_Static::value) {
                 memory::free(stack.alloc, stack.data);
                 stack.data     = {};
                 stack.capacity = {};
@@ -89,7 +100,7 @@ namespace basecode {
         u0 reset(Stack_Concept auto& stack) {
             using T = std::remove_reference_t<decltype(stack)>;
             stack.size = {};
-            std::memset(stack.data, 0, stack.capacity * sizeof(typename T::value_type));
+            std::memset(stack.data, 0, stack.capacity * sizeof(typename T::Value_Type));
         }
 
         u0 trim(Dynamic_Stack_Concept auto& stack) {
@@ -108,18 +119,18 @@ namespace basecode {
 
         inline decltype(auto) pop(Stack_Concept auto& stack) {
             using T = std::remove_reference_t<decltype(stack)>;
-            using value_type = typename T::value_type;
+            using Value_Type = typename T::Value_Type;
 
-            if (stack.size == 0) return (value_type) {};
-            value_type top = stack.data[stack.size - 1];
+            if (stack.size == 0) return (Value_Type) {};
+            Value_Type top = stack.data[stack.size - 1];
             --stack.size;
             return top;
         }
 
         inline decltype(auto) dup(Stack_Concept auto& stack) {
             using T = std::remove_reference_t<decltype(stack)>;
-            if (stack.size == 0) return (typename T::value_type) {};
-            if constexpr (T::is_static::value) {
+            if (stack.size == 0) return (typename T::Value_Type) {};
+            if constexpr (T::Is_Static::value) {
                 assert(stack.size + 1 < stack.capacity);
             } else {
                 if (stack.size + 1 > stack.capacity)
@@ -138,7 +149,7 @@ namespace basecode {
 
         inline decltype(auto) top(Stack_Concept auto& stack) {
             using T = std::remove_reference_t<decltype(stack)>;
-            if constexpr (std::is_pointer_v<typename T::value_type>) {
+            if constexpr (std::is_pointer_v<typename T::Value_Type>) {
                 return (stack.size == 0 ? nullptr : stack.data[stack.size - 1]);
             } else {
                 return (stack.size == 0 ? nullptr : &stack.data[stack.size - 1]);
@@ -147,7 +158,7 @@ namespace basecode {
 
         inline decltype(auto) push(Stack_Concept auto& stack) {
             using T = std::remove_reference_t<decltype(stack)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(stack.size + 1 < stack.capacity);
             } else {
                 if (stack.size + 1 > stack.capacity)
@@ -159,7 +170,7 @@ namespace basecode {
 
         inline u32 push(Stack_Concept auto& stack, auto& value) {
             using T = std::remove_reference_t<decltype(stack)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(stack.size + 1 < stack.capacity);
             } else {
                 if (stack.size + 1 > stack.capacity)
@@ -171,7 +182,7 @@ namespace basecode {
 
         inline u32 push(Stack_Concept auto& stack, auto&& value) {
             using T = std::remove_reference_t<decltype(stack)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(stack.size + 1 < stack.capacity);
             } else {
                 if (stack.size + 1 > stack.capacity)
@@ -183,12 +194,12 @@ namespace basecode {
 
         inline decltype(auto) top(const Stack_Concept auto& stack) {
             using T = std::remove_reference_t<decltype(stack)>;
-            using value_type = typename T::value_type;
+            using Value_Type = typename T::value_type;
 
-            if constexpr (std::is_pointer_v<value_type>) {
-                return (const value_type) (stack.size == 0 ? nullptr : stack.data[stack.size - 1]);
+            if constexpr (std::is_pointer_v<Value_Type>) {
+                return (const Value_Type) (stack.size == 0 ? nullptr : stack.data[stack.size - 1]);
             } else {
-                return (const value_type*) (stack.size == 0 ? nullptr : &stack.data[stack.size - 1]);
+                return (const Value_Type*) (stack.size == 0 ? nullptr : &stack.data[stack.size - 1]);
             }
         }
 
@@ -200,15 +211,15 @@ namespace basecode {
 
         u0 insert(Stack_Concept auto& stack, u32 index, auto& value) {
             using T = std::remove_reference_t<decltype(stack)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(stack.size + 1 < stack.capacity);
             } else {
                 if (stack.size + 1 > stack.capacity)
                     grow(stack);
             }
-            auto target = stack.data + index;
+            auto target  = stack.data + index;
             auto current = stack.data + stack.size;
-            auto prev = current + 1;
+            auto prev    = current + 1;
             while (prev <= target)
                 *current++ = *prev++;
             *target = value;
@@ -220,9 +231,9 @@ namespace basecode {
             reserve(stack, min_capacity * 2 + 8);
         }
 
-        u32 inline push(Stack_Concept auto& stack, const auto& value) {
+        inline u32 push(Stack_Concept auto& stack, const auto& value) {
             using T = std::remove_reference_t<decltype(stack)>;
-            if constexpr (T::is_static::value) {
+            if constexpr (T::Is_Static::value) {
                 assert(stack.size + 1 < stack.capacity);
             } else {
                 if (stack.size + 1 > stack.capacity)
@@ -234,7 +245,7 @@ namespace basecode {
 
         u0 reserve(Dynamic_Stack_Concept auto& stack, u32 new_capacity) {
             using T = std::remove_reference_t<decltype(stack)>;
-            using value_type = typename T::value_type;
+            using Value_Type = typename T::Value_Type;
 
             if (new_capacity == 0) {
                 memory::free(stack.alloc, stack.data);
@@ -247,14 +258,18 @@ namespace basecode {
                 return;
 
             new_capacity = std::max(stack.size, new_capacity);
-            stack.data = (value_type*) memory::realloc(stack.alloc, stack.data, new_capacity * sizeof(value_type), alignof(value_type));
+            stack.data = (Value_Type*) memory::realloc(stack.alloc,
+                                                       stack.data,
+                                                       new_capacity * sizeof(Value_Type),
+                                                       alignof(Value_Type));
             const auto data          = stack.data + stack.size;
             const auto size_to_clear = new_capacity > stack.capacity ? new_capacity - stack.capacity : 0;
-            std::memset(data, 0, size_to_clear * sizeof(value_type));
+            std::memset(data, 0, size_to_clear * sizeof(Value_Type));
             stack.capacity = new_capacity;
         }
 
-        template<typename T> stack_t<T> make(std::initializer_list<T> elements, alloc_t* alloc) {
+        template<typename T>
+        stack_t<T> make(std::initializer_list<T> elements, alloc_t* alloc) {
             stack_t<T> stack{};
             init(stack, alloc);
             reserve(stack, elements.size());

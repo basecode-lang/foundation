@@ -27,10 +27,9 @@ namespace basecode {
     struct pratt_ctx_t;
 
     using rule_map_t            = hashtab_t<token_type_t, rule_t>;
-
-    using std_t = ast::node_id_t (*)(pratt_ctx_t*);
-    using nud_t = ast::node_id_t (*)(pratt_ctx_t*);
-    using led_t = ast::node_id_t (*)(pratt_ctx_t*, ast::node_id_t);
+    using std_t                 = ast::node_id_t (*)(pratt_ctx_t*);
+    using nud_t                 = ast::node_id_t (*)(pratt_ctx_t*);
+    using led_t                 = ast::node_id_t (*)(pratt_ctx_t*, ast::node_id_t);
 
     struct rule_t final {
         std_t                   std;
