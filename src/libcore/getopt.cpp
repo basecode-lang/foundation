@@ -18,5 +18,18 @@
 
 #include <basecode/core/getopt.h>
 
-namespace basecode {
+namespace basecode::getopt {
+    u0 free(getopt_t& opt) {
+        array::free(opt.args);
+        array::free(opt.opts);
+    }
+
+    status_t init(getopt_t& opt, s32 argc, const s8** argv, alloc_t* alloc) {
+        opt.alloc = alloc;
+        opt.argc  = argc;
+        opt.argv  = argv;
+        array::init(opt.args, opt.alloc);
+        array::init(opt.opts, opt.alloc);
+        return status_t::ok;
+    }
 }
