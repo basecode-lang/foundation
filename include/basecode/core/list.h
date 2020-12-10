@@ -81,6 +81,10 @@ namespace basecode {
     };
 
     namespace list {
+        inline list_node_t* get_node(Linked_List auto& list, u32 id);
+
+        u32 alloc_node(Linked_List auto& list, list_node_t** new_node = {});
+
         u0 free(Linked_List auto& list) {
             array::free(list.nodes);
             array::free(list.values);
@@ -178,15 +182,7 @@ namespace basecode {
             return id == 0 || id > list.nodes.size ? nullptr : &list.nodes[id - 1];
         }
 
-        inline list_node_t* prev(Linked_List auto& list, list_node_t* node) {
-            return get_node(list, node->prev);
-        }
-
-        inline list_node_t* next(Linked_List auto& list, list_node_t* node) {
-            return get_node(list, node->next);
-        }
-
-        u32 alloc_node(Linked_List auto& list, list_node_t** new_node = {}) {
+        u32 alloc_node(Linked_List auto& list, list_node_t** new_node) {
             if (list.free) {
                 for (u32 i = list.free - 1; i < list.nodes.size; ++i) {
                     auto& node = list.nodes[i];
@@ -201,6 +197,14 @@ namespace basecode {
             node->prev = node->next = node->value = {};
             if (new_node) *new_node = node;
             return list.nodes.size;
+        }
+
+        inline list_node_t* prev(Linked_List auto& list, list_node_t* node) {
+            return get_node(list, node->prev);
+        }
+
+        inline list_node_t* next(Linked_List auto& list, list_node_t* node) {
+            return get_node(list, node->next);
         }
 
         u0 init(Linked_List auto& list, alloc_t* alloc = context::top()->alloc) {
