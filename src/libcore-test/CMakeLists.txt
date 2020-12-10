@@ -26,6 +26,7 @@ add_executable(
     slice_tests.cpp
     queue_tests.cpp
     buddy_tests.cpp
+    getopt_tests.cpp
     config_tests.cpp
     intern_tests.cpp
     bitset_tests.cpp

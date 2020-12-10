@@ -94,6 +94,8 @@ set(
 
     gap_buf.cpp ${CORE_INC_DIR}/gap_buf.h
 
+    getopt.cpp ${CORE_INC_DIR}/getopt.h
+
     ${CORE_INC_DIR}/hashable.h
 
     hash/crc.cpp ${CORE_INC_DIR}/hash/crc.h
