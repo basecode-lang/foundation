@@ -36,6 +36,7 @@ add_executable(
     gap_buf_tests.cpp
     bintree_tests.cpp
     hashtab_tests.cpp
+    obj_pool_tests.cpp
     str_array_tests.cpp
     assoc_array_tests.cpp
     stable_array_tests.cpp

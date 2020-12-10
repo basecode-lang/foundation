@@ -278,8 +278,8 @@ namespace basecode {
             return table.size == 0;
         }
 
-        template<typename K>
-        b8 remove(Hash_Table auto& table, const K& key) {
+        template <typename T> requires Hash_Table<T>
+        b8 remove(T& table, const typename T::Key_Type& key) {
             if (table.capacity == 0)
                 return false;
             u64 hash         = hash::hash64(key);
@@ -341,7 +341,7 @@ namespace basecode {
         }
 
         template<typename T> requires Hash_Table<T>
-        u32 for_each_pair(T& table, typename T::each_callback cb, u0* user = {}) {
+        u32 for_each_pair(T& table, typename T::Each_Callback cb, u0* user = {}) {
             u32 idx{};
             for (u32 i = 0; i < table.capacity; ++i) {
                 if (!table.hashes[i]) continue;

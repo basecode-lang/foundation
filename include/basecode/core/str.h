@@ -60,7 +60,7 @@ namespace basecode {
             str::grow(*this, n);
             std::memcpy(data, value, n * sizeof(u8));
             data[n] = '\0';
-            length = n;
+            length = n - 1;
         }
 
         explicit str_t(str::slice_t value, alloc_t* alloc = context::top()->alloc) : alloc(alloc) {

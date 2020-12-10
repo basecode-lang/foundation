@@ -50,6 +50,7 @@ set(
 
     ${CORE_INC_DIR}/defer.h
     ${CORE_INC_DIR}/types.h
+    ${CORE_INC_DIR}/family.h
 
     ${CORE_INC_DIR}/array.h
 
@@ -142,6 +143,8 @@ set(
     network.cpp ${CORE_INC_DIR}/network.h
 
     numbers.cpp ${CORE_INC_DIR}/numbers.h
+
+    obj_pool.cpp ${CORE_INC_DIR}/obj_pool.h
 
     path.cpp ${CORE_INC_DIR}/path.h
 
