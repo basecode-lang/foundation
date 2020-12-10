@@ -19,6 +19,19 @@ const KEYED_HASH: u8 = 1 << 4;
 pub const TEST_CASES: &[usize] = &[
     0,
     1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    BLOCK_LEN - 1,
+    BLOCK_LEN,
+    BLOCK_LEN + 1,
+    2 * BLOCK_LEN - 1,
+    2 * BLOCK_LEN,
+    2 * BLOCK_LEN + 1,
     CHUNK_LEN - 1,
     CHUNK_LEN,
     CHUNK_LEN + 1,
@@ -140,6 +153,18 @@ fn test_compress_portable() {
     test_compress_fn(
         crate::ffi::blake3_compress_in_place_portable,
         crate::ffi::blake3_compress_xof_portable,
+    );
+}
+
+#[test]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+fn test_compress_sse2() {
+    if !crate::sse2_detected() {
+        return;
+    }
+    test_compress_fn(
+        crate::ffi::x86::blake3_compress_in_place_sse2,
+        crate::ffi::x86::blake3_compress_xof_sse2,
     );
 }
 
@@ -286,6 +311,15 @@ fn test_hash_many_portable() {
 
 #[test]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
+fn test_hash_many_sse2() {
+    if !crate::sse2_detected() {
+        return;
+    }
+    test_hash_many_fn(crate::ffi::x86::blake3_hash_many_sse2);
+}
+
+#[test]
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 fn test_hash_many_sse41() {
     if !crate::sse41_detected() {
         return;
@@ -362,11 +396,19 @@ fn test_compare_reference_impl() {
             let mut expected_out = [0; OUT];
             reference_hasher.finalize(&mut expected_out);
 
+            // the regular C string API
             let mut test_hasher = crate::Hasher::new_derive_key(context);
             test_hasher.update(input);
             let mut test_out = [0; OUT];
             test_hasher.finalize(&mut test_out);
             assert_eq!(test_out[..], expected_out[..]);
+
+            // the raw bytes API
+            let mut test_hasher_raw = crate::Hasher::new_derive_key_raw(context.as_bytes());
+            test_hasher_raw.update(input);
+            let mut test_out_raw = [0; OUT];
+            test_hasher_raw.finalize(&mut test_out_raw);
+            assert_eq!(test_out_raw[..], expected_out[..]);
         }
     }
 }
@@ -383,7 +425,10 @@ fn reference_hash(input: &[u8]) -> [u8; OUT_LEN] {
 fn test_compare_update_multiple() {
     // Don't use all the long test cases here, since that's unnecessarily slow
     // in debug mode.
-    let short_test_cases = &TEST_CASES[..10];
+    let mut short_test_cases = TEST_CASES;
+    while *short_test_cases.last().unwrap() > 4 * CHUNK_LEN {
+        short_test_cases = &short_test_cases[..short_test_cases.len() - 1];
+    }
     assert_eq!(*short_test_cases.last().unwrap(), 4 * CHUNK_LEN);
 
     let mut input_buf = [0; 2 * TEST_CASES_MAX];

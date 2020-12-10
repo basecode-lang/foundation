@@ -149,32 +149,32 @@ target_include_directories(utf8proc PUBLIC ext/utf8proc-2.5.0)
 # blake3
 set(
         BLAKE3_SOURCES
-        ext/blake3-0.3.1/blake3.c
-        ext/blake3-0.3.1/blake3_dispatch.c
-        ext/blake3-0.3.1/blake3_portable.c
+        ext/blake3-0.3.7/blake3.c
+        ext/blake3-0.3.7/blake3_dispatch.c
+        ext/blake3-0.3.7/blake3_portable.c
 )
 if (WIN32)
     set(
         BLAKE3_SOURCES
         ${BLAKE3_SOURCES}
-        ext/blake3-0.3.1/blake3_sse41_x86-64_windows_gnu.S
-        ext/blake3-0.3.1/blake3_avx2_x86-64_windows_gnu.S
-        ext/blake3-0.3.1/blake3_avx512_x86-64_windows_gnu.S
+        ext/blake3-0.3.7/blake3_sse41_x86-64_windows_gnu.S
+        ext/blake3-0.3.7/blake3_avx2_x86-64_windows_gnu.S
+        ext/blake3-0.3.7/blake3_avx512_x86-64_windows_gnu.S
     )
 else ()
     set(
         BLAKE3_SOURCES
         ${BLAKE3_SOURCES}
-        ext/blake3-0.3.1/blake3_sse41_x86-64_unix.S
-        ext/blake3-0.3.1/blake3_avx2_x86-64_unix.S
-        ext/blake3-0.3.1/blake3_avx512_x86-64_unix.S
+        ext/blake3-0.3.7/blake3_sse41_x86-64_unix.S
+        ext/blake3-0.3.7/blake3_avx2_x86-64_unix.S
+        ext/blake3-0.3.7/blake3_avx512_x86-64_unix.S
     )
 endif ()
 add_library(blake3 ${BLAKE3_SOURCES})
 if (NOT WIN32)
     target_compile_options(blake3 PUBLIC -march=native)
 endif()
-target_include_directories(blake3 INTERFACE ext/blake3-0.3.1)
+target_include_directories(blake3 INTERFACE ext/blake3-0.3.7)
 
 # dyncall
 add_subdirectory(ext/dyncall-1.1.0 EXCLUDE_FROM_ALL)
