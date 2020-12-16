@@ -32,8 +32,9 @@ namespace basecode {
     };
 
     struct option_t final {
-        str::slice_t            name;
-        str::slice_t            desc;
+        str::slice_t            long_name;
+        str::slice_t            short_name;
+        str::slice_t            description;
         arg_type_t              type;
         struct {
             u32                 min;
@@ -73,6 +74,10 @@ namespace basecode {
         };
 
         u0 free(getopt_t& opt);
+
+        status_t parse(getopt_t& opt);
+
+        u0 format_help(getopt_t& opt, str_t& buf);
 
         status_t init(getopt_t& opt, s32 argc, const s8** argv, alloc_t* alloc = context::top()->alloc);
     }

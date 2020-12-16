@@ -16,12 +16,31 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/path.h>
+#include <basecode/core/defer.h>
 #include <basecode/core/getopt.h>
+#include <basecode/core/format.h>
 
 namespace basecode::getopt {
     u0 free(getopt_t& opt) {
         array::free(opt.args);
         array::free(opt.opts);
+    }
+
+    status_t parse(getopt_t& opt) {
+        UNUSED(opt);
+        return status_t::ok;
+    }
+
+    u0 format_help(getopt_t& opt, str_t& buf) {
+        path_t self{};
+        path::init(self);
+        path::set(self, opt.argv[0]);
+        defer(path::free(self));
+
+        const auto self_stem = path::stem(self);
+        str_buf_t sb{&buf};
+        format::format_to(sb, "usage: {} ", self_stem);
     }
 
     status_t init(getopt_t& opt, s32 argc, const s8** argv, alloc_t* alloc) {

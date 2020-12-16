@@ -19,8 +19,32 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/defer.h>
 #include <basecode/core/getopt.h>
+#include <basecode/core/format.h>
+#include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
 TEST_CASE("basecode::getopt basics") {
+    const char* argv[] = {
+        "C:\\temp\\foo.exe",
+        "-xvfz",
+        "test.tar.gz"
+    };
+
+    stopwatch_t timer{};
+    stopwatch::start(timer);
+
+    getopt_t cl{};
+    getopt::init(cl, 3, argv);
+    defer(getopt::free(cl));
+
+    str_t buf{};
+    str::init(buf);
+    defer(str::free(buf));
+
+    getopt::format_help(cl, buf);
+    format::print("{}\n", buf);
+
+    stopwatch::stop(timer);
+    stopwatch::print_elapsed("getopt setup & parse"_ss, 40, timer);
 }
