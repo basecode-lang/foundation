@@ -215,14 +215,14 @@
         (let str:undecl-msg (localized-string 5005 'en_US "undeclared identifier: {}"))
         (localized-error 5000 'en_US 'BC001 str:undecl-msg)
 
-        ; basic assertions around fe scheme terp
-        (test-suite "fe scheme terp basic assertions"
+        ; basic assertions around scheme terp
+        (test-suite "scheme terp basic assertions"
             (assert '(is 2 2))
             (assert '(not (> 2 9)))
             (assert '(>= 2 2))
             (assert '(is 0 (mod 10 2))))
 
-        (test-suite "fe + config module integration"
+        (test-suite "scheme + config module integration"
             (assert '(is "Basecode Foundation Core Library" (cvar-ref cvar:product-name)))
             (assert '(is 0 (cvar-ref cvar:version-major)))
             (assert '(is 1 (cvar-ref cvar:version-minor)))

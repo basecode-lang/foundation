@@ -25,8 +25,8 @@ configure_file(
     "${CMAKE_BINARY_DIR}/include/basecode/binfmt/configure.h"
 )
 configure_file(
-    ${PROJECT_DIR_BASE}/etc/binfmt.fe
-    ${CMAKE_BINARY_DIR}/etc/binfmt.fe COPYONLY
+    ${PROJECT_DIR_BASE}/etc/binfmt.scm
+    ${CMAKE_BINARY_DIR}/etc/binfmt.scm COPYONLY
 )
 
 # -----------------------------------------------------------------------------

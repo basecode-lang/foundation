@@ -29,8 +29,8 @@ configure_file(
     "${CMAKE_BINARY_DIR}/include/basecode/core/configure.h"
 )
 configure_file(
-    ${PROJECT_DIR_BASE}/etc/core.fe
-    ${CMAKE_BINARY_DIR}/etc/core.fe COPYONLY
+    ${PROJECT_DIR_BASE}/etc/core.scm
+    ${CMAKE_BINARY_DIR}/etc/core.scm COPYONLY
 )
 
 # -----------------------------------------------------------------------------

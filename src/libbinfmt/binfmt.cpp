@@ -59,7 +59,7 @@ namespace basecode::binfmt {
             stable_array::init(g_binfmt_sys.modules, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.sections, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.symbols, g_binfmt_sys.alloc);
-            auto file_path = "../etc/binfmt.fe"_path;
+            auto file_path = "../etc/binfmt.scm"_path;
             path_t config_path{};
             filesys::bin_rel_path(config_path, file_path);
             defer({
