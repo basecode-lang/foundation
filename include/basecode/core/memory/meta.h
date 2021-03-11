@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/bintree.h>
+#include <basecode/core/bst.h>
 
 namespace basecode::memory::meta {
     u0 fini();
@@ -27,7 +27,7 @@ namespace basecode::memory::meta {
 
     u0 untrack(alloc_t* alloc);
 
-    const bintree_t<alloc_t*>& tree();
+    const bst_t<alloc_t*>& tree();
 
     u0 init(alloc_t* alloc = context::top()->alloc);
 }

@@ -20,7 +20,7 @@
 
 #include <basecode/core/slice.h>
 
-#define IS_PROXY(a)     (a->system && a->system->type == alloc_type_t::proxy)
+#define IS_PROXY(a)     ((a)->system && (a)->system->type == alloc_type_t::proxy)
 
 namespace basecode {
     using mspace                    = u0*;
@@ -124,6 +124,10 @@ namespace basecode {
         alloc_subclass_t            subclass;
         u32                         total_allocated;
         u32                         pad;
+
+        std::weak_ordering operator<=>(const alloc_t& other) const {
+            return std::weak_ordering::equivalent;
+        }
     };
 
     namespace memory {

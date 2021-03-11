@@ -58,11 +58,11 @@ set(
 
     bass.cpp ${CORE_INC_DIR}/bass.h
 
-    ${CORE_INC_DIR}/bintree.h
-
     bits.cpp ${CORE_INC_DIR}/bits.h
 
     bitset.cpp ${CORE_INC_DIR}/bitset.h
+
+    ${CORE_INC_DIR}/bst.h
 
     buf.cpp ${CORE_INC_DIR}/buf.h
 
@@ -234,7 +234,6 @@ target_include_directories(
 target_include_directories(
     ${LIBRARY_TARGET} PRIVATE
 
-    fe/src
     ${PLATFORM_INC_DIR}
 )
 target_compile_options(
@@ -276,7 +275,6 @@ add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(
     ${PROJECT_NAME} INTERFACE
 
-    fe/src
     ${INC_DIR_BASE}
     ${PLATFORM_INC_DIR}
     ${CMAKE_BINARY_DIR}/include)

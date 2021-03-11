@@ -17,6 +17,7 @@ add_executable(
     set_tests.cpp
     buf_tests.cpp
     eav_tests.cpp
+    bst_tests.cpp
     path_tests.cpp
     list_tests.cpp
     uuid_tests.cpp
@@ -35,7 +36,6 @@ add_executable(
     memory_tests.cpp
     filesys_tests.cpp
     gap_buf_tests.cpp
-    bintree_tests.cpp
     hashtab_tests.cpp
     obj_pool_tests.cpp
     str_array_tests.cpp
