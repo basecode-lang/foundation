@@ -49,6 +49,6 @@ TEST_CASE("basecode::bst basics") {
     if (bst::size(tree) != values.size) REQUIRE(false);
 
     bst::print_whole_tree(tree, "before balance"_ss);
-    bst::balance(tree);
-    bst::print_whole_tree(tree, "after balance "_ss);
+//    bst::balance(tree);
+//    bst::print_whole_tree(tree, "after balance "_ss);
 }

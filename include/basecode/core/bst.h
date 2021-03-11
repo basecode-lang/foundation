@@ -223,9 +223,8 @@ namespace basecode {
         u0 balance(Binary_Tree auto& tree) {
             if (tree.size == 0) return;
             tree_to_vine(tree);
-            print_whole_tree(tree, "as vine"_ss);
-//            vine_to_tree(tree);
-//            update_parents(tree);
+            vine_to_tree(tree);
+            update_parents(tree);
         }
 
         inline u32 size(const Binary_Tree auto& tree) {
