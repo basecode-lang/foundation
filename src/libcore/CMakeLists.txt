@@ -96,6 +96,8 @@ set(
 
     getopt.cpp ${CORE_INC_DIR}/getopt.h
 
+    graphviz/gv.cpp ${CORE_INC_DIR}/graphviz/gv.h
+
     ${CORE_INC_DIR}/hashable.h
 
     hash/crc.cpp ${CORE_INC_DIR}/hash/crc.h
