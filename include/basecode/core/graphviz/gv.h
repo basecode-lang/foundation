@@ -719,6 +719,113 @@ namespace basecode::graphviz {
         yellowgreen,
     };
 
+    enum class graph_label_loc_t : u8 {
+        top,
+        bottom,
+    };
+
+    enum class node_label_loc_t : u8 {
+        top,
+        center,
+        bottom,
+    };
+
+    enum class image_pos_t : u8 {
+        tl,
+        tc,
+        tr,
+        ml,
+        mc,
+        mr,
+        bl,
+        bc,
+        br,
+    };
+
+    enum class shape_t : u8 {
+        none,
+        box,
+        polygon,
+        ellipse,
+        oval,
+        circle,
+        point,
+        egg,
+        triangle,
+        plaintext,
+        plain,
+        diamond,
+        trapezium,
+        parallelogram,
+        house,
+        pentagon,
+        hexagon,
+        septagon,
+        octagon,
+        doublecircle,
+        doubleoctagon,
+        tripleoctagon,
+        invtriangle,
+        invtrapezium,
+        invhouse,
+        mdiamond,
+        msquare,
+        mcircle,
+        mrecord,
+        record,
+        rect,
+        rectangle,
+        square,
+        star,
+        underline,
+        box3d,
+        component,
+        promoter,
+        cds,
+        terminator,
+        utr,
+        primersite,
+        restrictionsite,
+        fiveproverhang,
+        threepoverhange,
+        noverhang,
+        assembly,
+        signature,
+        insulator,
+        ribosite,
+        rnastab,
+        proteasesite,
+        proteinstab,
+        rpromoter,
+        rarrow,
+        larrow,
+        lpromoter,
+    };
+
+    enum class overlap_t : u8 {
+        retain,
+        scale,
+        prism,
+        voronoi,
+        scalexy,
+        compress,
+        vpsc,
+        ortho,
+        orthoxy,
+        orthoyx,
+        portho,
+        porthoxy,
+        porthoyx,
+    };
+
+    enum class image_scale_t : u8 {
+        none,
+        uniform,
+        width,
+        height,
+        both,
+    };
+
     enum class edge_style_t : u8 {
         dashed,
         dotted,
@@ -773,6 +880,11 @@ namespace basecode::graphviz {
         halfopen,
     };
 
+    enum class charset_t : u8 {
+        utf8,
+        iso_8859_1,
+    };
+
     enum class rank_dir_t : u8 {
         tb,
         lr,
@@ -812,24 +924,17 @@ namespace basecode::graphviz {
         edges_first,
     };
 
-    enum class compass_point_t : u8 {
-        n,
-        ne,
-        e,
-        se,
-        s,
-        sw,
-        w,
-        nw,
-        c,
-        _
-    };
-
     enum class dir_type_t : u8 {
         none,
         back,
         both,
         forward,
+    };
+
+    enum class ordering_t : u8 {
+        none,
+        out,
+        in
     };
 
     enum class graph_type_t : u8 {
@@ -843,12 +948,42 @@ namespace basecode::graphviz {
         global,
     };
 
-    enum class component_type_t : u8 {
-        edge,
-        node,
-        graph,
-        subgraph,
-        cluster_subgraph
+    enum class color_scheme_t : u8 {
+        x11,
+        svg
+    };
+
+    enum class orientation_t : u8 {
+        portrait,
+        landscape,
+    };
+
+    enum class spline_mode_t : u8 {
+        none,
+        spline,
+        line,
+        polyline,
+        ortho,
+        curved,
+    };
+
+    enum class compass_point_t : u8 {
+        n,
+        ne,
+        e,
+        se,
+        s,
+        sw,
+        w,
+        nw,
+        c,
+        _
+    };
+
+    enum class justification_t : u8 {
+        left,
+        center,
+        right,
     };
 
     enum class attr_type_t : u8 {
@@ -961,6 +1096,14 @@ namespace basecode::graphviz {
         z
     };
 
+    enum class component_type_t : u8 {
+        edge,
+        node,
+        graph,
+        subgraph,
+        cluster_subgraph
+    };
+
     enum class attr_value_type_t : u8 {
         string,
         boolean,
@@ -1040,11 +1183,13 @@ namespace basecode::graphviz {
 
         u0 skew(node_t& n, f64 v);
 
-        u0 sortv(node_t& n, b8 v);
+        u0 sortv(node_t& n, u32 v);
 
         u0 width(node_t& n, f64 v);
 
         u0 sides(node_t& n, u32 v);
+
+        u0 height(node_t& n, f64 v);
 
         u0 margin(node_t& n, f64 v);
 
@@ -1066,13 +1211,13 @@ namespace basecode::graphviz {
 
         u0 pen_width(node_t& n, f64 v);
 
+        u0 shape(node_t& n, shape_t v);
+
         u0 show_boxes(node_t& n, u32 v);
 
         u0 margin(node_t& n, point_t v);
 
         u0 distortion(node_t& n, f64 v);
-
-        u0 image_scale(node_t& n, b8 v);
 
         u0 peripheries(node_t& n, u32 v);
 
@@ -1090,15 +1235,10 @@ namespace basecode::graphviz {
 
         u0 style(node_t& n, node_style_t v);
 
-        // XXX
-        u0 shape(node_t& n, str::slice_t v);
-
         u0 label(node_t& n, str::slice_t v);
 
         // XXX
         u0 layer(node_t& n, str::slice_t v);
-
-        u0 image(node_t& n, str::slice_t v);
 
         u0 fill_color(node_t& n, color_t v);
 
@@ -1108,21 +1248,21 @@ namespace basecode::graphviz {
 
         u0 gradient_angle(node_t& n, u32 v);
 
+        u0 image(node_t& n, const path_t& v);
+
+        u0 ordering(node_t& n, ordering_t v);
+
         u0 comment(node_t& n, str::slice_t v);
 
-        u0 ordering(node_t& n, str::slice_t v);
-
-        // XXX
-        u0 image_pos(node_t& n, str::slice_t v);
+        u0 image_pos(node_t& n, image_pos_t v);
 
         u0 font_name(node_t& n, str::slice_t v);
 
-        // XXX
-        u0 label_loc(node_t& n, str::slice_t v);
+        u0 image_scale(node_t& n, image_scale_t v);
 
-        u0 shape_file(node_t& n, const path_t& v);
+        u0 label_loc(node_t& n, node_label_loc_t v);
 
-        u0 color_scheme(node_t& n, str::slice_t v);
+        u0 color_scheme(node_t& n, color_scheme_t v);
 
         status_t init(node_t& n, alloc_t* alloc = context::top()->alloc);
     }
@@ -1156,9 +1296,9 @@ namespace basecode::graphviz {
 
         u0 pen_width(edge_t& e, f64 v);
 
-        u0 show_boxes(edge_t& e, b8 v);
-
         u0 font_size(edge_t& e, f64 v);
+
+        u0 show_boxes(edge_t& e, u32 v);
 
         u0 dir(edge_t& e, dir_type_t v);
 
@@ -1175,6 +1315,8 @@ namespace basecode::graphviz {
         u0 fill_color(edge_t& e, rgba_t v);
 
         u0 font_color(edge_t& e, rgba_t v);
+
+        u0 style(edge_t& e, edge_style_t v);
 
         u0 font_color(edge_t& e, color_t v);
 
@@ -1202,12 +1344,10 @@ namespace basecode::graphviz {
 
         u0 same_tail(edge_t& e, str::slice_t v);
 
-        // XXX
         u0 head_port(edge_t& e, str::slice_t v);
 
         u0 arrow_head(edge_t& e, arrow_type_t v);
 
-        // XXX
         u0 tail_port(edge_t& e, str::slice_t v);
 
         u0 tail_label(edge_t& e, str::slice_t v);
@@ -1220,7 +1360,7 @@ namespace basecode::graphviz {
 
         u0 label_font_color(edge_t& e, color_t v);
 
-        u0 color_scheme(edge_t& e, str::slice_t v);
+        u0 color_scheme(edge_t& e, color_scheme_t v);
 
         u0 label_font_name(edge_t& e, str::slice_t v);
 
@@ -1229,6 +1369,8 @@ namespace basecode::graphviz {
 
     namespace graph {
         u0 free(graph_t& g);
+
+        u0 sep(graph_t& g, f64 v);
 
         u0 pad(graph_t& g, f64 v);
 
@@ -1242,30 +1384,21 @@ namespace basecode::graphviz {
 
         u0 sortv(graph_t& g, u32 v);
 
-        // XXX:
         u0 ratio(graph_t& g, f64 v);
 
         u0 scale(graph_t& g, f64 v);
 
         u0 center(graph_t& g, b8 v);
 
-        u0 overlap(graph_t& g, b8 v);
-
         u0 rotate(graph_t& g, u32 v);
 
         u0 margin(graph_t& g, f64 v);
-
-        u0 lwidth(graph_t& g, f64 v);
-
-        u0 splines(graph_t& g, b8 v);
 
         u0 lp(graph_t& g, point_t v);
 
         u0 pad(graph_t& g, point_t v);
 
         u0 new_rank(graph_t& g, b8 v);
-
-        u0 min_len(graph_t& g, u32 v);
 
         u0 lheight(graph_t& g, f64 v);
 
@@ -1287,7 +1420,6 @@ namespace basecode::graphviz {
 
         u0 landscape(graph_t& g, b8 v);
 
-        // XXX:
         u0 rank_sep(graph_t& g, f64 v);
 
         u0 mc_limit(graph_t& g, f64 v);
@@ -1295,8 +1427,6 @@ namespace basecode::graphviz {
         u0 ns_limit(graph_t& g, f64 v);
 
         u0 scale(graph_t& g, point_t v);
-
-        u0 show_boxes(graph_t& g, b8 v);
 
         u0 color(graph_t& g, color_t v);
 
@@ -1308,7 +1438,8 @@ namespace basecode::graphviz {
 
         u0 font_size(graph_t& g, f64 v);
 
-        // XXX: color list?
+        u0 show_boxes(graph_t& g, u32 v);
+
         u0 bg_color(graph_t& g, rgb_t v);
 
         u0 margin(graph_t& g, point_t v);
@@ -1321,24 +1452,25 @@ namespace basecode::graphviz {
 
         u0 force_labels(graph_t& g, b8 v);
 
-        u0 orientation(graph_t& g, f64 v);
-
         u0 re_min_cross(graph_t& g, b8 v);
+
+        u0 search_size(graph_t& g, u32 v);
+
+        u0 rank(graph_t& g, rank_type_t v);
 
         u0 bb(graph_t& g, const rect_t& v);
 
         u0 bg_color(graph_t& g, color_t v);
 
+        u0 charset(graph_t& g, charset_t v);
+
+        u0 overlap(graph_t& g, overlap_t v);
+
         u0 label(graph_t& g, str::slice_t v);
 
         u0 gradient_angle(graph_t& g, u32 v);
 
-        // XXX
-        u0 style(graph_t& g, str::slice_t v);
-
-        u0 layout(graph_t& g, str::slice_t v);
-
-        u0 class_(graph_t& g, str::slice_t v);
+        u0 style(graph_t& g, graph_style_t v);
 
         u0 layers(graph_t& g, str::slice_t v);
 
@@ -1348,20 +1480,15 @@ namespace basecode::graphviz {
 
         u0 viewport(graph_t& g, viewport_t v);
 
-        // XXX:
-        u0 splines(graph_t& g, str::slice_t v);
-
-        u0 charset(graph_t& g, str::slice_t v);
+        u0 ordering(graph_t& g, ordering_t v);
 
         u0 comment(graph_t& g, str::slice_t v);
 
+        u0 splines(graph_t& g, spline_mode_t v);
+
+        u0 font_name(node_t& n, str::slice_t v);
+
         u0 pack_mode(graph_t& g, pack_mode_t v);
-
-        u0 ordering(graph_t& g, str::slice_t v);
-
-        u0 label_loc(graph_t& g, str::slice_t v);
-
-        u0 label_just(graph_t& g, str::slice_t v);
 
         u0 font_path(graph_t& g, const path_t& v);
 
@@ -1371,15 +1498,21 @@ namespace basecode::graphviz {
 
         u0 image_path(graph_t& g, const path_t& v);
 
-        u0 orientation(graph_t& g, str::slice_t v);
-
-        u0 color_scheme(graph_t& g, str::slice_t v);
+        u0 orientation(graph_t& g, orientation_t v);
 
         u0 output_order(graph_t& g, output_mode_t v);
 
         u0 layers_select(graph_t& g, str::slice_t v);
 
+        u0 label_loc(graph_t& g, graph_label_loc_t v);
+
+        u0 color_scheme(graph_t& g, color_scheme_t v);
+
         u0 layer_list_sep(graph_t& g, str::slice_t v);
+
+        u0 cluster_rank(graph_t& g, cluster_mode_t v);
+
+        u0 label_justification(graph_t& g, justification_t v);
 
         status_t init(graph_t& g, graph_type_t type, alloc_t* alloc = context::top()->alloc);
     }
