@@ -722,29 +722,6 @@ namespace basecode::graphviz {
         yellowgreen,
     };
 
-    enum class graph_label_loc_t : u8 {
-        top,
-        bottom,
-    };
-
-    enum class node_label_loc_t : u8 {
-        top,
-        center,
-        bottom,
-    };
-
-    enum class image_pos_t : u8 {
-        tl,
-        tc,
-        tr,
-        ml,
-        mc,
-        mr,
-        bl,
-        bc,
-        br,
-    };
-
     enum class shape_t : u8 {
         none,
         box,
@@ -805,6 +782,23 @@ namespace basecode::graphviz {
         lpromoter,
     };
 
+    enum class image_pos_t : u8 {
+        tl,
+        tc,
+        tr,
+        ml,
+        mc,
+        mr,
+        bl,
+        bc,
+        br,
+    };
+
+    enum class charset_t : u8 {
+        utf8,
+        iso_8859_1,
+    };
+
     enum class overlap_t : u8 {
         retain,
         scale,
@@ -821,71 +815,11 @@ namespace basecode::graphviz {
         porthoyx,
     };
 
-    enum class image_scale_t : u8 {
+    enum class dir_type_t : u8 {
         none,
-        uniform,
-        width,
-        height,
+        back,
         both,
-    };
-
-    enum class edge_style_t : u8 {
-        dashed,
-        dotted,
-        solid,
-        invis,
-        bold,
-        tapered
-    };
-
-    enum class graph_style_t : u8 {
-        radial,
-    };
-
-    enum class node_style_t : u8 {
-        dashed,
-        dotted,
-        solid,
-        invis,
-        bold,
-        filled,
-        striped,
-        wedged,
-        diagonals,
-        rounded,
-    };
-
-    enum class cluster_style_t : u8 {
-        filled,
-        striped,
-        rounded,
-    };
-
-    enum class arrow_type_t : u8 {
-        normal,
-        dot,
-        odot,
-        none,
-        empty,
-        diamond,
-        ediamond,
-        box,
-        open_,
-        vee,
-        inv,
-        invdot,
-        invodot,
-        tee,
-        invempty,
-        odiamond,
-        crow,
-        obox,
-        halfopen,
-    };
-
-    enum class charset_t : u8 {
-        utf8,
-        iso_8859_1,
+        forward,
     };
 
     enum class rank_dir_t : u8 {
@@ -895,12 +829,10 @@ namespace basecode::graphviz {
         rl
     };
 
-    enum class rank_type_t : u8 {
-        same,
-        min,
-        source,
-        max,
-        sink
+    enum class ordering_t : u8 {
+        none,
+        out,
+        in
     };
 
     enum class page_dir_t : u8 {
@@ -919,74 +851,6 @@ namespace basecode::graphviz {
         cluster,
         graph,
         array,
-    };
-
-    enum class output_mode_t : u8 {
-        breadth_first,
-        nodes_first,
-        edges_first,
-    };
-
-    enum class dir_type_t : u8 {
-        none,
-        back,
-        both,
-        forward,
-    };
-
-    enum class ordering_t : u8 {
-        none,
-        out,
-        in
-    };
-
-    enum class graph_type_t : u8 {
-        directed,
-        undirected
-    };
-
-    enum class cluster_mode_t : u8 {
-        none,
-        local,
-        global,
-    };
-
-    enum class color_scheme_t : u8 {
-        x11,
-        svg
-    };
-
-    enum class orientation_t : u8 {
-        portrait,
-        landscape,
-    };
-
-    enum class spline_mode_t : u8 {
-        none,
-        spline,
-        line,
-        polyline,
-        ortho,
-        curved,
-    };
-
-    enum class compass_point_t : u8 {
-        n,
-        ne,
-        e,
-        se,
-        s,
-        sw,
-        w,
-        nw,
-        c,
-        _
-    };
-
-    enum class justification_t : u8 {
-        left,
-        center,
-        right,
     };
 
     enum class attr_type_t : u8 {
@@ -1099,6 +963,142 @@ namespace basecode::graphviz {
         z
     };
 
+    enum class edge_style_t : u8 {
+        dashed,
+        dotted,
+        solid,
+        invis,
+        bold,
+        tapered
+    };
+
+    enum class node_style_t : u8 {
+        dashed,
+        dotted,
+        solid,
+        invis,
+        bold,
+        filled,
+        striped,
+        wedged,
+        diagonals,
+        rounded,
+    };
+
+    enum class rank_type_t : u8 {
+        same,
+        min,
+        source,
+        max,
+        sink
+    };
+
+    enum class graph_type_t : u8 {
+        directed,
+        undirected
+    };
+
+    enum class arrow_type_t : u8 {
+        normal,
+        dot,
+        odot,
+        none,
+        empty,
+        diamond,
+        ediamond,
+        box,
+        open_,
+        vee,
+        inv,
+        invdot,
+        invodot,
+        tee,
+        invempty,
+        odiamond,
+        crow,
+        obox,
+        halfopen,
+    };
+
+    enum class output_mode_t : u8 {
+        breadth_first,
+        nodes_first,
+        edges_first,
+    };
+
+    enum class graph_style_t : u8 {
+        radial,
+    };
+
+    enum class orientation_t : u8 {
+        portrait,
+        landscape,
+    };
+
+    enum class image_scale_t : u8 {
+        none,
+        uniform,
+        width,
+        height,
+        both,
+    };
+
+    enum class spline_mode_t : u8 {
+        none,
+        spline,
+        line,
+        polyline,
+        ortho,
+        curved,
+    };
+
+    enum class cluster_mode_t : u8 {
+        none,
+        local,
+        global,
+    };
+
+    enum class color_scheme_t : u8 {
+        x11,
+        svg
+    };
+
+    enum class cluster_style_t : u8 {
+        filled,
+        striped,
+        rounded,
+    };
+
+    enum class compass_point_t : u8 {
+        n,
+        ne,
+        e,
+        se,
+        s,
+        sw,
+        w,
+        nw,
+        c,
+        _
+    };
+
+    enum class justification_t : u8 {
+        left,
+        center,
+        right,
+    };
+
+    enum class node_label_loc_t : u8 {
+        top,
+        bottom,
+        center,
+    };
+
+    enum class graph_label_loc_t : u8 {
+        top,
+        bottom,
+    };
+
     enum class component_type_t : u8 {
         edge,
         node,
@@ -1118,6 +1118,9 @@ namespace basecode::graphviz {
         boolean,
         integer,
         viewport,
+        node_style,
+        edge_style,
+        graph_style,
         enumeration,
         floating_point,
     };
@@ -1161,8 +1164,8 @@ namespace basecode::graphviz {
             color_t             color;
             viewport_t          viewport;
         }                       value;
-        u8                      type:       4;
-        u8                      value_type: 4;
+        attr_type_t             type;
+        attr_value_type_t       value_type;
     };
 
     struct attr_set_t final {
@@ -1181,7 +1184,6 @@ namespace basecode::graphviz {
         attr_set_t              attrs;
         u32                     first;
         u32                     second;
-        intern_id               name;
         u32                     id;
     };
 
@@ -1192,14 +1194,51 @@ namespace basecode::graphviz {
         node_list_t             nodes;
         graph_list_t            subgraphs;
         attr_set_t              attrs;
+        str_t                   scratch;
         intern_id               name;
         graph_type_t            type;
     };
 
     namespace attr {
+        str::slice_t dir_name(dir_type_t dir);
+
+        str::slice_t color_name(color_t color);
+
+        str::slice_t shape_name(shape_t shape);
+
+        str::slice_t charset_name(charset_t cs);
+
+        str::slice_t overlap_name(overlap_t ol);
+
         str::slice_t type_name(attr_type_t type);
 
+        str::slice_t rank_dir_name(rank_dir_t dir);
+
+        str::slice_t page_dir_name(page_dir_t dir);
+
+        str::slice_t image_pos_name(image_pos_t pos);
+
+        str::slice_t ordering_name(ordering_t order);
+
+        str::slice_t pack_mode_name(pack_mode_t mode);
+
+        str::slice_t rank_type_name(rank_type_t type);
+
         str::slice_t arrow_type_name(arrow_type_t type);
+
+        str::slice_t edge_style_name(edge_style_t style);
+
+        str::slice_t node_style_name(node_style_t style);
+
+        str::slice_t output_mode_name(output_mode_t mode);
+
+        str::slice_t label_loc_name(node_label_loc_t loc);
+
+        str::slice_t graph_style_name(graph_style_t style);
+
+        str::slice_t cluster_mode_name(cluster_mode_t mode);
+
+        str::slice_t color_scheme_name(color_scheme_t scheme);
 
         u0 serialize(graph_t& g, const attr_value_t& attr, mem_buf_t& mb);
     }
@@ -1391,7 +1430,7 @@ namespace basecode::graphviz {
 
         u0 serialize(graph_t& g, const edge_t& e, mem_buf_t& mb);
 
-        status_t init(edge_t& e, u32 id, str::slice_t name, alloc_t* alloc = context::top()->alloc);
+        status_t init(edge_t& e, u32 id, alloc_t* alloc = context::top()->alloc);
     }
 
     namespace graph {
@@ -1420,6 +1459,8 @@ namespace basecode::graphviz {
         u0 rotate(graph_t& g, u32 v);
 
         u0 margin(graph_t& g, f64 v);
+
+        edge_t* make_edge(graph_t& g);
 
         u0 pad(graph_t& g, point_t v);
 
@@ -1545,19 +1586,20 @@ namespace basecode::graphviz {
 
         node_t* make_node(graph_t& g, str::slice_t name);
 
-        edge_t* make_edge(graph_t& g, str::slice_t name);
-
         u0 label_justification(graph_t& g, justification_t v);
     }
 
     namespace attr_set {
+        u0 set(attr_set_t& set,
+               attr_type_t type,
+               u32 value,
+               attr_value_type_t value_type = attr_value_type_t::integer);
+
         u0 free(attr_set_t& set);
 
         u0 set(attr_set_t& set, attr_type_t type, b8 flag);
 
         attr_value_t* get(attr_set_t& set, attr_type_t type);
-
-        u0 set(attr_set_t& set, attr_type_t type, u32 value);
 
         u0 set(attr_set_t& set, attr_type_t type, f64 value);
 

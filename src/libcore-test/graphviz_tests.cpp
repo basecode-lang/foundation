@@ -30,18 +30,30 @@ TEST_CASE("basecode::graphviz basics") {
     defer(graphviz::graph::free(g));
 
     auto root = graphviz::graph::make_node(g, "root"_ss);
-    auto lhs  = graphviz::graph::make_node(g, "lhs"_ss);
-    auto rhs  = graphviz::graph::make_node(g, "rhs"_ss);
+    graphviz::node::style(*root, graphviz::node_style_t::filled);
+    graphviz::node::fill_color(*root, graphviz::color_t::aliceblue);
 
-    auto edge1 = graphviz::graph::make_edge(g, "1"_ss);
+    auto lhs  = graphviz::graph::make_node(g, "lhs"_ss);
+    graphviz::node::style(*lhs, graphviz::node_style_t::filled);
+    graphviz::node::fill_color(*lhs, graphviz::color_t::pink);
+
+    auto rhs  = graphviz::graph::make_node(g, "rhs"_ss);
+    graphviz::node::style(*rhs, graphviz::node_style_t::filled);
+    graphviz::node::fill_color(*rhs, graphviz::color_t::green);
+
+    auto edge1 = graphviz::graph::make_edge(g);
     edge1->first  = root->id;
     edge1->second = lhs->id;
+    graphviz::edge::label(*edge1, "lhs"_ss);
+    graphviz::edge::dir(*edge1, graphviz::dir_type_t::both);
     graphviz::edge::arrow_tail(*edge1, graphviz::arrow_type_t::dot);
     graphviz::edge::arrow_head(*edge1, graphviz::arrow_type_t::normal);
 
-    auto edge2 = graphviz::graph::make_edge(g, "2"_ss);
+    auto edge2 = graphviz::graph::make_edge(g);
     edge2->first  = root->id;
     edge2->second = rhs->id;
+    graphviz::edge::label(*edge2, "rhs"_ss);
+    graphviz::edge::dir(*edge2, graphviz::dir_type_t::both);
     graphviz::edge::arrow_tail(*edge2, graphviz::arrow_type_t::dot);
     graphviz::edge::arrow_head(*edge2, graphviz::arrow_type_t::normal);
 
