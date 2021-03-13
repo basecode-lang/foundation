@@ -36,19 +36,25 @@ TEST_CASE("basecode::graphviz basics") {
     auto edge1 = graphviz::graph::make_edge(g, "1"_ss);
     edge1->first  = root->id;
     edge1->second = lhs->id;
-    graphviz::edge::arrow_head(*edge1, graphviz::arrow_type_t::box);
-    graphviz::edge::arrow_tail(*edge1, graphviz::arrow_type_t::normal);
+    graphviz::edge::arrow_tail(*edge1, graphviz::arrow_type_t::dot);
+    graphviz::edge::arrow_head(*edge1, graphviz::arrow_type_t::normal);
 
     auto edge2 = graphviz::graph::make_edge(g, "2"_ss);
     edge2->first  = root->id;
     edge2->second = rhs->id;
-    graphviz::edge::arrow_head(*edge2, graphviz::arrow_type_t::box);
-    graphviz::edge::arrow_tail(*edge2, graphviz::arrow_type_t::normal);
+    graphviz::edge::arrow_tail(*edge2, graphviz::arrow_type_t::dot);
+    graphviz::edge::arrow_head(*edge2, graphviz::arrow_type_t::normal);
+
+    auto p = "C:/temp/test.dot"_path;
 
     buf_t buf{};
     buf.mode = buf_mode_t::alloc;
     buf::init(buf);
-    defer(buf::free(buf));
+    defer(
+        buf::free(buf);
+        path::free(p);
+        );
 
-    REQUIRE(OK(graphviz::dot::serialize(g, buf)));
+    REQUIRE(OK(graphviz::graph::serialize(g, buf)));
+    REQUIRE(OK(buf::save(buf, p)));
 }

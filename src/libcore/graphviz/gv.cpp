@@ -19,28 +19,8 @@
 #include <basecode/core/graphviz/gv.h>
 
 namespace basecode::graphviz {
-    namespace dot {
-        status_t serialize(graph_t& g, buf_t& buf) {
-            const auto node_connector = g.type == graph_type_t::directed ? "->"_ss : "--"_ss;
-            {
-                mem_buf_t mb{&buf};
-
-                auto graph_name = string::interned::get(g.name);
-                if (!OK(graph_name.status))
-                    return status_t::intern_failure;
-                format::format_to(mb,
-                                  g.type == graph_type_t::directed ? "digraph {} {{\n" : "graph {} {{\n",
-                                  graph_name.slice);
-
-
-                format::format_to(mb, "\n}}\n");
-            }
-            return status_t::ok;
-        }
-    }
-
     namespace attr {
-        static str::slice_t s_names[] = {
+        static str::slice_t s_type_names[] = {
             [u32(attr_type_t::rank_dir)]        = "rankdir"_ss,
             [u32(attr_type_t::font_size)]       = "fontsize"_ss,
             [u32(attr_type_t::label)]           = "label"_ss,
@@ -150,12 +130,38 @@ namespace basecode::graphviz {
             [u32(attr_type_t::z)]               = "z"_ss
         };
 
-        str::slice_t name(attr_type_t type) {
-            return s_names[u32(type)];
+        static str::slice_t s_arrow_type_names[] = {
+            [u32(arrow_type_t::normal)]         = "normal"_ss,
+            [u32(arrow_type_t::dot)]            = "dot"_ss,
+            [u32(arrow_type_t::odot)]           = "odot"_ss,
+            [u32(arrow_type_t::none)]           = "none"_ss,
+            [u32(arrow_type_t::empty)]          = "empty"_ss,
+            [u32(arrow_type_t::diamond)]        = "diamond"_ss,
+            [u32(arrow_type_t::ediamond)]       = "ediamond"_ss,
+            [u32(arrow_type_t::box)]            = "box"_ss,
+            [u32(arrow_type_t::open_)]          = "open"_ss,
+            [u32(arrow_type_t::vee)]            = "vee"_ss,
+            [u32(arrow_type_t::inv)]            = "inv"_ss,
+            [u32(arrow_type_t::invdot)]         = "invdot"_ss,
+            [u32(arrow_type_t::invodot)]        = "invodot"_ss,
+            [u32(arrow_type_t::tee)]            = "tee"_ss,
+            [u32(arrow_type_t::invempty)]       = "invempty"_ss,
+            [u32(arrow_type_t::odiamond)]       = "odiamond"_ss,
+            [u32(arrow_type_t::crow)]           = "crow"_ss,
+            [u32(arrow_type_t::obox)]           = "obox"_ss,
+            [u32(arrow_type_t::halfopen)]       = "halfopen"_ss,
+        };
+
+        str::slice_t type_name(attr_type_t type) {
+            return s_type_names[u32(type)];
+        }
+
+        str::slice_t arrow_type_name(arrow_type_t type) {
+            return s_arrow_type_names[u32(type)];
         }
 
         u0 serialize(graph_t& g, const attr_value_t& attr, mem_buf_t& mb) {
-            format::format_to(mb, "{}=", name(attr_type_t(attr.type)));
+            format::format_to(mb, "{}=", type_name(attr_type_t(attr.type)));
             switch (attr_type_t(attr.type)) {
                 // enumeration
                 case attr_type_t::dir:
@@ -169,8 +175,13 @@ namespace basecode::graphviz {
                 case attr_type_t::image_pos:
                 case attr_type_t::label_loc:
                 case attr_type_t::pack_mode:
+                    break;
                 case attr_type_t::arrow_head:
-                case attr_type_t::arrow_tail:
+                case attr_type_t::arrow_tail: {
+                    const auto type = arrow_type_t(attr.value.dw);
+                    format::format_to(mb, "{}", arrow_type_name(type));
+                    break;
+                }
                 case attr_type_t::color_scheme:
                 case attr_type_t::cluster_rank:
                 case attr_type_t::output_order:
@@ -452,6 +463,22 @@ namespace basecode::graphviz {
             attr_set::set(n.attrs, attr_type_t::color_scheme, u32(v));
         }
 
+        u0 serialize(graph_t& g, const node_t& n, mem_buf_t& mb) {
+            auto node_name = string::interned::get(n.name);
+            if (!OK(node_name.status))
+                return;
+            format::format_to(mb, "{}", node_name.slice);
+            if (n.attrs.values.size > 0) {
+                format::format_to(mb, "[");
+                for (u32 i = 0; i < n.attrs.values.size; ++i) {
+                    if (i > 0) format::format_to(mb, ", ");
+                    attr::serialize(g, n.attrs.values[i], mb);
+                }
+                format::format_to(mb, "]");
+            }
+            format::format_to(mb, ";");
+        }
+
         status_t init(node_t& n, u32 id, str::slice_t name, alloc_t* alloc) {
             auto r = string::interned::fold_for_result(name);
             n.id   = id;
@@ -628,7 +655,7 @@ namespace basecode::graphviz {
         }
 
         u0 arrow_tail(edge_t& e, arrow_type_t v) {
-            attr_set::set(e.attrs, attr_type_t::arrow_head, u32(v));
+            attr_set::set(e.attrs, attr_type_t::arrow_tail, u32(v));
         }
 
         u0 head_label(edge_t& e, str::slice_t v) {
@@ -649,6 +676,26 @@ namespace basecode::graphviz {
 
         u0 label_font_name(edge_t& e, str::slice_t v) {
             attr_set::set(e.attrs, attr_type_t::label_font_name, v);
+        }
+
+        u0 serialize(graph_t& g, const edge_t& e, mem_buf_t& mb) {
+            const auto node_connector = g.type == graph_type_t::directed ? "->"_ss : "--"_ss;
+            auto lhs = graph::get_node(g, e.first);
+            auto rhs = graph::get_node(g, e.second);
+            if (!lhs || !rhs)
+                return;
+            auto lhs_name = string::interned::get(lhs->name);
+            auto rhs_name = string::interned::get(rhs->name);
+            format::format_to(mb, "{} {} {}", lhs_name.slice, node_connector, rhs_name.slice);
+            if (e.attrs.values.size > 0) {
+                format::format_to(mb, "[");
+                for (u32 i = 0; i < e.attrs.values.size; ++i) {
+                    if (i > 0) format::format_to(mb, ", ");
+                    attr::serialize(g, e.attrs.values[i], mb);
+                }
+                format::format_to(mb, "]");
+            }
+            format::format_to(mb, ";");
         }
 
         status_t init(edge_t& e, u32 id, str::slice_t name, alloc_t* alloc) {
@@ -871,6 +918,14 @@ namespace basecode::graphviz {
             attr_set::set(g.attrs, attr_type_t::label, v);
         }
 
+        edge_t* get_edge(graph_t& g, u32 id) {
+            return id == 0 || id > g.edges.size ? nullptr : &g.edges[id - 1];
+        }
+
+        node_t* get_node(graph_t& g, u32 id) {
+            return id == 0 || id > g.nodes.size ? nullptr : &g.nodes[id - 1];
+        }
+
         u0 gradient_angle(graph_t& g, u32 v) {
             attr_set::set(g.attrs, attr_type_t::gradient_angle, v);
         }
@@ -922,6 +977,45 @@ namespace basecode::graphviz {
         u0 layers_sep(graph_t& g, str::slice_t v) {
         }
 
+        status_t serialize(graph_t& g, buf_t& buf) {
+            mem_buf_t mb{&buf};
+            auto graph_name = string::interned::get(g.name);
+            if (!OK(graph_name.status))
+                return status_t::intern_failure;
+            format::format_to(mb,
+                              g.type == graph_type_t::directed ? "digraph {} {{\n" : "graph {} {{\n",
+                              graph_name.slice);
+
+            for (const auto& attr : g.attrs.values) {
+                format::format_to(mb, "\t");
+                attr::serialize(g, attr, mb);
+                format::format_to(mb, ";\n");
+            }
+
+            if (g.nodes.size > 0) {
+                if (g.attrs.values.size > 0)
+                    format::format_to(mb, "\n\n");
+                for (u32 i = 0; i < g.nodes.size; ++i) {
+                    if (i > 0) format::format_to(mb, "\n");
+                    format::format_to(mb, "\t");
+                    node::serialize(g, g.nodes[i], mb);
+                }
+            }
+
+            if (g.edges.size > 0) {
+                if (g.nodes.size > 0)
+                    format::format_to(mb, "\n\n");
+                for (u32 i = 0; i < g.edges.size; ++i) {
+                    if (i > 0) format::format_to(mb, "\n");
+                    format::format_to(mb, "\t");
+                    edge::serialize(g, g.edges[i], mb);
+                }
+            }
+
+            format::format_to(mb, "\n}}\n");
+            return status_t::ok;
+        }
+
         u0 image_path(graph_t& g, const path_t& v) {
         }
 
@@ -970,21 +1064,14 @@ namespace basecode::graphviz {
 
     namespace attr_set {
         u0 free(attr_set_t& set) {
-            array::free(set.attrs);
-        }
-
-        status_t init(attr_set_t& set, component_type_t type, alloc_t* alloc) {
-            set.alloc = alloc;
-            set.type  = type;
-            array::init(set.attrs, set.alloc);
-            return status_t::ok;
+            array::free(set.values);
         }
 
         u0 set(attr_set_t& set, attr_type_t type, b8 flag) {
             auto attr = get(set, type);
             if (attr)
                 return;
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type       = u8(type);
             attr->value.f    = flag;
             attr->value_type = u8(attr_value_type_t::boolean);
@@ -994,7 +1081,7 @@ namespace basecode::graphviz {
             auto attr = get(set, type);
             if (attr)
                 return;
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type       = u8(type);
             attr->value.dw   = value;
             attr->value_type = u8(attr_value_type_t::integer);
@@ -1004,16 +1091,16 @@ namespace basecode::graphviz {
             auto attr = get(set, type);
             if (attr)
                 return;
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type       = u8(type);
             attr->value.fqw  = value;
             attr->value_type = u8(attr_value_type_t::floating_point);
         }
 
         attr_value_t* get(attr_set_t& set, attr_type_t type) {
-            for (u32 i = 0; i < set.attrs.size; ++i) {
-                if (set.attrs[i].type == u8(type))
-                    return &set.attrs[i];
+            for (u32 i = 0; i < set.values.size; ++i) {
+                if (set.values[i].type == u8(type))
+                    return &set.values[i];
             }
             return nullptr;
         }
@@ -1022,7 +1109,7 @@ namespace basecode::graphviz {
             auto attr = get(set, type);
             if (attr)
                 return;
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type       = u8(type);
             attr->value.hsv  = value;
             attr->value_type = u8(attr_value_type_t::hsv);
@@ -1032,7 +1119,7 @@ namespace basecode::graphviz {
             auto attr = get(set, type);
             if (attr)
                 return;
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type       = u8(type);
             attr->value.rgb  = value;
             attr->value_type = u8(attr_value_type_t::rgb);
@@ -1042,7 +1129,7 @@ namespace basecode::graphviz {
             auto attr = get(set, type);
             if (attr)
                 return;
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type       = u8(type);
             attr->value.rgba = value;
             attr->value_type = u8(attr_value_type_t::rgba);
@@ -1052,7 +1139,7 @@ namespace basecode::graphviz {
             auto attr = get(set, type);
             if (attr)
                 return;
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type       = u8(type);
             attr->value.rect = value;
             attr->value_type = u8(attr_value_type_t::rect);
@@ -1062,7 +1149,7 @@ namespace basecode::graphviz {
             auto attr = get(set, type);
             if (attr)
                 return;
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type          = u8(type);
             attr->value.point   = value;
             attr->value_type    = u8(attr_value_type_t::point);
@@ -1072,7 +1159,7 @@ namespace basecode::graphviz {
             auto attr = get(set, type);
             if (attr)
                 return;
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type          = u8(type);
             attr->value.color   = value;
             attr->value_type    = u8(attr_value_type_t::color);
@@ -1082,7 +1169,7 @@ namespace basecode::graphviz {
             auto attr = get(set, type);
             if (attr)
                 return;
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type              = u8(type);
             attr->value.viewport    = value;
             attr->value_type        = u8(attr_value_type_t::viewport);
@@ -1093,10 +1180,17 @@ namespace basecode::graphviz {
             if (attr)
                 return;
             auto r = string::interned::fold_for_result(value);
-            attr = &array::append(set.attrs);
+            attr = &array::append(set.values);
             attr->type       = u8(type);
             attr->value.dw   = r.id;
             attr->value_type = u8(attr_value_type_t::string);
+        }
+
+        status_t init(attr_set_t& set, component_type_t type, alloc_t* alloc) {
+            set.alloc = alloc;
+            set.type  = type;
+            array::init(set.values, set.alloc);
+            return status_t::ok;
         }
     }
 }

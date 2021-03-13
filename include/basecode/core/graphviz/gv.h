@@ -1167,7 +1167,7 @@ namespace basecode::graphviz {
 
     struct attr_set_t final {
         alloc_t*                alloc;
-        attr_list_t             attrs;
+        attr_list_t             values;
         component_type_t        type;
     };
 
@@ -1196,14 +1196,12 @@ namespace basecode::graphviz {
         graph_type_t            type;
     };
 
-    namespace dot {
-        status_t serialize(graph_t& g, buf_t& buf);
-    }
-
     namespace attr {
-        str::slice_t name(attr_type_t type);
+        str::slice_t type_name(attr_type_t type);
 
-        u0 serialize(graph_t& g, const attr_value_t& attr, buf_t& buf);
+        str::slice_t arrow_type_name(arrow_type_t type);
+
+        u0 serialize(graph_t& g, const attr_value_t& attr, mem_buf_t& mb);
     }
 
     namespace node {
@@ -1288,6 +1286,8 @@ namespace basecode::graphviz {
         u0 label_loc(node_t& n, node_label_loc_t v);
 
         u0 color_scheme(node_t& n, color_scheme_t v);
+
+        u0 serialize(graph_t& g, const node_t& n, mem_buf_t& mb);
 
         status_t init(node_t& n, u32 id, str::slice_t name, alloc_t* alloc = context::top()->alloc);
     }
@@ -1389,6 +1389,8 @@ namespace basecode::graphviz {
 
         u0 label_font_name(edge_t& e, str::slice_t v);
 
+        u0 serialize(graph_t& g, const edge_t& e, mem_buf_t& mb);
+
         status_t init(edge_t& e, u32 id, str::slice_t name, alloc_t* alloc = context::top()->alloc);
     }
 
@@ -1489,6 +1491,10 @@ namespace basecode::graphviz {
 
         u0 overlap(graph_t& g, overlap_t v);
 
+        node_t* get_node(graph_t& g, u32 id);
+
+        edge_t* get_edge(graph_t& g, u32 id);
+
         u0 label(graph_t& g, str::slice_t v);
 
         u0 gradient_angle(graph_t& g, u32 v);
@@ -1520,6 +1526,8 @@ namespace basecode::graphviz {
         u0 layers_sep(graph_t& g, str::slice_t v);
 
         u0 image_path(graph_t& g, const path_t& v);
+
+        status_t serialize(graph_t& g, buf_t& buf);
 
         u0 orientation(graph_t& g, orientation_t v);
 
