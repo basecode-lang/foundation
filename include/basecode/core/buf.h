@@ -154,6 +154,8 @@ namespace basecode {
 
         u0 reserve(buf_t& buf, u32 new_capacity);
 
+        u0 grow(buf_t& buf, u32 new_capacity = 0);
+
         status_t unmap(buf_t& buf, b8 sync = false);
 
         status_t load(buf_t& buf, const path_t& path);

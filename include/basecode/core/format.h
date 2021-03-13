@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <basecode/core/buf.h>
 #include <basecode/core/str.h>
 #include <basecode/core/types.h>
 #include <basecode/core/format_types.h>
@@ -28,10 +29,32 @@ namespace basecode {
         "PB"_ss,    "EB"_ss, "ZB"_ss, "YB"_ss
     };
 
+    class mem_buf_t : public fmt::detail::buffer<s8> {
+        buf_t*                  _buf;
+    public: explicit mem_buf_t(buf_t* buf) : _buf(buf) {
+            set((s8*) _buf->data, _buf->capacity);
+        }
+        mem_buf_t(mem_buf_t&& other) FMT_NOEXCEPT {
+            _buf->operator=(*other._buf);
+        }
+        ~mem_buf_t() {
+            _buf->length = size();
+        }
+        mem_buf_t& operator=(mem_buf_t&& other) FMT_NOEXCEPT {
+            _buf->operator=(*other._buf);
+            return *this;
+        }
+    protected:
+        u0 grow(usize capacity) FMT_OVERRIDE {
+            buf::grow(*_buf, capacity);
+            set((s8*) _buf->data, _buf->capacity);
+        }
+    };
+
     class str_buf_t : public fmt::detail::buffer<s8> {
-        str_t*      _str;
+        str_t*                  _str;
     public: explicit str_buf_t(str_t* str) : _str(str) {
-            set((s8*) _str->data, str->capacity);
+            set((s8*) _str->data, _str->capacity);
         }
         str_buf_t(str_buf_t&& other) FMT_NOEXCEPT {
             _str->operator=(*other._str);

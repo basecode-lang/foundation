@@ -25,5 +25,30 @@
 using namespace basecode;
 
 TEST_CASE("basecode::graphviz basics") {
+    graphviz::graph_t g{};
+    graphviz::graph::init(g, graphviz::graph_type_t::directed, "test"_ss);
+    defer(graphviz::graph::free(g));
 
+    auto root = graphviz::graph::make_node(g, "root"_ss);
+    auto lhs  = graphviz::graph::make_node(g, "lhs"_ss);
+    auto rhs  = graphviz::graph::make_node(g, "rhs"_ss);
+
+    auto edge1 = graphviz::graph::make_edge(g, "1"_ss);
+    edge1->first  = root->id;
+    edge1->second = lhs->id;
+    graphviz::edge::arrow_head(*edge1, graphviz::arrow_type_t::box);
+    graphviz::edge::arrow_tail(*edge1, graphviz::arrow_type_t::normal);
+
+    auto edge2 = graphviz::graph::make_edge(g, "2"_ss);
+    edge2->first  = root->id;
+    edge2->second = rhs->id;
+    graphviz::edge::arrow_head(*edge2, graphviz::arrow_type_t::box);
+    graphviz::edge::arrow_tail(*edge2, graphviz::arrow_type_t::normal);
+
+    buf_t buf{};
+    buf.mode = buf_mode_t::alloc;
+    buf::init(buf);
+    defer(buf::free(buf));
+
+    REQUIRE(OK(graphviz::dot::serialize(g, buf)));
 }

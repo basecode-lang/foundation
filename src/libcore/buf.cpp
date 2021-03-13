@@ -26,11 +26,6 @@
 #include <basecode/core/filesys.h>
 
 namespace basecode::buf {
-    static u0 grow(buf_t& buf, u32 new_capacity = 0) {
-        new_capacity = std::max(new_capacity, buf.capacity);
-        reserve(buf, new_capacity * 2 + 8);
-    }
-
     namespace cursor {
         u0 pop(buf_crsr_t& crsr) {
             if (!stack::empty(crsr.stack))
@@ -196,6 +191,11 @@ namespace basecode::buf {
         }
 
         return rc == 0 ? status_t::ok : status_t::munmap_error;
+    }
+
+    u0 grow(buf_t& buf, u32 new_capacity) {
+        new_capacity = std::max(new_capacity, buf.capacity);
+        reserve(buf, new_capacity * 2 + 8);
     }
 
     str::slice_t line(buf_t& buf, u32 idx) {

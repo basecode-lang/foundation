@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <basecode/core/buf.h>
 #include <basecode/core/path.h>
 #include <basecode/core/string.h>
 
@@ -28,13 +29,15 @@ namespace basecode::graphviz {
     struct attr_set_t;
     struct attr_value_t;
 
-    using edge_list_t           = array_t<edge_t*>;
-    using node_list_t           = array_t<node_t*>;
+    using id_list_t             = array_t<u32>;
+    using edge_list_t           = array_t<edge_t>;
+    using node_list_t           = array_t<node_t>;
+    using attr_list_t           = array_t<attr_value_t>;
     using graph_list_t          = array_t<graph_t*>;
-    using attr_value_list_t     = array_t<attr_value_t*>;
 
     enum status_t : u8 {
         ok,
+        intern_failure,
     };
 
     enum class color_t : u16 {
@@ -988,14 +991,14 @@ namespace basecode::graphviz {
 
     enum class attr_type_t : u8 {
         rank_dir,
-        fontsize,
+        font_size,
         label,
-        fillcolor,
+        fill_color,
         label_loc,
         shape,
         style,
         background,
-        arrowhead,
+        arrow_head,
         arrow_size,
         arrow_tail,
         bg_color,
@@ -1003,7 +1006,7 @@ namespace basecode::graphviz {
         charset,
         cluster_rank,
         color,
-        colorscheme,
+        color_scheme,
         comment,
         compound,
         concentrate,
@@ -1013,7 +1016,7 @@ namespace basecode::graphviz {
         distortion,
         esep,
         fixed_size,
-        fontcolor,
+        font_color,
         font_name,
         font_path,
         force_labels,
@@ -1061,7 +1064,7 @@ namespace basecode::graphviz {
         pad,
         page,
         page_dir,
-        pencolor,
+        pen_color,
         pen_width,
         peripheries,
         pos,
@@ -1078,7 +1081,7 @@ namespace basecode::graphviz {
         scale,
         search_size,
         sep,
-        shapefile,
+        shape_file,
         show_boxes,
         sides,
         size,
@@ -1105,9 +1108,16 @@ namespace basecode::graphviz {
     };
 
     enum class attr_value_type_t : u8 {
+        hsv,
+        rgb,
+        rgba,
+        rect,
+        point,
+        color,
         string,
         boolean,
         integer,
+        viewport,
         enumeration,
         floating_point,
     };
@@ -1143,6 +1153,13 @@ namespace basecode::graphviz {
             b8                  f;
             u32                 dw;
             f64                 fqw;
+            rgb_t               rgb;
+            hsv_t               hsv;
+            rgba_t              rgba;
+            rect_t              rect;
+            point_t             point;
+            color_t             color;
+            viewport_t          viewport;
         }                       value;
         u8                      type:       4;
         u8                      value_type: 4;
@@ -1150,19 +1167,22 @@ namespace basecode::graphviz {
 
     struct attr_set_t final {
         alloc_t*                alloc;
-        attr_value_list_t       attrs;
+        attr_list_t             attrs;
         component_type_t        type;
     };
 
     struct node_t final {
         attr_set_t              attrs;
         intern_id               name;
+        u32                     id;
     };
 
     struct edge_t final {
-        node_t*                 first;
-        node_t*                 second;
         attr_set_t              attrs;
+        u32                     first;
+        u32                     second;
+        intern_id               name;
+        u32                     id;
     };
 
     struct graph_t final {
@@ -1176,10 +1196,18 @@ namespace basecode::graphviz {
         graph_type_t            type;
     };
 
+    namespace dot {
+        status_t serialize(graph_t& g, buf_t& buf);
+    }
+
+    namespace attr {
+        str::slice_t name(attr_type_t type);
+
+        u0 serialize(graph_t& g, const attr_value_t& attr, buf_t& buf);
+    }
+
     namespace node {
         u0 free(node_t& n);
-
-        u0 z(node_t& n, f64 v);
 
         u0 skew(node_t& n, f64 v);
 
@@ -1195,8 +1223,6 @@ namespace basecode::graphviz {
 
         u0 regular(node_t& n, b8 v);
 
-        u0 xlp(node_t& n, point_t v);
-
         u0 color(node_t& n, rgb_t v);
 
         u0 pos(node_t& n, point_t v);
@@ -1205,7 +1231,7 @@ namespace basecode::graphviz {
 
         u0 fixed_size(node_t& n, b8 v);
 
-        u0 font_size(node_t& e, f64 v);
+        u0 font_size(node_t& n, f64 v);
 
         u0 no_justify(node_t& n, b8 v);
 
@@ -1237,7 +1263,6 @@ namespace basecode::graphviz {
 
         u0 label(node_t& n, str::slice_t v);
 
-        // XXX
         u0 layer(node_t& n, str::slice_t v);
 
         u0 fill_color(node_t& n, color_t v);
@@ -1264,7 +1289,7 @@ namespace basecode::graphviz {
 
         u0 color_scheme(node_t& n, color_scheme_t v);
 
-        status_t init(node_t& n, alloc_t* alloc = context::top()->alloc);
+        status_t init(node_t& n, u32 id, str::slice_t name, alloc_t* alloc = context::top()->alloc);
     }
 
     namespace edge {
@@ -1364,7 +1389,7 @@ namespace basecode::graphviz {
 
         u0 label_font_name(edge_t& e, str::slice_t v);
 
-        status_t init(edge_t& e, alloc_t* alloc = context::top()->alloc);
+        status_t init(edge_t& e, u32 id, str::slice_t name, alloc_t* alloc = context::top()->alloc);
     }
 
     namespace graph {
@@ -1394,19 +1419,13 @@ namespace basecode::graphviz {
 
         u0 margin(graph_t& g, f64 v);
 
-        u0 lp(graph_t& g, point_t v);
-
         u0 pad(graph_t& g, point_t v);
 
         u0 new_rank(graph_t& g, b8 v);
 
-        u0 lheight(graph_t& g, f64 v);
-
         u0 compound(graph_t& g, b8 v);
 
         u0 color(graph_t& g, rgb_t v);
-
-        u0 damping(graph_t& g, f64 v);
 
         u0 quantum(graph_t& g, f64 v);
 
@@ -1456,9 +1475,13 @@ namespace basecode::graphviz {
 
         u0 search_size(graph_t& g, u32 v);
 
-        u0 rank(graph_t& g, rank_type_t v);
+        status_t init(graph_t& g,
+                      graph_type_t type,
+                      str::slice_t name,
+                      graph_t* parent = {},
+                      alloc_t* alloc = context::top()->alloc);
 
-        u0 bb(graph_t& g, const rect_t& v);
+        u0 rank(graph_t& g, rank_type_t v);
 
         u0 bg_color(graph_t& g, color_t v);
 
@@ -1486,9 +1509,9 @@ namespace basecode::graphviz {
 
         u0 splines(graph_t& g, spline_mode_t v);
 
-        u0 font_name(node_t& n, str::slice_t v);
-
         u0 pack_mode(graph_t& g, pack_mode_t v);
+
+        u0 font_name(graph_t& g, str::slice_t v);
 
         u0 font_path(graph_t& g, const path_t& v);
 
@@ -1512,14 +1535,40 @@ namespace basecode::graphviz {
 
         u0 cluster_rank(graph_t& g, cluster_mode_t v);
 
-        u0 label_justification(graph_t& g, justification_t v);
+        node_t* make_node(graph_t& g, str::slice_t name);
 
-        status_t init(graph_t& g, graph_type_t type, alloc_t* alloc = context::top()->alloc);
+        edge_t* make_edge(graph_t& g, str::slice_t name);
+
+        u0 label_justification(graph_t& g, justification_t v);
     }
 
     namespace attr_set {
         u0 free(attr_set_t& set);
 
-        status_t init(attr_set_t& set, alloc_t* alloc = context::top()->alloc);
+        u0 set(attr_set_t& set, attr_type_t type, b8 flag);
+
+        attr_value_t* get(attr_set_t& set, attr_type_t type);
+
+        u0 set(attr_set_t& set, attr_type_t type, u32 value);
+
+        u0 set(attr_set_t& set, attr_type_t type, f64 value);
+
+        u0 set(attr_set_t& set, attr_type_t type, rgb_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, hsv_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, rgba_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, rect_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, point_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, color_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, viewport_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, str::slice_t value);
+
+        status_t init(attr_set_t& set, component_type_t type, alloc_t* alloc = context::top()->alloc);
     }
 }
