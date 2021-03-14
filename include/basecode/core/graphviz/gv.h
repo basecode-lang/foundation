@@ -1465,11 +1465,12 @@ namespace basecode::graphviz {
             attr_set::set(e.attrs, attr_type_t::comment, v);
         }
 
-        // XXX:
         u0 tail_port(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::tail_port, v);
         }
 
         u0 head_port(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::head_port, v);
         }
 
         u0 font_name(edge_t& e, const String_Concept auto& v) {

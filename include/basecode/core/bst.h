@@ -65,10 +65,13 @@ namespace basecode {
         }                       free;
         u32                     size;
         u32                     root;
+        b8                      dump;
     };
-    static_assert(sizeof(bst_t<u32>) <= 116, "bst_t<u32> is now larger than 116 bytes!");
+    static_assert(sizeof(bst_t<u32>) <= 120, "bst_t<u32> is now larger than 120 bytes!");
 
     namespace bst {
+        static u32 s_id = 1;
+
         inline bst_node_t* root(Binary_Tree auto& tree);
 
         template <typename T> requires Binary_Tree<T>
@@ -94,7 +97,7 @@ namespace basecode {
         template <typename T> requires Binary_Tree<T>
         inline bool get_value(const T& tree, const bst_node_t* node, typename T::Value_Type& value);
 
-        inline u0 print_tree_struct(const bst_t<u32>& tree, const bst_node_t* node, u32 level) {
+        u0 print_tree_struct(const Binary_Tree auto& tree, const bst_node_t* node, u32 level) {
             if (level > 16) {
                 format::print("[...]");
                 return;
@@ -121,13 +124,13 @@ namespace basecode {
             }
         }
 
-        inline u0 print_whole_tree(const bst_t<u32>& tree, str::slice_t title) {
+        u0 print_whole_tree(const Binary_Tree auto& tree, str::slice_t title) {
             format::print("{}: ", title);
             print_tree_struct(tree, bst::root(tree), 0);
             format::print("\n");
         }
 
-        inline static u0 compress(Binary_Tree auto& tree, bst_node_t* node, u32 count) {
+        u0 compress(Binary_Tree auto& tree, bst_node_t* node, u32 count) {
             if (tree.size == 0 || !node || count > tree.size) return;
             while (count--) {
                 auto red   = get_node(tree, node->link[0]);
@@ -139,7 +142,7 @@ namespace basecode {
             }
         }
 
-        inline static u0 tree_to_vine(Binary_Tree auto& tree) {
+        u0 tree_to_vine(Binary_Tree auto& tree) {
             bst_node_t* p = root(tree);
             bst_node_t* q = p;
 
@@ -157,7 +160,7 @@ namespace basecode {
             }
         }
 
-        inline static u0 vine_to_tree(Binary_Tree auto& tree) {
+        u0 vine_to_tree(Binary_Tree auto& tree) {
             auto leaves = tree.size + 1;
             for (;;) {
                 auto next = leaves & (leaves - 1);
@@ -175,7 +178,7 @@ namespace basecode {
             }
         }
 
-        inline static u0 update_parents(Binary_Tree auto& tree) {
+        u0 update_parents(Binary_Tree auto& tree) {
             if (tree.size == 0)
                 return;
 
@@ -204,6 +207,80 @@ namespace basecode {
                 auto temp = get_node(tree, p->link[1]);
                 temp->parent = p->id;
             }
+        }
+
+        template <Binary_Tree T>
+        u0 dump_dot(T& tree, const String_Concept auto& name) {
+            using Value_Type = typename T::Value_Type;
+
+            graphviz::graph_t g{};
+            graphviz::graph::init(g, graphviz::graph_type_t::directed, name, {}, tree.alloc);
+            defer(graphviz::graph::free(g));
+
+            for (auto& node : tree.nodes) {
+                Value_Type v{};
+                get_value(tree, &node, v);
+
+                auto n = graphviz::graph::make_node(g);
+                if constexpr (std::is_pointer_v<Value_Type>) {
+                    graphviz::node::label(*n, format::format("id({})", node.id));
+                } else {
+                    graphviz::node::label(*n, format::format("id({})={}", node.id, (u32) v));
+                }
+                if (tree.root == node.id) {
+                    graphviz::node::style(*n, graphviz::node_style_t::filled);
+                    graphviz::node::fill_color(*n, graphviz::color_t::aqua);
+                }
+
+                if (node.parent) {
+                    auto e = graphviz::graph::make_edge(g);
+                    e->first  = node.id;
+                    e->second = node.parent;
+                    graphviz::edge::label(*e, "parent"_ss);
+                    graphviz::edge::color(*e, graphviz::color_t::red);
+                    graphviz::edge::style(*e, graphviz::edge_style_t::dashed);
+                    graphviz::edge::dir(*e, graphviz::dir_type_t::both);
+                    graphviz::edge::arrow_size(*e, .5f);
+                    graphviz::edge::arrow_tail(*e, graphviz::arrow_type_t::dot);
+                    graphviz::edge::arrow_head(*e, graphviz::arrow_type_t::normal);
+                }
+
+                if (node.link[0]) {
+                    auto e = graphviz::graph::make_edge(g);
+                    e->first  = node.id;
+                    e->second = node.link[0];
+                    graphviz::edge::label(*e, "lhs"_ss);
+                    graphviz::edge::dir(*e, graphviz::dir_type_t::both);
+                    graphviz::edge::arrow_tail(*e, graphviz::arrow_type_t::dot);
+                    graphviz::edge::arrow_head(*e, graphviz::arrow_type_t::normal);
+                }
+
+                if (node.link[1]) {
+                    auto e = graphviz::graph::make_edge(g);
+                    e->first  = node.id;
+                    e->second = node.link[1];
+                    graphviz::edge::label(*e, "rhs"_ss);
+                    graphviz::edge::dir(*e, graphviz::dir_type_t::both);
+                    graphviz::edge::arrow_tail(*e, graphviz::arrow_type_t::dot);
+                    graphviz::edge::arrow_head(*e, graphviz::arrow_type_t::normal);
+                }
+            }
+
+            path_t p{};
+            path::init(p, tree.alloc);
+            path::set(p, format::format("C:/temp/{}.dot", name));
+
+            buf_t buf{};
+            buf.mode = buf_mode_t::alloc;
+            buf::init(buf);
+
+            defer(
+                buf::free(buf);
+                path::free(p);
+                 );
+
+            graphviz::graph::serialize(g, buf);
+            buf::save(buf, p);
         }
 
         u0 free(Binary_Tree auto& tree) {
@@ -390,6 +467,9 @@ namespace basecode {
             }
 
             tree.size++;
+
+            if (tree.dump)
+                dump_dot(tree, format::format("bst_{}", s_id++));
 
             return node;
         }

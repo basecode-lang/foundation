@@ -29,6 +29,7 @@ TEST_CASE("basecode::bst basics") {
 
     bst_t<u32> tree{};
     bst::init(tree);
+    tree.dump = true;
     defer(bst::free(tree));
 
     array_t<u32> values{};
