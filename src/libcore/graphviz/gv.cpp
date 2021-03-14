@@ -1510,17 +1510,6 @@ namespace basecode::graphviz {
             attr_set::set(n.attrs, attr_type_t::style, u32(v), attr_value_type_t::node_style);
         }
 
-        u0 label(node_t& n, str::slice_t v) {
-            attr_set::set(n.attrs, attr_type_t::label, v);
-        }
-
-        u0 layer(node_t& n, str::slice_t v) {
-        }
-
-        u0 image(node_t& n, str::slice_t v) {
-            attr_set::set(n.attrs, attr_type_t::image, v);
-        }
-
         u0 fill_color(node_t& n, color_t v) {
             attr_set::set(n.attrs, attr_type_t::fill_color, v);
         }
@@ -1529,28 +1518,21 @@ namespace basecode::graphviz {
             attr_set::set(n.attrs, attr_type_t::font_color, v);
         }
 
-        u0 group(node_t& n, str::slice_t v) {
-            attr_set::set(n.attrs, attr_type_t::group, v);
-        }
-
         u0 gradient_angle(node_t& n, u32 v) {
             attr_set::set(n.attrs, attr_type_t::gradient_angle, v);
+        }
+
+        // XXX:
+        u0 image(node_t& n, const path_t& v) {
+            attr_set::set(n.attrs, attr_type_t::image, path::c_str(v));
         }
 
         u0 ordering(node_t& n, ordering_t v) {
             attr_set::set(n.attrs, attr_type_t::ordering, u32(v));
         }
 
-        u0 comment(node_t& n, str::slice_t v) {
-            attr_set::set(n.attrs, attr_type_t::comment, v);
-        }
-
         u0 image_pos(node_t& n, image_pos_t v) {
             attr_set::set(n.attrs, attr_type_t::image_pos, u32(v));
-        }
-
-        u0 font_name(node_t& n, str::slice_t v) {
-            attr_set::set(n.attrs, attr_type_t::font_name, v);
         }
 
         u0 image_scale(node_t& n, image_scale_t v) {
@@ -1695,73 +1677,28 @@ namespace basecode::graphviz {
             attr_set::set(e.attrs, attr_type_t::fill_color, v);
         }
 
-        u0 label(edge_t& e, str::slice_t v) {
-            attr_set::set(e.attrs, attr_type_t::label, v);
-        }
-
         u0 label_distance(edge_t& e, f64 v) {
             attr_set::set(e.attrs, attr_type_t::label_distance, v);
-        }
-
-        u0 layer(edge_t& e, str::slice_t v) {
         }
 
         u0 style(edge_t& e, edge_style_t v) {
             attr_set::set(e.attrs, attr_type_t::style, u32(v), attr_value_type_t::edge_style);
         }
 
-        u0 lhead(edge_t& e, str::slice_t v) {
-            attr_set::set(e.attrs, attr_type_t::lhead, v);
-        }
-
-        u0 ltail(edge_t& e, str::slice_t v) {
-            attr_set::set(e.attrs, attr_type_t::ltail, v);
-        }
-
         u0 label_font_size(edge_t& e, f64 v) {
             attr_set::set(e.attrs, attr_type_t::label_font_size, v);
-        }
-
-        u0 comment(edge_t& e, str::slice_t v) {
-            attr_set::set(e.attrs, attr_type_t::comment, v);
         }
 
         u0 label_font_color(edge_t& e, rgb_t v) {
             attr_set::set(e.attrs, attr_type_t::label_font_color, v);
         }
 
-        u0 font_name(edge_t& e, str::slice_t v) {
-            attr_set::set(e.attrs, attr_type_t::font_name, v);
-        }
-
-        u0 same_head(edge_t& e, str::slice_t v) {
-            attr_set::set(e.attrs, attr_type_t::same_head, v);
-        }
-
-        u0 same_tail(edge_t& e, str::slice_t v) {
-            attr_set::set(e.attrs, attr_type_t::same_tail, v);
-        }
-
-        u0 head_port(edge_t& e, str::slice_t v) {
-        }
-
         u0 arrow_head(edge_t& e, arrow_type_t v) {
             attr_set::set(e.attrs, attr_type_t::arrow_head, u32(v));
         }
 
-        u0 tail_port(edge_t& e, str::slice_t v) {
-        }
-
-        u0 tail_label(edge_t& e, str::slice_t v) {
-            attr_set::set(e.attrs, attr_type_t::tail_label, v);
-        }
-
         u0 arrow_tail(edge_t& e, arrow_type_t v) {
             attr_set::set(e.attrs, attr_type_t::arrow_tail, u32(v));
-        }
-
-        u0 head_label(edge_t& e, str::slice_t v) {
-            attr_set::set(e.attrs, attr_type_t::head_label, v);
         }
 
         u0 label_font_color(edge_t& e, rgba_t v) {
@@ -1774,10 +1711,6 @@ namespace basecode::graphviz {
 
         u0 color_scheme(edge_t& e, color_scheme_t v) {
             attr_set::set(e.attrs, attr_type_t::color_scheme, u32(v));
-        }
-
-        u0 label_font_name(edge_t& e, str::slice_t v) {
-            attr_set::set(e.attrs, attr_type_t::label_font_name, v);
         }
 
         status_t init(edge_t& e, u32 id, alloc_t* alloc) {
@@ -1967,6 +1900,17 @@ namespace basecode::graphviz {
             return status_t::ok;
         }
 
+        node_t* make_node(graph_t& g) {
+            auto node = &array::append(g.nodes);
+            {
+                str::reset(g.scratch);
+                str_buf_t buf(&g.scratch);
+                format::format_to(buf, "node_{}", g.nodes.size);
+            }
+            node::init(*node, g.nodes.size, slice::make(g.scratch), g.alloc);
+            return node;
+        }
+
         u0 font_size(graph_t& g, f64 v) {
             attr_set::set(g.attrs, attr_type_t::font_size, v);
         }
@@ -2023,10 +1967,6 @@ namespace basecode::graphviz {
             attr_set::set(g.attrs, attr_type_t::charset, u32(v));
         }
 
-        u0 label(graph_t& g, str::slice_t v) {
-            attr_set::set(g.attrs, attr_type_t::label, v);
-        }
-
         edge_t* get_edge(graph_t& g, u32 id) {
             return id == 0 || id > g.edges.size ? nullptr : &g.edges[id - 1];
         }
@@ -2041,9 +1981,6 @@ namespace basecode::graphviz {
 
         u0 style(graph_t& g, graph_style_t v) {
             attr_set::set(g.attrs, attr_type_t::style, u32(v), attr_value_type_t::graph_style);
-        }
-
-        u0 layers(graph_t& g, str::slice_t v) {
         }
 
         u0 rank_dir(graph_t& g, rank_dir_t v) {
@@ -2062,15 +1999,9 @@ namespace basecode::graphviz {
             attr_set::set(g.attrs, attr_type_t::ordering, u32(v));
         }
 
-        u0 comment(graph_t& g, str::slice_t v) {
-            attr_set::set(g.attrs, attr_type_t::comment, v);
-        }
-
         u0 splines(graph_t& g, spline_mode_t v) {
-        }
-
-        u0 font_name(graph_t& g, str::slice_t v) {
-            attr_set::set(g.attrs, attr_type_t::font_name, v);
+            UNUSED(g);
+            UNUSED(v);
         }
 
         u0 pack_mode(graph_t& g, pack_mode_t v) {
@@ -2078,12 +2009,8 @@ namespace basecode::graphviz {
         }
 
         u0 font_path(graph_t& g, const path_t& v) {
-        }
-
-        u0 background(graph_t& g, str::slice_t v) {
-        }
-
-        u0 layers_sep(graph_t& g, str::slice_t v) {
+            UNUSED(g);
+            UNUSED(v);
         }
 
         status_t serialize(graph_t& g, buf_t& buf) {
@@ -2126,6 +2053,8 @@ namespace basecode::graphviz {
         }
 
         u0 image_path(graph_t& g, const path_t& v) {
+            UNUSED(g);
+            UNUSED(v);
         }
 
         u0 orientation(graph_t& g, orientation_t v) {
@@ -2136,9 +2065,6 @@ namespace basecode::graphviz {
             attr_set::set(g.attrs, attr_type_t::output_order, u32(v));
         }
 
-        u0 layers_select(graph_t& g, str::slice_t v) {
-        }
-
         u0 color_scheme(graph_t& g, color_scheme_t v) {
             attr_set::set(g.attrs, attr_type_t::color_scheme, u32(v));
         }
@@ -2147,17 +2073,8 @@ namespace basecode::graphviz {
             attr_set::set(g.attrs, attr_type_t::label_loc, u32(v));
         }
 
-        u0 layer_list_sep(graph_t& g, str::slice_t v) {
-        }
-
         u0 cluster_rank(graph_t& g, cluster_mode_t v) {
             attr_set::set(g.attrs, attr_type_t::cluster_rank, u32(v));
-        }
-
-        node_t* make_node(graph_t& g, str::slice_t name) {
-            auto node = &array::append(g.nodes);
-            node::init(*node, g.nodes.size, name, g.alloc);
-            return node;
         }
 
         u0 label_justification(graph_t& g, justification_t v) {

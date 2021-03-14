@@ -1243,6 +1243,39 @@ namespace basecode::graphviz {
         u0 serialize(graph_t& g, const attr_value_t& attr, mem_buf_t& mb);
     }
 
+    namespace attr_set {
+        u0 set(attr_set_t& set,
+               attr_type_t type,
+               u32 value,
+               attr_value_type_t value_type = attr_value_type_t::integer);
+
+        u0 free(attr_set_t& set);
+
+        u0 set(attr_set_t& set, attr_type_t type, b8 flag);
+
+        attr_value_t* get(attr_set_t& set, attr_type_t type);
+
+        u0 set(attr_set_t& set, attr_type_t type, f64 value);
+
+        u0 set(attr_set_t& set, attr_type_t type, rgb_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, hsv_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, rgba_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, rect_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, point_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, color_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, viewport_t value);
+
+        u0 set(attr_set_t& set, attr_type_t type, str::slice_t value);
+
+        status_t init(attr_set_t& set, component_type_t type, alloc_t* alloc = context::top()->alloc);
+    }
+
     namespace node {
         u0 free(node_t& n);
 
@@ -1298,15 +1331,9 @@ namespace basecode::graphviz {
 
         u0 style(node_t& n, node_style_t v);
 
-        u0 label(node_t& n, str::slice_t v);
-
-        u0 layer(node_t& n, str::slice_t v);
-
         u0 fill_color(node_t& n, color_t v);
 
         u0 font_color(node_t& n, color_t v);
-
-        u0 group(node_t& n, str::slice_t v);
 
         u0 gradient_angle(node_t& n, u32 v);
 
@@ -1314,17 +1341,33 @@ namespace basecode::graphviz {
 
         u0 ordering(node_t& n, ordering_t v);
 
-        u0 comment(node_t& n, str::slice_t v);
-
         u0 image_pos(node_t& n, image_pos_t v);
-
-        u0 font_name(node_t& n, str::slice_t v);
 
         u0 image_scale(node_t& n, image_scale_t v);
 
         u0 label_loc(node_t& n, node_label_loc_t v);
 
         u0 color_scheme(node_t& n, color_scheme_t v);
+
+        // XXX:
+        u0 layer(node_t& n, const String_Concept auto& v) {
+        }
+
+        u0 group(node_t& n, const String_Concept auto& v) {
+            attr_set::set(n.attrs, attr_type_t::group, v);
+        }
+
+        u0 label(node_t& n, const String_Concept auto& v) {
+            attr_set::set(n.attrs, attr_type_t::label, v);
+        }
+
+        u0 comment(node_t& n, const String_Concept auto& v) {
+            attr_set::set(n.attrs, attr_type_t::comment, v);
+        }
+
+        u0 font_name(node_t& n, const String_Concept auto& v) {
+            attr_set::set(n.attrs, attr_type_t::font_name, v);
+        }
 
         u0 serialize(graph_t& g, const node_t& n, mem_buf_t& mb);
 
@@ -1386,39 +1429,15 @@ namespace basecode::graphviz {
 
         u0 fill_color(edge_t& e, color_t v);
 
-        u0 label(edge_t& e, str::slice_t v);
-
         u0 label_distance(edge_t& e, f64 v);
-
-        u0 layer(edge_t& e, str::slice_t v);
-
-        u0 lhead(edge_t& e, str::slice_t v);
-
-        u0 ltail(edge_t& e, str::slice_t v);
 
         u0 label_font_size(edge_t& e, f64 v);
 
-        u0 comment(edge_t& e, str::slice_t v);
-
         u0 label_font_color(edge_t& e, rgb_t v);
-
-        u0 font_name(edge_t& e, str::slice_t v);
-
-        u0 same_head(edge_t& e, str::slice_t v);
-
-        u0 same_tail(edge_t& e, str::slice_t v);
-
-        u0 head_port(edge_t& e, str::slice_t v);
 
         u0 arrow_head(edge_t& e, arrow_type_t v);
 
-        u0 tail_port(edge_t& e, str::slice_t v);
-
-        u0 tail_label(edge_t& e, str::slice_t v);
-
         u0 arrow_tail(edge_t& e, arrow_type_t v);
-
-        u0 head_label(edge_t& e, str::slice_t v);
 
         u0 label_font_color(edge_t& e, rgba_t v);
 
@@ -1426,9 +1445,58 @@ namespace basecode::graphviz {
 
         u0 color_scheme(edge_t& e, color_scheme_t v);
 
-        u0 label_font_name(edge_t& e, str::slice_t v);
+        u0 label(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::label, v);
+        }
+
+        // XXX:
+        u0 layer(edge_t& e, const String_Concept auto& v) {
+        }
+
+        u0 lhead(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::lhead, v);
+        }
+
+        u0 ltail(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::ltail, v);
+        }
+
+        u0 comment(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::comment, v);
+        }
+
+        // XXX:
+        u0 tail_port(edge_t& e, const String_Concept auto& v) {
+        }
+
+        u0 head_port(edge_t& e, const String_Concept auto& v) {
+        }
+
+        u0 font_name(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::font_name, v);
+        }
+
+        u0 same_head(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::same_head, v);
+        }
+
+        u0 same_tail(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::same_tail, v);
+        }
+
+        u0 tail_label(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::tail_label, v);
+        }
+
+        u0 head_label(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::head_label, v);
+        }
 
         u0 serialize(graph_t& g, const edge_t& e, mem_buf_t& mb);
+
+        u0 label_font_name(edge_t& e, const String_Concept auto& v) {
+            attr_set::set(e.attrs, attr_type_t::label_font_name, v);
+        }
 
         status_t init(edge_t& e, u32 id, alloc_t* alloc = context::top()->alloc);
     }
@@ -1461,6 +1529,8 @@ namespace basecode::graphviz {
         u0 margin(graph_t& g, f64 v);
 
         edge_t* make_edge(graph_t& g);
+
+        node_t* make_node(graph_t& g);
 
         u0 pad(graph_t& g, point_t v);
 
@@ -1536,13 +1606,9 @@ namespace basecode::graphviz {
 
         edge_t* get_edge(graph_t& g, u32 id);
 
-        u0 label(graph_t& g, str::slice_t v);
-
         u0 gradient_angle(graph_t& g, u32 v);
 
         u0 style(graph_t& g, graph_style_t v);
-
-        u0 layers(graph_t& g, str::slice_t v);
 
         u0 rank_dir(graph_t& g, rank_dir_t v);
 
@@ -1552,19 +1618,11 @@ namespace basecode::graphviz {
 
         u0 ordering(graph_t& g, ordering_t v);
 
-        u0 comment(graph_t& g, str::slice_t v);
-
         u0 splines(graph_t& g, spline_mode_t v);
 
         u0 pack_mode(graph_t& g, pack_mode_t v);
 
-        u0 font_name(graph_t& g, str::slice_t v);
-
         u0 font_path(graph_t& g, const path_t& v);
-
-        u0 background(graph_t& g, str::slice_t v);
-
-        u0 layers_sep(graph_t& g, str::slice_t v);
 
         u0 image_path(graph_t& g, const path_t& v);
 
@@ -1574,51 +1632,55 @@ namespace basecode::graphviz {
 
         u0 output_order(graph_t& g, output_mode_t v);
 
-        u0 layers_select(graph_t& g, str::slice_t v);
-
         u0 label_loc(graph_t& g, graph_label_loc_t v);
 
         u0 color_scheme(graph_t& g, color_scheme_t v);
 
-        u0 layer_list_sep(graph_t& g, str::slice_t v);
-
         u0 cluster_rank(graph_t& g, cluster_mode_t v);
 
-        node_t* make_node(graph_t& g, str::slice_t name);
+        u0 label(graph_t& g, const String_Concept auto& v) {
+            attr_set::set(g.attrs, attr_type_t::label, v);
+        }
+
+        u0 layers(graph_t& g, const String_Concept auto& v) {
+            UNUSED(g);
+            UNUSED(v);
+        }
 
         u0 label_justification(graph_t& g, justification_t v);
-    }
 
-    namespace attr_set {
-        u0 set(attr_set_t& set,
-               attr_type_t type,
-               u32 value,
-               attr_value_type_t value_type = attr_value_type_t::integer);
+        u0 comment(graph_t& g, const String_Concept auto& v) {
+            attr_set::set(g.attrs, attr_type_t::comment, v);
+        }
 
-        u0 free(attr_set_t& set);
+        u0 font_name(graph_t& g, const String_Concept auto& v) {
+            attr_set::set(g.attrs, attr_type_t::font_name, v);
+        }
 
-        u0 set(attr_set_t& set, attr_type_t type, b8 flag);
+        u0 background(graph_t& g, const String_Concept auto& v) {
+            UNUSED(g);
+            UNUSED(v);
+        }
 
-        attr_value_t* get(attr_set_t& set, attr_type_t type);
+        u0 layers_sep(graph_t& g, const String_Concept auto& v) {
+            UNUSED(g);
+            UNUSED(v);
+        }
 
-        u0 set(attr_set_t& set, attr_type_t type, f64 value);
+        u0 layers_select(graph_t& g, const String_Concept auto& v) {
+            UNUSED(g);
+            UNUSED(v);
+        }
 
-        u0 set(attr_set_t& set, attr_type_t type, rgb_t value);
+        u0 layer_list_sep(graph_t& g, const String_Concept auto& v) {
+            UNUSED(g);
+            UNUSED(v);
+        }
 
-        u0 set(attr_set_t& set, attr_type_t type, hsv_t value);
-
-        u0 set(attr_set_t& set, attr_type_t type, rgba_t value);
-
-        u0 set(attr_set_t& set, attr_type_t type, rect_t value);
-
-        u0 set(attr_set_t& set, attr_type_t type, point_t value);
-
-        u0 set(attr_set_t& set, attr_type_t type, color_t value);
-
-        u0 set(attr_set_t& set, attr_type_t type, viewport_t value);
-
-        u0 set(attr_set_t& set, attr_type_t type, str::slice_t value);
-
-        status_t init(attr_set_t& set, component_type_t type, alloc_t* alloc = context::top()->alloc);
+        node_t* make_node(graph_t& g, const String_Concept auto& name) {
+            auto node = &array::append(g.nodes);
+            node::init(*node, g.nodes.size, name, g.alloc);
+            return node;
+        }
     }
 }

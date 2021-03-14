@@ -21,6 +21,7 @@
 #include <basecode/core/array.h>
 #include <basecode/core/stack.h>
 #include <basecode/core/format.h>
+#include <basecode/core/graphviz/gv.h>
 
 namespace basecode {
     struct bst_node_t final {
@@ -45,6 +46,8 @@ namespace basecode {
         {t.values}              -> same_as<array_t<typename T::Value_Type>>;
         {t.free.nodes}          -> same_as<bst_node_stack_t>;
         {t.free.values}         -> same_as<bst_node_stack_t>;
+        {t.size}                -> same_as<u32>;
+        {t.root}                -> same_as<u32>;
     };
 
     template <typename T>

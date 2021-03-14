@@ -29,15 +29,18 @@ TEST_CASE("basecode::graphviz basics") {
     graphviz::graph::init(g, graphviz::graph_type_t::directed, "test"_ss);
     defer(graphviz::graph::free(g));
 
-    auto root = graphviz::graph::make_node(g, "root"_ss);
+    auto root = graphviz::graph::make_node(g);
+    graphviz::node::label(*root, "root"_ss);
     graphviz::node::style(*root, graphviz::node_style_t::filled);
     graphviz::node::fill_color(*root, graphviz::color_t::aliceblue);
 
-    auto lhs  = graphviz::graph::make_node(g, "lhs"_ss);
+    auto lhs  = graphviz::graph::make_node(g);
+    graphviz::node::label(*lhs, "lhs"_ss);
     graphviz::node::style(*lhs, graphviz::node_style_t::filled);
     graphviz::node::fill_color(*lhs, graphviz::color_t::pink);
 
-    auto rhs  = graphviz::graph::make_node(g, "rhs"_ss);
+    auto rhs  = graphviz::graph::make_node(g);
+    graphviz::node::label(*rhs, "rhs"_ss);
     graphviz::node::style(*rhs, graphviz::node_style_t::filled);
     graphviz::node::fill_color(*rhs, graphviz::color_t::green);
 
