@@ -19,7 +19,6 @@
 #include <random>
 #include <catch2/catch.hpp>
 #include <basecode/core/bst.h>
-#include <basecode/core/defer.h>
 
 using namespace basecode;
 
@@ -29,13 +28,12 @@ TEST_CASE("basecode::bst basics") {
 
     bst_t<u32> tree{};
     bst::init(tree);
-    tree.dump = true;
     defer(bst::free(tree));
 
     array_t<u32> values{};
     array::init(values);
 
-    for (u32 i = 0; i < 5; ++i)
+    for (u32 i = 1; i < 8; ++i)
         array::append(values, i);
 
     for (auto v : values)
@@ -50,6 +48,6 @@ TEST_CASE("basecode::bst basics") {
     if (bst::size(tree) != values.size) REQUIRE(false);
 
     bst::print_whole_tree(tree, "before balance"_ss);
-//    bst::balance(tree);
-//    bst::print_whole_tree(tree, "after balance "_ss);
+    bst::balance(tree);
+    bst::print_whole_tree(tree, "after balance "_ss);
 }

@@ -22,249 +22,130 @@
 #include <basecode/core/stack.h>
 #include <basecode/core/format.h>
 #include <basecode/core/graphviz/gv.h>
+#include <basecode/core/memory/system/slab.h>
+
+#define BST_BRANCH(n, d)   ((d) == 1 ? (n)->rhs : (n)->lhs)
 
 namespace basecode {
-    struct bst_node_t final {
-        u32                     link[2];
-        u32                     parent;
-        u32                     value;
-        u32                     id;
-    };
-    static_assert(sizeof(bst_node_t) <= 24, "bst_node_t is now larger than 24 bytes!");
-
-    using bst_node_array_t      = array_t<bst_node_t>;
-    using bst_node_stack_t      = stack_t<u32>;
-
     template <typename T>
     concept Binary_Tree = requires(const T& t) {
+        typename                T::Node_Type;
         typename                T::Value_Type;
-        typename                T::Value_Array;
-        typename                T::Value_Type_Ptr;
 
         {t.alloc}               -> same_as<alloc_t*>;
-        {t.nodes}               -> same_as<bst_node_array_t>;
-        {t.values}              -> same_as<array_t<typename T::Value_Type>>;
-        {t.free.nodes}          -> same_as<bst_node_stack_t>;
-        {t.free.values}         -> same_as<bst_node_stack_t>;
+        {t.node_slab}           -> same_as<alloc_t*>;
+        {t.value_slab}          -> same_as<alloc_t*>;
+        {t.root}                -> same_as<typename T::Node_Type>;
         {t.size}                -> same_as<u32>;
-        {t.root}                -> same_as<u32>;
     };
 
     template <typename T>
     struct bst_t final {
-        using Value_Type        = T;
-        using Value_Array       = array_t<Value_Type>;
-        using Value_Type_Ptr    = std::remove_pointer_t<Value_Type>*;
+        struct node_t;
+
+        using Node_Type         = node_t*;
+        using Value_Type        = T*;
+        static constexpr u32 Value_Type_Size    = sizeof(T);
+        static constexpr u32 Value_Type_Align   = alignof(T);
+
+        struct node_t final {
+            node_t*             lhs;
+            node_t*             rhs;
+            node_t*             parent;
+            Value_Type          value;
+        };
+        static_assert(sizeof(node_t) <= 32, "node_t is now larger than 32 bytes!");
+
+        static constexpr u32 Node_Type_Size     = sizeof(node_t);
+        static constexpr u32 Node_Type_Align    = alignof(node_t);
 
         alloc_t*                alloc;
-        bst_node_array_t        nodes;
-        Value_Array             values;
-        struct {
-            bst_node_stack_t    nodes;
-            bst_node_stack_t    values;
-        }                       free;
+        alloc_t*                node_slab;
+        alloc_t*                value_slab;
+        Node_Type               root;
         u32                     size;
-        u32                     root;
-        b8                      dump;
     };
-    static_assert(sizeof(bst_t<u32>) <= 120, "bst_t<u32> is now larger than 120 bytes!");
+    static_assert(sizeof(bst_t<u32>) <= 40, "bst_t<u32> is now larger than 40 bytes!");
 
     namespace bst {
-        static u32 s_id = 1;
-
-        inline bst_node_t* root(Binary_Tree auto& tree);
-
-        template <typename T> requires Binary_Tree<T>
-        b8 remove(T& tree, const typename T::Value_Type& value);
-
-        inline const bst_node_t* root(const Binary_Tree auto& tree);
-
-        inline bst_node_t* get_node(Binary_Tree auto& tree, u32 id);
-
-        inline const bst_node_t* get_node(const Binary_Tree auto& tree, u32 id);
-
-        inline bst_node_t* left(Binary_Tree auto& tree, const bst_node_t* node);
-
-        inline bst_node_t* right(Binary_Tree auto& tree, const bst_node_t* node);
-
-        template <typename T> requires Binary_Tree<T>
-        inline bool get_value(T& tree, bst_node_t* node, typename T::Value_Type& value);
-
-        inline const bst_node_t* left(const Binary_Tree auto& tree, const bst_node_t* node);
-
-        inline const bst_node_t* right(const Binary_Tree auto& tree, const bst_node_t* node);
-
-        template <typename T> requires Binary_Tree<T>
-        inline bool get_value(const T& tree, const bst_node_t* node, typename T::Value_Type& value);
-
-        u0 print_tree_struct(const Binary_Tree auto& tree, const bst_node_t* node, u32 level) {
-            if (level > 16) {
-                format::print("[...]");
-                return;
-            }
-
-            if (!node) {
-                format::print("nil");
-                return;
-            }
-
-            u32 value{};
-            if (!bst::get_value(tree, node, value))
-                return;
-
-            format::print("{}", value);
-            if (node->link[0] || node->link[1]) {
-                format::print("(");
-                print_tree_struct(tree, bst::get_node(tree, node->link[0]), level + 1);
-                if (node->link[1]) {
-                    format::print(",");
-                    print_tree_struct(tree, bst::get_node(tree, node->link[1]), level + 1);
-                }
-                format::print(")");
-            }
+        inline graphviz::edge_t* make_edge(graphviz::graph_t& g,
+                                           u32 first,
+                                           u32 second,
+                                           str::slice_t label = {}) {
+            auto e = graphviz::graph::make_edge(g);
+            e->first  = first;
+            e->second = second;
+            if (!slice::empty(label))
+                graphviz::edge::label(*e, label);
+            graphviz::edge::arrow_size(*e, .5f);
+            graphviz::edge::dir(*e, graphviz::dir_type_t::both);
+            graphviz::edge::arrow_tail(*e, graphviz::arrow_type_t::dot);
+            graphviz::edge::arrow_head(*e, graphviz::arrow_type_t::normal);
+            return e;
         }
 
-        u0 print_whole_tree(const Binary_Tree auto& tree, str::slice_t title) {
-            format::print("{}: ", title);
-            print_tree_struct(tree, bst::root(tree), 0);
-            format::print("\n");
+        inline u0 make_nil_node(graphviz::graph_t& g, u32 id, str::slice_t label) {
+            auto nil = graphviz::graph::make_node(g);
+            graphviz::node::label(*nil, "nil"_ss);
+            graphviz::node::shape(*nil, graphviz::shape_t::point);
+            make_edge(g, id, nil->id, label);
         }
 
-        u0 compress(Binary_Tree auto& tree, bst_node_t* node, u32 count) {
-            if (tree.size == 0 || !node || count > tree.size) return;
-            while (count--) {
-                auto red   = get_node(tree, node->link[0]);
-                auto black = get_node(tree, red->link[0]);
-                node->link[0]  = black->id;
-                red->link[0]   = black->link[1];
-                black->link[1] = red->id;
-                node = black;
+        template <Binary_Tree T,
+                  typename Node_Type = typename T::Node_Type,
+                  typename Value_Type = typename T::Value_Type>
+        u32 dump_node(T& tree, graphviz::graph_t& g, Node_Type node, u32 parent_id = {}) {
+            auto n = graphviz::graph::make_node(g);
+            graphviz::node::label(*n,
+                                  format::format("{}{}",
+                                                 tree.root == node ? "ROOT\n"_ss : ""_ss,
+                                                 *node->value));
+
+            if (tree.root == node) {
+                graphviz::node::shape(*n, graphviz::shape_t::doublecircle);
+                graphviz::node::style(*n, graphviz::node_style_t::filled);
+                graphviz::node::fill_color(*n, graphviz::color_t::aqua);
             }
+
+            if (node->parent) {
+                auto e = make_edge(g, n->id, parent_id);
+                graphviz::edge::color(*e, graphviz::color_t::red);
+                graphviz::edge::style(*e, graphviz::edge_style_t::dashed);
+            }
+
+            if (node->lhs) {
+                auto lhs_id = dump_node(tree, g, node->lhs, n->id);
+                make_edge(g, n->id, lhs_id, "L"_ss);
+            } else {
+                make_nil_node(g, n->id, "L"_ss);
+            }
+
+            if (node->rhs) {
+                auto rhs_id = dump_node(tree, g, node->rhs, n->id);
+                make_edge(g, n->id, rhs_id, "R"_ss);
+            } else {
+                make_nil_node(g, n->id, "R"_ss);
+            }
+
+            return n->id;
         }
 
-        u0 tree_to_vine(Binary_Tree auto& tree) {
-            bst_node_t* p = root(tree);
-            bst_node_t* q = p;
-
-            while (p) {
-                if (!p->link[1]) {
-                    q = p;
-                    p = get_node(tree, p->link[0]);
-                } else {
-                    auto r = get_node(tree, p->link[1]);
-                    p->link[1] = r->link[0];
-                    r->link[0] = p->id;
-                    p = r;
-                    q->link[0] = r->id;
-                }
-            }
-        }
-
-        u0 vine_to_tree(Binary_Tree auto& tree) {
-            auto leaves = tree.size + 1;
-            for (;;) {
-                auto next = leaves & (leaves - 1);
-                if (!next) break;
-                leaves = next;
-            }
-            leaves = tree.size + 1 - leaves;
-            compress(tree, root(tree), leaves);
-            auto vine = tree.size - leaves;
-            auto height = 1 + (leaves > 0);
-            while (vine > 1) {
-                compress(tree, root(tree), vine / 2);
-                vine /= 2;
-                height++;
-            }
-        }
-
-        u0 update_parents(Binary_Tree auto& tree) {
-            if (tree.size == 0)
-                return;
-
-            auto r = root(tree);
-            r->parent = 0;
-
-            bst_node_t* p;
-
-            for (p = r;; p = get_node(tree, p->link[1])) {
-                for (; p->link[0]; p = get_node(tree, p->link[0])) {
-                    auto temp = get_node(tree, p->link[0]);
-                    temp->parent = p->id;
-                }
-
-                for (; !p->link[1]; p = get_node(tree, p->parent)) {
-                    for (;;) {
-                        if (!p->parent)
-                            return;
-                        auto temp = get_node(tree, p->parent);
-                        if (p->id == temp->link[0])
-                            break;
-                        p = get_node(tree, p->parent);
-                    }
-                }
-
-                auto temp = get_node(tree, p->link[1]);
-                temp->parent = p->id;
-            }
-        }
-
-        template <Binary_Tree T>
+        template <Binary_Tree T,
+                  typename Node_Type = typename T::Node_Type,
+                  typename Value_Type = typename T::Value_Type>
         u0 dump_dot(T& tree, const String_Concept auto& name) {
-            using Value_Type = typename T::Value_Type;
+            if (!tree.root)
+                return;
 
             graphviz::graph_t g{};
-            graphviz::graph::init(g, graphviz::graph_type_t::directed, name, {}, tree.alloc);
+            graphviz::graph::init(g,
+                                  graphviz::graph_type_t::directed,
+                                  name,
+                                  {},
+                                  tree.alloc);
             defer(graphviz::graph::free(g));
 
-            for (auto& node : tree.nodes) {
-                Value_Type v{};
-                get_value(tree, &node, v);
-
-                auto n = graphviz::graph::make_node(g);
-                if constexpr (std::is_pointer_v<Value_Type>) {
-                    graphviz::node::label(*n, format::format("id({})", node.id));
-                } else {
-                    graphviz::node::label(*n, format::format("id({})={}", node.id, (u32) v));
-                }
-                if (tree.root == node.id) {
-                    graphviz::node::style(*n, graphviz::node_style_t::filled);
-                    graphviz::node::fill_color(*n, graphviz::color_t::aqua);
-                }
-
-                if (node.parent) {
-                    auto e = graphviz::graph::make_edge(g);
-                    e->first  = node.id;
-                    e->second = node.parent;
-                    graphviz::edge::label(*e, "parent"_ss);
-                    graphviz::edge::color(*e, graphviz::color_t::red);
-                    graphviz::edge::style(*e, graphviz::edge_style_t::dashed);
-                    graphviz::edge::dir(*e, graphviz::dir_type_t::both);
-                    graphviz::edge::arrow_size(*e, .5f);
-                    graphviz::edge::arrow_tail(*e, graphviz::arrow_type_t::dot);
-                    graphviz::edge::arrow_head(*e, graphviz::arrow_type_t::normal);
-                }
-
-                if (node.link[0]) {
-                    auto e = graphviz::graph::make_edge(g);
-                    e->first  = node.id;
-                    e->second = node.link[0];
-                    graphviz::edge::label(*e, "lhs"_ss);
-                    graphviz::edge::dir(*e, graphviz::dir_type_t::both);
-                    graphviz::edge::arrow_tail(*e, graphviz::arrow_type_t::dot);
-                    graphviz::edge::arrow_head(*e, graphviz::arrow_type_t::normal);
-                }
-
-                if (node.link[1]) {
-                    auto e = graphviz::graph::make_edge(g);
-                    e->first  = node.id;
-                    e->second = node.link[1];
-                    graphviz::edge::label(*e, "rhs"_ss);
-                    graphviz::edge::dir(*e, graphviz::dir_type_t::both);
-                    graphviz::edge::arrow_tail(*e, graphviz::arrow_type_t::dot);
-                    graphviz::edge::arrow_head(*e, graphviz::arrow_type_t::normal);
-                }
-            }
+            dump_node(tree, g, tree.root);
 
             path_t p{};
             path::init(p, tree.alloc);
@@ -283,19 +164,132 @@ namespace basecode {
             buf::save(buf, p);
         }
 
+        template <Binary_Tree T,
+            typename Node_Type = typename T::_Node_Type>
+        u0 print_tree_struct(const T& tree, const Node_Type node, u32 level) {
+            if (level > 16) {
+                format::print("[...]");
+                return;
+            }
+
+            if (!node) {
+                format::print("nil");
+                return;
+            }
+
+            u32 value = *node->value;
+            format::print("{}", value);
+            if (node->lhs || node->rhs) {
+                format::print("(");
+                print_tree_struct(tree, node->lhs, level + 1);
+                if (node->rhs) {
+                    format::print(",");
+                    print_tree_struct(tree, node->rhs, level + 1);
+                }
+                format::print(")");
+            }
+        }
+
+        u0 print_whole_tree(const Binary_Tree auto& tree, str::slice_t title) {
+            format::print("{}: ", title);
+            print_tree_struct(tree, tree.root, 0);
+            format::print("\n");
+        }
+
+        template <Binary_Tree T,
+                  typename Node_Type = typename T::Node_Type>
+        u0 compress(T& tree, Node_Type root, u32 count) {
+            if (!root)
+                return;
+            while (count--) {
+                auto red    = root->lhs;
+                auto black  = red->lhs;
+                root->lhs   = black;
+                red->lhs    = black->rhs;
+                black->rhs  = red;
+                root        = black;
+            }
+        }
+
+        template <Binary_Tree T,
+                  typename Node_Type = typename T::Node_Type>
+        u0 tree_to_vine(T& tree) {
+            Node_Type q;
+            Node_Type p;
+
+            q = (Node_Type) &tree.root;
+            p = tree.root;
+
+            while (p != nullptr) {
+                if (!p->rhs) {
+                    q = p;
+                    p = p->lhs;
+                } else {
+                    auto r = p->rhs;
+                    p->rhs = r->lhs;
+                    r->lhs = p;
+                    p = r;
+                    q->lhs = r;
+                }
+            }
+        }
+
+        template <Binary_Tree T,
+                  typename Node_Type = typename T::Node_Type>
+        u0 vine_to_tree(T& tree) {
+            auto leaves = tree.size + 1;
+            for (;;) {
+                auto next = leaves & (leaves - 1);
+                if (!next) break;
+                leaves = next;
+            }
+            leaves = tree.size + 1 - leaves;
+            compress(tree, Node_Type(&tree.root), leaves);
+            auto vine = tree.size - leaves;
+            auto height = 1 + (leaves > 0);
+            while (vine > 1) {
+                compress(tree, Node_Type(&tree.root), vine / 2);
+                vine /= 2;
+                height++;
+            }
+        }
+
+        template <Binary_Tree T,
+                  typename Node_Type = typename T::Node_Type>
+        u0 update_parents(T& tree) {
+            if (!tree.root)
+                return;
+
+            Node_Type p;
+            tree.root->parent = nullptr;
+
+            for (p = tree.root;; p = p->rhs) {
+                for (; p->lhs; p = p->lhs)
+                    p->lhs->parent = p;
+
+                for (; !p->rhs; p = p->parent) {
+                    for (;;) {
+                        if (!p->parent)
+                            return;
+                        if (p == p->parent->lhs)
+                            break;
+                        p = p->parent;
+                    }
+                }
+                p->rhs->parent = p;
+            }
+        }
+
         u0 free(Binary_Tree auto& tree) {
-            array::free(tree.nodes);
-            array::free(tree.values);
-            stack::free(tree.free.nodes);
-            stack::free(tree.free.values);
+            memory::system::free(tree.node_slab);
+            memory::system::free(tree.value_slab);
             tree.size = {};
+            tree.root = {};
         }
 
         u0 reset(Binary_Tree auto& tree) {
-            array::reset(tree.nodes);
-            array::reset(tree.values);
-            stack::reset(tree.free.nodes);
-            stack::reset(tree.free.values);
+            memory::slab::reset(tree.node_slab);
+            memory::slab::reset(tree.value_slab);
             tree.size = {};
             tree.root = {};
         }
@@ -307,6 +301,79 @@ namespace basecode {
             update_parents(tree);
         }
 
+        template <Binary_Tree T,
+                  typename Node_Type = typename T::Node_Type,
+                  typename Value_Type = typename T::Value_Type>
+        b8 remove(T& tree, const Value_Type& value) {
+            Node_Type p     {};
+            Node_Type q     {};
+            s32       dir   {};
+
+            if (!tree.root)
+                return false;
+
+            p = tree.root;
+            for (;;) {
+                auto cmp = value <=> *p->value;
+                if (cmp == 0)
+                    break;
+                dir = cmp > 0;
+                p   = BST_BRANCH(p, dir);
+                if (!p)
+                    return false;
+            }
+
+            q = p->parent;
+            if (!q) {
+                q   = Node_Type(&tree.root);
+                dir = 0;
+            }
+
+            if (!p->rhs) {
+                auto qb = BST_BRANCH(q, dir);
+                qb = p->lhs;
+                if (qb)
+                    qb->parent = p->parent;
+            } else {
+                auto r = p->rhs;
+                if (!r->lhs) {
+                    r->lhs = p->lhs;
+                    BST_BRANCH(q, dir) = r;
+                    r->parent = p->parent;
+                    if (r->lhs) {
+                        r->lhs->parent = r;
+                    }
+                } else {
+                    auto s = r->lhs;
+                    while (s->lhs)
+                        s = s->lhs;
+                    r = s->parent;
+                    r->lhs = s->rhs;
+                    s->lhs = p->lhs;
+                    s->rhs = p->rhs;
+                    BST_BRANCH(q, dir) = s;
+                    if (s->lhs)
+                        s->lhs->parent = s;
+                    s->rhs->parent = s;
+                    s->parent = p->parent;
+                    if (r->lhs)
+                        r->lhs->parent = r;
+                }
+            }
+
+            memory::free(tree.value_slab, p->value);
+            p->value      = nullptr;
+
+            p->parent     = nullptr;
+            p->lhs        = p->rhs = nullptr;
+            if (p == tree.root)
+                tree.root = nullptr;
+            memory::free(tree.node_slab, p);
+            tree.size--;
+
+            return true;
+        }
+
         inline u32 size(const Binary_Tree auto& tree) {
             return tree.size;
         }
@@ -315,226 +382,75 @@ namespace basecode {
             return tree.size == 0;
         }
 
-        inline bst_node_t* root(Binary_Tree auto& tree) {
-            return tree.root == 0 ? nullptr : &tree.nodes[tree.root - 1];
-        }
+        template <Binary_Tree T,
+                  typename Node_Type = typename T::Node_Type,
+                  typename Value_Type = typename T::Value_Type>
+        Node_Type insert(T& tree, const Value_Type& value) {
+            Node_Type node;
+            Node_Type p;
+            Node_Type q{};
+            s32       dir{};
 
-        inline u32 capacity(const Binary_Tree auto& tree) {
-            return tree.nodes.capacity;
-        }
-
-        u0 reserve(Binary_Tree auto& tree, u32 new_capacity) {
-            array::reserve(tree.nodes, new_capacity);
-            array::reserve(tree.values, new_capacity);
-        }
-
-        template <typename T> requires Binary_Tree<T>
-        b8 remove(T& tree, const typename T::Value_Type& value) {
-            using Value_Type = typename T::Value_Type;
-
-            bst_node_t* p;
-            bst_node_t* q;
-            s32         dir;
-
-            if (tree.size == 0)
-                return false;
-
-            p = root(tree);
-            for (;;) {
-                Value_Type v{};
-                if (!get_value(tree, p, v))
-                    return false;
-                auto cmp = value <=> v;
-                if (cmp == 0)
-                    break;
-                dir = cmp > 0;
-                p   = get_node(tree, p->link[dir]);
-                if (!p)
-                    return false;
-            }
-
-            q = get_node(tree, p->parent);
-            if (!q) {
-                q   = root(tree);
-                dir = 0;
-            }
-
-            if (!p->link[1]) {
-                q->link[dir] = p->link[0];
-                if (q->link[dir]) {
-                    auto temp = get_node(tree, q->link[dir]);
-                    temp->parent = p->parent;
-                }
-            } else {
-                auto r = get_node(tree, p->link[1]);
-                if (!r->link[0]) {
-                    r->link[0]   = p->link[0];
-                    q->link[dir] = r->id;
-                    r->parent    = p->parent;
-                    if (r->link[0]) {
-                        auto temp    = get_node(tree, r->link[0]);
-                        temp->parent = r->id;
-                    }
-                } else {
-                    auto s = get_node(tree, r->link[0]);
-                    while (s->link[0])
-                        s = get_node(tree, s->link[0]);
-                    r = get_node(tree, s->parent);
-                    r->link[0] = s->link[1];
-                    s->link[0] = p->link[0];
-                    s->link[1] = p->link[1];
-                    q->link[dir] = s->id;
-                    if (s->link[0]) {
-                        auto temp = get_node(tree, s->link[0]);
-                        temp->parent = s->id;
-                    }
-                    {
-                        auto temp = get_node(tree, s->link[1]);
-                        temp->parent = s->id;
-                    }
-                    s->parent = p->parent;
-                    if (r->link[0]) {
-                        auto temp = get_node(tree, r->link[0]);
-                        temp->parent = r->id;
-                    }
-                }
-            }
-
-            stack::push(tree.free.nodes, p->id);
-            stack::push(tree.free.values, p->value);
-            p->value  = 0;
-            p->parent = 0;
-            p->link[0] = p->link[1] = 0;
-            if (p->id == tree.root)
-                tree.root = 0;
-            tree.size--;
-
-            return true;
-        }
-
-        inline bst_node_t* get_node(Binary_Tree auto& tree, u32 id) {
-            return id == 0 || id > tree.nodes.size ? nullptr : &tree.nodes[id - 1];
-        }
-
-        inline const bst_node_t* root(const Binary_Tree auto& tree) {
-            return tree.root == 0 ? nullptr : &tree.nodes[tree.root - 1];
-        }
-
-        template <typename T> requires Binary_Tree<T>
-        bst_node_t* insert(T& tree, const typename T::Value_Type& value) {
-            using Value_Type = typename T::Value_Type;
-
-            bst_node_t* node;
-            bst_node_t* p;
-            bst_node_t* q;
-            s32         dir{};
-
-            for (q = nullptr, p = root(tree);
+            for (q = nullptr, p = tree.root;
                  p != nullptr;
-                 q = p, p = get_node(tree, p->link[dir])) {
-                Value_Type v{};
-                if (!get_value(tree, p, v))
-                    return nullptr;
-                auto cmp = value <=> v;
+                 q = p, p = BST_BRANCH(p,dir)) {
+                auto cmp = value <=> *p->value;
                 if (cmp == 0)
                     return p;
                 dir = cmp > 0;
             }
 
-            if (!stack::empty(tree.free.nodes)) {
-                node = get_node(tree, stack::pop(tree.free.nodes));
-            } else {
-                node = &array::append(tree.nodes);
-                node->id = tree.nodes.size;
-            }
-            node->value   = 0;
-            node->parent  = 0;
-            node->link[0] = node->link[1] = 0;
+            node = Node_Type(memory::alloc(tree.node_slab));
+            node->parent  = nullptr;
+            node->lhs     = node->rhs = nullptr;
 
             if (q) {
-                node->parent = q->id;
-                q->link[dir] = node->id;
+                node->parent = q;
+                BST_BRANCH(q, dir) = node;
             } else {
-                tree.root = node->id;
+                tree.root = node;
             }
 
-            if (!stack::empty(tree.free.values)) {
-                node->value = stack::pop(tree.free.values);
-                tree.values[node->value - 1] = value;
-            } else {
-                array::append(tree.values, value);
-                node->value = tree.values.size;
-            }
+            node->value = (Value_Type*) memory::alloc(tree.value_slab);
+            *node->value = value;
 
             tree.size++;
-
-            if (tree.dump)
-                dump_dot(tree, format::format("bst_{}", s_id++));
 
             return node;
         }
 
-        u0 init(Binary_Tree auto& tree, alloc_t* alloc = context::top()->alloc) {
+        template <Binary_Tree T,
+            typename Node_Type = typename T::Node_Type>
+        u0 init(T& tree, alloc_t* alloc = context::top()->alloc) {
             tree.size  = {};
             tree.root  = {};
             tree.alloc = alloc;
-            array::init(tree.nodes, tree.alloc);
-            array::init(tree.values, tree.alloc);
-            stack::init(tree.free.nodes, tree.alloc);
-            stack::init(tree.free.values, tree.alloc);
+
+            slab_config_t node_cfg{};
+            node_cfg.backing   = tree.alloc;
+            node_cfg.buf_size  = bst_t<T>::Node_Type_Size;
+            node_cfg.buf_align = bst_t<T>::Node_Type_Align;
+            tree.node_slab = memory::system::make(alloc_type_t::slab, &node_cfg);
+
+            slab_config_t value_cfg{};
+            value_cfg.backing   = tree.alloc;
+            value_cfg.buf_size  = bst_t<T>::Value_Type_Size;
+            value_cfg.buf_align = bst_t<T>::Value_Type_Align;
+            tree.value_slab = memory::system::make(alloc_type_t::slab, &value_cfg);
         }
 
-        inline const bst_node_t* get_node(const Binary_Tree auto& tree, u32 id) {
-            return id == 0 || id > tree.nodes.size ? nullptr : &tree.nodes[id - 1];
-        }
-
-        inline bst_node_t* left(Binary_Tree auto& tree, const bst_node_t* node) {
-            return get_node(tree, node->link[0]);
-        }
-
-        inline bst_node_t* right(Binary_Tree auto& tree, const bst_node_t* node) {
-            return get_node(tree, node->link[1]);
-        }
-
-        template <typename T> requires Binary_Tree<T>
-        const bst_node_t* find(const T& tree, const typename T::Value_Type& value) {
-            using Value_Type = typename T::Value_Type;
-
-            const bst_node_t* p = root(tree);
+        template <Binary_Tree T,
+            typename Node_Type = typename T::Node_Type,
+            typename Value_Type = typename T::Value_Type>
+        const Node_Type find(const T& tree, const Value_Type& value) {
+            Node_Type p = tree.root;
             while (p != nullptr) {
-                Value_Type v{};
-                if (!get_value(tree, p, v))
-                    break;
-                auto cmp = value <=> v;
-                if (cmp < 0)        p = left(tree, p);
-                else if (cmp > 0)   p = right(tree, p);
+                auto cmp = value <=> *p->value;
+                if (cmp < 0)        p = p->lhs;
+                else if (cmp > 0)   p = p->rhs;
                 else return         p;
             }
             return nullptr;
-        }
-
-        template <typename T> requires Binary_Tree<T>
-        inline bool get_value(T& tree, bst_node_t* node, typename T::Value_Type& value) {
-            if (!node || node->value == 0 || node->value > tree.values.size)
-                return false;
-            value = tree.values[node->value - 1];
-            return true;
-        }
-
-        inline const bst_node_t* left(const Binary_Tree auto& tree, const bst_node_t* node) {
-            return get_node(tree, node->link[0]);
-        }
-
-        inline const bst_node_t* right(const Binary_Tree auto& tree, const bst_node_t* node) {
-            return get_node(tree, node->link[1]);
-        }
-
-        template <typename T> requires Binary_Tree<T>
-        inline bool get_value(const T& tree, const bst_node_t* node, typename T::Value_Type& value) {
-            if (!node || node->value == 0 || node->value > tree.values.size)
-                return false;
-            value = tree.values[node->value - 1];
-            return true;
         }
     }
 }

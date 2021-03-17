@@ -18,37 +18,31 @@
 
 #include <basecode/core/memory/meta.h>
 
+// XXX: rework
 namespace basecode::memory::meta {
     struct system_t final {
-        bst_t<alloc_t*>         tree;
         b8                      init{};
     };
 
     thread_local system_t       t_meta_system{};
 
-    const bst_t<alloc_t*>& tree() {
-        return t_meta_system.tree;
-    }
-
     u0 fini() {
-        bst::free(t_meta_system.tree);
         t_meta_system.init = {};
     }
 
     u0 init(alloc_t* alloc) {
-        bst::init(t_meta_system.tree, alloc);
         t_meta_system.init = true;
         track(alloc);
     }
 
     u0 track(alloc_t* alloc) {
         if (!t_meta_system.init) return;
-        bst::insert(t_meta_system.tree, alloc);
+        UNUSED(alloc);
     }
 
     u0 untrack(alloc_t* alloc) {
         if (!t_meta_system.init) return;
-        bst::remove(t_meta_system.tree, alloc);
+        UNUSED(alloc);
     }
 }
 

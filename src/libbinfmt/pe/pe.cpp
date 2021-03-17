@@ -265,9 +265,9 @@ namespace basecode::binfmt::io::pe {
         FILE_WRITE(u16, u16(file.flags.console ? subsystem::win_cui : subsystem::win_gui));
         FILE_WRITE(u16, pe.flags.dll);
         FILE_WRITE(u64, pe.reserve.stack);
-        FILE_WRITE(u64, 0x1000UL);
+        FILE_WRITE(u64, 0x1000ULL);
         FILE_WRITE(u64, pe.reserve.heap);
-        FILE_WRITE(u64, 0x1000UL);
+        FILE_WRITE(u64, 0x1000ULL);
         FILE_WRITE(u32, pe.flags.load);
         FILE_WRITE(const u32, max_dir_entry_count);
 
@@ -354,6 +354,7 @@ namespace basecode::binfmt::io::pe {
                     module.symbols.size  = import.symbols.size;
                     lookup_rva += (import.symbols.size + 1) * import_lookup_table::entry_size;
                     for (auto symbol_id : import.symbols) {
+                        UNUSED(symbol_id);
                         // XXX: FIXME!
 //                        const auto symbol    = module::get_symbol(*file.module, symbol_id);
                         const auto intern_rc = string::interned::get(0);    // XXX: FIXME!
