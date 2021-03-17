@@ -53,4 +53,16 @@ TEST_CASE("basecode::bst basics") {
     avl::print_whole_tree(tree, "before balance"_ss);
     bst::balance(tree);
     avl::print_whole_tree(tree, "after balance "_ss);
+
+    bin_tree_cursor_t<bst_t<u32>> cursor{};
+    avl::cursor::init(cursor, &tree);
+    s32 i;
+    u32* v;
+    for (v = avl::cursor::first(cursor, &tree), i = 0;
+            v;
+            ++i, v = avl::cursor::next(cursor)) {
+        if (i > 0) format::print(",");
+        format::print("{}", *v);
+    }
+    format::print("\n");
 }

@@ -52,4 +52,16 @@ TEST_CASE("basecode::rbt basics") {
 
     avl::print_whole_tree(tree, "red-black tree"_ss);
     avl::dump_dot(tree, "rbt"_ss);
+
+    bin_tree_cursor_t<rbt_t<u32>> cursor{};
+    avl::cursor::init(cursor, &tree);
+    s32 i;
+    u32* v;
+    for (v = avl::cursor::first(cursor, &tree), i = 0;
+         v;
+         ++i, v = avl::cursor::next(cursor)) {
+        if (i > 0) format::print(",");
+        format::print("{}", *v);
+    }
+    format::print("\n");
 }

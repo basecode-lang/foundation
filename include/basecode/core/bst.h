@@ -23,8 +23,6 @@
 #include <basecode/core/graphviz/gv.h>
 #include <basecode/core/memory/system/slab.h>
 
-#define BST_BRANCH(n, d)        ((d) == 1 ? (n)->rhs : (n)->lhs)
-
 namespace basecode {
     template <typename T>
     struct bst_t final {
@@ -175,7 +173,7 @@ namespace basecode {
                 if (cmp == 0)
                     break;
                 dir = cmp > 0;
-                p   = BST_BRANCH(p, dir);
+                p   = NODE_BRANCH(p, dir);
                 if (!p)
                     return false;
             }
@@ -187,7 +185,7 @@ namespace basecode {
             }
 
             if (!p->rhs) {
-                auto qb = BST_BRANCH(q, dir);
+                auto qb = NODE_BRANCH(q, dir);
                 qb = p->lhs;
                 if (qb)
                     qb->parent = p->parent;
@@ -195,7 +193,7 @@ namespace basecode {
                 auto r = p->rhs;
                 if (!r->lhs) {
                     r->lhs = p->lhs;
-                    BST_BRANCH(q, dir) = r;
+                    NODE_BRANCH(q, dir) = r;
                     r->parent = p->parent;
                     if (r->lhs) {
                         r->lhs->parent = r;
@@ -208,7 +206,7 @@ namespace basecode {
                     r->lhs = s->rhs;
                     s->lhs = p->lhs;
                     s->rhs = p->rhs;
-                    BST_BRANCH(q, dir) = s;
+                    NODE_BRANCH(q, dir) = s;
                     if (s->lhs)
                         s->lhs->parent = s;
                     s->rhs->parent = s;
@@ -250,7 +248,7 @@ namespace basecode {
 
             for (q = nullptr, p = tree.root;
                  p != nullptr;
-                 q = p, p = BST_BRANCH(p,dir)) {
+                 q = p, p = NODE_BRANCH(p,dir)) {
                 auto cmp = value <=> *p->value;
                 if (cmp == 0)
                     return p;
@@ -263,7 +261,7 @@ namespace basecode {
 
             if (q) {
                 node->parent = q;
-                BST_BRANCH(q, dir) = node;
+                NODE_BRANCH(q, dir) = node;
             } else {
                 tree.root = node;
             }

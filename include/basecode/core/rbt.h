@@ -23,8 +23,6 @@
 #include <basecode/core/graphviz/gv.h>
 #include <basecode/core/memory/system/slab.h>
 
-#define RBT_BRANCH(n, d)        ((d) == 1 ? (n)->rhs : (n)->lhs)
-
 namespace basecode {
     enum class rbt_color_t : u8 {
         none  = avl::color::none,
@@ -95,7 +93,7 @@ namespace basecode {
                 if (cmp == 0)
                     break;
                 dir = cmp > 0;
-                p   = RBT_BRANCH(p, dir);
+                p   = NODE_BRANCH(p, dir);
                 if (!p)
                     return false;
             }
@@ -107,7 +105,7 @@ namespace basecode {
             }
 
             if (!p->rhs) {
-                auto qb = RBT_BRANCH(q, dir);
+                auto qb = NODE_BRANCH(q, dir);
                 qb = p->lhs;
                 if (qb)
                     qb->parent = p->parent;
@@ -118,7 +116,7 @@ namespace basecode {
 
                 if (!r->lhs) {
                     r->lhs = p->lhs;
-                    RBT_BRANCH(q, dir) = r;
+                    NODE_BRANCH(q, dir) = r;
                     r->parent = p->parent;
                     if (r->rhs)
                         r->lhs->parent = r;
@@ -137,7 +135,7 @@ namespace basecode {
                     r->lhs   = s->rhs;
                     s->lhs   = p->lhs;
                     s->rhs   = p->rhs;
-                    RBT_BRANCH(q, dir) = s;
+                    NODE_BRANCH(q, dir) = s;
                     if (s->lhs)
                         s->lhs->parent = s;
                     s->rhs->parent     = s;
@@ -158,7 +156,7 @@ namespace basecode {
                 for (;;) {
                     Node_Type t;
 
-                    auto x = RBT_BRANCH(f, dir);
+                    auto x = NODE_BRANCH(f, dir);
                     if (x && x->color == rbt_color_t::red) {
                         x->color = rbt_color_t::black;
                         break;
@@ -180,7 +178,7 @@ namespace basecode {
 
                             f->rhs = w->lhs;
                             w->lhs = f;
-                            RBT_BRANCH(g, g->lhs != f) = w;
+                            NODE_BRANCH(g, g->lhs != f) = w;
 
                             w->parent = f->parent;
                             f->parent = w;
@@ -214,7 +212,7 @@ namespace basecode {
 
                             f->rhs = w->lhs;
                             w->lhs = f;
-                            RBT_BRANCH(g, g->lhs != f) = w;
+                            NODE_BRANCH(g, g->lhs != f) = w;
 
                             w->parent = f->parent;
                             f->parent = w;
@@ -231,7 +229,7 @@ namespace basecode {
 
                             f->lhs = w->rhs;
                             w->rhs = f;
-                            RBT_BRANCH(g, g->lhs != f) = w;
+                            NODE_BRANCH(g, g->lhs != f) = w;
 
                             w->parent = f->parent;
                             f->parent = w;
@@ -265,7 +263,7 @@ namespace basecode {
 
                             f->lhs = w->rhs;
                             w->rhs = f;
-                            RBT_BRANCH(g, g->lhs != f) = w;
+                            NODE_BRANCH(g, g->lhs != f) = w;
 
                             w->parent = f->parent;
                             f->parent = w;
@@ -311,7 +309,7 @@ namespace basecode {
 
             for (q = nullptr, p = tree.root;
                  p != nullptr;
-                 q = p, p = RBT_BRANCH(p,dir)) {
+                 q = p, p = NODE_BRANCH(p,dir)) {
                 auto cmp = value <=> *p->value;
                 if (cmp == 0)
                     return p;
@@ -325,7 +323,7 @@ namespace basecode {
 
             if (q) {
                 n->parent = q;
-                RBT_BRANCH(q, dir) = n;
+                NODE_BRANCH(q, dir) = n;
             } else {
                 tree.root = n;
             }
@@ -372,7 +370,7 @@ namespace basecode {
 
                         g->lhs = f->rhs;
                         f->rhs = g;
-                        RBT_BRANCH(h, h->lhs != g) = f;
+                        NODE_BRANCH(h, h->lhs != g) = f;
 
                         f->parent = g->parent;
                         g->parent = f;
@@ -406,7 +404,7 @@ namespace basecode {
 
                         g->rhs   = f->lhs;
                         f->lhs   = g;
-                        RBT_BRANCH(h, h->lhs != g) = f;
+                        NODE_BRANCH(h, h->lhs != g) = f;
 
                         f->parent = g->parent;
                         g->parent = f;

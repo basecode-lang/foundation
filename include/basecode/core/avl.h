@@ -22,6 +22,8 @@
 #include <basecode/core/format.h>
 #include <basecode/core/graphviz/gv.h>
 
+#define NODE_BRANCH(n, d)       ((d) == 1 ? (n)->rhs : (n)->lhs)
+
 namespace basecode {
     template <typename T>
     concept Binary_Tree = requires(const T& t) {
@@ -33,6 +35,13 @@ namespace basecode {
         {t.value_slab}          -> same_as<alloc_t*>;
         {t.root}                -> same_as<typename T::Node_Type>;
         {t.size}                -> same_as<u32>;
+    };
+
+    template <Binary_Tree Tree_Type,
+              typename Node_Type = typename Tree_Type::Node_Type>
+    struct bin_tree_cursor_t final {
+        Tree_Type*              tree;
+        Node_Type               node;
     };
 
     namespace avl {
@@ -178,6 +187,113 @@ namespace basecode {
 
             graphviz::graph::serialize(g, buf);
             buf::save(buf, p);
+        }
+
+        namespace cursor {
+            // insert
+
+            template <Binary_Tree Tree_Type>
+            u0 init(bin_tree_cursor_t<Tree_Type>& cursor, Tree_Type* tree) {
+                cursor.tree = tree;
+                cursor.node = nullptr;
+            }
+
+            template <Binary_Tree Tree_Type,
+                      typename Value_Type = typename Tree_Type::Value_Type>
+            Value_Type first(bin_tree_cursor_t<Tree_Type>& cursor, Tree_Type* tree) {
+                cursor.tree = tree;
+                cursor.node = tree->root;
+                if (cursor.node) {
+                    while (cursor.node->lhs)
+                        cursor.node = cursor.node->lhs;
+                    return cursor.node->value;
+                }
+                return nullptr;
+            }
+
+            template <Binary_Tree Tree_Type,
+                      typename Value_Type = typename Tree_Type::Value_Type>
+            Value_Type last(bin_tree_cursor_t<Tree_Type>& cursor, Tree_Type* tree) {
+                cursor.tree = tree;
+                cursor.node = tree->root;
+                if (cursor.node) {
+                    while (cursor.node->rhs)
+                        cursor.node = cursor.node->rhs;
+                    return cursor.node->value;
+                }
+                return nullptr;
+            }
+
+            template <Binary_Tree Tree_Type,
+                      typename Value_Type = typename Tree_Type::Value_Type>
+            Value_Type find(bin_tree_cursor_t<Tree_Type>& cursor, Tree_Type* tree, const Value_Type& value) {
+                s32 dir;
+                cursor.tree = tree;
+                for (auto p = tree->root; p; p = NODE_BRANCH(p, dir)) {
+                    auto cmp = value <=> *p->value;
+                    if (cmp == 0) {
+                        cursor.node = p;
+                        return p->value;
+                    }
+                    dir = cmp > 0;
+                }
+                cursor.node = nullptr;
+                return nullptr;
+            }
+
+            template <Binary_Tree Tree_Type,
+                      typename Value_Type = typename Tree_Type::Value_Type>
+            Value_Type next(bin_tree_cursor_t<Tree_Type>& cursor) {
+                if (!cursor.node)
+                    return first(cursor, cursor.tree);
+                else if (!cursor.node->rhs) {
+                    for (auto p = cursor.node, q = p->parent;;
+                         p = q, q = q->parent) {
+                        if (!q || p == q->lhs) {
+                            cursor.node = q;
+                            return cursor.node ? cursor.node->value : nullptr;
+                        }
+                    }
+                } else {
+                    cursor.node = cursor.node->rhs;
+                    while (cursor.node->lhs)
+                        cursor.node = cursor.node->lhs;
+                    return cursor.node->value;
+                }
+            }
+
+            template <Binary_Tree Tree_Type,
+                      typename Value_Type = typename Tree_Type::Value_Type>
+            Value_Type prev(bin_tree_cursor_t<Tree_Type>& cursor) {
+                if (!cursor.node)
+                    return last(cursor, cursor.tree);
+                else if (!cursor.node->lhs) {
+                    for (auto p = cursor.node, q = p->parent;;
+                         p = q, q = q->parent) {
+                        if (!q || p == q->rhs) {
+                            cursor.node = q;
+                            return cursor.node ? cursor.node->value : nullptr;
+                        }
+                    }
+                } else {
+                    cursor.node = cursor.node->lhs;
+                    while (cursor.node->rhs)
+                        cursor.node = cursor.node->rhs;
+                    return cursor.node->value;
+                }
+            }
+
+            template <Binary_Tree Tree_Type,
+                      typename Value_Type = typename Tree_Type::Value_Type>
+            Value_Type curr(bin_tree_cursor_t<Tree_Type>& cursor) {
+                return cursor.node ? cursor.node->value : nullptr;
+            }
+
+            template <Binary_Tree Tree_Type,
+                      typename Value_Type = typename Tree_Type::Value_Type>
+            u0 replace(bin_tree_cursor_t<Tree_Type>& cursor, const Value_Type& value) {
+                *cursor.node->value = value;
+            }
         }
     }
 }
