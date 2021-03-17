@@ -19,17 +19,17 @@
 #include <random>
 #include <catch2/catch.hpp>
 #include <basecode/core/set.h>
-#include <basecode/core/bst.h>
+#include <basecode/core/rbt.h>
 
 using namespace basecode;
 
-TEST_CASE("basecode::bst basics") {
+TEST_CASE("basecode::rbt basics") {
     std::mt19937                       rg{std::random_device{}()};
     std::uniform_int_distribution<u32> pick(0, 4096);
 
-    bst_t<u32> tree{};
-    bst::init(tree);
-    defer(bst::free(tree));
+    rbt_t<u32> tree{};
+    rbt::init(tree);
+    defer(rbt::free(tree));
 
     set_t<u32> set{};
     set::init(set);
@@ -39,18 +39,17 @@ TEST_CASE("basecode::bst basics") {
 
     set::for_each(set,
                   [](u32 idx, const auto& v, u0* user) -> u32 {
-                      bst_t<u32>& t = *((bst_t<u32>*) user);
-                      bst::insert(t, v);
-                      if (!bst::find(t, v))
+                      rbt_t<u32>& t = *((rbt_t<u32>*) user);
+                      rbt::insert(t, v);
+                      if (!rbt::find(t, v))
                           REQUIRE(false);
                       return 0;
                   },
                   &tree);
 
-    if (bst::empty(tree))               REQUIRE(!bst::empty(tree));
-    if (bst::size(tree) != set.size)    REQUIRE(bst::size(tree) == set.size);
+    if (rbt::empty(tree))               REQUIRE(!rbt::empty(tree));
+    if (rbt::size(tree) != set.size)    REQUIRE(rbt::size(tree) == set.size);
 
-    avl::print_whole_tree(tree, "before balance"_ss);
-    bst::balance(tree);
-    avl::print_whole_tree(tree, "after balance "_ss);
+    avl::print_whole_tree(tree, "red-black tree"_ss);
+    avl::dump_dot(tree, "rbt"_ss);
 }

@@ -42,6 +42,8 @@ configure_file(
 set(
     CORE_SOURCES
 
+    ${CORE_INC_DIR}/avl.h
+
     ${CORE_INC_DIR}/src_loc.h
 
     ast.cpp ${CORE_INC_DIR}/ast.h
@@ -159,6 +161,8 @@ set(
     profiler.cpp ${CORE_INC_DIR}/profiler.h
 
     ${CORE_INC_DIR}/queue.h
+
+    ${CORE_INC_DIR}/rbt.h
 
     rpn.cpp ${CORE_INC_DIR}/rpn.h
 
