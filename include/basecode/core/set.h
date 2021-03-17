@@ -25,6 +25,8 @@
 namespace basecode {
     template <typename T> requires hash::Hashable<T>
     struct set_t final {
+        using Each_Callback     = u32 (*)(u32, const T&, u0*);
+
         alloc_t*                alloc;
         u64*                    hashes;
         T*                      values;
@@ -126,6 +128,19 @@ namespace basecode {
 
         template<typename T> inline b8 empty(set_t<T>& set) {
             return set.size == 0;
+        }
+
+        template <typename T,
+                  typename Each_Callback = typename T::Each_Callback>
+        u32 for_each(set_t<T>& set, Each_Callback cb, u0* user = {}) {
+            u32 idx{};
+            for (u32 i = 0; i < set.capacity; ++i) {
+                if (!set.hashes[i]) continue;
+                auto rc = cb(idx++, set.values[i], user);
+                if (rc)
+                    return rc;
+            }
+            return true;
         }
 
         template<typename T> b8 remove(set_t<T>& set, const T& value) {

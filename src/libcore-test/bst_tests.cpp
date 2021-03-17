@@ -18,6 +18,7 @@
 
 #include <random>
 #include <catch2/catch.hpp>
+#include <basecode/core/set.h>
 #include <basecode/core/bst.h>
 
 using namespace basecode;
@@ -30,22 +31,24 @@ TEST_CASE("basecode::bst basics") {
     bst::init(tree);
     defer(bst::free(tree));
 
-    array_t<u32> values{};
-    array::init(values);
+    set_t<u32> set{};
+    set::init(set);
 
-    for (u32 i = 1; i < 8; ++i)
-        array::append(values, i);
+    for (u32 i = 1; i < 64; ++i)
+        set::insert(set, pick(rg));
 
-    for (auto v : values)
-        bst::insert(tree, v);
+    set::for_each(set,
+                  [](u32 idx, const auto& v, u0* user) -> u32 {
+                      bst_t<u32>& t = *((bst_t<u32>*) user);
+                      bst::insert(t, v);
+                      if (!bst::find(t, v))
+                          REQUIRE(false);
+                      return 0;
+                  },
+                  &tree);
 
-    for (auto v : values) {
-        if (!bst::find(tree, v))
-            REQUIRE(false);
-    }
-
-    if (bst::empty(tree))               REQUIRE(false);
-    if (bst::size(tree) != values.size) REQUIRE(false);
+    if (bst::empty(tree))               REQUIRE(!bst::empty(tree));
+    if (bst::size(tree) != set.size)    REQUIRE(bst::size(tree) == set.size);
 
     bst::print_whole_tree(tree, "before balance"_ss);
     bst::balance(tree);

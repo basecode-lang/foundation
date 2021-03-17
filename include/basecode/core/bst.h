@@ -86,7 +86,6 @@ namespace basecode {
 
         inline u0 make_nil_node(graphviz::graph_t& g, u32 id, str::slice_t label) {
             auto nil = graphviz::graph::make_node(g);
-            graphviz::node::label(*nil, "nil"_ss);
             graphviz::node::shape(*nil, graphviz::shape_t::point);
             make_edge(g, id, nil->id, label);
         }
@@ -96,6 +95,7 @@ namespace basecode {
                   typename Value_Type = typename T::Value_Type>
         u32 dump_node(T& tree, graphviz::graph_t& g, Node_Type node, u32 parent_id = {}) {
             auto n = graphviz::graph::make_node(g);
+            u32 id = n->id;
             graphviz::node::label(*n,
                                   format::format("{}{}",
                                                  tree.root == node ? "ROOT\n"_ss : ""_ss,
@@ -108,26 +108,26 @@ namespace basecode {
             }
 
             if (node->parent) {
-                auto e = make_edge(g, n->id, parent_id);
+                auto e = make_edge(g, id, parent_id);
                 graphviz::edge::color(*e, graphviz::color_t::red);
                 graphviz::edge::style(*e, graphviz::edge_style_t::dashed);
             }
 
             if (node->lhs) {
-                auto lhs_id = dump_node(tree, g, node->lhs, n->id);
-                make_edge(g, n->id, lhs_id, "L"_ss);
+                auto lhs_id = dump_node(tree, g, node->lhs, id);
+                make_edge(g, id, lhs_id, "L"_ss);
             } else {
-                make_nil_node(g, n->id, "L"_ss);
+                make_nil_node(g, id, "L"_ss);
             }
 
             if (node->rhs) {
-                auto rhs_id = dump_node(tree, g, node->rhs, n->id);
-                make_edge(g, n->id, rhs_id, "R"_ss);
+                auto rhs_id = dump_node(tree, g, node->rhs, id);
+                make_edge(g, id, rhs_id, "R"_ss);
             } else {
-                make_nil_node(g, n->id, "R"_ss);
+                make_nil_node(g, id, "R"_ss);
             }
 
-            return n->id;
+            return id;
         }
 
         template <Binary_Tree T,
@@ -144,6 +144,7 @@ namespace basecode {
                                   {},
                                   tree.alloc);
             defer(graphviz::graph::free(g));
+            graphviz::graph::font_size(g, 8.0f);
 
             dump_node(tree, g, tree.root);
 

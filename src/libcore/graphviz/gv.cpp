@@ -1549,8 +1549,10 @@ namespace basecode::graphviz {
 
         u0 serialize(graph_t& g, const node_t& n, mem_buf_t& mb) {
             auto node_name = string::interned::get(n.name);
-            if (!OK(node_name.status))
+            if (!OK(node_name.status)) {
+                format::format_to(mb, "// node has invalid name: {}", n.id);
                 return;
+            }
             format::format_to(mb, "{}", node_name.slice);
             if (n.attrs.values.size > 0) {
                 format::format_to(mb, "[");
@@ -1723,8 +1725,10 @@ namespace basecode::graphviz {
             const auto node_connector = g.type == graph_type_t::directed ? "->"_ss : "--"_ss;
             auto lhs = graph::get_node(g, e.first);
             auto rhs = graph::get_node(g, e.second);
-            if (!lhs || !rhs)
+            if (!lhs || !rhs) {
+                format::format_to(mb, "// empty edge: {}", e.id);
                 return;
+            }
             auto lhs_name = string::interned::get(lhs->name);
             auto rhs_name = string::interned::get(rhs->name);
             format::format_to(mb, "{} {} {}", lhs_name.slice, node_connector, rhs_name.slice);
@@ -1819,7 +1823,7 @@ namespace basecode::graphviz {
 
         edge_t* make_edge(graph_t& g) {
             auto edge = &array::append(g.edges);
-            edge::init(*edge, g.nodes.size, g.alloc);
+            edge::init(*edge, g.edges.size, g.alloc);
             return edge;
         }
 
@@ -2022,10 +2026,11 @@ namespace basecode::graphviz {
                               g.type == graph_type_t::directed ? "digraph {} {{\n" : "graph {} {{\n",
                               graph_name.slice);
 
-            for (const auto& attr : g.attrs.values) {
+            for (u32 i = 0; i < g.attrs.values.size; ++i) {
+                if (i > 0) format::format_to(mb, "\n");
                 format::format_to(mb, "\t");
-                attr::serialize(g, attr, mb);
-                format::format_to(mb, ";\n");
+                attr::serialize(g, g.attrs.values[i], mb);
+                format::format_to(mb, ";");
             }
 
             if (g.nodes.size > 0) {
