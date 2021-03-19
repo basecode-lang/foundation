@@ -18,25 +18,23 @@
 
 #pragma once
 
-#include <basecode/core/avl.h>
-#include <basecode/core/format.h>
-#include <basecode/core/graphviz/gv.h>
+#include <basecode/core/bintree.h>
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode {
     enum class rbt_color_t : u8 {
-        none  = avl::color::none,
-        red   = avl::color::red,
-        black = avl::color::black
+        none  = bintree::color::none,
+        red   = bintree::color::red,
+        black = bintree::color::black
     };
 
     template <typename T>
     struct rbt_t final {
         struct node_t;
 
-        using Node_Type         = node_t*;
-        using Value_Type        = T*;
         using Has_Color         = std::integral_constant<b8, true>;
+        using Node_Type         = node_t*;
+        using Value_Type        = T;
         static constexpr u32    Value_Type_Size    = sizeof(T);
         static constexpr u32    Value_Type_Align   = alignof(T);
 
@@ -44,7 +42,7 @@ namespace basecode {
             node_t*             lhs;
             node_t*             rhs;
             node_t*             parent;
-            Value_Type          value;
+            Value_Type*         value;
             rbt_color_t         color;
         };
         static_assert(sizeof(node_t) <= 40, "node_t is now larger than 40 bytes!");
@@ -285,17 +283,10 @@ namespace basecode {
             p->value  = nullptr;
             p->parent = nullptr;
             p->lhs    = p->rhs = nullptr;
+            p->color  = rbt_color_t::none;
             memory::free(tree.node_slab, p);
             --tree.size;
             return true;
-        }
-
-        inline u32 size(const Binary_Tree auto& tree) {
-            return tree.size;
-        }
-
-        inline b8 empty(const Binary_Tree auto& tree) {
-            return tree.size == 0;
         }
 
         template <Binary_Tree T,
@@ -438,20 +429,6 @@ namespace basecode {
             value_cfg.buf_size  = rbt_t<T>::Value_Type_Size;
             value_cfg.buf_align = rbt_t<T>::Value_Type_Align;
             tree.value_slab = memory::system::make(alloc_type_t::slab, &value_cfg);
-        }
-
-        template <Binary_Tree T,
-                  typename Node_Type = typename T::Node_Type,
-                  typename Value_Type = typename T::Value_Type>
-        const Node_Type find(const T& tree, const Value_Type& value) {
-            auto p = tree.root;
-            while (p != nullptr) {
-                auto cmp = value <=> *p->value;
-                if (cmp < 0)        p = p->lhs;
-                else if (cmp > 0)   p = p->rhs;
-                else return         p;
-            }
-            return nullptr;
         }
     }
 }

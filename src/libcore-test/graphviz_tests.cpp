@@ -60,7 +60,7 @@ TEST_CASE("basecode::graphviz basics") {
     graphviz::edge::arrow_tail(*edge2, graphviz::arrow_type_t::dot);
     graphviz::edge::arrow_head(*edge2, graphviz::arrow_type_t::normal);
 
-    auto p = "C:/temp/test.dot"_path;
+    auto p = "test.dot"_path;
 
     buf_t buf{};
     buf.mode = buf_mode_t::alloc;

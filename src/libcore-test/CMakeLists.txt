@@ -11,6 +11,7 @@ add_executable(
 
     test.h
     main.cpp
+    avl_tests.cpp
     job_tests.cpp
     ffi_tests.cpp
     cxx_tests.cpp

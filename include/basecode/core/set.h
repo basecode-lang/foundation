@@ -19,6 +19,7 @@
 #pragma once
 
 #include <basecode/core/types.h>
+#include <basecode/core/array.h>
 #include <basecode/core/memory.h>
 #include <basecode/core/hashable.h>
 
@@ -58,6 +59,26 @@ namespace basecode {
                 }
             }
             return false;
+        }
+
+        template <typename T,
+                  typename B = std::remove_pointer_t<T>,
+                  b8 IsPtr = std::is_pointer_v<T>>
+        auto values(set_t<T>& set) {
+            using Array = array_t<B*>;
+
+            Array list{};
+            array::init(list, set.alloc);
+            array::reserve(list, set.size);
+            for (u32 i = 0; i < set.capacity; ++i) {
+                if (!set.hashes[i]) continue;
+                if constexpr (IsPtr) {
+                    array::append(list, set.values[i]);
+                } else {
+                    array::append(list, &set.values[i]);
+                }
+            }
+            return list;
         }
 
         template <typename T,

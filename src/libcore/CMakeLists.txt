@@ -48,17 +48,19 @@ set(
 
     ast.cpp ${CORE_INC_DIR}/ast.h
 
+    ${CORE_INC_DIR}/array.h
+
     ${CORE_INC_DIR}/assoc_array.h
 
     ${CORE_INC_DIR}/defer.h
     ${CORE_INC_DIR}/types.h
     ${CORE_INC_DIR}/family.h
 
-    ${CORE_INC_DIR}/array.h
-
     base64.cpp ${CORE_INC_DIR}/base64.h
 
     bass.cpp ${CORE_INC_DIR}/bass.h
+
+    ${CORE_INC_DIR}/bintree.h
 
     bits.cpp ${CORE_INC_DIR}/bits.h
 

@@ -18,9 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/avl.h>
-#include <basecode/core/format.h>
-#include <basecode/core/graphviz/gv.h>
+#include <basecode/core/bintree.h>
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode {
@@ -28,9 +26,9 @@ namespace basecode {
     struct bst_t final {
         struct node_t;
 
-        using Node_Type         = node_t*;
-        using Value_Type        = T*;
         using Has_Color         = std::integral_constant<b8, false>;
+        using Node_Type         = node_t*;
+        using Value_Type        = T;
         static constexpr u32    Value_Type_Size    = sizeof(T);
         static constexpr u32    Value_Type_Align   = alignof(T);
 
@@ -38,9 +36,9 @@ namespace basecode {
             node_t*             lhs;
             node_t*             rhs;
             node_t*             parent;
-            Value_Type          value;
+            Value_Type*         value;
         };
-        static_assert(sizeof(node_t) <= 32, "node_t is now larger than 32 bytes!");
+        static_assert(sizeof(node_t) <= 32, "bst<T>::node_t is now larger than 32 bytes!");
 
         static constexpr u32    Node_Type_Size     = sizeof(node_t);
         static constexpr u32    Node_Type_Align    = alignof(node_t);
@@ -160,14 +158,12 @@ namespace basecode {
                   typename Node_Type = typename T::Node_Type,
                   typename Value_Type = typename T::Value_Type>
         b8 remove(T& tree, const Value_Type& value) {
-            Node_Type p     {};
-            Node_Type q     {};
-            s32       dir   {};
+            s32 dir{};
 
             if (!tree.root)
                 return false;
 
-            p = tree.root;
+            auto p = tree.root;
             for (;;) {
                 auto cmp = value <=> *p->value;
                 if (cmp == 0)
@@ -178,7 +174,7 @@ namespace basecode {
                     return false;
             }
 
-            q = p->parent;
+            auto q = p->parent;
             if (!q) {
                 q   = Node_Type(&tree.root);
                 dir = 0;
@@ -229,19 +225,11 @@ namespace basecode {
             return true;
         }
 
-        inline u32 size(const Binary_Tree auto& tree) {
-            return tree.size;
-        }
-
-        inline b8 empty(const Binary_Tree auto& tree) {
-            return tree.size == 0;
-        }
-
         template <Binary_Tree T,
                   typename Node_Type = typename T::Node_Type,
                   typename Value_Type = typename T::Value_Type>
         Node_Type insert(T& tree, const Value_Type& value) {
-            Node_Type node;
+            Node_Type n;
             Node_Type p;
             Node_Type q     {};
             s32       dir   {};
@@ -255,23 +243,23 @@ namespace basecode {
                 dir = cmp > 0;
             }
 
-            node = Node_Type(memory::alloc(tree.node_slab));
-            node->parent  = nullptr;
-            node->lhs     = node->rhs = nullptr;
+            n = Node_Type(memory::alloc(tree.node_slab));
+            n->parent = nullptr;
+            n->lhs    = n->rhs = nullptr;
 
             if (q) {
-                node->parent = q;
-                NODE_BRANCH(q, dir) = node;
+                n->parent = q;
+                NODE_BRANCH(q, dir) = n;
             } else {
-                tree.root = node;
+                tree.root = n;
             }
 
-            node->value = (Value_Type*) memory::alloc(tree.value_slab);
-            *node->value = value;
+            n->value = (Value_Type*) memory::alloc(tree.value_slab);
+            *n->value = value;
 
             tree.size++;
 
-            return node;
+            return n;
         }
 
         template <Binary_Tree T,
@@ -292,20 +280,6 @@ namespace basecode {
             value_cfg.buf_size  = bst_t<T>::Value_Type_Size;
             value_cfg.buf_align = bst_t<T>::Value_Type_Align;
             tree.value_slab = memory::system::make(alloc_type_t::slab, &value_cfg);
-        }
-
-        template <Binary_Tree T,
-                  typename Node_Type = typename T::Node_Type,
-                  typename Value_Type = typename T::Value_Type>
-        const Node_Type find(const T& tree, const Value_Type& value) {
-            auto p = tree.root;
-            while (p != nullptr) {
-                auto cmp = value <=> *p->value;
-                if (cmp < 0)        p = p->lhs;
-                else if (cmp > 0)   p = p->rhs;
-                else return         p;
-            }
-            return nullptr;
         }
     }
 }

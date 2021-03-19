@@ -31,36 +31,45 @@ TEST_CASE("basecode::bst basics") {
     bst::init(tree);
     defer(bst::free(tree));
 
-    set_t<u32> set{};
-    set::init(set);
+    {
+        set_t<u32> set{};
+        set::init(set);
 
-    for (u32 i = 1; i < 64; ++i)
-        set::insert(set, pick(rg));
+        for (u32 i = 1; i < 64; ++i)
+            set::insert(set, pick(rg));
 
-    set::for_each(set,
-                  [](u32 idx, const auto& v, u0* user) -> u32 {
-                      bst_t<u32>& t = *((bst_t<u32>*) user);
-                      bst::insert(t, v);
-                      if (!bst::find(t, v))
-                          REQUIRE(false);
-                      return 0;
-                  },
-                  &tree);
+        auto values = set::values(set);
+        for (auto v : values) {
+            bst::insert(tree, *v);
+        }
 
-    if (bst::empty(tree))               REQUIRE(!bst::empty(tree));
-    if (bst::size(tree) != set.size)    REQUIRE(bst::size(tree) == set.size);
+        if (bintree::empty(tree))
+            REQUIRE(!bintree::empty(tree));
+        if (bintree::size(tree) != set.size)
+            REQUIRE(bintree::size(tree) == set.size);
 
-    avl::print_whole_tree(tree, "before balance"_ss);
+        for (auto v : values) {
+            if (!bintree::find(tree, *v)) {
+                REQUIRE(false);
+            }
+        }
+
+        array::free(values);
+        set::free(set);
+    }
+
+    bintree::print_whole_tree(tree, "before balance"_ss);
     bst::balance(tree);
-    avl::print_whole_tree(tree, "after balance "_ss);
+    bintree::print_whole_tree(tree, "after balance "_ss);
 
+    format::print("bst cursor: ");
     bin_tree_cursor_t<bst_t<u32>> cursor{};
-    avl::cursor::init(cursor, &tree);
+    bintree::cursor::init(cursor, &tree);
     s32 i;
     u32* v;
-    for (v = avl::cursor::first(cursor, &tree), i = 0;
+    for (v = bintree::cursor::first(cursor, &tree), i = 0;
             v;
-            ++i, v = avl::cursor::next(cursor)) {
+            ++i, v = bintree::cursor::next(cursor)) {
         if (i > 0) format::print(",");
         format::print("{}", *v);
     }

@@ -19,17 +19,17 @@
 #include <random>
 #include <catch2/catch.hpp>
 #include <basecode/core/set.h>
-#include <basecode/core/rbt.h>
+#include <basecode/core/avl.h>
 
 using namespace basecode;
 
-TEST_CASE("basecode::rbt basics") {
+TEST_CASE("basecode::avl basics") {
     std::mt19937                       rg{std::random_device{}()};
     std::uniform_int_distribution<u32> pick(0, 4096);
 
-    rbt_t<u32> tree{};
-    rbt::init(tree);
-    defer(rbt::free(tree));
+    avl_t<u32> tree{};
+    avl::init(tree);
+    defer(avl::free(tree));
 
     {
         set_t<u32> set{};
@@ -40,7 +40,7 @@ TEST_CASE("basecode::rbt basics") {
 
         auto values = set::values(set);
         for (auto v : values) {
-            rbt::insert(tree, *v);
+            avl::insert(tree, *v);
         }
 
         if (bintree::empty(tree))
@@ -58,11 +58,11 @@ TEST_CASE("basecode::rbt basics") {
         set::free(set);
     }
 
-    bintree::print_whole_tree(tree, "red-black tree"_ss);
-    bintree::dump_dot(tree, "rbt"_ss);
+    bintree::print_whole_tree(tree, "avl tree"_ss);
+    bintree::dump_dot(tree, "avl"_ss);
 
-    format::print("rbt cursor: ");
-    bin_tree_cursor_t<rbt_t<u32>> cursor{};
+    format::print("avl cursor: ");
+    bin_tree_cursor_t<avl_t<u32>> cursor{};
     bintree::cursor::init(cursor, &tree);
     s32 i;
     u32* v;
