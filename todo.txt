@@ -1,23 +1,14 @@
 HIGH
 ---------
-- locale: localized strings
-
-- buf: create a Buffer_Concept and rework buf to be based on it
-- buf: pretty formatting for source errors
-- term: module for ANSI output to terminals
 
 MEDIUM
 ---------
-- add directed_graph_t
-- rework graphviz api
 
 LOW
 ---------
 - abstract: shared memory buffer between processes
 - ipc: create an ipc module for low-level base
     ipc_addr_t, ipc_transport_t, ipc_
-
-- buddy allocator
 
 - page allocator: implement free list so pages can recycle
 - page allocator/slab allocator: implement reserve function so n numbers of pages can be allocated at a time.
@@ -36,6 +27,13 @@ LOW
 
 DONE
 ----
+- add digraph_t
+- buddy allocator
+- rework graphviz api
+- buf: create a Buffer_Concept and rework buf to be based on it
+- buf: pretty formatting for source errors
+- term: module for ANSI output to terminals
+- locale: localized strings
 - path: implement replace_extension function
 - path: implement stem function, which returns the file name without the extension
 - add bintree_t

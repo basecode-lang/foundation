@@ -41,6 +41,15 @@ namespace basecode {
         template <typename T> b8 find_value(set_t<T>& set, u32 start, u64 hash, const T& value, u32* found);
         template <typename T> u0 init(set_t<T>& set, alloc_t* alloc = context::top()->alloc, f32 load_factor = .5f);
 
+        template <typename T>
+        inline u32 size_of_buffer(set_t<T>& set, u32 capacity = 0) {
+            if (capacity == 0)
+                capacity = set.capacity;
+            const auto size_of_hashes = capacity * sizeof(u64);
+            const auto size_of_values = capacity * sizeof(T);
+            return size_of_hashes + alignof(T) + size_of_values;
+        }
+
         inline b8 requires_rehash(u32 size, u32 capacity, f32 load_factor) {
             return capacity == 0 || f32(size) + 1 > f32(capacity - 1) * load_factor;
         }
@@ -143,7 +152,7 @@ namespace basecode {
 
         template <typename T> u0 reset(set_t<T>& set) {
             if (set.hashes)
-                std::memset(set.hashes, 0, set.capacity * sizeof(u64));
+                std::memset(set.hashes, 0, size_of_buffer(set));
             set.size = {};
         }
 
@@ -177,15 +186,13 @@ namespace basecode {
         }
 
         template<typename T> u0 rehash(set_t<T>& set, u32 new_capacity) {
-            new_capacity = std::max<u32>(new_capacity, std::ceil(std::max<u32>(16, new_capacity) / set.load_factor));
-
-            const auto size_of_hashes = new_capacity * sizeof(u64);
-            const auto size_of_values = new_capacity * sizeof(T);
-            const auto buf_size       = size_of_hashes + alignof(T) + size_of_values;
-
+            new_capacity = std::max<u32>(new_capacity,
+                                         std::ceil(std::max<u32>(16, new_capacity) / set.load_factor));
+            const auto buf_size = size_of_buffer(set, new_capacity);
             auto buf = (u8*) memory::alloc(set.alloc, buf_size, alignof(u64));
             std::memset(buf, 0, buf_size);
 
+            const auto size_of_hashes = new_capacity * sizeof(u64);
             u32  values_align{};
             auto new_hashes = (u64*) buf;
             auto new_values = (T*) memory::system::align_forward(buf + size_of_hashes,

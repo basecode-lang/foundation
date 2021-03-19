@@ -36,6 +36,7 @@ add_executable(
     string_tests.cpp
     symtab_tests.cpp
     memory_tests.cpp
+    digraph_tests.cpp
     filesys_tests.cpp
     gap_buf_tests.cpp
     hashtab_tests.cpp
