@@ -32,7 +32,7 @@ TEST_CASE("basecode::hashtab names") {
     REQUIRE(OK(buf::load(buf, path)));
 
     hashtab_t<str::slice_t, baby_name_t> table{};
-    hashtab::init(table, context::top()->alloc, 0.7f);
+    hashtab::init(table);
 
     array_t<str::slice_t> fields{};
     array::init(fields);
@@ -79,7 +79,7 @@ TEST_CASE("basecode::hashtab names") {
 
 TEST_CASE("basecode::hashtab payload with random string keys") {
     hashtab_t<str::slice_t, payload_t> table{};
-    hashtab::init(table, context::top()->alloc, .65f);
+    hashtab::init(table);
 
     str_array_t strings{};
     str_array::init(strings);
@@ -116,7 +116,7 @@ TEST_CASE("basecode::hashtab payload with random string keys") {
 
 TEST_CASE("basecode::hashtab payload with integer keys") {
     hashtab_t<u32, payload_t> table{};
-    hashtab::init(table, context::top()->alloc, .65f);
+    hashtab::init(table);
     defer(hashtab::free(table));
 
     stopwatch_t time{};
@@ -156,7 +156,6 @@ TEST_CASE("basecode::hashtab basics") {
     hashtab::insert(table, 6, six);
     hashtab::insert(table, 7, seven);
     REQUIRE(table.size == 7);
-    REQUIRE(table.capacity == 32);
 
     str::slice_t* s;
 

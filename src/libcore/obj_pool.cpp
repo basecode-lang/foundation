@@ -33,7 +33,8 @@ namespace basecode::obj_pool {
         hashtab::for_each_pair(
             pool.storage,
             [](auto idx, const auto& key, auto& value, auto* user) -> u32 {
-                value.destroy(value.obj);
+                if (value.destroy)
+                    value.destroy(value.obj);
                 return 0;
             },
             nullptr);

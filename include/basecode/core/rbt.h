@@ -77,15 +77,13 @@ namespace basecode {
                   typename Node_Type = typename T::Node_Type,
                   typename Value_Type = typename T::Value_Type>
         b8 remove(T& tree, const Value_Type& value) {
-            Node_Type p     {};
-            Node_Type q     {};
             Node_Type f     {};
             s32       dir   {};
 
             if (!tree.root)
                 return false;
 
-            p = tree.root;
+            auto p = tree.root;
             for (;;) {
                 auto cmp = value <=> *p->value;
                 if (cmp == 0)
@@ -96,17 +94,16 @@ namespace basecode {
                     return false;
             }
 
-            q = p->parent;
+            auto q = p->parent;
             if (!q) {
                 q   = Node_Type(&tree.root);
                 dir = 0;
             }
 
             if (!p->rhs) {
-                auto qb = NODE_BRANCH(q, dir);
-                qb = p->lhs;
-                if (qb)
-                    qb->parent = p->parent;
+                NODE_BRANCH(q, dir) = p->lhs;
+                if (NODE_BRANCH(q, dir))
+                    NODE_BRANCH(q, dir)->parent = p->parent;
                 f = q;
             } else {
                 rbt_color_t t;
@@ -193,7 +190,7 @@ namespace basecode {
                         } else {
                             if (!w->rhs
                             ||  w->rhs->color == rbt_color_t::black) {
-                                Node_Type y = w->lhs;
+                                auto y = w->lhs;
                                 y->color = rbt_color_t::black;
                                 w->color = rbt_color_t::red;
                                 w->lhs   = y->rhs;

@@ -29,6 +29,10 @@ namespace basecode {
         alloc_t*                alloc;
         u0*                     obj;
         destroy_callback_t      destroy;
+
+        auto operator<=>(const obj_destroyer_t& rhs) const {
+            return obj <=> rhs.obj;
+        }
     };
 
     using slab_table_t          = hashtab_t<u32, alloc_t*>;
@@ -38,6 +42,7 @@ namespace basecode {
         alloc_t*                alloc;
         slab_table_t            slabs;
         storage_table_t         storage;
+        u32                     size;
     };
 
     namespace obj_pool {
@@ -55,17 +60,14 @@ namespace basecode {
             if (d) {
                 if (d->destroy)
                     d->destroy(d->obj);
+                hashtab::remove(pool.storage, d->obj);
                 memory::free(d->alloc, d->obj);
-                hashtab::remove(pool.storage, (u0*) obj);
+                --pool.size;
             }
         }
 
-        inline u32 size(const obj_pool_t& pool) {
-            return pool.storage.size;
-        }
-
         inline b8 empty(const obj_pool_t& pool) {
-            return hashtab::empty(pool.storage);
+            return pool.size == 0;
         }
 
         template <typename T, typename... Args>
@@ -89,8 +91,9 @@ namespace basecode {
                     static_cast<const T*>(x)->~T();
                 };
             } else {
-                d->destroy = {};
+                d->destroy = nullptr;
             }
+            ++pool.size;
             return new (mem) T(std::forward<Args>(args)...);
         }
 

@@ -68,7 +68,7 @@ namespace basecode {
         template <Hash_Table T>
         u0 init(T& table,
                 alloc_t* alloc = context::top()->alloc,
-                f32 load_factor = .5f);
+                f32 load_factor = .9f);
 
         template<Hash_Table T, typename Key_Type = typename T::Key_Type>
         b8 find_key(T& table,
@@ -150,42 +150,22 @@ namespace basecode {
                     const Key_Type& key,
                     u32* found) {
             for (u32 i = start; i < table.capacity; ++i) {
-                if (!table.hashes[i]) return false;
+                if (!table.hashes[i])
+                    continue;
                 if (hash == table.hashes[i] && key == table.keys[i]) {
                     *found = i;
                     return true;
                 }
             }
             for (u32 i = 0; i < start; ++i) {
-                if (!table.hashes[i]) return false;
+                if (!table.hashes[i])
+                    continue;
                 if (hash == table.hashes[i] && key == table.keys[i]) {
                     *found = i;
                     return true;
                 }
             }
             return false;
-        }
-
-        template <Hash_Table T,
-                  typename Value_Type = typename T::Value_Type,
-                  b8 Is_Pointer = std::is_pointer_v<Value_Type>>
-        auto find(T& table, const auto& key) {
-            using Base_Value_Type = std::remove_pointer_t<Value_Type>*;
-
-            if (table.capacity <= 0) return Base_Value_Type(nullptr);
-
-            u64 hash         = hash::hash64(key);
-            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
-            u32 found_index;
-            if (find_key(table, bucket_index, hash, key, &found_index)) {
-                if constexpr (Is_Pointer) {
-                    return table.values[found_index];
-                } else {
-                    return &table.values[found_index];
-                }
-            }
-
-            return Base_Value_Type(nullptr);
         }
 
         template <Hash_Table T>
@@ -197,6 +177,8 @@ namespace basecode {
         u0 rehash(T& table, u32 new_capacity) {
             new_capacity = std::max<u32>(new_capacity,
                                          std::ceil(std::max<u32>(16, new_capacity) / table.load_factor));
+            if (new_capacity % 2 != 0)
+                new_capacity++;
 
             const auto size_of_hashes = new_capacity * sizeof(u64);
             const auto size_of_keys   = new_capacity * sizeof(Key_Type);
@@ -215,8 +197,8 @@ namespace basecode {
                                                                       alignof(Key_Type),
                                                                       keys_align);
             auto new_values = (Value_Type*) memory::system::align_forward(buf + size_of_hashes + size_of_keys + keys_align,
-                                                                 alignof(Value_Type),
-                                                                 values_align);
+                                                                            alignof(Value_Type),
+                                                                         values_align);
 
             for (u32 i = 0; i < table.capacity; ++i) {
                 if (!table.hashes[i]) continue;
@@ -238,15 +220,56 @@ namespace basecode {
             table.capacity  = new_capacity;
         }
 
+        template <Hash_Table T>
+        u0 reserve(T& table, u32 new_capacity) {
+            rehash(table, std::ceil(std::max<u32>(16, new_capacity) / table.load_factor));
+        }
+
+        template <Hash_Table T,
+                  typename Key_Type = typename T::Key_Type>
+        b8 remove(T& table, const Key_Type& key) {
+            if (table.size == 0 || table.capacity == 0)
+                return false;
+            u64 hash         = hash::hash64(key);
+            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
+            u32 found_index;
+            if (!find_key(table, bucket_index, hash, key, &found_index))
+                return false;
+            table.hashes[found_index] = 0;
+            --table.size;
+            return true;
+        }
+
         template <Hash_Table T,
                   typename Value_Type = typename T::Value_Type,
-                  b8 Is_Pointer = std::is_pointer_v<Value_Type>>
-        auto emplace(T& table, const auto& key) {
-            using Base_Value_Type = std::remove_pointer_t<Value_Type>*;
+                  b8 Is_Pointer = std::is_pointer_v<Value_Type>,
+                  typename Base_Value_Type = std::remove_pointer_t<Value_Type>*>
+        Base_Value_Type find(T& table, const auto& key) {
+            if (table.capacity <= 0)
+                return nullptr;
 
+            u64 hash         = hash::hash64(key);
+            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
+            u32 found_index{};
+            if (find_key(table, bucket_index, hash, key, &found_index)) {
+                if constexpr (Is_Pointer) {
+                    return table.values[found_index];
+                } else {
+                    return &table.values[found_index];
+                }
+            }
+
+            return nullptr;
+        }
+
+        template <Hash_Table T,
+                  typename Value_Type = typename T::Value_Type,
+                  b8 Is_Pointer = std::is_pointer_v<Value_Type>,
+                  typename Base_Value_Type = std::remove_pointer_t<Value_Type>*>
+        Base_Value_Type emplace(T& table, const auto& key) {
             auto v = find(table, key);
             if (v)
-                return Base_Value_Type(v);
+                return v;
 
             if (requires_rehash(table.size, table.capacity, table.load_factor))
                 rehash(table, table.capacity << 1);
@@ -265,28 +288,7 @@ namespace basecode {
                 }
             }
 
-            return Base_Value_Type(nullptr);
-        }
-
-        template <Hash_Table T,
-                  typename Key_Type = typename T::Key_Type>
-        b8 remove(T& table, const Key_Type& key) {
-            if (table.capacity == 0)
-                return false;
-            u64 hash         = hash::hash64(key);
-            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
-            u32 found_index;
-            if (!find_key(table, bucket_index, hash, key, &found_index))
-                return false;
-            table.hashes[found_index] = 0;
-            --table.size;
-            return true;
-        }
-
-        template <Hash_Table T>
-        u0 reserve(T& table, u32 new_capacity) {
-            rehash(table,
-                   std::ceil(std::max<u32>(16, new_capacity) / std::min(.5f, table.load_factor)));
+            return nullptr;
         }
 
         template <Hash_Table T>
@@ -315,13 +317,12 @@ namespace basecode {
         template <Hash_Table T,
                   typename Key_Type = typename T::Key_Type,
                   typename Value_Type = typename T::Value_Type,
-                  b8 Is_Pointer = std::is_pointer_v<Value_Type>>
-        auto insert(T& table, const Key_Type& key, const Value_Type& value) {
-            using Base_Value_Type = std::remove_pointer_t<Value_Type>*;
-
+                  b8 Is_Pointer = std::is_pointer_v<Value_Type>,
+                  typename Base_Type_Value = std::remove_pointer_t<Value_Type>*>
+        Base_Type_Value insert(T& table, const Key_Type& key, const Value_Type& value) {
             auto v = find(table, key);
             if (v)
-                return Base_Value_Type(v);
+                return v;
 
             if (requires_rehash(table.size, table.capacity, table.load_factor))
                 rehash(table, table.capacity << 1);
@@ -341,7 +342,7 @@ namespace basecode {
                 }
             }
 
-            return Base_Value_Type(nullptr);
+            return nullptr;
         }
     }
 }

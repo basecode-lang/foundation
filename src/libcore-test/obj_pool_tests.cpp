@@ -29,22 +29,25 @@ TEST_CASE("basecode::obj_pool basics") {
 
     obj_pool_t pool{};
     obj_pool::init(pool);
-    defer(obj_pool::free(pool));
 
-    auto s1 = obj_pool::make<str_t>(pool, "hello world!");
-    auto s2 = obj_pool::make<str::slice_t>(pool, "foobar"_ss);
+    array_t<str_t*> strings{};
+    array::init(strings);
+    defer(array::free(strings); obj_pool::free(pool));
+
+    for (u32 i = 0; i < 100; ++i) {
+        array::append(strings, obj_pool::make<str_t>(pool, "hello world!"));
+    }
 
     stopwatch::stop(timer);
     stopwatch::print_elapsed("total obj_pool make time"_ss, 40, timer);
 
-    REQUIRE(*s1 == "hello world!");
-    REQUIRE(*s2 == "foobar"_ss);
     REQUIRE(!obj_pool::empty(pool));
-    REQUIRE(obj_pool::size(pool) == 2);
+    REQUIRE(strings.size == 100);
+    REQUIRE(pool.size == strings.size);
 
     stopwatch::start(timer);
-    obj_pool::destroy(pool, s1);
-    obj_pool::destroy(pool, s2);
+    for (u32 i = 0; i < strings.size; ++i)
+        obj_pool::destroy(pool, strings[i]);
     stopwatch::stop(timer);
     stopwatch::print_elapsed("total obj_pool destroy time"_ss, 40, timer);
 

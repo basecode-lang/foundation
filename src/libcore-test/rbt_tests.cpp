@@ -58,8 +58,8 @@ TEST_CASE("basecode::rbt basics") {
         set::free(set);
     }
 
-    bintree::print_whole_tree(tree, "red-black tree"_ss);
-    bintree::dump_dot(tree, "rbt"_ss);
+//    bintree::print_whole_tree(tree, "red-black tree"_ss);
+//    bintree::dump_dot(tree, "rbt"_ss);
 
     format::print("rbt cursor: ");
     bin_tree_cursor_t<rbt_t<u32>> cursor{};

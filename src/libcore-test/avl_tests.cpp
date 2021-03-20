@@ -58,8 +58,8 @@ TEST_CASE("basecode::avl basics") {
         set::free(set);
     }
 
-    bintree::print_whole_tree(tree, "avl tree"_ss);
-    bintree::dump_dot(tree, "avl"_ss);
+//    bintree::print_whole_tree(tree, "avl tree"_ss);
+//    bintree::dump_dot(tree, "avl"_ss);
 
     format::print("avl cursor: ");
     bin_tree_cursor_t<avl_t<u32>> cursor{};

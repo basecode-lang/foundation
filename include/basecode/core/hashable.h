@@ -26,6 +26,11 @@ namespace basecode::hash {
 
     template <typename K> u64 hash64(const K& value);
 
+    inline u64 hash64(u0* const& key) {
+        static const usize shift = std::log2(1 + sizeof(u0*));
+        return usize(key) >> shift;
+    }
+
     inline u32 hash32(const u8& key) { return hash32((u32) key); }
 
     inline u64 hash64(const u8& key) { return hash64((u64) key); }
@@ -53,16 +58,6 @@ namespace basecode::hash {
     inline u64 hash64(const s64& key) { return murmur::hash64(&key, sizeof(s64)); }
 
     inline u64 hash64(const u64& key) { return murmur::hash64(&key, sizeof(u64)); }
-
-    inline u64 hash64(u0* const& key) { return murmur::hash64(&key, sizeof(u0*)); }
-
-    inline u64 hash64(u8* const& key) { return murmur::hash64(&key, sizeof(u8*)); }
-
-    inline u64 hash64(u16* const& key) { return murmur::hash64(&key, sizeof(u16*)); }
-
-    inline u64 hash64(u32* const& key) { return murmur::hash64(&key, sizeof(u32*)); }
-
-    inline u64 hash64(u64* const& key) { return murmur::hash64(&key, sizeof(u64*)); }
 
     template <typename T> concept Hashable = requires(T hashable) {
         { hash::hash32(hashable) } -> convertible_to<u32>;

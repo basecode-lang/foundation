@@ -80,6 +80,11 @@ namespace basecode {
             ok
         };
 
+        template <Directed_Graph T,
+                  typename Node = typename T::Node,
+                  typename Node_Array = typename T::Node_Array>
+        u0 outgoing_nodes(const T& graph, Node* node, Node_Array& nodes);
+
         template <Directed_Graph T>
         u0 free(T& graph) {
             memory::system::free(graph.edge_slab);
@@ -135,16 +140,6 @@ namespace basecode {
         }
 
         template <Directed_Graph T,
-                  typename Node = typename T::Node,
-                  typename Node_Array = typename T::Node_Array>
-        u0 outgoing_nodes(const T& graph, Node* node, Node_Array& nodes) {
-            for (auto e : graph.edges) {
-                if (e->src != node) continue;
-                array::append(nodes, const_cast<Node*>(e->dst));
-            }
-        }
-
-        template <Directed_Graph T,
                   typename Edge = typename T::Edge,
                   typename Node = typename T::Node,
                   typename Node_Array = typename T::Node_Array,
@@ -180,6 +175,14 @@ namespace basecode {
             array::append(graph.nodes, node);
             ++graph.size;
             return node;
+        }
+
+        template <Directed_Graph T, typename Node, typename Node_Array>
+        u0 outgoing_nodes(const T& graph, Node* node, Node_Array& nodes) {
+            for (auto e : graph.edges) {
+                if (e->src != node) continue;
+                array::append(nodes, const_cast<Node*>(e->dst));
+            }
         }
 
         template <Directed_Graph T,
