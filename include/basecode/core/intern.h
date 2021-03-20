@@ -21,7 +21,6 @@
 #include <basecode/core/types.h>
 #include <basecode/core/array.h>
 #include <basecode/core/slice.h>
-#include <basecode/core/hashtab.h>
 
 namespace basecode {
     struct interned_str_t;
@@ -40,6 +39,7 @@ namespace basecode {
         u64*                    hashes;
         interned_str_list_t     strings;
         u32                     size;
+        u32                     cap_idx;
         u32                     capacity;
         f32                     load_factor;
     };

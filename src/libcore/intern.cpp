@@ -21,7 +21,34 @@
 #include <basecode/core/hash_common.h>
 
 namespace basecode::intern {
-    static status_t rehash(intern_t& pool, u32 new_capacity);
+    static status_t rehash(intern_t& pool, s32 new_capacity = -1);
+
+    static b8 find_key(const intern_t& pool,
+                       u64 hash,
+                       str::slice_t key,
+                       u32& bucket_index) {
+        for (u32 i = bucket_index; i < pool.capacity; ++i) {
+            const auto id = pool.ids[i];
+            if (id == 0)
+                continue;
+            if (pool.hashes[i] == hash
+            &&  pool.strings[id - 1].value == key) {
+                bucket_index = i;
+                return true;
+            }
+        }
+        for (u32 i = 0; i < bucket_index; ++i) {
+            const auto id = pool.ids[i];
+            if (id == 0)
+                continue;
+            if (pool.hashes[i] == hash
+            &&  pool.strings[id - 1].value == key) {
+                bucket_index = i;
+                return true;
+            }
+        }
+        return false;
+    }
 
     static u32 buffer_size(const intern_t& pool, u32 capacity = 0) {
         if (!capacity)
@@ -31,32 +58,13 @@ namespace basecode::intern {
         return ids_size + alignof(u64) + hashes_size;
     }
 
-    static b8 find_key(const intern_t& pool, u64 hash, const str::slice_t& key, u32& bucket_index) {
-        for (u32 i = bucket_index; i < pool.capacity; ++i) {
-            const auto id = pool.ids[i];
-            if (id == 0) return false;
-            if (pool.hashes[i] == hash && pool.strings[id - 1].value == key) {
-                bucket_index = i;
-                return true;
-            }
-        }
-        for (u32 i = 0; i < bucket_index; ++i) {
-            const auto id = pool.ids[i];
-            if (id == 0) return false;
-            if (pool.hashes[i] == hash && pool.strings[id - 1].value == key) {
-                bucket_index = i;
-                return true;
-            }
-        }
-        return false;
-    }
-
     u0 free(intern_t& pool) {
         array::free(pool.strings);
         memory::free(pool.alloc, pool.ids);
-        pool.ids    = {};
-        pool.hashes = {};
-        pool.size   = pool.capacity = {};
+        pool.ids     = {};
+        pool.size    = pool.capacity = {};
+        pool.hashes  = {};
+        pool.cap_idx = {};
     }
 
     u0 reset(intern_t& pool) {
@@ -85,7 +93,7 @@ namespace basecode::intern {
     }
 
     u0 reserve(intern_t& pool, u32 capacity) {
-        array::reserve(pool.strings, capacity);
+        array::reserve(pool.strings, find_nearest_prime_capacity(capacity));
     }
 
     result_t get(intern_t& pool, intern_id id) {
@@ -110,8 +118,7 @@ namespace basecode::intern {
 
         const auto value = slice::make(data, len == -1 ? strlen(data) : len);
         u64 hash         = hash::hash64(value);
-        u32 bucket_index = (u128(hash) * u128(pool.capacity)) >> u128(64);
-
+        u32 bucket_index = range_reduction(hash, pool.capacity);
         if (find_key(pool, hash, value, bucket_index)) {
             const auto id = pool.ids[bucket_index];
             return result_t{
@@ -143,21 +150,25 @@ namespace basecode::intern {
     }
 
     u0 init(intern_t& pool, alloc_t* alloc, f32 load_factor) {
-        pool.hashes      = {};
         pool.ids         = {};
-        pool.alloc       = alloc;
-        pool.load_factor = load_factor;
         pool.size        = pool.capacity = {};
+        pool.alloc       = alloc;
+        pool.hashes      = {};
+        pool.cap_idx     = {};
+        pool.load_factor = load_factor;
         array::init(pool.strings, pool.alloc);
     }
 
-    static status_t rehash(intern_t& pool, u32 new_capacity) {
-        new_capacity = std::max<u32>(new_capacity,
-                                     std::ceil(std::max<u32>(16, new_capacity) / pool.load_factor));
+    static status_t rehash(intern_t& pool, s32 new_capacity) {
+        if (new_capacity == -1) {
+            new_capacity = prime_capacity(pool.cap_idx++);
+        } else {
+            new_capacity = std::max<u32>(17, new_capacity);
+        }
 
         const auto ids_size = new_capacity * sizeof(intern_id);
         const auto buf_size = buffer_size(pool, new_capacity);
-        auto buf    = (u8*) memory::alloc(pool.alloc, buf_size, alignof(intern_id));
+        auto       buf      = (u8*) memory::alloc(pool.alloc, buf_size, alignof(intern_id));
         std::memset(buf, 0, buf_size);
 
         u32  hashes_align{};
@@ -168,16 +179,19 @@ namespace basecode::intern {
 
         for (u32 i = 0; i < pool.capacity; ++i) {
             const auto id = pool.ids[i];
-            if (id == 0) continue;
+            if (id == 0)
+                continue;
 
             const u64 hash = pool.hashes[i];
-            u32 bucket_index = (u128(hash) * u128(new_capacity)) >> u128(64);
+            u32 bucket_index = range_reduction(hash, new_capacity);
             if (!find_free_bucket(hashes, new_capacity, bucket_index))
                 return status_t::no_bucket;
 
             ids[bucket_index]    = id;
             hashes[bucket_index] = hash;
-            pool.strings[id - 1].bucket_index = bucket_index;
+
+            auto& s = pool.strings[id - 1];
+            s.bucket_index = bucket_index;
         }
 
         memory::free(pool.alloc, pool.ids);

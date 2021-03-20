@@ -20,7 +20,7 @@
 #include <basecode/core/defer.h>
 #include <basecode/core/array.h>
 #include <basecode/core/intern.h>
-#include <basecode/core/profiler.h>
+#include <basecode/core/format.h>
 #include <basecode/core/str_array.h>
 #include <basecode/core/stopwatch.h>
 

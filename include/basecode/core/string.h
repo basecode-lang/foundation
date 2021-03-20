@@ -20,6 +20,7 @@
 
 #include <basecode/core/slice.h>
 #include <basecode/core/intern.h>
+#include <basecode/core/format.h>
 
 namespace basecode::string {
     enum class status_t : u8 {

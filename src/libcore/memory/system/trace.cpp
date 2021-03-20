@@ -18,6 +18,7 @@
 
 #include <basecode/core/str.h>
 #include <basecode/core/intern.h>
+#include <basecode/core/hashtab.h>
 #include <basecode/core/memory/system/trace.h>
 
 namespace basecode::memory::trace {
