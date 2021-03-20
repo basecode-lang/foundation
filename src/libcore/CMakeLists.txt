@@ -104,6 +104,8 @@ set(
 
     ${CORE_INC_DIR}/hashable.h
 
+    hash_common.cpp ${CORE_INC_DIR}/hash_common.h
+
     hash/crc.cpp ${CORE_INC_DIR}/hash/crc.h
     hash/adler.cpp ${CORE_INC_DIR}/hash/adler.h
     hash/murmur.cpp ${CORE_INC_DIR}/hash/murmur.h

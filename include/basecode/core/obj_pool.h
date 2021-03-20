@@ -53,9 +53,10 @@ namespace basecode {
         u0 destroy(obj_pool_t& pool, T* obj) {
             auto d = hashtab::find(pool.storage, (u0*) obj);
             if (d) {
-                d->destroy(d->obj);
+                if (d->destroy)
+                    d->destroy(d->obj);
                 memory::free(d->alloc, d->obj);
-                hashtab::remove(pool.storage, obj);
+                hashtab::remove(pool.storage, (u0*) obj);
             }
         }
 
@@ -83,9 +84,13 @@ namespace basecode {
             auto d = hashtab::emplace(pool.storage, mem);
             d->obj     = mem;
             d->alloc   = slab;
-            d->destroy = [](const u0* x) -> u0 {
-                static_cast<const T*>(x)->~T();
-            };
+            if constexpr (std::is_destructible_v<T>) {
+                d->destroy = [](const u0* x) -> u0 {
+                    static_cast<const T*>(x)->~T();
+                };
+            } else {
+                d->destroy = {};
+            }
             return new (mem) T(std::forward<Args>(args)...);
         }
 
