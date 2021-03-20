@@ -19,10 +19,6 @@
 #include <basecode/core/hash_common.h>
 
 namespace basecode {
-    b8 requires_rehash(u32 size, u32 capacity, f32 load_factor) {
-        return capacity == 0 || f32(size) + 1 > f32(capacity - 1) * load_factor;
-    }
-
     b8 find_free_bucket(const u64* hashes, u32 size, u32& bucket_idx) {
         for (u32 i = bucket_idx; i < size; ++i) {
             if (!hashes[i]) {

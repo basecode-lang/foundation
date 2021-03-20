@@ -48,6 +48,7 @@ namespace basecode {
         u64*                    hashes;
         Value_Type*             values;
         u32                     size;
+        u32                     cap_idx;
         u32                     capacity;
         f32                     load_factor;
     };
@@ -55,22 +56,23 @@ namespace basecode {
     namespace set {
         template <Hash_Set T,
                   typename Value_Type = typename T::Value_Type>
-        u0 rehash(T& set, u32 new_capacity = 16);
+        u0 rehash(T& set, s32 new_capacity = -1);
 
         template <Hash_Set T,
                   typename Value_Type = typename T::Value_Type>
         b8 find_value(T& set, u32 start, u64 hash, const Value_Type& value, u32* found);
 
         template <Hash_Set T>
-        u0 init(T& set, alloc_t* alloc = context::top()->alloc, f32 load_factor = .5f);
+        u0 init(T& set, alloc_t* alloc = context::top()->alloc, f32 load_factor = .9f);
 
-        template <Hash_Set T>
+        template <Hash_Set T,
+                  typename Value_Type = typename T::Value_Type>
         inline u32 size_of_buffer(T& set, u32 capacity = 0) {
             if (capacity == 0)
                 capacity = set.capacity;
             const auto size_of_hashes = capacity * sizeof(u64);
-            const auto size_of_values = capacity * sizeof(T);
-            return size_of_hashes + alignof(T) + size_of_values;
+            const auto size_of_values = capacity * sizeof(Value_Type);
+            return size_of_hashes + alignof(Value_Type) + size_of_values;
         }
 
         template <Hash_Set T>
@@ -119,9 +121,12 @@ namespace basecode {
         }
 
         template <Hash_Set T, typename Value_Type>
-        u0 rehash(T& set, u32 new_capacity) {
-            new_capacity = std::max<u32>(new_capacity,
-                                         std::ceil(std::max<u32>(16, new_capacity) / set.load_factor));
+        u0 rehash(T& set, s32 new_capacity) {
+            if (new_capacity == -1) {
+                new_capacity = prime_capacity(set.cap_idx++);
+            } else {
+                new_capacity = std::max<u32>(new_capacity, std::max<u32>(17, new_capacity));
+            }
             const auto buf_size = size_of_buffer(set, new_capacity);
             auto buf = (u8*) memory::alloc(set.alloc, buf_size, alignof(u64));
             std::memset(buf, 0, buf_size);
@@ -130,18 +135,17 @@ namespace basecode {
             u32  values_align{};
             auto new_hashes = (u64*) buf;
             auto new_values = (Value_Type*) memory::system::align_forward(buf + size_of_hashes,
-                                                                          alignof(T),
+                                                                          alignof(Value_Type),
                                                                           values_align);
 
             for (u32 i = 0; i < set.capacity; ++i) {
-                if (!set.hashes[i]) continue;
-
-                u32 bucket_index = u128(set.hashes[i]) * u128(new_capacity) >> 64U;
-                if (!find_free_bucket(new_hashes, new_capacity, bucket_index))
-                    return;
-
-                new_hashes[bucket_index] = set.hashes[i];
-                new_values[bucket_index] = set.values[i];
+                if (!set.hashes[i])
+                    continue;
+                u32 bucket_index = range_reduction(set.hashes[i], new_capacity);
+                if (find_free_bucket(new_hashes, new_capacity, bucket_index)) {
+                    new_hashes[bucket_index] = set.hashes[i];
+                    new_values[bucket_index] = set.values[i];
+                }
             }
 
             memory::free(set.alloc, set.hashes);
@@ -153,7 +157,7 @@ namespace basecode {
 
         template<Hash_Set T>
         u0 reserve(T& set, u32 new_capacity) {
-            rehash(set, std::ceil(std::max<u32>(16, new_capacity) / std::min(.5f, set.load_factor)));
+            rehash(set, std::max<u32>(17, new_capacity));
         }
 
         template <Hash_Set T,
@@ -161,7 +165,7 @@ namespace basecode {
         b8 remove(T& set, const Value_Type& value) {
             if (set.size == 0) return false;
             u64 hash         = hash::hash64(value);
-            u32 bucket_index = u128(hash) * u128(set.capacity) >> 64U;
+            u32 bucket_index = range_reduction(hash, set.capacity);
             u32 found_index;
             if (!find_value(set, bucket_index, hash, value, &found_index))
                 return false;
@@ -172,11 +176,12 @@ namespace basecode {
 
         template <Hash_Set T>
         u0 init(T& set, alloc_t* alloc, f32 load_factor) {
+            set.size        = set.capacity = {};
+            set.alloc       = alloc;
             set.hashes      = {};
             set.values      = {};
-            set.alloc       = alloc;
+            set.cap_idx     = {};
             set.load_factor = load_factor;
-            set.size        = set.capacity = {};
         }
 
         template <Hash_Set T,
@@ -197,10 +202,11 @@ namespace basecode {
                   typename Value_Type = typename T::Value_Type,
                   typename Value_Type_Base = typename T::Value_Type_Base>
         Value_Type_Base* find(T& set, const Value_Type& value) {
-            if (set.size == 0) return nullptr;
+            if (set.size == 0)
+                return nullptr;
 
             u64 hash         = hash::hash64(value);
-            u32 bucket_index = u128(hash) * u128(set.capacity) >> 64U;
+            u32 bucket_index = range_reduction(hash, set.capacity);
             u32 found_index;
             if (find_value(set, bucket_index, hash, value, &found_index)) {
                 if constexpr (Is_Pointer) {
@@ -223,10 +229,10 @@ namespace basecode {
                 return v;
 
             if (requires_rehash(set.size, set.capacity, set.load_factor))
-                rehash(set, set.capacity << 1);
+                rehash(set);
 
             u64 hash         = hash::hash64(value);
-            u32 bucket_index = u128(hash) * u128(set.capacity) >> 64U;
+            u32 bucket_index = range_reduction(hash, set.capacity);
 
             if (find_free_bucket(set.hashes, set.capacity, bucket_index)) {
                 set.hashes[bucket_index] = hash;
@@ -245,14 +251,16 @@ namespace basecode {
         template <Hash_Set T, typename Value_Type>
         b8 find_value(T& set, u32 start, u64 hash, const Value_Type& value, u32* found) {
             for (u32 i = start; i < set.capacity; ++i) {
-                if (!set.hashes[i]) return false;
+                if (!set.hashes[i])
+                    continue;
                 if (hash == set.hashes[i] && value == set.values[i]) {
                     *found = i;
                     return true;
                 }
             }
             for (u32 i = 0; i < start; ++i) {
-                if (!set.hashes[i]) return false;
+                if (!set.hashes[i])
+                    continue;
                 if (hash == set.hashes[i] && value == set.values[i]) {
                     *found = i;
                     return true;

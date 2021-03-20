@@ -56,10 +56,12 @@ namespace basecode {
         Value_Type*             values;
         alloc_t*                alloc;
         u32                     size;
+        u32                     cap_idx;
         u32                     capacity;
+        u32                     collisions;
         f32                     load_factor;
     };
-    static_assert(sizeof(hashtab_t<s32, s32>) <= 48, "hashtab_t<K, V> is now larger than 48 bytes!");
+    static_assert(sizeof(hashtab_t<s32, s32>) <= 56, "hashtab_t<K, V> is now larger than 56 bytes!");
 
     namespace hashtab {
         template <Hash_Table T>
@@ -80,7 +82,7 @@ namespace basecode {
         template <Hash_Table T,
                   typename Key_Type = typename T::Key_Type,
                   typename Value_Type = typename T::Value_Type>
-        u0 rehash(T& table, u32 new_capacity = 16);
+        u0 rehash(T& table, s32 new_capacity = -1);
 
         template <Hash_Table T>
         u0 free(T& table) {
@@ -150,16 +152,20 @@ namespace basecode {
                     const Key_Type& key,
                     u32* found) {
             for (u32 i = start; i < table.capacity; ++i) {
-                if (!table.hashes[i])
+                if (!table.hashes[i]) {
+                    table.collisions++;
                     continue;
+                }
                 if (hash == table.hashes[i] && key == table.keys[i]) {
                     *found = i;
                     return true;
                 }
             }
             for (u32 i = 0; i < start; ++i) {
-                if (!table.hashes[i])
+                if (!table.hashes[i]) {
+                    table.collisions++;
                     continue;
+                }
                 if (hash == table.hashes[i] && key == table.keys[i]) {
                     *found = i;
                     return true;
@@ -174,11 +180,12 @@ namespace basecode {
         }
 
         template <Hash_Table T, typename Key_Type, typename Value_Type>
-        u0 rehash(T& table, u32 new_capacity) {
-            new_capacity = std::max<u32>(new_capacity,
-                                         std::ceil(std::max<u32>(16, new_capacity) / table.load_factor));
-            if (new_capacity % 2 != 0)
-                new_capacity++;
+        u0 rehash(T& table, s32 new_capacity) {
+            if (new_capacity == -1) {
+                new_capacity = prime_capacity(table.cap_idx++);
+            } else {
+                new_capacity = find_nearest_prime_capacity(std::max<u32>(17, new_capacity));
+            }
 
             const auto size_of_hashes = new_capacity * sizeof(u64);
             const auto size_of_keys   = new_capacity * sizeof(Key_Type);
@@ -189,7 +196,7 @@ namespace basecode {
                                   + alignof(Value_Type) + size_of_values;
 
             auto buf = (u8*) memory::alloc(table.alloc, buf_size, alignof(u64));
-            std::memset(buf, 0, size_of_hashes);
+            std::memset(buf, 0, buf_size);
             auto new_hashes = (u64*) buf;
 
             u32 keys_align{}, values_align{};
@@ -197,13 +204,13 @@ namespace basecode {
                                                                       alignof(Key_Type),
                                                                       keys_align);
             auto new_values = (Value_Type*) memory::system::align_forward(buf + size_of_hashes + size_of_keys + keys_align,
-                                                                            alignof(Value_Type),
+                                                                         alignof(Value_Type),
                                                                          values_align);
 
             for (u32 i = 0; i < table.capacity; ++i) {
                 if (!table.hashes[i]) continue;
 
-                u32 bucket_index = u128(table.hashes[i]) * u128(new_capacity) >> 64U;
+                u32 bucket_index = range_reduction(table.hashes[i], new_capacity);
                 if (!find_free_bucket(new_hashes, new_capacity, bucket_index))
                     return;
 
@@ -222,16 +229,17 @@ namespace basecode {
 
         template <Hash_Table T>
         u0 reserve(T& table, u32 new_capacity) {
-            rehash(table, std::ceil(std::max<u32>(16, new_capacity) / table.load_factor));
+            rehash(table, find_nearest_prime_capacity(new_capacity));
         }
 
         template <Hash_Table T,
                   typename Key_Type = typename T::Key_Type>
         b8 remove(T& table, const Key_Type& key) {
-            if (table.size == 0 || table.capacity == 0)
+            if (table.size == 0)
                 return false;
+            table.collisions = 0;
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
+            u32 bucket_index = range_reduction(hash, table.capacity);
             u32 found_index;
             if (!find_key(table, bucket_index, hash, key, &found_index))
                 return false;
@@ -245,11 +253,12 @@ namespace basecode {
                   b8 Is_Pointer = std::is_pointer_v<Value_Type>,
                   typename Base_Value_Type = std::remove_pointer_t<Value_Type>*>
         Base_Value_Type find(T& table, const auto& key) {
-            if (table.capacity <= 0)
+            table.collisions = 0;
+            if (table.size == 0)
                 return nullptr;
 
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
+            u32 bucket_index = range_reduction(hash, table.capacity);
             u32 found_index{};
             if (find_key(table, bucket_index, hash, key, &found_index)) {
                 if constexpr (Is_Pointer) {
@@ -272,10 +281,10 @@ namespace basecode {
                 return v;
 
             if (requires_rehash(table.size, table.capacity, table.load_factor))
-                rehash(table, table.capacity << 1);
+                rehash(table);
 
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
+            u32 bucket_index = range_reduction(hash, table.capacity);
 
             if (find_free_bucket(table.hashes, table.capacity, bucket_index)) {
                 table.keys[bucket_index]   = key;
@@ -294,9 +303,11 @@ namespace basecode {
         template <Hash_Table T>
         u0 init(T& table, alloc_t* alloc, f32 load_factor) {
             table.keys          = {};
+            table.alloc         = alloc;
             table.values        = {};
             table.hashes        = {};
-            table.alloc         = alloc;
+            table.cap_idx       = {};
+            table.collisions    = {};
             table.load_factor   = load_factor;
             table.size = table.capacity = {};
         }
@@ -325,10 +336,10 @@ namespace basecode {
                 return v;
 
             if (requires_rehash(table.size, table.capacity, table.load_factor))
-                rehash(table, table.capacity << 1);
+                rehash(table);
 
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = u128(hash) * u128(table.capacity) >> 64U;
+            u32 bucket_index = range_reduction(hash, table.capacity);
 
             if (find_free_bucket(table.hashes, table.capacity, bucket_index)) {
                 table.keys[bucket_index]   = key;

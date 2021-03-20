@@ -17,8 +17,10 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
+#include <basecode/core/str.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/stack.h>
+#include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
@@ -60,13 +62,20 @@ TEST_CASE("basecode::stack force grow multiple times") {
     stack::init(numbers, context::top()->alloc);
     defer(stack::free(numbers));
 
-    REQUIRE(stack::empty(numbers));
+    if (!stack::empty(numbers))
+        REQUIRE(stack::empty(numbers));
 
+    stopwatch_t timer{};
+    stopwatch::start(timer);
     for (s32 i = 0; i < 1000; ++i)
         stack::push(numbers, i);
+    stopwatch::stop(timer);
+    stopwatch::print_elapsed("total stack::push time"_ss, 40, timer);
 
-    REQUIRE(numbers.size == 1000);
+    if (numbers.size != 1000)
+        REQUIRE(numbers.size == 1000);
 
+    stopwatch::start(timer);
     auto n = 999;
     while (!stack::empty(numbers)) {
         auto top = *stack::top(numbers);
@@ -74,14 +83,19 @@ TEST_CASE("basecode::stack force grow multiple times") {
             REQUIRE(false);
         stack::pop(numbers);
     }
+    stopwatch::stop(timer);
+    stopwatch::print_elapsed("total first stack::pop time"_ss, 40, timer);
 
-    REQUIRE(stack::empty(numbers));
+    if (!stack::empty(numbers))
+        REQUIRE(stack::empty(numbers));
 
     stack::push(numbers, 100);
     stack::push(numbers, 200);
     stack::push(numbers, 300);
-    REQUIRE(numbers.size == 3);
+    if (numbers.size != 3)
+        REQUIRE(numbers.size == 3);
 
+    stopwatch::start(timer);
     n = 300;
     while (!stack::empty(numbers)) {
         auto top = *stack::top(numbers);
@@ -90,9 +104,12 @@ TEST_CASE("basecode::stack force grow multiple times") {
         n -= 100;
         stack::pop(numbers);
     }
+    stopwatch::stop(timer);
+    stopwatch::print_elapsed("total second stack::pop time"_ss, 40, timer);
 
     stack::reset(numbers);
-    REQUIRE(stack::empty(numbers));
+    if (!stack::empty(numbers))
+        REQUIRE(stack::empty(numbers));
 }
 
 TEST_CASE("basecode::stack insert") {

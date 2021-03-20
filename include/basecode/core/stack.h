@@ -76,7 +76,7 @@ namespace basecode {
 
         u0 reserve(Dynamic_Stack_Concept auto& stack, u32 new_capacity);
 
-        u0 grow(Dynamic_Stack_Concept auto& stack, u32 min_capacity = 8);
+        u0 grow(Dynamic_Stack_Concept auto& stack, u32 min_capacity = 16);
 
         u0 init(Stack_Concept auto& stack, alloc_t* alloc = context::top()->alloc);
 
@@ -228,7 +228,7 @@ namespace basecode {
 
         u0 grow(Dynamic_Stack_Concept auto& stack, u32 min_capacity) {
             min_capacity = std::max(min_capacity, stack.capacity);
-            reserve(stack, min_capacity * 2 + 8);
+            reserve(stack, min_capacity * 3 + 16);
         }
 
         inline u32 push(Stack_Concept auto& stack, const auto& value) {

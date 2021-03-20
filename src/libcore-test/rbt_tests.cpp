@@ -23,6 +23,21 @@
 
 using namespace basecode;
 
+template <Binary_Tree T>
+static u0 print_rbt_cursor(T& tree) {
+    format::print("rbt cursor: ");
+    bin_tree_cursor_t<T> cursor{};
+    s32 i;
+    u32* v;
+    for (v = bintree::cursor::first(cursor, &tree), i = 0;
+         v;
+         ++i, v = bintree::cursor::next(cursor)) {
+        if (i > 0) format::print(",");
+        format::print("{}", *v);
+    }
+    format::print("\n");
+}
+
 TEST_CASE("basecode::rbt basics") {
     std::mt19937                       rg{std::random_device{}()};
     std::uniform_int_distribution<u32> pick(0, 4096);
@@ -45,8 +60,21 @@ TEST_CASE("basecode::rbt basics") {
 
         if (bintree::empty(tree))
             REQUIRE(!bintree::empty(tree));
-        if (bintree::size(tree) != set.size)
+        if (bintree::size(tree) != set.size) {
+            std::sort(
+                values.begin(),
+                values.end(),
+                [&](const auto lhs, const auto rhs) {
+                    return *lhs < *rhs;
+                });
+            print_rbt_cursor(tree);
+            format::print("rbt values: ");
+            for (u32 i = 0; i < values.size; ++i) {
+                if (i > 0) format::print(",");
+                format::print("{}", *values[i]);
+            }
             REQUIRE(bintree::size(tree) == set.size);
+        }
 
         for (auto v : values) {
             if (!bintree::find(tree, *v)) {
@@ -58,19 +86,6 @@ TEST_CASE("basecode::rbt basics") {
         set::free(set);
     }
 
-//    bintree::print_whole_tree(tree, "red-black tree"_ss);
-//    bintree::dump_dot(tree, "rbt"_ss);
-
-    format::print("rbt cursor: ");
-    bin_tree_cursor_t<rbt_t<u32>> cursor{};
-    bintree::cursor::init(cursor, &tree);
-    s32 i;
-    u32* v;
-    for (v = bintree::cursor::first(cursor, &tree), i = 0;
-         v;
-         ++i, v = bintree::cursor::next(cursor)) {
-        if (i > 0) format::print(",");
-        format::print("{}", *v);
-    }
-    format::print("\n");
+    bintree::print_whole_tree(tree, "red-black tree"_ss);
+    print_rbt_cursor(tree);
 }

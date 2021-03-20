@@ -61,16 +61,21 @@ TEST_CASE("basecode::hashtab names") {
     stopwatch_t emplace_time{};
     stopwatch::start(emplace_time);
 
+    u32 count{};
     for (const auto& rec : records) {
-        auto name = hashtab::find(table, fields[rec.idx + 3]);
-        if (name) continue;
-        name = hashtab::emplace(table, fields[rec.idx + 3]);
-        name->sex = fields[rec.idx + 1][0];
-        std::memcpy(name->year, fields[rec.idx + 2].data, 4);
-        name->year[4] = '\0';
-        std::memcpy(name->state, fields[rec.idx + 0].data, 2);
-        name->state[2] = '\0';
+        auto name = hashtab::emplace(table, fields[rec.idx + 3]);
+        if (name->sex == 0) {
+            ++count;
+            name->sex = fields[rec.idx + 1][0];
+            std::memcpy(name->year, fields[rec.idx + 2].data, 4);
+            name->year[4] = '\0';
+            std::memcpy(name->state, fields[rec.idx + 0].data, 2);
+            name->state[2] = '\0';
+        }
     }
+
+    if (count != table.size)
+        REQUIRE(count == table.size);
 
     stopwatch::stop(emplace_time);
     format::print("table.size = {}, table.capacity = {}\n", table.size, table.capacity);

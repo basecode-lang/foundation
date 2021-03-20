@@ -23,6 +23,21 @@
 
 using namespace basecode;
 
+template <Binary_Tree T>
+static u0 print_bst_cursor(T& tree) {
+    format::print("bst cursor: ");
+    bin_tree_cursor_t<T> cursor{};
+    s32 i;
+    u32* v;
+    for (v = bintree::cursor::first(cursor, &tree), i = 0;
+         v;
+         ++i, v = bintree::cursor::next(cursor)) {
+        if (i > 0) format::print(",");
+        format::print("{}", *v);
+    }
+    format::print("\n");
+}
+
 TEST_CASE("basecode::bst basics") {
     std::mt19937                       rg{std::random_device{}()};
     std::uniform_int_distribution<u32> pick(0, 4096);
@@ -45,8 +60,21 @@ TEST_CASE("basecode::bst basics") {
 
         if (bintree::empty(tree))
             REQUIRE(!bintree::empty(tree));
-        if (bintree::size(tree) != set.size)
+        if (bintree::size(tree) != set.size) {
+            std::sort(
+                values.begin(),
+                values.end(),
+                [&](const auto lhs, const auto rhs) {
+                    return *lhs < *rhs;
+                });
+            print_bst_cursor(tree);
+            format::print("bst values: ");
+            for (u32 i = 0; i < values.size; ++i) {
+                if (i > 0) format::print(",");
+                format::print("{}", *values[i]);
+            }
             REQUIRE(bintree::size(tree) == set.size);
+        }
 
         for (auto v : values) {
             if (!bintree::find(tree, *v)) {
@@ -61,17 +89,7 @@ TEST_CASE("basecode::bst basics") {
     bintree::print_whole_tree(tree, "before balance"_ss);
     bst::balance(tree);
     bintree::print_whole_tree(tree, "after balance "_ss);
+//    bintree::dump_dot(tree, "bst"_ss);
 
-    format::print("bst cursor: ");
-    bin_tree_cursor_t<bst_t<u32>> cursor{};
-    bintree::cursor::init(cursor, &tree);
-    s32 i;
-    u32* v;
-    for (v = bintree::cursor::first(cursor, &tree), i = 0;
-            v;
-            ++i, v = bintree::cursor::next(cursor)) {
-        if (i > 0) format::print(",");
-        format::print("{}", *v);
-    }
-    format::print("\n");
+    print_bst_cursor(tree);
 }
