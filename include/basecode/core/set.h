@@ -251,16 +251,14 @@ namespace basecode {
         template <Hash_Set T, typename Value_Type>
         b8 find_value(T& set, u32 start, u64 hash, const Value_Type& value, u32* found) {
             for (u32 i = start; i < set.capacity; ++i) {
-                if (!set.hashes[i])
-                    continue;
+                if (!set.hashes[i]) return false;
                 if (hash == set.hashes[i] && value == set.values[i]) {
                     *found = i;
                     return true;
                 }
             }
             for (u32 i = 0; i < start; ++i) {
-                if (!set.hashes[i])
-                    continue;
+                if (!set.hashes[i]) return false;
                 if (hash == set.hashes[i] && value == set.values[i]) {
                     *found = i;
                     return true;

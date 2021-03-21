@@ -133,6 +133,12 @@ TEST_CASE("basecode::hashtab payload with integer keys") {
         payload->offset = i * 100;
     }
 
+    for (u32 i = 0; i < 4096; ++i) {
+        auto payload = hashtab::find(table, i * 4096);
+        if (payload->offset != i * 100)
+            REQUIRE(payload->offset == i * 100);
+    }
+
     stopwatch::stop(time);
     stopwatch::print_elapsed("hashtab payload + int key"_ss, 40, time);
 }

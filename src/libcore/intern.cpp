@@ -29,8 +29,7 @@ namespace basecode::intern {
                        u32& bucket_index) {
         for (u32 i = bucket_index; i < pool.capacity; ++i) {
             const auto id = pool.ids[i];
-            if (id == 0)
-                continue;
+            if (id == 0) return false;
             if (pool.hashes[i] == hash
             &&  pool.strings[id - 1].value == key) {
                 bucket_index = i;
@@ -39,8 +38,7 @@ namespace basecode::intern {
         }
         for (u32 i = 0; i < bucket_index; ++i) {
             const auto id = pool.ids[i];
-            if (id == 0)
-                continue;
+            if (id == 0) return false;
             if (pool.hashes[i] == hash
             &&  pool.strings[id - 1].value == key) {
                 bucket_index = i;

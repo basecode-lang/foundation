@@ -58,10 +58,9 @@ namespace basecode {
         u32                     size;
         u32                     cap_idx;
         u32                     capacity;
-        u32                     collisions;
         f32                     load_factor;
     };
-    static_assert(sizeof(hashtab_t<s32, s32>) <= 56, "hashtab_t<K, V> is now larger than 56 bytes!");
+    static_assert(sizeof(hashtab_t<s32, s32>) <= 48, "hashtab_t<K, V> is now larger than 48 bytes!");
 
     namespace hashtab {
         template <Hash_Table T>
@@ -152,20 +151,14 @@ namespace basecode {
                     const Key_Type& key,
                     u32* found) {
             for (u32 i = start; i < table.capacity; ++i) {
-                if (!table.hashes[i]) {
-                    table.collisions++;
-                    continue;
-                }
+                if (!table.hashes[i]) return false;
                 if (hash == table.hashes[i] && key == table.keys[i]) {
                     *found = i;
                     return true;
                 }
             }
             for (u32 i = 0; i < start; ++i) {
-                if (!table.hashes[i]) {
-                    table.collisions++;
-                    continue;
-                }
+                if (!table.hashes[i]) return false;
                 if (hash == table.hashes[i] && key == table.keys[i]) {
                     *found = i;
                     return true;
@@ -229,7 +222,7 @@ namespace basecode {
 
         template <Hash_Table T>
         u0 reserve(T& table, u32 new_capacity) {
-            rehash(table, find_nearest_prime_capacity(new_capacity));
+            rehash(table, new_capacity);
         }
 
         template <Hash_Table T,
@@ -237,7 +230,6 @@ namespace basecode {
         b8 remove(T& table, const Key_Type& key) {
             if (table.size == 0)
                 return false;
-            table.collisions = 0;
             u64 hash         = hash::hash64(key);
             u32 bucket_index = range_reduction(hash, table.capacity);
             u32 found_index;
@@ -253,7 +245,6 @@ namespace basecode {
                   b8 Is_Pointer = std::is_pointer_v<Value_Type>,
                   typename Base_Value_Type = std::remove_pointer_t<Value_Type>*>
         Base_Value_Type find(T& table, const auto& key) {
-            table.collisions = 0;
             if (table.size == 0)
                 return nullptr;
 
@@ -307,7 +298,6 @@ namespace basecode {
             table.values        = {};
             table.hashes        = {};
             table.cap_idx       = {};
-            table.collisions    = {};
             table.load_factor   = load_factor;
             table.size = table.capacity = {};
         }

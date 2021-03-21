@@ -46,10 +46,8 @@ TEST_CASE("basecode::obj_pool basics") {
     REQUIRE(pool.size == strings.size);
 
     stopwatch::start(timer);
-    for (u32 i = 0; i < strings.size; ++i) {
+    for (u32 i = 0; i < strings.size; ++i)
         obj_pool::destroy(pool, strings[i]);
-//        format::print("pool.storage.collisions = {}\n", pool.storage.collisions);
-    }
     stopwatch::stop(timer);
     stopwatch::print_elapsed("total obj_pool destroy time"_ss, 40, timer);
 
