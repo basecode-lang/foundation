@@ -40,7 +40,7 @@ static u0 print_bst_cursor(T& tree) {
 
 TEST_CASE("basecode::bst basics") {
     std::mt19937                       rg{std::random_device{}()};
-    std::uniform_int_distribution<u32> pick(0, 4096);
+    std::uniform_int_distribution<u32> pick(1, 4096);
 
     bst_t<u32> tree{};
     bst::init(tree);
@@ -50,7 +50,7 @@ TEST_CASE("basecode::bst basics") {
         set_t<u32> set{};
         set::init(set);
 
-        for (u32 i = 1; i < 64; ++i)
+        for (u32 i = 0; i < 64; ++i)
             set::insert(set, pick(rg));
 
         auto values = set::values(set);
@@ -60,6 +60,7 @@ TEST_CASE("basecode::bst basics") {
 
         if (bintree::empty(tree))
             REQUIRE(!bintree::empty(tree));
+
         if (bintree::size(tree) != set.size) {
             std::sort(
                 values.begin(),
@@ -76,10 +77,9 @@ TEST_CASE("basecode::bst basics") {
             REQUIRE(bintree::size(tree) == set.size);
         }
 
-        for (auto v : values) {
-            if (!bintree::find(tree, *v)) {
+        for (auto v : set) {
+            if (!bintree::find(tree, v))
                 REQUIRE(false);
-            }
         }
 
         array::free(values);

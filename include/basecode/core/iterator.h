@@ -45,9 +45,9 @@
     DECL_CONST_RITER(Container, Type, State)
 
 #define DECL_MUT_RITER(Container, Type, State) \
-    using reverse_iterator = bascode::iterator<Container, Type, State##_reversed >;     \
-    reverse_iterator rbegin() { return reverse_iterator::begin(this); }     \
-    reverse_iterator rend()   { return reverse_iterator::end(this); }       \
+    using reverse_iterator = basecode::iterator<Container, Type, State##_reversed >;    \
+    reverse_iterator rbegin() { return reverse_iterator::begin(this); }                 \
+    reverse_iterator rend()   { return reverse_iterator::end(this); }
 
 #define DECL_CONST_RITER(Container, Type, State)                                        \
     using const_reverse_iterator = basecode::const_iterator<Container, Type, State##_reversed >;\

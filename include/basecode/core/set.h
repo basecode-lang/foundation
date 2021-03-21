@@ -21,6 +21,7 @@
 #include <basecode/core/array.h>
 #include <basecode/core/memory.h>
 #include <basecode/core/hashable.h>
+#include <basecode/core/iterator.h>
 #include <basecode/core/hash_common.h>
 
 namespace basecode {
@@ -51,6 +52,58 @@ namespace basecode {
         u32                     cap_idx;
         u32                     capacity;
         f32                     load_factor;
+
+        struct iterator_state_t {
+            u32                 pos;
+
+            inline u0 end(const set_t* ref) {
+                pos = ref->capacity - 1;
+                while (!ref->hashes[pos] && pos < ref->capacity)
+                    --pos;
+            }
+
+            inline u0 prev(const set_t* ref) {
+                if (pos == 0)
+                    return;
+                --pos;
+                while (!ref->hashes[pos] && pos >= 0) {
+                    --pos;
+                }
+            }
+
+            inline u0 next(const set_t* ref) {
+                if (pos < ref->capacity)
+                    ++pos;
+                else
+                    return;
+                while (!ref->hashes[pos] && pos < ref->capacity)
+                    ++pos;
+            }
+
+            inline Value_Type get(set_t* ref) {
+                return ref->values[pos];
+            }
+
+            inline u0 begin(const set_t* ref) {
+                pos = 0;
+                while (!ref->hashes[pos] && pos < ref->capacity)
+                    ++pos;
+            }
+
+            inline const Value_Type get(const set_t* ref) {
+                return ref->values[pos];
+            }
+
+            inline b8 cmp(const iterator_state_t& s) const {
+                return pos != s.pos;
+            }
+        };
+        DECL_ITERS(set_t, Value_Type, iterator_state_t);
+        DECL_RITERS(set_t, Value_Type, iterator_state_t);
+
+        using pointer           = Value_Type*;
+        using difference_type   = s32;
+        using iterator_category = std::random_access_iterator_tag;
     };
 
     namespace set {
