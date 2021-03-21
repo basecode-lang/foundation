@@ -206,6 +206,16 @@
                 (print i "=" arg)
                 (= i (+ i 1))))
 
+        (do
+            (let a 42)
+            (print "(eval 'a) =" (eval 'a)))
+        (print "(eval '(+ 100 200)) =" (eval '(+ 100 200)))
+
+        (do
+            (let expr '(for x (list 1 2 3 4 5)
+                            (print "x =" x)))
+            (print "(eval expr) =" (eval expr)))
+
         (localized-string 5000 'en_US "US: test localized string: 0={} 1={} 2={}")
         (localized-string 5001 'en_US "duplicate cvar")
         (localized-string 5002 'en_US "cvar not found")

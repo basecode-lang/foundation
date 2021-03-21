@@ -1,5 +1,8 @@
 HIGH
 ---------
+- scm: implement tail call optimization
+- scm: adjust print primitive to not add spaces and line feeds
+- scm: add full quasiquote, unquote, unquote-splicing primitive support
 
 MEDIUM
 ---------
@@ -27,6 +30,7 @@ LOW
 
 DONE
 ----
+- scm: implement eval primitive
 - add digraph_t
 - buddy allocator
 - rework graphviz api

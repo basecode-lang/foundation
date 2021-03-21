@@ -87,6 +87,7 @@
 
 namespace basecode::scm {
     enum class prim_type_t : u8 {
+        eval,
         let,
         set,
         if_,
@@ -94,6 +95,9 @@ namespace basecode::scm {
         mac,
         while_,
         quote,
+        unquote,
+        quasiquote,
+        unquote_splicing,
         and_,
         or_,
         do_,
@@ -116,10 +120,11 @@ namespace basecode::scm {
         mul,
         div,
         mod,
-        max
+        max,
     };
 
     static const s8* s_prim_names[] = {
+        "eval",
         "let",
         "=",
         "if",
@@ -127,6 +132,9 @@ namespace basecode::scm {
         "mac",
         "while",
         "quote",
+        "unquote",
+        "quasiquote",
+        "unquote-splicing",
         "and",
         "or",
         "do",
@@ -220,7 +228,7 @@ namespace basecode::scm {
         s8                      next_chr;
     };
 
-    struct Char_Ptr_Int {
+    struct char_ptr_int_t final {
         s8*                     p;
         u32                     n;
     };
@@ -282,7 +290,7 @@ namespace basecode::scm {
     }
 
     static u0 write_buf(ctx_t* ctx, u0* udata, s8 chr) {
-        auto x = (Char_Ptr_Int*) udata;
+        auto x = (char_ptr_int_t*) udata;
         UNUSED(ctx);
         if (x->n) {
             *x->p++ = chr;
@@ -369,6 +377,33 @@ namespace basecode::scm {
                     push_gc(ctx, head);
                 }
                 return head;
+            }
+
+            case '`': {
+                v = read(ctx, fn, udata);
+                if (!v)
+                    error(ctx, "stray '`'");
+                return cons(ctx,
+                            make_symbol(ctx, "quasiquote", 10),
+                            cons(ctx, v, ctx->nil));
+            }
+
+            case ',': {
+                obj_t* sym;
+                chr = fn(ctx, udata);
+                if (chr == '@') {
+                    v = read(ctx, fn, udata);
+                    if (!v)
+                        error(ctx, "stray ',@'");
+                    sym = make_symbol(ctx, "unquote-splicing", 16);
+                } else {
+                    ctx->next_chr = chr;
+                    v = read(ctx, fn, udata);
+                    if (!v)
+                        error(ctx, "stray ','");
+                    sym = make_symbol(ctx, "unquote", 7);
+                }
+                return cons(ctx, sym, cons(ctx, v, ctx->nil));
             }
 
             case '\'': {
@@ -484,6 +519,10 @@ namespace basecode::scm {
         switch (TYPE(fn)) {
             case obj_type_t::prim:
                 switch (PRIM(fn)) {
+                    case prim_type_t::eval:
+                        res = eval(ctx, EVAL_ARG(), env, nullptr);
+                        break;
+
                     case prim_type_t::let:
                         va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
                         if (new_env) {
@@ -528,6 +567,15 @@ namespace basecode::scm {
 
                     case prim_type_t::quote:
                         res = next_arg(ctx, &arg);
+                        break;
+
+                    case prim_type_t::unquote:
+                        break;
+
+                    case prim_type_t::quasiquote:
+                        break;
+
+                    case prim_type_t::unquote_splicing:
                         break;
 
                     case prim_type_t::and_:
@@ -1059,7 +1107,7 @@ namespace basecode::scm {
     }
 
     u32 to_string(ctx_t* ctx, obj_t* obj, s8* dst, u32 size) {
-        Char_Ptr_Int x{};
+        char_ptr_int_t x{};
         x.p = dst;
         x.n = size - 1;
         write(ctx, obj, write_buf, &x, 0);
