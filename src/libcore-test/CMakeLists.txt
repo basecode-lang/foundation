@@ -23,6 +23,7 @@ add_executable(
     path_tests.cpp
     list_tests.cpp
     uuid_tests.cpp
+    wasm_tests.cpp
     error_tests.cpp
     array_tests.cpp
     stack_tests.cpp

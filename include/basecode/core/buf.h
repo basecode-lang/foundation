@@ -30,6 +30,44 @@
 #define CRSR_MORE(c)            ((c).pos < (c).buf->length)
 #define CRSR_NEWLINE(c)         SAFE_SCOPE((c).column = 0; ++(c).line;)
 
+#define FILE_POS()              CRSR_POS(file.crsr)
+#define FILE_PTR()              CRSR_PTR(file.crsr)
+#define FILE_POP_POS()          SAFE_SCOPE(buf::cursor::pop(file.crsr);)
+#define FILE_PUSH_POS()         SAFE_SCOPE(buf::cursor::push(file.crsr);)
+#define FILE_SEEK(p)            SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::seek(file.crsr, (p))))             \
+        return status_t::read_error;)
+#define FILE_SEEK_FWD(p)        SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::seek_fwd(file.crsr, (p))))         \
+        return status_t::read_error;)
+#define FILE_SEEK_RWD(p)        SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::seek_rwd(file.crsr, (p))))         \
+        return status_t::read_error;)
+#define FILE_WRITE(t, v)        SAFE_SCOPE(                 \
+    static_assert(std::is_same_v<decltype(v), t>);          \
+    if (!OK(buf::cursor::write(file.crsr, (v))))            \
+        return status_t::write_error;)
+#define FILE_READ(t, v)         SAFE_SCOPE(                 \
+    static_assert(std::is_same_v<decltype(v), t>);          \
+    if (!OK(buf::cursor::read(file.crsr, (v))))             \
+        return status_t::read_error;)
+#define FILE_READ_STR(d, l)     SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::read_str(file.crsr, (d), (l))))    \
+        return status_t::read_error;)
+#define FILE_WRITE_STR(v)       SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::write_str(file.crsr, (v))))        \
+        return status_t::write_error;)
+#define FILE_WRITE_CSTR(v)      SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::write_cstr(file.crsr, (v))))       \
+        return status_t::write_error;)
+#define FILE_WRITE_PAD(l)       SAFE_SCOPE(                 \
+    if (!OK(buf::cursor::zero_fill(file.crsr, (l))))        \
+        return status_t::write_error;)
+#define FILE_WRITE0(T)          SAFE_SCOPE(                 \
+    T zero{};                                               \
+    if (!OK(buf::cursor::write(file.crsr, zero)))           \
+        return status_t::write_error;)
+
 namespace basecode {
     struct buf_line_t final {
         u32                     pos;
@@ -162,6 +200,8 @@ namespace basecode {
 
         buf_t make(alloc_t* alloc = context::top()->alloc);
 
+        status_t load(buf_t& buf, const u8* data, u32 size);
+
         status_t map_existing(buf_t& buf, const path_t& path);
 
         u0 init(buf_t& buf, alloc_t* alloc = context::top()->alloc);
@@ -169,16 +209,7 @@ namespace basecode {
         status_t map_new(buf_t& buf, const path_t& path, usize size);
 
         status_t load(buf_t& buf, const String_Concept auto& value) {
-            if (buf.mode == buf_mode_t::mapped)
-                return status_t::buf_already_mapped;
-            auto file = ::fmemopen((u0*) value.data, value.length, "r");
-            if (!file)
-                return status_t::unable_to_open_file;
-            defer(::fclose(file));
-            buf.mode = buf_mode_t::alloc;
-            write(buf, 0, file, value.length);
-            path::reset(buf.path);
-            return status_t::ok;
+            return load(buf, value.data, value.length);
         }
 
         status_t save(buf_t& buf, const path_t& path, u32 offset = {}, u32 length = {});

@@ -244,6 +244,19 @@ namespace basecode::buf {
         return status_t::ok;
     }
 
+    status_t load(buf_t& buf, const u8* data, u32 size) {
+        if (buf.mode == buf_mode_t::mapped)
+            return status_t::buf_already_mapped;
+        auto file = ::fmemopen((u0*) data, size, "r");
+        if (!file)
+            return status_t::unable_to_open_file;
+        defer(::fclose(file));
+        buf.mode = buf_mode_t::alloc;
+        write(buf, 0, file, size);
+        path::reset(buf.path);
+        return status_t::ok;
+    }
+
     status_t map_existing(buf_t& buf, const path_t& path) {
         if (buf.mode == buf_mode_t::mapped)
             return status_t::buf_already_mapped;

@@ -206,7 +206,7 @@ set(
 
     uuid.cpp ${CORE_INC_DIR}/uuid.h
 
-    ${CORE_INC_DIR}/wasm.h
+    wasm.cpp ${CORE_INC_DIR}/wasm.h
 )
 if (WIN32)
     set (
