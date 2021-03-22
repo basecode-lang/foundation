@@ -21,11 +21,12 @@
 #include <cassert>
 #include <algorithm>
 #include <basecode/core/str.h>
+#include <basecode/core/bits.h>
 #include <basecode/core/array.h>
 #include <basecode/core/memory.h>
-#include <basecode/core/format.h>
 #include <basecode/core/locale.h>
 #include <basecode/core/context.h>
+#include <basecode/core/iterator.h>
 #include <basecode/core/hashable.h>
 #include <basecode/core/hash_common.h>
 
@@ -33,9 +34,10 @@ namespace basecode {
     template <typename T>
     concept Hash_Table = hash::Hashable<typename T::Key_Type> && requires(const T& t) {
         typename                T::Key_Type;
+        typename                T::Pair_Type;
         typename                T::Value_Type;
-        typename                T::Each_Callback;
 
+        {t.flags}              -> same_as<u64*>;
         {t.hashes}              -> same_as<u64*>;
         {t.keys}                -> same_as<typename T::Key_Type*>;
         {t.values}              -> same_as<typename T::Value_Type*>;
@@ -47,10 +49,13 @@ namespace basecode {
 
     template <typename K, typename V>
     struct hashtab_t final {
-        using Key_Type          = K;
-        using Value_Type        = V;
-        using Each_Callback     = u32 (*)(u32, const Key_Type&, Value_Type&, u0*);
+        struct pair_t;
 
+        using Key_Type          = K;
+        using Pair_Type         = pair_t;
+        using Value_Type        = V;
+
+        u64*                    flags;
         u64*                    hashes;
         Key_Type*               keys;
         Value_Type*             values;
@@ -59,8 +64,63 @@ namespace basecode {
         u32                     cap_idx;
         u32                     capacity;
         f32                     load_factor;
+
+        Value_Type& operator[](u32 bucket_idx) {
+            return values[bucket_idx];
+        }
+
+        struct pair_t final {
+            Key_Type            key;
+            Value_Type          value;
+            u32                 bucket_idx;
+        };
+
+        struct iterator_state_t {
+            u32                 pos;
+
+            inline u0 end(const hashtab_t* ref) {
+                pos = ref->capacity;
+            }
+
+            inline u0 next(const hashtab_t* ref) {
+                while (pos < ref->capacity) {
+                    if (read(ref->flags, ++pos))
+                        break;
+                }
+            }
+
+            inline Pair_Type get(hashtab_t* ref) {
+                pair_t p{};
+                p.key        = ref->keys[pos];
+                p.value      = ref->values[pos];
+                p.bucket_idx = pos;
+                return p;
+            }
+
+            inline u0 begin(const hashtab_t* ref) {
+                pos = 0;
+                while (pos < ref->capacity) {
+                    if (read(ref->flags, pos))
+                        break;
+                    ++pos;
+                }
+            }
+
+            inline const Pair_Type get(const hashtab_t* ref) {
+                pair_t p{};
+                p.key        = ref->keys[pos];
+                p.value      = ref->values[pos];
+                p.bucket_idx = pos;
+                return p;
+            }
+
+            inline b8 cmp(const iterator_state_t& s) const {
+                return pos != s.pos;
+            }
+        };
+        DECL_ITERS(hashtab_t, Pair_Type, iterator_state_t);
     };
-    static_assert(sizeof(hashtab_t<s32, s32>) <= 48, "hashtab_t<K, V> is now larger than 48 bytes!");
+    static_assert(sizeof(hashtab_t<s32, s32>) <= 56, "hashtab_t<K, V> is now larger than 56 bytes!");
 
     namespace hashtab {
         template <Hash_Table T>
@@ -69,7 +129,7 @@ namespace basecode {
         template <Hash_Table T>
         u0 init(T& table,
                 alloc_t* alloc = context::top()->alloc,
-                f32 load_factor = .9f);
+                f32 load_factor = .75f);
 
         template<Hash_Table T, typename Key_Type = typename T::Key_Type>
         b8 find_key(T& table,
@@ -90,15 +150,16 @@ namespace basecode {
 
         template <Hash_Table T>
         u0 reset(T& table) {
-            if (table.hashes)
-                std::memset(table.hashes, 0, table.capacity * sizeof(u64));
+            if (table.flags)
+                std::memset(table.flags, 0, flag_words_for_capacity(table.capacity) * sizeof(u64));
             table.size = {};
         }
 
         template <Hash_Table T>
         u0 clear(T& table) {
-            memory::free(table.alloc, table.hashes);
+            memory::free(table.alloc, table.flags);
             table.keys     = {};
+            table.flags    = {};
             table.values   = {};
             table.hashes   = {};
             table.capacity = table.size = {};
@@ -113,8 +174,9 @@ namespace basecode {
             Array list{};
             array::init(list, table.alloc);
             array::reserve(list, table.size);
-            for (u32 i = 0; i < table.capacity; ++i) {
-                if (!table.hashes[i]) continue;
+            for (u32 i = 0; i < table.capacity;) {
+                if (!read(table.flags, i))
+                    continue;
                 if constexpr (Is_Pointer) {
                     array::append(list, table.keys[i]);
                 } else {
@@ -134,7 +196,8 @@ namespace basecode {
             array::init(list, table.alloc);
             array::reserve(list, table.size);
             for (u32 i = 0; i < table.capacity; ++i) {
-                if (!table.hashes[i]) continue;
+                if (!read(table.flags, i))
+                    continue;
                 if constexpr (Is_Pointer) {
                     array::append(list, table.values[i]);
                 } else {
@@ -151,14 +214,14 @@ namespace basecode {
                     const Key_Type& key,
                     u32* found) {
             for (u32 i = start; i < table.capacity; ++i) {
-                if (!table.hashes[i]) return false;
+                if (!read(table.flags, i)) return false;
                 if (hash == table.hashes[i] && key == table.keys[i]) {
                     *found = i;
                     return true;
                 }
             }
             for (u32 i = 0; i < start; ++i) {
-                if (!table.hashes[i]) return false;
+                if (!read(table.flags, i)) return false;
                 if (hash == table.hashes[i] && key == table.keys[i]) {
                     *found = i;
                     return true;
@@ -174,47 +237,53 @@ namespace basecode {
 
         template <Hash_Table T, typename Key_Type, typename Value_Type>
         u0 rehash(T& table, s32 new_capacity) {
-            if (new_capacity == -1) {
-                new_capacity = prime_capacity(table.cap_idx++);
-            } else {
-                new_capacity = find_nearest_prime_capacity(std::max<u32>(17, new_capacity));
-            }
+            s32 idx = new_capacity == -1 ? table.cap_idx : find_nearest_prime_capacity(new_capacity);
+            f32 lf;
+            do {
+                new_capacity = prime_capacity(idx++);
+                lf = f32(table.size) / f32(new_capacity);
+            } while (lf > table.load_factor);
+            table.cap_idx = idx;
 
+            const auto num_of_flags   = flag_words_for_capacity(new_capacity);
             const auto size_of_hashes = new_capacity * sizeof(u64);
             const auto size_of_keys   = new_capacity * sizeof(Key_Type);
             const auto size_of_values = new_capacity * sizeof(Value_Type);
 
-            const auto buf_size = size_of_hashes
+            const auto buf_size = (num_of_flags * sizeof(u64))
+                                  + size_of_hashes
                                   + alignof(Key_Type) + size_of_keys
                                   + alignof(Value_Type) + size_of_values;
 
             auto buf = (u8*) memory::alloc(table.alloc, buf_size, alignof(u64));
             std::memset(buf, 0, buf_size);
-            auto new_hashes = (u64*) buf;
 
-            u32 keys_align{}, values_align{};
-            auto new_keys = (Key_Type*) memory::system::align_forward(buf + size_of_hashes,
-                                                                      alignof(Key_Type),
-                                                                      keys_align);
-            auto new_values = (Value_Type*) memory::system::align_forward(buf + size_of_hashes + size_of_keys + keys_align,
-                                                                         alignof(Value_Type),
-                                                                         values_align);
+            u32 keys_align, values_align;
+            auto new_flags  = (u64*) buf;
+            auto new_hashes = new_flags + num_of_flags;
+            auto new_keys = (Key_Type*) memory::system::align_forward(
+                new_hashes + new_capacity,
+                alignof(Key_Type),
+                keys_align);
+            auto new_values = (Value_Type*) memory::system::align_forward(
+                new_keys + new_capacity,
+                alignof(Value_Type),
+                values_align);
 
             for (u32 i = 0; i < table.capacity; ++i) {
-                if (!table.hashes[i]) continue;
-
+                if (!read(table.flags, i)) continue;
                 u32 bucket_index = range_reduction(table.hashes[i], new_capacity);
-                if (!find_free_bucket(new_hashes, new_capacity, bucket_index))
-                    return;
-
+                assert(find_free_bucket2(new_flags, new_capacity, bucket_index));
+                write(new_flags, bucket_index, true);
                 new_keys[bucket_index]   = table.keys[i];
                 new_values[bucket_index] = table.values[i];
                 new_hashes[bucket_index] = table.hashes[i];
             }
 
-            memory::free(table.alloc, table.hashes);
+            memory::free(table.alloc, table.flags);
 
             table.keys      = new_keys;
+            table.flags     = new_flags;
             table.values    = new_values;
             table.hashes    = new_hashes;
             table.capacity  = new_capacity;
@@ -235,7 +304,7 @@ namespace basecode {
             u32 found_index;
             if (!find_key(table, bucket_index, hash, key, &found_index))
                 return false;
-            table.hashes[found_index] = 0;
+            write(table.flags, found_index, false);
             --table.size;
             return true;
         }
@@ -276,43 +345,28 @@ namespace basecode {
 
             u64 hash         = hash::hash64(key);
             u32 bucket_index = range_reduction(hash, table.capacity);
-
-            if (find_free_bucket(table.hashes, table.capacity, bucket_index)) {
-                table.keys[bucket_index]   = key;
-                table.hashes[bucket_index] = hash;
-                ++table.size;
-                if constexpr (Is_Pointer) {
-                    return table.values[bucket_index];
-                } else {
-                    return &table.values[bucket_index];
-                }
+            assert(find_free_bucket2(table.flags, table.capacity, bucket_index));
+            write(table.flags, bucket_index, true);
+            table.keys[bucket_index]   = key;
+            table.hashes[bucket_index] = hash;
+            ++table.size;
+            if constexpr (Is_Pointer) {
+                return table.values[bucket_index];
+            } else {
+                return &table.values[bucket_index];
             }
-
-            return nullptr;
         }
 
         template <Hash_Table T>
         u0 init(T& table, alloc_t* alloc, f32 load_factor) {
             table.keys          = {};
             table.alloc         = alloc;
+            table.flags         = {};
             table.values        = {};
             table.hashes        = {};
             table.cap_idx       = {};
             table.load_factor   = load_factor;
             table.size = table.capacity = {};
-        }
-
-        template <Hash_Table T,
-                  typename Each_Callback = typename T::Each_Callback>
-        u32 for_each_pair(T& table, Each_Callback cb, u0* user = {}) {
-            u32 idx{};
-            for (u32 i = 0; i < table.capacity; ++i) {
-                if (!table.hashes[i]) continue;
-                auto rc = cb(idx++, table.keys[i], table.values[i], user);
-                if (rc)
-                    return rc;
-            }
-            return true;
         }
 
         template <Hash_Table T,
@@ -330,20 +384,17 @@ namespace basecode {
 
             u64 hash         = hash::hash64(key);
             u32 bucket_index = range_reduction(hash, table.capacity);
-
-            if (find_free_bucket(table.hashes, table.capacity, bucket_index)) {
-                table.keys[bucket_index]   = key;
-                table.hashes[bucket_index] = hash;
-                table.values[bucket_index] = value;
-                ++table.size;
-                if constexpr (Is_Pointer) {
-                    return table.values[bucket_index];
-                } else {
-                    return &table.values[bucket_index];
-                }
+            assert(find_free_bucket2(table.flags, table.capacity, bucket_index));
+            write(table.flags, bucket_index, true);
+            table.keys[bucket_index]   = key;
+            table.hashes[bucket_index] = hash;
+            table.values[bucket_index] = value;
+            ++table.size;
+            if constexpr (Is_Pointer) {
+                return table.values[bucket_index];
+            } else {
+                return &table.values[bucket_index];
             }
-
-            return nullptr;
         }
     }
 }

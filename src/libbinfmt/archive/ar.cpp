@@ -201,7 +201,7 @@ namespace basecode::binfmt::ar {
                 auto& sym = sym_offsets[idx++];
                 sym.name = slice::make(c.buf->data + symbol_offset,
                                        CRSR_POS(c) - symbol_offset - 1);
-                hashtab::insert(ar.symbol_map, sym.name, 0);
+                hashtab::insert(ar.symbol_map, sym.name, 0U);
                 symbol_offset = CRSR_POS(c);
                 --num_symbols;
             }
@@ -216,12 +216,8 @@ namespace basecode::binfmt::ar {
         bitset::resize(ar.symbol_module_bitmap,
                        ar.symbol_map.size * ar.members.size);
 
-        hashtab::for_each_pair(ar.symbol_map,
-                               [](const auto idx, const auto& key, auto& value, u0* user) -> u32 {
-                                   value = idx * *((u32*) user);
-                                   return 0;
-                               },
-                               &ar.members.size);
+        for (const auto& pair : ar.symbol_map)
+            ar.symbol_map[pair.bucket_idx] = idx * ar.members.size;
 
         for (u32 i = 0; i < sym_offsets.size; ++i) {
             auto& sym = sym_offsets[i];

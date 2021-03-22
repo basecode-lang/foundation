@@ -20,24 +20,15 @@
 
 namespace basecode::obj_pool {
     static u0 free_slabs(obj_pool_t& pool) {
-        hashtab::for_each_pair(
-            pool.slabs,
-            [](auto idx, const auto& key, auto& value, auto* user) -> u32 {
-                memory::system::free(value);
-                return 0;
-            },
-            nullptr);
+        for (const auto& pair : pool.slabs)
+            memory::system::free(pair.value);
     }
 
     static u0 free_storage(obj_pool_t& pool) {
-        hashtab::for_each_pair(
-            pool.storage,
-            [](auto idx, const auto& key, auto& value, auto* user) -> u32 {
-                if (value.destroy)
-                    value.destroy(value.obj);
-                return 0;
-            },
-            nullptr);
+        for (const auto& pair : pool.storage) {
+            if (pair.value.destroy)
+                pair.value.destroy(pair.value.obj);
+        }
     }
 
     u0 free(obj_pool_t& pool) {

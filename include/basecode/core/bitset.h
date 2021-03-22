@@ -24,8 +24,8 @@
 
 namespace basecode {
     struct bitset_t final {
+        alloc_t*                alloc;
         u64*                    data;
-        alloc_t*                allocator;
         u32                     capacity;
 
         bitset_t& operator<<(u32 bits);
@@ -70,6 +70,8 @@ namespace basecode {
 
         u0 difference_of(bitset_t& lhs, const bitset_t& rhs);
 
+        bitset_t make(alloc_t* alloc = context::top()->alloc);
+
         b8 disjoint(const bitset_t& lhs, const bitset_t& rhs);
 
         u0 intersection_of(bitset_t& lhs, const bitset_t& rhs);
@@ -78,17 +80,15 @@ namespace basecode {
 
         u32 union_count(const bitset_t& lhs, const bitset_t& rhs);
 
-        bitset_t make(alloc_t* allocator = context::top()->alloc);
-
         b8 intersection_of(const bitset_t& lhs, const bitset_t& rhs);
+
+        u0 init(bitset_t& set, alloc_t* alloc = context::top()->alloc);
 
         u0 symmetric_difference_of(bitset_t& lhs, const bitset_t& rhs);
 
         u32 difference_count(const bitset_t& lhs, const bitset_t& rhs);
 
         u32 intersection_count(const bitset_t& lhs, const bitset_t& rhs);
-
-        u0 init(bitset_t& set, alloc_t* allocator = context::top()->alloc);
 
         u0 resize(bitset_t& set, u32 new_capacity, b8 pad_with_zeros = true);
 

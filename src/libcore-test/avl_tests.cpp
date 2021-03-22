@@ -53,36 +53,36 @@ TEST_CASE("basecode::avl basics") {
         for (u32 i = 0; i < 64; ++i)
             set::insert(set, pick(rg));
 
-        auto values = set::values(set);
-        for (auto v : values) {
-            avl::insert(tree, *v);
-        }
+        for (auto v : set)
+            avl::insert(tree, v);
 
         if (bintree::empty(tree))
             REQUIRE(!bintree::empty(tree));
         if (bintree::size(tree) != set.size) {
+            u32 values[set.size];
+            u32 x = {};
+            for (auto v : set)
+                values[x++] = v;
             std::sort(
-                values.begin(),
-                values.end(),
+                &values[0],
+                &values[set.size - 1],
                 [&](const auto lhs, const auto rhs) {
-                    return *lhs < *rhs;
+                    return lhs < rhs;
                 });
             print_avl_cursor(tree);
             format::print("avl values: ");
-            for (u32 i = 0; i < values.size; ++i) {
+            for (u32 i = 0; i < set.size; ++i) {
                 if (i > 0) format::print(",");
-                format::print("{}", *values[i]);
+                format::print("{}", values[i]);
             }
             REQUIRE(bintree::size(tree) == set.size);
         }
 
-        for (auto v : values) {
-            if (!bintree::find(tree, *v)) {
+        for (auto v : set) {
+            if (!bintree::find(tree, v))
                 REQUIRE(false);
-            }
         }
 
-        array::free(values);
         set::free(set);
     }
 

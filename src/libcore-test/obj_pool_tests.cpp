@@ -51,5 +51,6 @@ TEST_CASE("basecode::obj_pool basics") {
     stopwatch::stop(timer);
     stopwatch::print_elapsed("total obj_pool destroy time"_ss, 40, timer);
 
+    REQUIRE(hashtab::empty(pool.storage));
     REQUIRE(obj_pool::empty(pool));
 }

@@ -23,11 +23,6 @@
 
 using namespace basecode;
 
-struct capture_t final {
-    str_buf_t*                  buf;
-    binfmt::ar::ar_t*           ar;
-};
-
 TEST_CASE("basecode::binfmt ar read test") {
     using namespace binfmt;
 
@@ -70,27 +65,18 @@ TEST_CASE("basecode::binfmt ar read test") {
             format::format_to(buf, "\n----\n\n");
         }
 
-        capture_t capture{};
-        capture.buf = &buf;
-        capture.ar = &ar;
-
-        hashtab::for_each_pair(
-            ar.symbol_map,
-            [](const auto idx, const auto& key, auto& value, u0* user) -> u32 {
-                auto c = (capture_t*)user;
-                format::format_to(*c->buf, "symbol . . . . . . . {}\n", key);
-                format::format_to(*c->buf, "bitmap offset  . . . {}\n", value);
-                format::format_to(*c->buf, "found in members:\n");
-                for (u32 i = 0; i < c->ar->members.size; ++i) {
-                    if (bitset::read(c->ar->symbol_module_bitmap, value + i)) {
-                        const auto& member = c->ar->members[i];
-                        format::format_to(*c->buf, "  {:>04}: {}\n", i, member.name);
-                    }
+        for (const auto& pair : ar.symbol_map) {
+            format::format_to(buf, "symbol . . . . . . . {}\n", pair.key);
+            format::format_to(buf, "bitmap offset  . . . {}\n", pair.value);
+            format::format_to(buf, "found in members:\n");
+            for (u32 i = 0; i < ar.members.size; ++i) {
+                if (bitset::read(ar.symbol_module_bitmap, pair.value + i)) {
+                    const auto& member = ar.members[i];
+                    format::format_to(buf, "  {:>04}: {}\n", i, member.name);
                 }
-                format::format_to(*c->buf, "\n");
-                return 0;
-            },
-            &capture);
+            }
+            format::format_to(buf, "\n");
+        }
     }
     format::print("{}", s);
 

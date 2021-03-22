@@ -82,7 +82,7 @@ namespace basecode {
             return fold(pool, (const s8*) value.data, value.length);
         }
 
-        u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc, f32 load_factor = .5f);
+        u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc, f32 load_factor = .75f);
     }
 }
 

@@ -1,5 +1,8 @@
 HIGH
 ---------
+- getopts: finish this!
+- rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
+    * add ca_hashtab_t and ca_set_t using chaining via linked list?
 - scm: implement tail call optimization
 - scm: adjust print primitive to not add spaces and line feeds
 - scm: add full quasiquote, unquote, unquote-splicing primitive support
@@ -30,6 +33,13 @@ LOW
 
 DONE
 ----
+- hashtab_t: implement basic forward-only iterator
+- hashtab_t/set_t: decide how to handle bucket state flag
+    * repurposed the minimal amount of bitset logic needed
+- hashtab_t: fix load_factor
+- set_t: fix load_factor
+- intern_t: fix load_factor
+- set_t: implement basic forward-only iterator
 - scm: implement eval primitive
 - add digraph_t
 - buddy allocator

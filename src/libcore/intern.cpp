@@ -91,7 +91,7 @@ namespace basecode::intern {
     }
 
     u0 reserve(intern_t& pool, u32 capacity) {
-        array::reserve(pool.strings, find_nearest_prime_capacity(capacity));
+        array::reserve(pool.strings, capacity);
     }
 
     result_t get(intern_t& pool, intern_id id) {
@@ -109,7 +109,7 @@ namespace basecode::intern {
 
     result_t fold(intern_t& pool, const s8* data, s32 len) {
         if (requires_rehash(pool.size, pool.capacity, pool.load_factor)) {
-            auto status = rehash(pool, pool.size * 2);
+            auto status = rehash(pool);
             if (!OK(status))
                 return result_t{.status = status, .new_value = false};
         }
@@ -158,11 +158,13 @@ namespace basecode::intern {
     }
 
     static status_t rehash(intern_t& pool, s32 new_capacity) {
-        if (new_capacity == -1) {
-            new_capacity = prime_capacity(pool.cap_idx++);
-        } else {
-            new_capacity = std::max<u32>(17, new_capacity);
-        }
+        s32 idx = new_capacity == -1 ? pool.cap_idx : find_nearest_prime_capacity(new_capacity);
+        f32 lf;
+        do {
+            new_capacity = prime_capacity(idx++);
+            lf = f32(pool.size) / f32(new_capacity);
+        } while (lf > pool.load_factor);
+        pool.cap_idx = idx;
 
         const auto ids_size = new_capacity * sizeof(intern_id);
         const auto buf_size = buffer_size(pool, new_capacity);
