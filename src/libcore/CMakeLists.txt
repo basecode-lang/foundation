@@ -122,6 +122,8 @@ set(
 
     job.cpp ${CORE_INC_DIR}/job.h
 
+    leb128.cpp ${CORE_INC_DIR}/leb128.h
+
     ${CORE_INC_DIR}/list.h
 
     locale.cpp ${CORE_INC_DIR}/locale.h
