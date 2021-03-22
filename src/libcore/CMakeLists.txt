@@ -205,6 +205,8 @@ set(
     utf.cpp ${CORE_INC_DIR}/utf.h
 
     uuid.cpp ${CORE_INC_DIR}/uuid.h
+
+    ${CORE_INC_DIR}/wasm.h
 )
 if (WIN32)
     set (
