@@ -17,21 +17,49 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/wasm.h>
+#include <basecode/core/leb128.h>
 #include <basecode/core/string.h>
+
+#define FILE_READ_SLEB128(t, v)             SAFE_SCOPE(     \
+    static_assert(std::is_same_v<decltype(v), t>);          \
+    if (!OK(leb::decode_signed(file.crsr, (v))))            \
+        return status_t::read_error;)
+#define FILE_READ_ULEB128(t, v)             SAFE_SCOPE(     \
+    static_assert(std::is_same_v<decltype(v), t>);          \
+    if (!OK(leb::decode_unsigned(file.crsr, (v))))          \
+        return status_t::read_error;)
+#define FILE_READ_PSTR(s)       SAFE_SCOPE(                     \
+    u32 l;                                                      \
+    FILE_READ_ULEB128(u32, l);                                  \
+    str::resize((s), l);                                        \
+    if (!OK(buf::cursor::read_str(file.crsr, (s).data, (l))))   \
+        return status_t::read_error;)
 
 namespace basecode::wasm {
     namespace types {
-        static str::slice_t s_names[] = {
-            [u32(i32)]                    = "i32"_ss,
-            [u32(i64)]                    = "i64"_ss,
-            [u32(f32)]                    = "f32"_ss,
-            [u32(f64)]                    = "f64"_ss,
-            [u32(fun_ref)]                = "funcref"_ss,
-            [u32(ext_ref)]                = "externref"_ss,
-        };
-
         str::slice_t name(u8 type) {
-            return s_names[u32(type)];
+            switch (type) {
+                case i32:
+                    return "i32"_ss;
+                case i64:
+                    return "i64"_ss;
+                case f32:
+                    return "f32"_ss;
+                case f64:
+                    return "f64"_ss;
+                case func_ref:
+                    return "func_ref"_ss;
+                case extern_ref:
+                    return "extern_ref"_ss;
+                case exn_ref:
+                    return "exn_ref"_ss;
+                case func:
+                    return "func"_ss;
+                case empty_block:
+                    return "empty_block"_ss;
+                default:
+                    return "unknown"_ss;
+            }
         }
     }
 
@@ -65,18 +93,27 @@ namespace basecode::wasm {
             [u32(loop)]                   = "loop"_ss,
             [u32(if_)]                    = "if"_ss,
             [u32(else_)]                  = "else"_ss,
+            [u32(try_)]                   = "try"_ss,
+            [u32(catch_)]                 = "catch"_ss,
+            [u32(throw_)]                 = "throw"_ss,
+            [u32(rethrow)]                = "rethrow"_ss,
+            [u32(unwind)]                 = "unwind"_ss,
+            [u32(end)]                    = "end"_ss,
             [u32(br)]                     = "br"_ss,
             [u32(br_if)]                  = "br_if"_ss,
             [u32(br_table)]               = "br_table"_ss,
             [u32(return_)]                = "return"_ss,
             [u32(call)]                   = "call"_ss,
             [u32(calli)]                  = "call_indirect"_ss,
+            [u32(return_call)]            = "return.call"_ss,
+            [u32(return_calli)]           = "return.call_indirect"_ss,
+            [u32(delegate)]               = "delegate"_ss,
             [u32(null)]                   = "ref.null"_ss,
             [u32(is_null)]                = "ref.is_null"_ss,
             [u32(ref_func)]               = "ref.func"_ss,
             [u32(drop)]                   = "drop"_ss,
             [u32(select)]                 = "select"_ss,
-            [u32(select_t)]               = "select"_ss,
+            [u32(typed_select)]           = "typed.select"_ss,
             [u32(local_get)]              = "local.get"_ss,
             [u32(local_set)]              = "local.set"_ss,
             [u32(local_tee)]              = "local.tee"_ss,
@@ -119,8 +156,6 @@ namespace basecode::wasm {
             [u32(data_drop)]              = "data.drop"_ss,
             [u32(memory_copy)]            = "memory.copy"_ss,
             [u32(memory_fill)]            = "memory.fill"_ss,
-            [u32(end)]                    = "end"_ss,
-            [u32(empty_block)]            = "empty"_ss,
             [u32(i32_const)]              = "i32.const"_ss,
             [u32(i64_const)]              = "i64.const"_ss,
             [u32(f32_const)]              = "f32.const"_ss,
@@ -280,6 +315,188 @@ namespace basecode::wasm {
 
             FILE_READ(u32, module.magic);
             FILE_READ(u32, module.version);
+
+            b8 ok = true;
+
+            while (ok && CRSR_MORE(module.crsr)) {
+                u32 size{};
+                s8 id{};
+
+                FILE_READ_ULEB128(s8, id);
+                FILE_READ_ULEB128(u32, size);
+
+                switch (id) {
+                    case sections::type: {
+                        format::print("section: type\n");
+
+                        u32 num_types{};
+                        FILE_READ_ULEB128(u32, num_types);
+
+                        for (u32 i = 0; i < num_types; ++i) {
+                            u8 type_code;
+                            FILE_READ(u8, type_code);
+
+                            switch (type_code) {
+                                case 0x60: {
+                                    u32 params_len{};
+                                    u32 returns_len{};
+                                    FILE_READ_ULEB128(u32, params_len);
+
+                                    format::print("func@{}(", i);
+                                    for (u32 j = 0; j < params_len; ++j) {
+                                        u8 code;
+                                        FILE_READ(u8, code);
+                                        if (j > 0 && j < params_len) format::print(", ");
+                                        format::print("{}", types::name(code));
+                                    }
+
+                                    FILE_READ_ULEB128(u32, returns_len);
+                                    if (returns_len > 0) {
+                                        format::print(") : ");
+                                        for (u32 j = 0; j < returns_len; ++j) {
+                                            u8 code;
+                                            FILE_READ(u8, code);
+                                            if (j > 0) format::print(", ");
+                                            format::print("{}", types::name(code));
+                                        }
+                                    } else {
+                                        format::print(")");
+                                    }
+
+                                    format::print("\n");
+                                    break;
+                                }
+                                case 0x61: {
+                                    u32 modules_len{};
+                                    FILE_READ_ULEB128(u32, modules_len);
+                                    for (u32 j = 0; j < modules_len; ++j) {
+                                        str::slice_t field_name{};
+                                        str::slice_t module_name{};
+                                        {
+                                            u32 len{};
+                                            FILE_READ_ULEB128(u32, len);
+
+                                            s8 buf[len];
+                                            FILE_READ_STR(buf, len);
+
+                                            module_name = string::interned::fold(buf, len);
+                                        }
+                                        {
+                                            u32 len{};
+                                            FILE_READ_ULEB128(u32, len);
+
+                                            s8 buf[len];
+                                            FILE_READ_STR(buf, len);
+
+                                            field_name = string::interned::fold(buf, len);
+                                        }
+                                        u8 extern_kind{};
+                                        FILE_READ_ULEB128(u8, extern_kind);
+                                        switch (extern_kind) {
+                                            default:
+                                                break;
+                                        }
+                                    }
+                                    // read module type
+                                    break;
+                                }
+                                case 0x62: {
+                                    // read instance type
+                                    break;
+                                }
+                                default: {
+                                    break;
+                                }
+                            }
+                        }
+                        break;
+                    }
+                    case sections::code: {
+                        format::print("section: code\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    case sections::data: {
+                        format::print("section: data\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    case sections::table: {
+                        format::print("section: table\n");
+                        u32 num_entries{};
+                        FILE_READ_ULEB128(u32, num_entries);
+                        for (u32 i = 0; i < num_entries; ++i) {
+                            u8 element_type{};
+                            u32 flags{};
+                            u32 min{};
+                            u32 max{};
+
+                            FILE_READ(u8, element_type);
+                            FILE_READ_ULEB128(u32, flags);
+                            FILE_READ_ULEB128(u32, min);
+                            if ((flags & 0x1U) != 0)
+                                FILE_READ_ULEB128(u32, max);
+                            format::print(
+                                "\telement_type = {}, flags = {}, min = {}, max = {}\n",
+                                types::name(element_type),
+                                flags,
+                                min,
+                                max);
+                        }
+                        break;
+                    }
+                    case sections::start: {
+                        format::print("section: start\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    case sections::import: {
+                        format::print("section: import\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    case sections::memory: {
+                        format::print("section: memory\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    case sections::global: {
+                        format::print("section: global\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    case sections::custom: {
+                        format::print("section: custom\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    case sections::export_: {
+                        format::print("section: export\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    case sections::element: {
+                        format::print("section: element\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    case sections::function: {
+                        format::print("section: function\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    case sections::data_count: {
+                        format::print("section: data count\n");
+                        FILE_SEEK_FWD(size);
+                        break;
+                    }
+                    default: {
+                        format::print("section: unknown\n");
+                        ok = false;
+                        break;
+                    }
+                }
+            }
 
             return status_t::ok;
         }

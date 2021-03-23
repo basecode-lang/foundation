@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/core/buf.h>
 
 namespace basecode {
     struct leb128_t final {
@@ -31,6 +31,11 @@ namespace basecode {
         constexpr u8 sign_bit         = 0x40;
         constexpr u8 continuation_bit = 0x80;
         constexpr u8 lower_seven_bits = 0x7f;
+
+        enum class status_t {
+            ok,
+            decode_error
+        };
 
         u0 init(leb128_t& leb);
 
@@ -95,6 +100,45 @@ namespace basecode {
                 } while(*p++ >= 128);
             }
             return value;
+        }
+
+        template <typename T,
+            u32 Size_In_Bits = sizeof(T) * 8,
+            std::enable_if_t<std::numeric_limits<T>::is_integer, b8> = true>
+        status_t decode_signed(buf_crsr_t& crsr, T& value) {
+            u32 shift   {};
+            u32 count   {};
+            u8  byte;
+            do {
+                buf::cursor::read(crsr, byte);
+                T slice = byte & lower_seven_bits;
+                value |= slice << shift;
+                shift += 7;
+                ++count;
+            } while (byte >= 128);
+            if (shift < Size_In_Bits && (byte & sign_bit))
+                value |= T(-1) << shift;
+            while (CRSR_PEEK(crsr) == 0 && count < 7)
+                ++count;
+            return status_t::ok;
+        }
+
+        template <typename T,
+            std::enable_if_t<std::numeric_limits<T>::is_integer, b8> = true>
+        status_t decode_unsigned(buf_crsr_t& crsr, T& value) {
+            u32 shift   {};
+            u32 count   {};
+            u8  byte;
+            do {
+                buf::cursor::read(crsr, byte);
+                T slice = byte & lower_seven_bits;
+                value += slice << shift;
+                shift += 7;
+                ++count;
+            } while(byte >= 128);
+            while (CRSR_PEEK(crsr) == 0 && count < 7)
+                ++count;
+            return status_t::ok;
         }
     }
 }
