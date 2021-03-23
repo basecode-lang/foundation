@@ -21,7 +21,7 @@
 
 using namespace basecode;
 
-TEST_CASE("basecode::wasm basics") {
+TEST_CASE("basecode::wasm basics", "[wasm]") {
     wasm_t wasm{};
     wasm::init(wasm);
     defer(wasm::free(wasm));

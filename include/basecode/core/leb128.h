@@ -109,6 +109,7 @@ namespace basecode {
             u32 shift   {};
             u32 count   {};
             u8  byte;
+            value = {};
             do {
                 buf::cursor::read(crsr, byte);
                 T slice = byte & lower_seven_bits;
@@ -129,6 +130,7 @@ namespace basecode {
             u32 shift   {};
             u32 count   {};
             u8  byte;
+            value = {};
             do {
                 buf::cursor::read(crsr, byte);
                 T slice = byte & lower_seven_bits;
