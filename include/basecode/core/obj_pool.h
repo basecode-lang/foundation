@@ -23,20 +23,26 @@
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode {
+    struct obj_type_t;
+    struct obj_destroyer_t;
+
+    using obj_array_t           = array_t<u0*>;
+    using slab_table_t          = hashtab_t<u32, obj_type_t>;
+    using storage_table_t       = hashtab_t<u0*, obj_destroyer_t>;
     using destroy_callback_t    = u0 (*)(const u0*);
 
     struct obj_destroyer_t final {
-        alloc_t*                alloc;
         u0*                     obj;
+        alloc_t*                alloc;
         destroy_callback_t      destroy;
-
-        auto operator<=>(const obj_destroyer_t& rhs) const {
-            return obj <=> rhs.obj;
-        }
     };
 
-    using slab_table_t          = hashtab_t<u32, alloc_t*>;
-    using storage_table_t       = hashtab_t<u0*, obj_destroyer_t>;
+    struct obj_type_t final {
+        alloc_t*                alloc;
+        u32                     type_id;
+        const s8*               type_name;
+        obj_array_t             objects;
+    };
 
     struct obj_pool_t final {
         alloc_t*                alloc;
@@ -55,12 +61,16 @@ namespace basecode {
 
         template <typename T>
         u0 destroy(obj_pool_t& pool, T* obj) {
-            auto d = hashtab::find(pool.storage, (u0*) obj);
+            u0* o = obj;
+            auto d = hashtab::find(pool.storage, o);
             if (d) {
+                const auto type_id = family_t<>::template type<T>;
+                auto type = hashtab::find(pool.slabs, type_id);
                 if (d->destroy)
-                    d->destroy(d->obj);
-                hashtab::remove(pool.storage, d->obj);
-                memory::free(d->alloc, d->obj);
+                    d->destroy(o);
+                hashtab::remove(pool.storage, o);
+                array::erase(type->objects, o);
+                memory::free(d->alloc, o);
                 --pool.size;
             }
         }
@@ -70,21 +80,30 @@ namespace basecode {
         }
 
         template <typename T, typename... Args>
-        T* make(obj_pool_t& pool, Args&&... args) {
+        obj_type_t* register_type(obj_pool_t& pool) {
             const auto type_id = family_t<>::template type<T>;
-            auto slab = hashtab::find(pool.slabs, type_id);
-            if (!slab) {
+            auto [type, is_new] = hashtab::emplace2(pool.slabs, type_id);
+            if (is_new) {
                 slab_config_t cfg{};
-                cfg.backing   = pool.alloc;
-                cfg.buf_size  = sizeof(T);
-                cfg.buf_align = alignof(T);
-                slab = memory::system::make(alloc_type_t::slab, &cfg);
-                hashtab::insert(pool.slabs, type_id, slab);
+                cfg.backing     = pool.alloc;
+                cfg.buf_size    = sizeof(T);
+                cfg.buf_align   = alignof(T);
+                type->alloc     = memory::system::make(alloc_type_t::slab, &cfg);
+                type->type_id   = type_id;
+                type->type_name = typeid(T).name();
+                array::init(type->objects, pool.alloc);
             }
-            u0* mem = memory::alloc(slab);
+            return type;
+        }
+
+        template <typename T, typename... Args>
+        T* make(obj_pool_t& pool, Args&&... args) {
+            auto type = register_type<T>(pool);
+            u0* mem = memory::alloc(type->alloc);
+            array::append(type->objects, mem);
             auto d = hashtab::emplace(pool.storage, mem);
             d->obj     = mem;
-            d->alloc   = slab;
+            d->alloc   = type->alloc;
             if constexpr (std::is_destructible_v<T>) {
                 d->destroy = [](const u0* x) -> u0 {
                     static_cast<const T*>(x)->~T();

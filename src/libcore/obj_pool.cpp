@@ -19,29 +19,25 @@
 #include <basecode/core/obj_pool.h>
 
 namespace basecode::obj_pool {
-    static u0 free_slabs(obj_pool_t& pool) {
-        for (const auto& pair : pool.slabs)
-            memory::system::free(pair.value);
-    }
-
-    static u0 free_storage(obj_pool_t& pool) {
-        for (const auto& pair : pool.storage) {
-            if (pair.value.destroy)
-                pair.value.destroy(pair.value.obj);
-        }
-    }
-
     u0 reset(obj_pool_t& pool) {
-        free_storage(pool);
-        free_slabs(pool);
-        hashtab::reset(pool.slabs);
         hashtab::reset(pool.storage);
+        for (const auto& pair : pool.slabs)
+            array::reset(const_cast<obj_array_t&>(pair.value.objects));
+        hashtab::reset(pool.slabs);
     }
 
     u0 free(obj_pool_t& pool, b8 skip_storage) {
-        if (!skip_storage)
-            free_storage(pool);
-        free_slabs(pool);
+        if (!skip_storage) {
+            for (const auto& pair : pool.storage) {
+                if (pair.value.destroy)
+                    pair.value.destroy(pair.value.obj);
+            }
+        }
+        for (const auto& pair : pool.slabs) {
+            auto& type = pair.value;
+            array::free(const_cast<obj_array_t&>(type.objects));
+            memory::system::free(type.alloc);
+        }
         hashtab::free(pool.slabs);
         hashtab::free(pool.storage);
     }

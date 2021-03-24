@@ -45,6 +45,7 @@ add_executable(
     graphviz_tests.cpp
     obj_pool_tests.cpp
     str_array_tests.cpp
+    proxy_array_tests.cpp
     assoc_array_tests.cpp
     stable_array_tests.cpp
 )

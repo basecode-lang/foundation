@@ -63,8 +63,8 @@ TEST_CASE("basecode::hashtab names") {
 
     u32 count{};
     for (const auto& rec : records) {
-        auto name = hashtab::emplace(table, fields[rec.idx + 3]);
-        if (name->sex == 0) {
+        auto [name, is_new] = hashtab::emplace2(table, fields[rec.idx + 3]);
+        if (is_new) {
             ++count;
             name->sex = fields[rec.idx + 1][0];
             std::memcpy(name->year, fields[rec.idx + 2].data, 4);

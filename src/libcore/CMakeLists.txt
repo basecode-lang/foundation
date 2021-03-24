@@ -166,6 +166,8 @@ set(
 
     profiler.cpp ${CORE_INC_DIR}/profiler.h
 
+    ${CORE_INC_DIR}/proxy_array.h
+
     ${CORE_INC_DIR}/queue.h
 
     ${CORE_INC_DIR}/rbt.h

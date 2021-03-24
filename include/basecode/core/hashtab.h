@@ -334,6 +334,18 @@ namespace basecode {
             return nullptr;
         }
 
+        template <Hash_Table T>
+        u0 init(T& table, alloc_t* alloc, f32 load_factor) {
+            table.keys          = {};
+            table.alloc         = alloc;
+            table.flags         = {};
+            table.values        = {};
+            table.hashes        = {};
+            table.cap_idx       = {};
+            table.load_factor   = load_factor;
+            table.size = table.capacity = {};
+        }
+
         template <Hash_Table T,
                   typename Value_Type = typename T::Value_Type,
                   b8 Is_Pointer = std::is_pointer_v<Value_Type>,
@@ -360,16 +372,30 @@ namespace basecode {
             }
         }
 
-        template <Hash_Table T>
-        u0 init(T& table, alloc_t* alloc, f32 load_factor) {
-            table.keys          = {};
-            table.alloc         = alloc;
-            table.flags         = {};
-            table.values        = {};
-            table.hashes        = {};
-            table.cap_idx       = {};
-            table.load_factor   = load_factor;
-            table.size = table.capacity = {};
+        template <Hash_Table T,
+                  typename Value_Type = typename T::Value_Type,
+                  b8 Is_Pointer = std::is_pointer_v<Value_Type>,
+                  typename Base_Value_Type = std::remove_pointer_t<Value_Type>*>
+        std::pair<Base_Value_Type, b8> emplace2(T& table, const auto& key) {
+            auto v = find(table, key);
+            if (v)
+                return {v, false};
+
+            if (hash_common::requires_rehash(table.size, table.capacity, table.load_factor))
+                rehash(table);
+
+            u64 hash         = hash::hash64(key);
+            u32 bucket_index = hash_common::range_reduction(hash, table.capacity);
+            assert(hash_common::find_free_bucket2(table.flags, table.capacity, bucket_index));
+            hash_common::write_flag(table.flags, bucket_index, true);
+            table.keys[bucket_index]   = key;
+            table.hashes[bucket_index] = hash;
+            ++table.size;
+            if constexpr (Is_Pointer) {
+                return {table.values[bucket_index], true};
+            } else {
+                return {&table.values[bucket_index], true};
+            }
         }
 
         template <Hash_Table T,
