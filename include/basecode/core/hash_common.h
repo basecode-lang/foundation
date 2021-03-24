@@ -22,7 +22,7 @@
 #include <basecode/core/types.h>
 #include <basecode/core/format.h>
 
-namespace basecode {
+namespace basecode::hash_common {
     static inline u32 s_prime_capacities[] = {
         17,
         37,
@@ -41,19 +41,27 @@ namespace basecode {
         1036039,
     };
 
-    u0 write(u64* data, u32 bit, b8 flag);
-
     force_inline u32 prime_capacity(u32 idx) {
         return s_prime_capacities[idx];
     }
 
-    force_inline b8 read(const u64* data, u32 bit) {
+    force_inline b8 read_flag(const u64* data, u32 bit) {
         const auto shifted_bit = bit >> 6U;
         return (data[shifted_bit] & (u64(1) << (bit % 64))) != 0;
     }
 
     force_inline u32 range_reduction(u64 hash, u32 size) {
         return hash % size;
+    }
+
+    force_inline u0 write_flag(u64* data, u32 bit, b8 flag) {
+        const auto shifted_bit = bit >> 6U;
+        const auto mask        = u64(1) << (bit % 64);
+        const auto new_mask    = u64(flag) << (bit % 64);
+        auto word = data[shifted_bit];
+        word &= ~mask;
+        word |= new_mask;
+        data[shifted_bit] = word;
     }
 
     force_inline u0 print_flags(const u64* flags, u32 size) {
@@ -63,10 +71,6 @@ namespace basecode {
         }
         format::print("\n");
     }
-
-    b8 find_free_bucket(const u64* hashes, u32 size, u32& bucket_idx);
-
-    b8 find_free_bucket2(const u64* flags, u32 size, u32& bucket_idx);
 
     force_inline u32 flag_words_for_capacity(u32 capacity) {
         return std::max<u32>(
@@ -81,6 +85,10 @@ namespace basecode {
         }
         return -1;
     }
+
+    b8 find_free_bucket(const u64* hashes, u32 size, u32& bucket_idx);
+
+    b8 find_free_bucket2(const u64* flags, u32 size, u32& bucket_idx);
 
     force_inline b8 requires_rehash(u32 size, u32 capacity, f32 load_factor) {
         if (capacity == 0)

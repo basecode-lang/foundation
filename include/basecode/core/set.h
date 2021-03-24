@@ -113,7 +113,7 @@ namespace basecode {
                 capacity = set.capacity;
             const auto size_of_hashes = capacity * sizeof(u64);
             const auto size_of_values = capacity * sizeof(Value_Type);
-            return (flag_words_for_capacity(capacity) * sizeof(u64))
+            return (hash_common::flag_words_for_capacity(capacity) * sizeof(u64))
                 + size_of_hashes
                 + alignof(Value_Type)
                 + size_of_values;
@@ -150,7 +150,7 @@ namespace basecode {
             array::init(list, set.alloc);
             array::reserve(list, set.size);
             for (u32 i = 0; i < set.capacity; ++i) {
-                if (!read(set.flags, i)) continue;
+                if (!hash_common::read_flag(set.flags, i)) continue;
                 if constexpr (Is_Pointer) {
                     array::append(list, set.values[i]);
                 } else {
@@ -167,10 +167,10 @@ namespace basecode {
 
         template <Hash_Set T, typename Value_Type>
         u0 rehash(T& set, s32 new_capacity) {
-            s32 idx = new_capacity == -1 ? set.cap_idx : find_nearest_prime_capacity(new_capacity);
+            s32 idx = new_capacity == -1 ? set.cap_idx : hash_common::find_nearest_prime_capacity(new_capacity);
             f32 lf;
             do {
-                new_capacity = prime_capacity(idx++);
+                new_capacity = hash_common::prime_capacity(idx++);
                 lf = f32(set.size) / f32(new_capacity);
             } while (lf > set.load_factor);
             set.cap_idx = idx;
@@ -181,17 +181,17 @@ namespace basecode {
 
             u32  values_align{};
             auto new_flags  = (u64*) buf;
-            auto new_hashes = new_flags + flag_words_for_capacity(new_capacity);
+            auto new_hashes = new_flags + hash_common::flag_words_for_capacity(new_capacity);
             auto new_values = (Value_Type*) memory::system::align_forward(
                 new_hashes + new_capacity,
                 alignof(Value_Type),
                 values_align);
 
             for (u32 i = 0; i < set.capacity; ++i) {
-                if (!read(set.flags, i)) continue;
-                u32 bucket_index = range_reduction(set.hashes[i], new_capacity);
-                assert(find_free_bucket2(new_flags, new_capacity, bucket_index));
-                write(new_flags, bucket_index, true);
+                if (!hash_common::read_flag(set.flags, i)) continue;
+                u32 bucket_index = hash_common::range_reduction(set.hashes[i], new_capacity);
+                assert(hash_common::find_free_bucket2(new_flags, new_capacity, bucket_index));
+                hash_common::write_flag(new_flags, bucket_index, true);
                 new_hashes[bucket_index] = set.hashes[i];
                 new_values[bucket_index] = set.values[i];
             }
@@ -214,11 +214,11 @@ namespace basecode {
         b8 remove(T& set, const Value_Type& value) {
             if (set.size == 0) return false;
             u64 hash         = hash::hash64(value);
-            u32 bucket_index = range_reduction(hash, set.capacity);
+            u32 bucket_index = hash_common::range_reduction(hash, set.capacity);
             u32 found_index;
             if (!find_value(set, bucket_index, hash, value, &found_index))
                 return false;
-            write(set.flags, found_index, false);
+            hash_common::write_flag(set.flags, found_index, false);
             --set.size;
             return true;
         }
@@ -243,7 +243,7 @@ namespace basecode {
                 return nullptr;
 
             u64 hash         = hash::hash64(value);
-            u32 bucket_index = range_reduction(hash, set.capacity);
+            u32 bucket_index = hash_common::range_reduction(hash, set.capacity);
             u32 found_index;
             if (find_value(set, bucket_index, hash, value, &found_index)) {
                 if constexpr (Is_Pointer) {
@@ -265,13 +265,13 @@ namespace basecode {
             if (v)
                 return v;
 
-            if (requires_rehash(set.size, set.capacity, set.load_factor))
+            if (hash_common::requires_rehash(set.size, set.capacity, set.load_factor))
                 rehash(set);
 
             u64 hash         = hash::hash64(value);
-            u32 bucket_index = range_reduction(hash, set.capacity);
-            assert(find_free_bucket2(set.flags, set.capacity, bucket_index));
-            write(set.flags, bucket_index, true);
+            u32 bucket_index = hash_common::range_reduction(hash, set.capacity);
+            assert(hash_common::find_free_bucket2(set.flags, set.capacity, bucket_index));
+            hash_common::write_flag(set.flags, bucket_index, true);
             set.hashes[bucket_index] = hash;
             set.values[bucket_index] = value;
             ++set.size;
@@ -285,14 +285,14 @@ namespace basecode {
         template <Hash_Set T, typename Value_Type>
         b8 find_value(T& set, u32 start, u64 hash, const Value_Type& value, u32* found) {
             for (u32 i = start; i < set.capacity; ++i) {
-                if (!read(set.flags, i)) return false;
+                if (!hash_common::read_flag(set.flags, i)) return false;
                 if (hash == set.hashes[i] && value == set.values[i]) {
                     *found = i;
                     return true;
                 }
             }
             for (u32 i = 0; i < start; ++i) {
-                if (!read(set.flags, i)) return false;
+                if (!hash_common::read_flag(set.flags, i)) return false;
                 if (hash == set.hashes[i] && value == set.values[i]) {
                     *found = i;
                     return true;

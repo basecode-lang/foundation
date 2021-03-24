@@ -108,7 +108,7 @@ namespace basecode::intern {
     }
 
     result_t fold(intern_t& pool, const s8* data, s32 len) {
-        if (requires_rehash(pool.size, pool.capacity, pool.load_factor)) {
+        if (hash_common::requires_rehash(pool.size, pool.capacity, pool.load_factor)) {
             auto status = rehash(pool);
             if (!OK(status))
                 return result_t{.status = status, .new_value = false};
@@ -116,7 +116,7 @@ namespace basecode::intern {
 
         const auto value = slice::make(data, len == -1 ? strlen(data) : len);
         u64 hash         = hash::hash64(value);
-        u32 bucket_index = range_reduction(hash, pool.capacity);
+        u32 bucket_index = hash_common::range_reduction(hash, pool.capacity);
         if (find_key(pool, hash, value, bucket_index)) {
             const auto id = pool.ids[bucket_index];
             return result_t{
@@ -128,7 +128,7 @@ namespace basecode::intern {
             };
         }
 
-        if (!find_free_bucket(pool.hashes, pool.capacity, bucket_index))
+        if (!hash_common::find_free_bucket(pool.hashes, pool.capacity, bucket_index))
             return result_t{.status = status_t::no_bucket, .new_value = false};
 
         auto& str = array::append(pool.strings);
@@ -158,10 +158,10 @@ namespace basecode::intern {
     }
 
     static status_t rehash(intern_t& pool, s32 new_capacity) {
-        s32 idx = new_capacity == -1 ? pool.cap_idx : find_nearest_prime_capacity(new_capacity);
+        s32 idx = new_capacity == -1 ? pool.cap_idx : hash_common::find_nearest_prime_capacity(new_capacity);
         f32 lf;
         do {
-            new_capacity = prime_capacity(idx++);
+            new_capacity = hash_common::prime_capacity(idx++);
             lf = f32(pool.size) / f32(new_capacity);
         } while (lf > pool.load_factor);
         pool.cap_idx = idx;
@@ -183,8 +183,8 @@ namespace basecode::intern {
                 continue;
 
             const u64 hash = pool.hashes[i];
-            u32 bucket_index = range_reduction(hash, new_capacity);
-            if (!find_free_bucket(hashes, new_capacity, bucket_index))
+            u32 bucket_index = hash_common::range_reduction(hash, new_capacity);
+            if (!hash_common::find_free_bucket(hashes, new_capacity, bucket_index))
                 return status_t::no_bucket;
 
             ids[bucket_index]    = id;

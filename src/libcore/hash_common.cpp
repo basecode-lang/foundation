@@ -18,26 +18,16 @@
 
 #include <basecode/core/hash_common.h>
 
-namespace basecode {
-    u0 write(u64* data, u32 bit, b8 flag) {
-        const auto shifted_bit = bit >> 6U;
-        const auto mask        = u64(1) << (bit % 64);
-        const auto new_mask    = u64(flag) << (bit % 64);
-        auto word = data[shifted_bit];
-        word &= ~mask;
-        word |= new_mask;
-        data[shifted_bit] = word;
-    }
-
+namespace basecode::hash_common {
     b8 find_free_bucket2(const u64* flags, u32 size, u32& bucket_idx) {
         for (u32 i = bucket_idx; i < size; ++i) {
-            if (!read(flags, i)) {
+            if (!read_flag(flags, i)) {
                 bucket_idx = i;
                 return true;
             }
         }
         for (u32 i = 0; i < bucket_idx; ++i) {
-            if (!read(flags, i)) {
+            if (!read_flag(flags, i)) {
                 bucket_idx = i;
                 return true;
             }

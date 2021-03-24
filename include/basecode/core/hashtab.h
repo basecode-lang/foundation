@@ -84,7 +84,7 @@ namespace basecode {
 
             inline u0 next(const hashtab_t* ref) {
                 while (pos < ref->capacity) {
-                    if (read(ref->flags, ++pos))
+                    if (hash_common::read_flag(ref->flags, ++pos))
                         break;
                 }
             }
@@ -100,7 +100,7 @@ namespace basecode {
             inline u0 begin(const hashtab_t* ref) {
                 pos = 0;
                 while (pos < ref->capacity) {
-                    if (read(ref->flags, pos))
+                    if (hash_common::read_flag(ref->flags, pos))
                         break;
                     ++pos;
                 }
@@ -150,8 +150,11 @@ namespace basecode {
 
         template <Hash_Table T>
         u0 reset(T& table) {
-            if (table.flags)
-                std::memset(table.flags, 0, flag_words_for_capacity(table.capacity) * sizeof(u64));
+            if (table.flags) {
+                std::memset(table.flags,
+                            0,
+                            hash_common::flag_words_for_capacity(table.capacity) * sizeof(u64));
+            }
             table.size = {};
         }
 
@@ -175,7 +178,7 @@ namespace basecode {
             array::init(list, table.alloc);
             array::reserve(list, table.size);
             for (u32 i = 0; i < table.capacity;) {
-                if (!read(table.flags, i))
+                if (!hash_common::read_flag(table.flags, i))
                     continue;
                 if constexpr (Is_Pointer) {
                     array::append(list, table.keys[i]);
@@ -196,7 +199,7 @@ namespace basecode {
             array::init(list, table.alloc);
             array::reserve(list, table.size);
             for (u32 i = 0; i < table.capacity; ++i) {
-                if (!read(table.flags, i))
+                if (!hash_common::read_flag(table.flags, i))
                     continue;
                 if constexpr (Is_Pointer) {
                     array::append(list, table.values[i]);
@@ -214,14 +217,14 @@ namespace basecode {
                     const Key_Type& key,
                     u32* found) {
             for (u32 i = start; i < table.capacity; ++i) {
-                if (!read(table.flags, i)) return false;
+                if (!hash_common::read_flag(table.flags, i)) return false;
                 if (hash == table.hashes[i] && key == table.keys[i]) {
                     *found = i;
                     return true;
                 }
             }
             for (u32 i = 0; i < start; ++i) {
-                if (!read(table.flags, i)) return false;
+                if (!hash_common::read_flag(table.flags, i)) return false;
                 if (hash == table.hashes[i] && key == table.keys[i]) {
                     *found = i;
                     return true;
@@ -237,15 +240,15 @@ namespace basecode {
 
         template <Hash_Table T, typename Key_Type, typename Value_Type>
         u0 rehash(T& table, s32 new_capacity) {
-            s32 idx = new_capacity == -1 ? table.cap_idx : find_nearest_prime_capacity(new_capacity);
+            s32 idx = new_capacity == -1 ? table.cap_idx : hash_common::find_nearest_prime_capacity(new_capacity);
             f32 lf;
             do {
-                new_capacity = prime_capacity(idx++);
+                new_capacity = hash_common::prime_capacity(idx++);
                 lf = f32(table.size) / f32(new_capacity);
             } while (lf > table.load_factor);
             table.cap_idx = idx;
 
-            const auto num_of_flags   = flag_words_for_capacity(new_capacity);
+            const auto num_of_flags   = hash_common::flag_words_for_capacity(new_capacity);
             const auto size_of_hashes = new_capacity * sizeof(u64);
             const auto size_of_keys   = new_capacity * sizeof(Key_Type);
             const auto size_of_values = new_capacity * sizeof(Value_Type);
@@ -271,10 +274,10 @@ namespace basecode {
                 values_align);
 
             for (u32 i = 0; i < table.capacity; ++i) {
-                if (!read(table.flags, i)) continue;
-                u32 bucket_index = range_reduction(table.hashes[i], new_capacity);
-                assert(find_free_bucket2(new_flags, new_capacity, bucket_index));
-                write(new_flags, bucket_index, true);
+                if (!hash_common::read_flag(table.flags, i)) continue;
+                u32 bucket_index = hash_common::range_reduction(table.hashes[i], new_capacity);
+                assert(hash_common::find_free_bucket2(new_flags, new_capacity, bucket_index));
+                hash_common::write_flag(new_flags, bucket_index, true);
                 new_keys[bucket_index]   = table.keys[i];
                 new_values[bucket_index] = table.values[i];
                 new_hashes[bucket_index] = table.hashes[i];
@@ -300,11 +303,11 @@ namespace basecode {
             if (table.size == 0)
                 return false;
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = range_reduction(hash, table.capacity);
+            u32 bucket_index = hash_common::range_reduction(hash, table.capacity);
             u32 found_index;
             if (!find_key(table, bucket_index, hash, key, &found_index))
                 return false;
-            write(table.flags, found_index, false);
+            hash_common::write_flag(table.flags, found_index, false);
             --table.size;
             return true;
         }
@@ -318,7 +321,7 @@ namespace basecode {
                 return nullptr;
 
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = range_reduction(hash, table.capacity);
+            u32 bucket_index = hash_common::range_reduction(hash, table.capacity);
             u32 found_index{};
             if (find_key(table, bucket_index, hash, key, &found_index)) {
                 if constexpr (Is_Pointer) {
@@ -340,13 +343,13 @@ namespace basecode {
             if (v)
                 return v;
 
-            if (requires_rehash(table.size, table.capacity, table.load_factor))
+            if (hash_common::requires_rehash(table.size, table.capacity, table.load_factor))
                 rehash(table);
 
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = range_reduction(hash, table.capacity);
-            assert(find_free_bucket2(table.flags, table.capacity, bucket_index));
-            write(table.flags, bucket_index, true);
+            u32 bucket_index = hash_common::range_reduction(hash, table.capacity);
+            assert(hash_common::find_free_bucket2(table.flags, table.capacity, bucket_index));
+            hash_common::write_flag(table.flags, bucket_index, true);
             table.keys[bucket_index]   = key;
             table.hashes[bucket_index] = hash;
             ++table.size;
@@ -379,13 +382,13 @@ namespace basecode {
             if (v)
                 return v;
 
-            if (requires_rehash(table.size, table.capacity, table.load_factor))
+            if (hash_common::requires_rehash(table.size, table.capacity, table.load_factor))
                 rehash(table);
 
             u64 hash         = hash::hash64(key);
-            u32 bucket_index = range_reduction(hash, table.capacity);
-            assert(find_free_bucket2(table.flags, table.capacity, bucket_index));
-            write(table.flags, bucket_index, true);
+            u32 bucket_index = hash_common::range_reduction(hash, table.capacity);
+            assert(hash_common::find_free_bucket2(table.flags, table.capacity, bucket_index));
+            hash_common::write_flag(table.flags, bucket_index, true);
             table.keys[bucket_index]   = key;
             table.hashes[bucket_index] = hash;
             table.values[bucket_index] = value;
