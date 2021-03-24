@@ -97,6 +97,7 @@ namespace basecode {
         s32                     file;
         buf_mode_t              mode;
     };
+    static_assert(sizeof(buf_t) <= 128, "buf_t is now larger than 128 bytes!");
 
     struct buf_crsr_t final {
         buf_t*                  buf;
@@ -105,6 +106,7 @@ namespace basecode {
         u32                     line;
         u32                     column;
     };
+    static_assert(sizeof(buf_crsr_t) <= 56, "buf_crsr_t is now larger than 56 bytes!");
 
     namespace buf {
         enum class status_t : u8 {

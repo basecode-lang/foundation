@@ -44,13 +44,12 @@ namespace basecode {
         storage_table_t         storage;
         u32                     size;
     };
+    static_assert(sizeof(obj_pool_t) <= 128, "obj_pool_t is now larger than 128 bytes!");
 
     namespace obj_pool {
         enum class status_t : u32 {
             ok                  = 0,
         };
-
-        u0 free(obj_pool_t& pool);
 
         u0 reset(obj_pool_t& pool);
 
@@ -96,6 +95,8 @@ namespace basecode {
             ++pool.size;
             return new (mem) T(std::forward<Args>(args)...);
         }
+
+        u0 free(obj_pool_t& pool, b8 skip_storage = true);
 
         status_t init(obj_pool_t& pool, alloc_t* alloc = context::top()->alloc);
     }

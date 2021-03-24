@@ -26,11 +26,13 @@ namespace basecode {
         slab_t*         prev;
         slab_t*         next;
         u32             buf_count;
+        u0*             pad[3];
     };
+    static_assert(sizeof(slab_t) <= 64, "slab_t is now larger than 64 bytes!");
 }
 
 namespace basecode::memory::slab {
-    constexpr auto slab_size = sizeof(slab_t) + alignof(slab_t);
+    constexpr auto slab_size = sizeof(slab_t);
 
     static u0 remove(alloc_t* alloc, slab_t* slab) {
         auto sc                                      = &alloc->subclass.slab;
@@ -74,18 +76,18 @@ namespace basecode::memory::slab {
         sc->count++;
 
         u32  align_adjust{};
-        auto slab = (slab_t*) system::align_forward(mem + sc->page_size - slab_size,
-                                                    alignof(slab_t),
-                                                    align_adjust);
+        auto slab = (slab_t*) system::align_forward(
+            mem + sc->page_size - slab_size,
+            alignof(slab_t),
+            align_adjust);
         slab->buf_count = {};
         slab->page      = mem;
         slab->free_list = mem;
         slab->next      = slab->prev = {};
 
-        auto eff_size = sc->buf_align * ((sc->buf_size - 1) / sc->buf_align + 1);
-        u8* last_buf = mem + (eff_size * (sc->buf_max_count - 1));
-        for (auto p  = mem; p < last_buf; p += eff_size)
-            *((u0**) p) = p + eff_size;
+        u8* last_buf = mem + (sc->buf_size * (sc->buf_max_count - 1));
+        for (auto p  = mem; p < last_buf; p += sc->buf_size)
+            *((u0**) p) = p + sc->buf_size;
 
         return {move_front(alloc, slab), r.size};
     }
@@ -110,18 +112,15 @@ namespace basecode::memory::slab {
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto sc  = &alloc->subclass.slab;
         auto cfg = (slab_config_t*) config;
-        alloc->backing = cfg->backing;
-        sc->count      = {};
-        sc->head       = sc->tail = {};
-        sc->num_pages  = std::max<u8>(cfg->num_pages, 1);
-        sc->buf_align  = std::max<u8>(cfg->buf_align, alignof
-            (u0*));
-        sc->buf_size   = std::max<u32>(cfg->buf_size, sizeof(u0*));
-        const auto page_overhead = sc->buf_align < 8 ? 8 : sc->buf_align;
-        sc->page_size     = (system::os_page_size() - page_overhead) *
-                            sc->num_pages;
-        sc->buf_max_count = (sc->page_size - slab_size) /
-                            sc->buf_size;
+        alloc->backing    = cfg->backing;
+        sc->count         = {};
+        sc->head          = sc->tail = {};
+        sc->num_pages     = std::max<u8>(cfg->num_pages, 1);
+        sc->buf_align     = std::max<u8>(cfg->buf_align, alignof(u0*));
+        sc->buf_size      = std::max<u32>(cfg->buf_size, sizeof(u0*));
+        sc->buf_size      = sc->buf_align * ((sc->buf_size - 1) / sc->buf_align + 1);
+        sc->page_size     = system::os_page_size() * sc->num_pages;
+        sc->buf_max_count = (sc->page_size - slab_size) / sc->buf_size;
     }
 
     static u32 free(alloc_t* alloc, u0* mem) {
@@ -140,9 +139,10 @@ namespace basecode::memory::slab {
             return {};
 
         u32 align_adjust{};
-        auto slab = (slab_t*) system::align_forward((u8*) curr->page + sc->page_size - slab_size,
-                                                    alignof(slab_t),
-                                                    align_adjust);
+        auto slab = (slab_t*) system::align_forward(
+            (u8*) curr->page + sc->page_size - slab_size,
+            alignof(slab_t),
+            align_adjust);
         *((u0**) mem) = slab->free_list;
         slab->free_list = mem;
         --slab->buf_count;
@@ -197,10 +197,9 @@ namespace basecode::memory::slab {
             auto mem        = (u8*) curr->page;
             curr->buf_count = {};
             curr->free_list = mem;
-            u32 eff_size    = sc->buf_align * ((sc->buf_size - 1) / sc->buf_align + 1);
-            u8* last_buf    = mem + (eff_size * (sc->buf_max_count - 1));
-            for (auto p  = mem; p < last_buf; p += eff_size)
-                *((u0**) p) = p + eff_size;
+            u8* last_buf    = mem + (sc->buf_size * (sc->buf_max_count - 1));
+            for (auto p  = mem; p < last_buf; p += sc->buf_size)
+                *((u0**) p) = p + sc->buf_size;
             curr = curr->next;
         }
     }

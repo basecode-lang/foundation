@@ -32,7 +32,9 @@ TEST_CASE("basecode::obj_pool basics") {
 
     array_t<str_t*> strings{};
     array::init(strings);
-    defer(array::free(strings); obj_pool::free(pool));
+    defer(
+        array::free(strings);
+        obj_pool::free(pool, false));
 
     for (u32 i = 0; i < 100; ++i) {
         array::append(strings, obj_pool::make<str_t>(pool, "hello world!"));

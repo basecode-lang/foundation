@@ -31,18 +31,19 @@ namespace basecode::obj_pool {
         }
     }
 
-    u0 free(obj_pool_t& pool) {
-        free_storage(pool);
-        free_slabs(pool);
-        hashtab::free(pool.slabs);
-        hashtab::free(pool.storage);
-    }
-
     u0 reset(obj_pool_t& pool) {
         free_storage(pool);
         free_slabs(pool);
         hashtab::reset(pool.slabs);
         hashtab::reset(pool.storage);
+    }
+
+    u0 free(obj_pool_t& pool, b8 skip_storage) {
+        if (!skip_storage)
+            free_storage(pool);
+        free_slabs(pool);
+        hashtab::free(pool.slabs);
+        hashtab::free(pool.storage);
     }
 
     status_t init(obj_pool_t& pool, alloc_t* alloc) {
