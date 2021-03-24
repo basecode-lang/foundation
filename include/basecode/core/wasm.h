@@ -32,26 +32,35 @@ namespace basecode {
     struct br_table_t;
     struct func_body_t;
     struct func_type_t;
+    struct global_var_t;
     struct table_type_t;
     struct local_entry_t;
     struct instruction_t;
     struct global_type_t;
     struct import_type_t;
+    struct export_type_t;
+    struct elem_segment_t;
     struct data_segment_t;
     struct resizable_limits_t;
 
     using name_array_t          = array_t<name_t>;
     using module_table_t        = hashtab_t<str::slice_t, module_t>;
+    using index_array_t         = array_t<u32>;
     using target_array_t        = array_t<u32>;
+    using limits_array_t        = array_t<resizable_limits_t>;
     using valtype_array_t       = array_t<valtype_t>;
     using section_array_t       = array_t<section_t>;
     using fun_type_array_t      = array_t<func_type_t>;
     using fun_body_array_t      = array_t<func_body_t>;
     using tab_type_array_t      = array_t<table_type_t>;
     using imp_type_array_t      = array_t<import_type_t>;
+    using exp_type_array_t      = array_t<export_type_t>;
+    using global_var_array_t    = array_t<global_var_t>;
     using local_entry_array_t   = array_t<local_entry_t>;
     using instruction_array_t   = array_t<instruction_t>;
+    using global_type_array_t   = array_t<global_type_t>;
     using dat_segment_array_t   = array_t<data_segment_t>;
+    using elem_segment_array_t  = array_t<elem_segment_t>;
 
     enum class op_code_t : u16 {
         unreachable             = 0x0000,
@@ -266,6 +275,13 @@ namespace basecode {
         table_fill              = 0xfc11,
     };
 
+    enum class op_prefix_t : u8 {
+        reserved                = 0xff,
+        threads                 = 0xfe,
+        simd                    = 0xfd,
+        misc                    = 0xfc,
+    };
+
     enum class name_type_t : u8 {
         module                  = 0x00,
         function                = 0x01,
@@ -350,40 +366,49 @@ namespace basecode {
     };
 
     union instruction_subclass_t final {
+        br_table_t              br_table;
         struct {
-            u32                 flags;
+            u32                 memory;
             u32                 offset;
+            u8                  align;
         }                       mem_imm;
         struct {
-            u8                  block_type;
-        }                       sig_imm;
-        struct {
-            u32                 idx;
-        }                       idx_imm;
+            u32                 memory;
+            u8                  byte;
+        }                       alloc_imm;
         struct {
             u32                 type_idx;
             u8                  reserved;
         }                       calli_imm;
         struct {
-            u32                 rel_depth;
-        }                       br_imm;
+            u32                 index;
+            u32                 table_index;
+        }                       ret_calli_imm;
         struct {
-            u32                 value;
-        }                       i32_f32_imm;
-        struct {
-            u64                 value;
-        }                       i64_f64_imm;
-        br_table_t              br_table;
+            u32                 results;
+            u8                  type;
+        }                       typed_select;
+        u32                     dw;
+        u64                     qw;
+        u8                      type;
     };
 
     struct instruction_t final {
+        u8*                     data;
         instruction_subclass_t  subclass;
+        u32                     size;
         op_code_t               op_code;
     };
 
     struct func_body_t final {
         local_entry_array_t     locals;
         instruction_array_t     instructions;
+    };
+
+    struct elem_segment_t final {
+        index_array_t           funcs;
+        instruction_array_t     offset;
+        u32                     tab_index;
     };
 
     struct data_segment_t final {
@@ -409,6 +434,11 @@ namespace basecode {
         b8                      mutability;
     };
 
+    struct global_var_t final {
+        instruction_array_t     init;
+        global_type_t           type;
+    };
+
     struct import_type_t final {
         str::slice_t            field_name;
         str::slice_t            module_name;
@@ -418,6 +448,12 @@ namespace basecode {
             global_type_t       global;
             resizable_limits_t  memory;
         }                       subclass;
+        external_kind_t         kind;
+    };
+
+    struct export_type_t final {
+        str::slice_t            field_name;
+        u32                     index;
         external_kind_t         kind;
     };
 
@@ -439,10 +475,24 @@ namespace basecode {
             imp_type_array_t    entries;
         }                       import;
         struct {
+            exp_type_array_t    entries;
+        }                       export_;
+        struct {
             name_array_t        names;
             u32                 size;
             name_type_t         type;
         }                       custom;
+        struct {
+            limits_array_t      limits;
+        }                       memory;
+        struct {
+            global_var_array_t  vars;
+        }                       global;
+        struct {
+            elem_segment_array_t entries;
+        }                       element;
+        index_array_t           function;
+        u32                     ds_count;
         u32                     start_func_idx;
     };
 
@@ -477,6 +527,7 @@ namespace basecode {
             read_error,
             write_error,
             invalid_section,
+            unsupported_op_prefix,
         };
 
         namespace type {
@@ -512,7 +563,11 @@ namespace basecode {
         namespace instruction {
             str::slice_t name(op_code_t op);
 
+            u0 format_body(const func_body_t& body, u32 addr, u32 idx);
+
             status_t read_body(module_t& module, instruction_array_t& list);
+
+            u0 format(const instruction_t& inst, u32 addr, u32& block_depth);
         }
 
         namespace external_kind {

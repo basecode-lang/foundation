@@ -105,11 +105,11 @@ namespace basecode {
         template <typename T,
             u32 Size_In_Bits = sizeof(T) * 8,
             std::enable_if_t<std::numeric_limits<T>::is_integer, b8> = true>
-        status_t decode_signed(buf_crsr_t& crsr, T& value) {
-            u32 shift   {};
-            u32 count   {};
+        status_t decode_signed(buf_crsr_t& crsr, T& value, u32& count) {
+            u32 shift{};
             u8  byte;
             value = {};
+            count = {};
             do {
                 buf::cursor::read(crsr, byte);
                 T slice = byte & lower_seven_bits;
@@ -119,18 +119,16 @@ namespace basecode {
             } while (byte >= 128);
             if (shift < Size_In_Bits && (byte & sign_bit))
                 value |= T(-1) << shift;
-            while (CRSR_PEEK(crsr) == 0 && count < 7)
-                ++count;
             return status_t::ok;
         }
 
         template <typename T,
             std::enable_if_t<std::numeric_limits<T>::is_integer, b8> = true>
-        status_t decode_unsigned(buf_crsr_t& crsr, T& value) {
-            u32 shift   {};
-            u32 count   {};
+        status_t decode_unsigned(buf_crsr_t& crsr, T& value, u32& count) {
+            u32 shift{};
             u8  byte;
             value = {};
+            count = {};
             do {
                 buf::cursor::read(crsr, byte);
                 T slice = byte & lower_seven_bits;
@@ -138,8 +136,6 @@ namespace basecode {
                 shift += 7;
                 ++count;
             } while(byte >= 128);
-            while (CRSR_PEEK(crsr) == 0 && count < 7)
-                ++count;
             return status_t::ok;
         }
     }
