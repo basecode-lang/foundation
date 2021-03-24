@@ -30,6 +30,7 @@
 #define CRSR_MORE(c)            ((c).pos < (c).buf->length)
 #define CRSR_NEWLINE(c)         SAFE_SCOPE((c).column = 0; ++(c).line;)
 
+#define FILE_ALIAS(f)           auto& file = f
 #define FILE_POS()              CRSR_POS(file.crsr)
 #define FILE_PTR()              CRSR_PTR(file.crsr)
 #define FILE_POP_POS()          SAFE_SCOPE(buf::cursor::pop(file.crsr);)

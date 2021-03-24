@@ -203,7 +203,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_code(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto sc = &sect->subclass.code;
             array::init(sc->bodies, sect->module->wasm->alloc);
             u32 size;
@@ -228,7 +228,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_data(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto sc = &sect->subclass.data;
             array::init(sc->segments, sect->module->wasm->alloc);
             u32 size;
@@ -248,14 +248,14 @@ namespace basecode::wasm {
         }
 
         static status_t read_start(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             u32 size;
             FILE_READ_ULEB128(u32, sect->subclass.start_func_idx, size);
             return status_t::ok;
         }
 
         static status_t read_table(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto sc = &sect->subclass.table;
             array::init(sc->elements, sect->module->wasm->alloc);
             u32 size;
@@ -275,7 +275,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_types(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto sc = &sect->subclass.type;
             array::init(sc->funcs, sect->module->wasm->alloc);
             u32 size;
@@ -339,7 +339,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_memory(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto sc = &sect->subclass.memory;
             array::init(sc->limits, sect->module->wasm->alloc);
             u32 size;
@@ -355,7 +355,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_custom(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             u32 size;
             FILE_READ_SLICE(sect->name, size);
             if (sect->name != "name"_ss)
@@ -392,7 +392,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_global(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto sc = &sect->subclass.global;
             array::init(sc->vars, sect->module->wasm->alloc);
             u32 size;
@@ -411,7 +411,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_exports(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto sc = &sect->subclass.export_;
             array::init(sc->entries, sect->module->wasm->alloc);
             u32 size;
@@ -427,7 +427,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_imports(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto sc = &sect->subclass.import;
             array::init(sc->entries, sect->module->wasm->alloc);
             u32 size;
@@ -474,7 +474,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_elements(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto sc = &sect->subclass.element;
             array::init(sc->entries, sect->module->wasm->alloc);
             u32 size;
@@ -497,7 +497,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_functions(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto& sc = sect->subclass.function;
             array::init(sc, sect->module->wasm->alloc);
             u32 size;
@@ -510,7 +510,7 @@ namespace basecode::wasm {
         }
 
         static status_t read_data_count(section_t* sect) {
-            auto& file = *sect->module;
+            FILE_ALIAS(*sect->module);
             auto sc = &sect->subclass;
             u32 size;
             FILE_READ_ULEB128(u32, sc->ds_count, size);
@@ -528,18 +528,15 @@ namespace basecode::wasm {
         }
 
         status_t decode(module_t& module) {
-            auto& file = module;
-
+            FILE_ALIAS(module);
             FILE_READ(u32, module.magic);
             FILE_READ(u32, module.version);
-
             while (CRSR_MORE(module.crsr)) {
                 section_t* sect{};
                 auto status = make_section(module, &sect);
                 if (!OK(status))
                     return status;
             }
-
             return status_t::ok;
         }
 
@@ -553,7 +550,7 @@ namespace basecode::wasm {
         }
 
         status_t make_section(module_t& module, section_t** section) {
-            auto& file = module;
+            FILE_ALIAS(module);
             auto sect = &array::append(module.sections);
             sect->module = &module;
             u32 size;
@@ -878,7 +875,7 @@ namespace basecode::wasm {
         }
 
         status_t read_body(module_t& module, instruction_array_t& list) {
-            auto& file = module;
+            FILE_ALIAS(module);
             u8* data = FILE_PTR();
             u32 block_depth {};
             b8  exit{};
@@ -1221,26 +1218,70 @@ namespace basecode::wasm {
                         size += 8;
                         break;
                     }
-                    case op_code_t::elem_drop:
+                    case op_code_t::elem_drop: {
+                        u32 c;
+                        FILE_READ_ULEB128(u32, inst.subclass.dw, c);
+                        size += c;
                         break;
-                    case op_code_t::data_drop:
+                    }
+                    case op_code_t::data_drop: {
+                        u32 c;
+                        FILE_READ_ULEB128(u32, inst.subclass.dw, c);
+                        size += c;
                         break;
-                    case op_code_t::table_grow:
+                    }
+                    case op_code_t::table_grow: {
+                        u32 c;
+                        FILE_READ_ULEB128(u32, inst.subclass.dw, c);
+                        size += c;
                         break;
-                    case op_code_t::table_size:
+                    }
+                    case op_code_t::table_size: {
+                        u32 c;
+                        FILE_READ_ULEB128(u32, inst.subclass.dw, c);
+                        size += c;
                         break;
-                    case op_code_t::table_fill:
+                    }
+                    case op_code_t::table_fill: {
+                        u32 c;
+                        FILE_READ_ULEB128(u32, inst.subclass.dw, c);
+                        size += c;
                         break;
-                    case op_code_t::table_init:
+                    }
+                    case op_code_t::table_init: {
+                        auto sc = &inst.subclass.seg_idx_imm;
+                        u32 c;
+                        FILE_READ_ULEB128(u32, sc->segment, c); size += c;
+                        FILE_READ_ULEB128(u32, sc->index, c); size += c;
                         break;
-                    case op_code_t::table_copy:
+                    }
+                    case op_code_t::table_copy: {
+                        auto sc = &inst.subclass.copy_imm;
+                        u32 c;
+                        FILE_READ_ULEB128(u32, sc->dst, c); size += c;
+                        FILE_READ_ULEB128(u32, sc->src, c); size += c;
                         break;
-                    case op_code_t::memory_init:
+                    }
+                    case op_code_t::memory_init: {
+                        auto sc = &inst.subclass.seg_idx_imm;
+                        u32 c;
+                        FILE_READ_ULEB128(u32, sc->segment, c); size += c;
+                        FILE_READ_ULEB128(u32, sc->index, c); size += c;
                         break;
-                    case op_code_t::memory_copy:
+                    }
+                    case op_code_t::memory_copy: {
+                        auto sc = &inst.subclass.copy_imm;
+                        u32 c;
+                        FILE_READ_ULEB128(u32, sc->dst, c); size += c;
+                        FILE_READ_ULEB128(u32, sc->src, c); size += c;
                         break;
-                    case op_code_t::memory_fill:
+                    }
+                    case op_code_t::memory_fill: {
+                        u32 c;
+                        FILE_READ_ULEB128(u32, inst.subclass.dw, c);
+                        size += c;
                         break;
+                    }
                 }
                 inst.size = size;
                 data += size;
@@ -1301,8 +1342,14 @@ namespace basecode::wasm {
                 case op_code_t::local_tee:
                 case op_code_t::table_get:
                 case op_code_t::table_set:
+                case op_code_t::elem_drop:
+                case op_code_t::data_drop:
                 case op_code_t::global_get:
                 case op_code_t::global_set:
+                case op_code_t::table_grow:
+                case op_code_t::table_size:
+                case op_code_t::table_fill:
+                case op_code_t::memory_fill:
                 case op_code_t::return_call: {
                     format::print("{}", inst.subclass.dw);
                     break;
@@ -1382,26 +1429,18 @@ namespace basecode::wasm {
                     format::print("{} {}", sc->align, sc->offset);
                     break;
                 }
-                case op_code_t::elem_drop:
-                    break;
-                case op_code_t::data_drop:
-                    break;
-                case op_code_t::table_grow:
-                    break;
-                case op_code_t::table_size:
-                    break;
-                case op_code_t::table_fill:
-                    break;
                 case op_code_t::table_init:
+                case op_code_t::memory_init: {
+                    auto sc = &inst.subclass.seg_idx_imm;
+                    format::print("{} {}", sc->segment, sc->index);
                     break;
+                }
                 case op_code_t::table_copy:
+                case op_code_t::memory_copy: {
+                    auto sc = &inst.subclass.copy_imm;
+                    format::print("{} {}", sc->dst, sc->src);
                     break;
-                case op_code_t::memory_init:
-                    break;
-                case op_code_t::memory_copy:
-                    break;
-                case op_code_t::memory_fill:
-                    break;
+                }
                 default:
                     break;
             }

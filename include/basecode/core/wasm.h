@@ -385,6 +385,14 @@ namespace basecode {
             u32                 table_index;
         }                       ret_calli_imm;
         struct {
+            u32                 index;
+            u32                 segment;
+        }                       seg_idx_imm;
+        struct {
+            u32                 dst;
+            u32                 src;
+        }                       copy_imm;
+        struct {
             u32                 results;
             u8                  type;
         }                       typed_select;
