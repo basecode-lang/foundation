@@ -119,7 +119,7 @@ namespace basecode::memory::slab {
         sc->buf_align     = std::max<u8>(cfg->buf_align, alignof(u0*));
         sc->buf_size      = std::max<u32>(cfg->buf_size, sizeof(u0*));
         sc->buf_size      = sc->buf_align * ((sc->buf_size - 1) / sc->buf_align + 1);
-        sc->page_size     = system::os_page_size() * sc->num_pages;
+        sc->page_size     = system::os_alloc_granularity() * sc->num_pages;
         sc->buf_max_count = (sc->page_size - slab_size) / sc->buf_size;
     }
 
