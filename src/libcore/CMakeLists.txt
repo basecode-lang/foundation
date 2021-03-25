@@ -208,7 +208,10 @@ set(
 
     uuid.cpp ${CORE_INC_DIR}/uuid.h
 
-    wasm.cpp ${CORE_INC_DIR}/wasm.h
+    wasm/wasm.cpp ${CORE_INC_DIR}/wasm/wasm.h
+    wasm/decoder.cpp ${CORE_INC_DIR}/wasm/decoder.h
+    wasm/encoder.cpp ${CORE_INC_DIR}/wasm/encoder.h
+    wasm/formatter.cpp ${CORE_INC_DIR}/wasm/formatter.h
 )
 if (WIN32)
     set (

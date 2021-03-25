@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/wasm.h>
+#include <basecode/core/wasm/wasm.h>
 #include <basecode/core/leb128.h>
 #include <basecode/core/string.h>
 

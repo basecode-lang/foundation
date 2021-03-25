@@ -17,7 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <catch2/catch.hpp>
-#include <basecode/core/wasm.h>
+#include <basecode/core/wasm/wasm.h>
 #include <basecode/core/stopwatch.h>
 
 using namespace basecode;
