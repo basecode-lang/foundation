@@ -1,15 +1,14 @@
 HIGH
 ---------
-- leb_128_t: implement this type
 - getopts: finish this!
-- rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
-    * add ca_hashtab_t and ca_set_t using chaining via linked list?
 - scm: implement tail call optimization
 - scm: adjust print primitive to not add spaces and line feeds
 - scm: add full quasiquote, unquote, unquote-splicing primitive support
 
 MEDIUM
 ---------
+- rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
+    * add ca_hashtab_t and ca_set_t using chaining via linked list?
 
 LOW
 ---------
@@ -34,6 +33,8 @@ LOW
 
 DONE
 ----
+- wasm decoder
+- leb_128_t: implement this type
 - hashtab_t: implement basic forward-only iterator
 - hashtab_t/set_t: decide how to handle bucket state flag
     * repurposed the minimal amount of bitset logic needed

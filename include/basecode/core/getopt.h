@@ -25,36 +25,35 @@ namespace basecode {
     enum class arg_type_t : u8 {
         none,
         flag,
+        file,
         string,
-        signed_integer,
-        floating_point,
-        unsigned_integer,
+        integer,
+        decimal,
     };
 
     struct option_t final {
         str::slice_t            long_name;
-        str::slice_t            short_name;
+        str::slice_t            value_name;
         str::slice_t            description;
+        s32                     max_allowed;
+        s32                     min_required;
+        s8                      short_name;
         arg_type_t              type;
-        struct {
-            u32                 min;
-            u32                 max;
-        }                       required;
     };
 
     union arg_subclass_t final {
         b8                      flag;
         str::slice_t            string;
-        s64                     signed_int;
-        u64                     unsigned_int;
-        f64                     floating_point;
+        s64                     integer;
+        f64                     decimal;
     };
 
     struct arg_t final {
-        option_t*               option;
+        const option_t*         option;
         arg_subclass_t          subclass;
         u32                     pos;
         arg_type_t              type;
+        b8                      extra;
     };
 
     using arg_array_t           = array_t<arg_t>;
@@ -63,15 +62,57 @@ namespace basecode {
     struct getopt_t final {
         alloc_t*                alloc;
         const s8**              argv;
+        option_t*               file_option;
+        str::slice_t            description;
         arg_array_t             args;
         option_array_t          opts;
+        arg_array_t             extras;
         s32                     argc;
     };
 
     namespace getopt {
         enum class status_t : u32 {
-            ok                  = 0,
+            ok                              = 0,
+            unconfigured,
+            invalid_option,
+            duplicate_option,
+            missing_required_option,
         };
+
+        class option_builder_t final {
+            getopt_t*               _opt;
+            str::slice_t            _long_name      {};
+            str::slice_t            _value_name     {};
+            str::slice_t            _description    {};
+            s32                     _min_required   {-1};
+            s32                     _max_allowed    {-1};
+            s8                      _short_name     {};
+            arg_type_t              _type           {};
+
+        public:
+            option_builder_t(getopt_t* opt) : _opt(opt) {}
+
+            status_t build();
+
+            option_builder_t& type(arg_type_t type);
+
+            option_builder_t& max_allowed(u32 value);
+
+            option_builder_t& min_required(u32 value);
+
+            option_builder_t& short_name(s8 short_name);
+
+            option_builder_t& long_name(str::slice_t long_name);
+
+            option_builder_t& value_name(str::slice_t value_name);
+
+            option_builder_t& description(str::slice_t description);
+        };
+
+        status_t init(getopt_t& opt,
+                      s32 argc,
+                      const s8** argv,
+                      alloc_t* alloc = context::top()->alloc);
 
         u0 free(getopt_t& opt);
 
@@ -79,6 +120,8 @@ namespace basecode {
 
         u0 format_help(getopt_t& opt, str_t& buf);
 
-        status_t init(getopt_t& opt, s32 argc, const s8** argv, alloc_t* alloc = context::top()->alloc);
+        option_builder_t make_option(getopt_t& opt);
+
+        u0 program_description(getopt_t& opt, str::slice_t description);
     }
 }

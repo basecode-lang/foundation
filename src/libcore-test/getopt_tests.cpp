@@ -24,9 +24,9 @@
 
 using namespace basecode;
 
-TEST_CASE("basecode::getopt basics") {
+TEST_CASE("basecode::getopt basics", "[getopt]") {
     const char* argv[] = {
-        "C:\\temp\\foo.exe",
+        "C:\\temp\\tar.exe",
         "-xvfz",
         "test.tar.gz"
     };
@@ -37,6 +37,47 @@ TEST_CASE("basecode::getopt basics") {
     getopt_t cl{};
     getopt::init(cl, 3, argv);
     defer(getopt::free(cl));
+    getopt::program_description(
+        cl,
+        "GNU 'tar' saves many files together into a single\n"
+        "tape or disk archive, and can restore"
+        "individual files from the archive."_ss);
+
+    getopt::make_option(cl)
+        .type(arg_type_t::flag)
+        .short_name('x')
+        .description("extract files from an archive"_ss)
+        .build();
+
+    getopt::make_option(cl)
+        .type(arg_type_t::flag)
+        .short_name('v')
+        .long_name("verbose"_ss)
+        .description("verbosely list files processed"_ss)
+        .build();
+
+    getopt::make_option(cl)
+        .min_required(1)
+        .max_allowed(64)
+        .type(arg_type_t::file)
+        .short_name('f')
+        .long_name("file"_ss)
+        .value_name("ARCHIVE"_ss)
+        .description("use archive file or device ARCHIVE"_ss)
+        .build();
+
+    getopt::make_option(cl)
+        .type(arg_type_t::flag)
+        .short_name('z')
+        .long_name("uncompress"_ss)
+        .description("filter the archive through compress"_ss)
+        .build();
+
+    getopt::make_option(cl)
+        .short_name('?')
+        .long_name("help"_ss)
+        .description("give this help list"_ss)
+        .build();
 
     str_t buf{};
     str::init(buf);

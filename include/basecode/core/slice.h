@@ -77,12 +77,12 @@ namespace basecode {
             return str::slice_t{.data = str, .length = length};
         }
 
-        template<typename T> inline b8 empty(slice_t<T>& slice) {
-            return slice.length == 0 || slice.data == nullptr;
-        }
-
         inline str::slice_t make(const s8* str, s32 length = -1) {
             return str::slice_t{.data = (const u8*) str, .length = length == -1 ? u32(strlen(str)) : length};
+        }
+
+        template<typename T> inline b8 empty(const slice_t<T>& slice) {
+            return slice.length == 0 || slice.data == nullptr;
         }
     }
 
