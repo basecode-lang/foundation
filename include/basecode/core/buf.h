@@ -70,6 +70,14 @@
         return status_t::write_error;)
 
 namespace basecode {
+    template <typename T>
+    concept Buffer_Concept = String_Concept<T> || requires(const T& t) {
+        {t.alloc}       -> same_as<alloc_t*>;
+        {t.data}        -> same_as<u8*>;
+        {t.length}      -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
+
     struct buf_line_t final {
         u32                     pos;
         u32                     len;

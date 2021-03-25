@@ -49,6 +49,7 @@ set(
     ast.cpp ${CORE_INC_DIR}/ast.h
 
     ${CORE_INC_DIR}/array.h
+    ${CORE_INC_DIR}/array_common.h
 
     ${CORE_INC_DIR}/assoc_array.h
 

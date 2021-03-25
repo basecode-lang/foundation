@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/core/str.h>
 #include <basecode/core/format_types.h>
 
 namespace basecode {

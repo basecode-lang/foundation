@@ -64,11 +64,8 @@ namespace basecode {
 
         namespace system {
             u0 fini() {
-                event_array_t temp{};
-                array::copy(temp, g_system.events);
-                for (auto event : temp)
+                for (auto event : g_system.events)
                     event::free(event);
-                array::free(temp);
                 array::free(g_system.events);
                 memory::system::free(g_system.event_pool);
             }

@@ -20,8 +20,7 @@
 
 #include <utility>
 #include <pthread.h>
-#include <basecode/core/types.h>
-#include <basecode/core/slice.h>
+#include <basecode/core/str.h>
 
 namespace basecode {
     struct thread_t;

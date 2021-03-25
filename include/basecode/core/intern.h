@@ -18,9 +18,8 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/core/str.h>
 #include <basecode/core/array.h>
-#include <basecode/core/slice.h>
 
 namespace basecode {
     struct interned_str_t;

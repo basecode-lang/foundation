@@ -135,48 +135,28 @@ namespace basecode {
     };
 #endif
 
-    template <typename From, typename To> concept convertible_to = std::is_convertible_v<From, To> && requires(std::add_rvalue_reference_t<From> (&f)()) {
+    template <typename From, typename To>
+    concept convertible_to = std::is_convertible_v<From, To>
+                             && requires(std::add_rvalue_reference_t<From> (&f)()) {
         static_cast<To>(f());
     };
 
-    template <typename T, typename U> concept same_helper = std::is_same_v<T, U>;
+    template <typename T, typename U>
+    concept same_helper = std::is_same_v<T, U>;
 
-    template <typename T, typename U> concept same_as = same_helper<T, U> && same_helper<U, T>;
+    template <typename T, typename U>
+    concept same_as = same_helper<T, U> && same_helper<U, T>;
 
-    template <typename T> concept Slice_Concept = same_as<typename T::Is_Static, std::true_type> && requires(const T& t) {
-        {t.data}        -> same_as<const u8*>;
-        {t.length}      -> same_as<u32>;
-    };
+    template <typename T>
+    concept Integer_Concept = std::is_integral_v<T>;
 
-    template <typename T> concept Static_String_Concept  = same_as<typename T::Is_Static, std::true_type> && requires(const T& t) {
-        {t.data}        -> same_as<u8*>;
-        {t.length}      -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
-    };
-
-    template <typename T> concept Dynamic_String_Concept  = same_as<typename T::Is_Static, std::false_type> && requires(const T& t) {
-        {t.alloc}       -> same_as<alloc_t*>;
-        {t.data}        -> same_as<u8*>;
-        {t.length}      -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
-    };
-
-    template <typename T> concept String_Concept    = Slice_Concept<T> || Static_String_Concept<T> || Dynamic_String_Concept<T>;
-
-    template <typename T> concept Integer_Concept   = std::is_integral_v<T>;
-
-    template <typename T> concept Radix_Concept     = Integer_Concept<T> && requires(T radix) {
+    template <typename T>
+    concept Radix_Concept = Integer_Concept<T> && requires(T radix) {
         radix == 2 || radix == 8 || radix == 10 || radix == 16;
     };
 
-    template <typename T> concept Buffer_Concept = String_Concept<T> || requires(const T& t) {
-        {t.alloc}       -> same_as<alloc_t*>;
-        {t.data}        -> same_as<u8*>;
-        {t.length}      -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
-    };
-
-    template <typename T> concept Status_Concept = std::is_enum_v<T> || requires(const T& t) {
+    template <typename T>
+    concept Status_Concept = std::is_enum_v<T> || requires(const T& t) {
         typename T::ok;
     };
 }

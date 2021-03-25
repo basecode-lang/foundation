@@ -83,7 +83,10 @@ namespace basecode::str_array {
         }
         if (new_capacity == array.capacity)  return;
         new_capacity = std::max(array.buf.size, new_capacity);
-        array.buf.data     = (u8*) memory::realloc(array.alloc, array.buf.data, new_capacity);
+        array.buf.data     = (u8*) memory::realloc(
+            array.alloc,
+            array.buf.data,
+            new_capacity);
         array.buf.capacity = new_capacity;
     }
 
@@ -96,7 +99,11 @@ namespace basecode::str_array {
         }
         if (new_capacity == array.capacity) return;
         new_capacity = std::max(array.size, new_capacity);
-        array.index  = (str_idx_t*) memory::realloc(array.alloc, array.index, new_capacity * sizeof(str_idx_t), alignof(str_idx_t));
+        array.index  = (str_idx_t*) memory::realloc(
+            array.alloc,
+            array.index,
+            new_capacity * sizeof(str_idx_t),
+            alignof(str_idx_t));
         const auto data          = array.index + array.size;
         const auto size_to_clear = new_capacity > array.capacity ? new_capacity - array.capacity : 0;
         std::memset(data, 0, size_to_clear * sizeof(str_idx_t));

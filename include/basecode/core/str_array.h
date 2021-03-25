@@ -18,27 +18,25 @@
 
 #pragma once
 
-#include <basecode/core/memory.h>
+#include <basecode/core/str.h>
 
 namespace basecode {
-    struct str_t;
-
     struct str_idx_t final {
-        u64                         status: 2;
-        u64                         offset: 31;
-        u64                         length: 31;
+        u64                     status: 2;
+        u64                     offset: 31;
+        u64                     length: 31;
     };
 
     struct str_array_t final {
-        alloc_t*                    alloc;
-        str_idx_t*                  index;
+        alloc_t*                alloc;
+        str_idx_t*              index;
         struct {
-            u8*                     data;
-            u32                     size;
-            u32                     capacity;
-        }                           buf;
-        u32                         size;
-        u32                         capacity;
+            u8*                 data;
+            u32                 size;
+            u32                 capacity;
+        }                       buf;
+        u32                     size;
+        u32                     capacity;
 
         str::slice_t operator[](u32 i) const {
             const auto& idx = index[i];

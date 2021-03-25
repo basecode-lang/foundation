@@ -123,7 +123,6 @@ s32 main(s32 argc, const s8** argv) {
     ffi::system::fini();
     profiler::fini();
     job::system::fini();
-    event::system::fini();
     thread::system::fini();
     config::system::fini();
     string::system::fini();
@@ -132,6 +131,7 @@ s32 main(s32 argc, const s8** argv) {
     locale::system::fini();
     log::system::fini();
     term::system::fini();
+    event::system::fini();
     memory::proxy::fini();
     memory::system::fini();
     context::pop();

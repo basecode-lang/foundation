@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <basecode/core/str.h>
 #include <basecode/core/array.h>
 #include <basecode/core/event.h>
 #include <basecode/core/stopwatch.h>

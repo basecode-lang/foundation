@@ -18,10 +18,10 @@
 
 #pragma once
 
+#include <basecode/core/buf.h>
 #include <basecode/core/array.h>
 #include <basecode/core/src_loc.h>
 #include <basecode/core/hashable.h>
-#include <basecode/core/hash/murmur.h>
 
 #define TOKEN_CLS(t)            (u32((t)) >> 16U & 0xffffU)
 #define TOKEN_TYPE(cls, type)   (u32((cls)) << 16U | u32((type)))

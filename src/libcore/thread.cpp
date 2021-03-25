@@ -22,7 +22,6 @@
 #   include <syscall.h>
 #endif
 #include <pthread.h>
-#include <basecode/core/memory.h>
 #include <basecode/core/thread.h>
 #include <basecode/core/memory/system/slab.h>
 

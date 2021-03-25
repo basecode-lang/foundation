@@ -20,14 +20,42 @@
 
 #include <cstring>
 #include <cassert>
-#include <basecode/core/slice.h>
 #include <basecode/core/types.h>
+#include <basecode/core/slice.h>
 #include <basecode/core/memory.h>
-#include <basecode/core/context.h>
 #include <basecode/core/hashable.h>
 #include <basecode/core/hash/murmur.h>
 
 namespace basecode {
+    template <typename T>
+    concept Slice_Concept = same_as<typename T::Is_Static, std::true_type>
+                            && requires(const T& t) {
+        {t.data}        -> same_as<const u8*>;
+        {t.length}      -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept Static_String_Concept = same_as<typename T::Is_Static, std::true_type>
+                                    && requires(const T& t) {
+        {t.data}        -> same_as<u8*>;
+        {t.length}      -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept Dynamic_String_Concept  = same_as<typename T::Is_Static, std::false_type>
+                                      && requires(const T& t) {
+        {t.alloc}       -> same_as<alloc_t*>;
+        {t.data}        -> same_as<u8*>;
+        {t.length}      -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept String_Concept = Slice_Concept<T>
+            || Static_String_Concept<T>
+            || Dynamic_String_Concept<T>;
+
     struct str_t;
 
     namespace str {
@@ -43,7 +71,7 @@ namespace basecode {
     }
 
     struct str_t final {
-        using Is_Static         = std::integral_constant<b8, false>;
+        using Is_Static         [[maybe_unused]] = std::integral_constant<b8, false>;
 
         alloc_t*                alloc{};
         u8*                     data{};
@@ -173,21 +201,6 @@ namespace basecode {
             free(str);
         }
 
-        u0 ltrim(String_Concept auto& str) {
-            erase(str,
-                  *str.begin(),
-                  *std::find_if(str.begin(),
-                                str.end(),
-                                [](u8 c) { return !std::isspace(c); }));
-        }
-
-        u0 rtrim(String_Concept auto& str) {
-            erase(str,
-                  *std::find_if(str.rbegin(),
-                                str.rend(),
-                                [](u8 c) { return !std::isspace(c); }), *str.end());
-        }
-
         u0 reset(String_Concept auto& str) {
             str.length = 0;
         }
@@ -248,6 +261,21 @@ namespace basecode {
 
         u0 trunc(String_Concept auto& str, u32 new_length) {
             str.length = new_length;
+        }
+
+        [[maybe_unused]] u0 ltrim(String_Concept auto& str) {
+            erase(str,
+                  *str.begin(),
+                  *std::find_if(str.begin(),
+                                str.end(),
+                                [](u8 c) { return !std::isspace(c); }));
+        }
+
+        [[maybe_unused]] u0 rtrim(String_Concept auto& str) {
+            erase(str,
+                  *std::find_if(str.rbegin(),
+                                str.rend(),
+                                [](u8 c) { return !std::isspace(c); }), *str.end());
         }
 
         b8 erase(String_Concept auto& str, u32 pos, u32 len) {
