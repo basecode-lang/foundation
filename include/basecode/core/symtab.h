@@ -27,7 +27,7 @@
 #include <basecode/core/assoc_array.h>
 
 //#define GET_NODE(t, id)         (id == 0 || id > t.nodes.size ? nullptr : &t.nodes[id - 1])
-#define GET_NODE(t, id)         (&t.nodes[id - 1])
+#define GET_NODE(t, id)         (&((t).nodes[(id) - 1]))
 
 namespace basecode {
     constexpr u8 empty          = 0b00;

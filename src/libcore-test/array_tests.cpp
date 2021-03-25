@@ -114,6 +114,22 @@ TEST_CASE("array_t reserve space; fill") {
     }
 }
 
+TEST_CASE("basecode::array iterator tests") {
+    auto numbers = array::make<u32>({0, 1, 2, 3, 4, 5, 6, 7, 8});
+    defer(array::free(numbers));
+
+    REQUIRE(!array::empty(numbers));
+    REQUIRE(numbers.size == 9);
+
+    s32 k = 0;
+    for (auto n : numbers)
+        REQUIRE(n == k++);
+
+    k = 8;
+    for (auto it = std::rbegin(numbers); it != std::rend(numbers); --it)
+        REQUIRE(k-- == *it);
+}
+
 TEST_CASE("basecode::array initializer list") {
     auto numbers = array::make<u32>({0, 1, 2, 3, 4, 5, 6, 7, 8});
     defer(array::free(numbers));

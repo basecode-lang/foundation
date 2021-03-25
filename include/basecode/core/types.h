@@ -148,21 +148,6 @@ namespace basecode {
         {t.length}      -> same_as<u32>;
     };
 
-    template <typename T> concept Static_Array_Concept = same_as<typename T::Is_Static, std::true_type> && requires(const T& t) {
-        typename        T::Value_Type;
-        {t.data}        -> same_as<typename T::Value_Type*>;
-        {t.size}        -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
-    };
-
-    template <typename T> concept Dynamic_Array_Concept = same_as<typename T::Is_Static, std::false_type> && requires(const T& t) {
-        typename        T::Value_Type;
-        {t.alloc}       -> same_as<alloc_t*>;
-        {t.data}        -> same_as<typename T::Value_Type*>;
-        {t.size}        -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
-    };
-
     template <typename T> concept Static_String_Concept  = same_as<typename T::Is_Static, std::true_type> && requires(const T& t) {
         {t.data}        -> same_as<u8*>;
         {t.length}      -> same_as<u32>;
@@ -177,8 +162,6 @@ namespace basecode {
     };
 
     template <typename T> concept String_Concept    = Slice_Concept<T> || Static_String_Concept<T> || Dynamic_String_Concept<T>;
-
-    template <typename T> concept Array_Concept     = Static_Array_Concept<T> || Dynamic_Array_Concept<T>;
 
     template <typename T> concept Integer_Concept   = std::is_integral_v<T>;
 

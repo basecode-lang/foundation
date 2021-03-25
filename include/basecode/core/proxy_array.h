@@ -89,7 +89,7 @@ namespace basecode {
         }
 
         template <Array_Concept D, Proxy_Array S,
-            b8 Dst_Is_Static = typename D::Is_Static::value(),
+                  b8 Dst_Is_Static = typename D::Is_Static::value(),
                   typename Dst_Type = std::remove_reference_t<typename D::Value_Type>,
                   typename Src_Type = std::remove_reference_t<typename S::Value_Type>>
         u0 copy(D& dst, const S& src) {
