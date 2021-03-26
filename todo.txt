@@ -1,6 +1,5 @@
 HIGH
 ---------
-- getopts: finish this!
 - scm: implement tail call optimization
 - scm: adjust print primitive to not add spaces and line feeds
 - scm: add full quasiquote, unquote, unquote-splicing primitive support
@@ -33,6 +32,7 @@ LOW
 
 DONE
 ----
+- getopts: finish this!
 - wasm decoder
 - leb_128_t: implement this type
 - hashtab_t: implement basic forward-only iterator

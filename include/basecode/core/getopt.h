@@ -37,6 +37,7 @@ namespace basecode {
         str::slice_t            description;
         s32                     max_allowed;
         s32                     min_required;
+        u8                      radix;
         s8                      short_name;
         arg_type_t              type;
     };
@@ -75,8 +76,12 @@ namespace basecode {
             ok                              = 0,
             unconfigured,
             invalid_option,
+            expected_value,
             duplicate_option,
+            invalid_argument,
             missing_required_option,
+            decimal_conversion_error,
+            integer_conversion_error,
         };
 
         class option_builder_t final {
@@ -87,6 +92,7 @@ namespace basecode {
             s32                     _min_required   {-1};
             s32                     _max_allowed    {-1};
             s8                      _short_name     {};
+            u8                      _radix          {10};
             arg_type_t              _type           {};
 
         public:
@@ -102,6 +108,11 @@ namespace basecode {
 
             option_builder_t& short_name(s8 short_name);
 
+            option_builder_t& radix(Radix_Concept auto value) {
+                _radix = value;
+                return *this;
+            }
+
             option_builder_t& long_name(str::slice_t long_name);
 
             option_builder_t& value_name(str::slice_t value_name);
@@ -115,6 +126,8 @@ namespace basecode {
                       alloc_t* alloc = context::top()->alloc);
 
         u0 free(getopt_t& opt);
+
+        u0 format(getopt_t& opt);
 
         status_t parse(getopt_t& opt);
 
