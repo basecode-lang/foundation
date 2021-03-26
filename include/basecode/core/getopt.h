@@ -37,6 +37,7 @@ namespace basecode {
         str::slice_t            description;
         s32                     max_allowed;
         s32                     min_required;
+        u32                     count;
         u8                      radix;
         s8                      short_name;
         arg_type_t              type;
@@ -50,7 +51,7 @@ namespace basecode {
     };
 
     struct arg_t final {
-        const option_t*         option;
+        option_t*               option;
         arg_subclass_t          subclass;
         u32                     pos;
         arg_type_t              type;
@@ -79,6 +80,7 @@ namespace basecode {
             expected_value,
             duplicate_option,
             invalid_argument,
+            count_exceeds_allowed,
             missing_required_option,
             decimal_conversion_error,
             integer_conversion_error,

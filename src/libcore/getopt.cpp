@@ -25,6 +25,18 @@
 #include <basecode/core/numbers.h>
 
 namespace basecode::getopt {
+    static arg_t* add_arg(getopt_t& opt,
+                          u32 idx,
+                          option_t* option,
+                          b8 extra = false) {
+        auto arg = extra ? &array::append(opt.extras) : &array::append(opt.args);
+        arg->option = option;
+        arg->type   = option ? option->type : arg_type_t::string;
+        arg->pos    = idx;
+        arg->extra  = extra;
+        return arg;
+    }
+
     static str::slice_t type_name(arg_type_t type) {
         switch (type) {
             case arg_type_t::none:          return "none"_ss;
@@ -38,6 +50,16 @@ namespace basecode::getopt {
 
     static b8 arg_expects_value(const arg_t* arg) {
         return arg->type != arg_type_t::none && arg->type != arg_type_t::flag;
+    }
+
+    static option_t* find_short_option(getopt_t& opt, s8 name) {
+        if (name == 0)
+            return nullptr;
+        for (auto& option : opt.opts) {
+            if (option.short_name == name)
+                return &option;
+        }
+        return nullptr;
     }
 
     static status_t set_arg_value(arg_t* arg, str::slice_t value) {
@@ -64,23 +86,56 @@ namespace basecode::getopt {
                 break;
             }
         }
+        if (arg->option)
+            arg->option->count++;
         return status_t::ok;
     }
 
-    static const option_t* find_short_option(const getopt_t& opt, const s8 name) {
-        if (name == 0)
-            return nullptr;
-        for (const auto& option : opt.opts) {
-            if (option.short_name == name)
-                return &option;
+    static u0 format_arg(const arg_t& arg, str_buf_t& sb, u32 idx) {
+        format::format_to(sb, "{:02}: ", idx);
+        if (arg.option) {
+            if (arg.option->short_name != 0)
+                format::format_to(sb, "{} ", arg.option->short_name);
+            else
+                format::format_to(sb, "  ");
+            if (!slice::empty(arg.option->long_name))
+                format::format_to(sb, "{:<16}", arg.option->long_name);
+            else
+                format::format_to(sb, "{:{}}", " ", 16);
+            format::format_to(sb, "{:<8}", type_name(arg.type));
+            format::format_to(sb, "{:>3} ", arg.option->min_required);
+            format::format_to(sb, "{:>3} ", arg.option->max_allowed);
+        } else {
+            format::format_to(sb,
+                              "- {:<16}{:<8}{:>3} {:>3} ",
+                              "-",
+                              type_name(arg.type),
+                              -1,
+                              -1);
         }
-        return nullptr;
+        if (arg_expects_value(&arg)) {
+            switch (arg.type) {
+                case arg_type_t::file:
+                case arg_type_t::string:
+                    format::format_to(sb, "{}", arg.subclass.string);
+                    break;
+                case arg_type_t::integer:
+                    format::format_to(sb, "{:>17}", arg.subclass.integer);
+                    break;
+                case arg_type_t::decimal:
+                    format::format_to(sb, "{:>17}", arg.subclass.decimal);
+                    break;
+                default:
+                    break;
+            }
+        }
+        format::format_to(sb, "\n");
     }
 
-    static const option_t* find_long_option(const getopt_t& opt, str::slice_t name) {
+    static option_t* find_long_option(getopt_t& opt, str::slice_t name) {
         if (slice::empty(name))
             return nullptr;
-        for (const auto& option : opt.opts) {
+        for (auto& option : opt.opts) {
             if (slice::empty(option.long_name))
                 continue;
             if (strncmp((const s8*) name.data,
@@ -90,15 +145,6 @@ namespace basecode::getopt {
             }
         }
         return nullptr;
-    }
-
-    static arg_t* add_arg(getopt_t& opt, u32 idx, const option_t* option, b8 extra = false) {
-        auto arg = extra ? &array::append(opt.extras) : &array::append(opt.args);
-        arg->option = option;
-        arg->type   = option ? option->type : arg_type_t::string;
-        arg->pos    = idx;
-        arg->extra  = extra;
-        return arg;
     }
 
     u0 free(getopt_t& opt) {
@@ -112,40 +158,19 @@ namespace basecode::getopt {
         str::init(buf, opt.alloc);
         {
             str_buf_t sb{&buf};
-
-            format::format_to(sb, "Idx S Long            Type    MR  MA  Value\n");
+            format::format_to(sb,
+                              "Idx S Long            Type    MR  MA  Value\n");
             format::format_to(sb, "-------------------------------------------------------\n");
             u32 idx{};
             for (const auto& arg : opt.args) {
-                format::format_to(sb, "{:02}: ", idx++);
-                if (arg.option->short_name != 0)
-                    format::format_to(sb, "{} ", arg.option->short_name);
-                else
-                    format::format_to(sb, "  ");
-                if (!slice::empty(arg.option->long_name))
-                    format::format_to(sb, "{:<16}", arg.option->long_name);
-                else
-                    format::format_to(sb, "{:{}}", " ", 16);
-                format::format_to(sb, "{:<8}", type_name(arg.type));
-                format::format_to(sb, "{:>3} ", arg.option->min_required);
-                format::format_to(sb, "{:>3} ", arg.option->max_allowed);
-                if (arg_expects_value(&arg)) {
-                    switch (arg.type) {
-                        case arg_type_t::file:
-                        case arg_type_t::string:
-                            format::format_to(sb, "{}", arg.subclass.string);
-                            break;
-                        case arg_type_t::integer:
-                            format::format_to(sb, "{:>17}", arg.subclass.integer);
-                            break;
-                        case arg_type_t::decimal:
-                            format::format_to(sb, "{:>17}", arg.subclass.decimal);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                format::format_to(sb, "\n");
+                format_arg(arg, sb, idx);
+                ++idx;
+            }
+            format::format_to(sb, "\nExtra Argument\n");
+            format::format_to(sb, "-------------------------------------------------------\n");
+            for (const auto& arg : opt.extras) {
+                format_arg(arg, sb, idx);
+                ++idx;
             }
         }
         format::print("{}\n", buf);
@@ -158,8 +183,10 @@ namespace basecode::getopt {
         str::slice_t args[opt.argc];
         for (u32 i = 0; i < opt.argc; ++i)
             args[i] = slice::make(opt.argv[i]);
-
         array::reserve(opt.args, opt.argc * 2);
+
+        for (auto& option : opt.opts)
+            option.count = {};
 
         queue_t<arg_t*> deferred{};
         queue::init(deferred);
@@ -261,6 +288,23 @@ namespace basecode::getopt {
                 }
             }
         }
+
+        for (const auto& option : opt.opts) {
+            if (option.min_required < 1)
+                continue;
+            u32 count{};
+            for (const auto& arg : opt.args) {
+                if (arg.option == &option)
+                    ++count;
+            }
+            if (count != option.min_required)
+                return status_t::missing_required_option;
+            if (option.max_allowed > 0
+            &&  count > option.max_allowed) {
+                return status_t::count_exceeds_allowed;
+            }
+        }
+
         return status_t::ok;
     }
 
