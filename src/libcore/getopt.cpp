@@ -16,11 +16,9 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/path.h>
+#include <basecode/core/bag.h>
 #include <basecode/core/queue.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/getopt.h>
-#include <basecode/core/format.h>
 #include <basecode/core/string.h>
 #include <basecode/core/numbers.h>
 
@@ -52,17 +50,9 @@ namespace basecode::getopt {
         return arg->type != arg_type_t::none && arg->type != arg_type_t::flag;
     }
 
-    static option_t* find_short_option(getopt_t& opt, s8 name) {
-        if (name == 0)
-            return nullptr;
-        for (auto& option : opt.opts) {
-            if (option.short_name == name)
-                return &option;
-        }
-        return nullptr;
-    }
-
-    static status_t set_arg_value(arg_t* arg, str::slice_t value) {
+    static status_t set_arg_value(arg_t* arg,
+                                  str::slice_t value,
+                                  bag_t<option_t*>& counts) {
         switch (arg->type) {
             case arg_type_t::file:
             case arg_type_t::string:
@@ -87,8 +77,18 @@ namespace basecode::getopt {
             }
         }
         if (arg->option)
-            arg->option->count++;
+            bag::insert(counts, arg->option);
         return status_t::ok;
+    }
+
+    static option_t* find_short_option(getopt_t& opt, s8 name) {
+        if (name == 0)
+            return nullptr;
+        for (auto& option : opt.opts) {
+            if (option.short_name == name)
+                return &option;
+        }
+        return nullptr;
     }
 
     static u0 format_arg(const arg_t& arg, str_buf_t& sb, u32 idx) {
@@ -185,12 +185,15 @@ namespace basecode::getopt {
             args[i] = slice::make(opt.argv[i]);
         array::reserve(opt.args, opt.argc * 2);
 
-        for (auto& option : opt.opts)
-            option.count = {};
+        bag_t<option_t*> counts{};
+        bag::init(counts, opt.alloc);
 
         queue_t<arg_t*> deferred{};
-        queue::init(deferred);
-        defer(queue::free(deferred));
+        queue::init(deferred, opt.alloc);
+
+        defer(
+            queue::free(deferred);
+            bag::free(counts));
 
         auto present_new_arg = [&](const option_t* option,
                                    arg_t* arg,
@@ -203,7 +206,7 @@ namespace basecode::getopt {
             if (j + 1 >= curr.length) {
                 if (i >= opt.argc)
                     return status_t::expected_value;
-                return set_arg_value(arg, args[++i]);
+                return set_arg_value(arg, args[++i], counts);
             }
 
             for (auto k = j + 1; k < curr.length; ++k) {
@@ -212,7 +215,8 @@ namespace basecode::getopt {
                 const auto len = curr.length - (k + 1);
                 auto status = set_arg_value(
                     arg,
-                    slice::make(curr.data + (k + 1), len));
+                    slice::make(curr.data + (k + 1), len),
+                    counts);
                 if (!OK(status))
                     return status;
                 j += len;
@@ -228,7 +232,7 @@ namespace basecode::getopt {
             const auto& curr = args[i];
             if (extra_switch) {
                 auto arg = add_arg(opt, i, nullptr, true);
-                auto status = set_arg_value(arg, curr);
+                auto status = set_arg_value(arg, curr, counts);
                 if (!OK(status))
                     return status;
             } else {
@@ -240,7 +244,8 @@ namespace basecode::getopt {
                     if (queue::empty(deferred))
                         return status_t::invalid_argument;
                     auto status = set_arg_value(queue::pop_front(deferred),
-                                                curr);
+                                                curr,
+                                                counts);
                     if (!OK(status))
                         return status;
                     continue;
@@ -282,21 +287,18 @@ namespace basecode::getopt {
                     if (queue::empty(deferred))
                         return status_t::invalid_argument;
                     auto status = set_arg_value(queue::pop_front(deferred),
-                                                curr);
+                                                curr,
+                                                counts);
                     if (!OK(status))
                         return status;
                 }
             }
         }
 
-        for (const auto& option : opt.opts) {
+        for (auto& option : opt.opts) {
             if (option.min_required < 1)
                 continue;
-            u32 count{};
-            for (const auto& arg : opt.args) {
-                if (arg.option == &option)
-                    ++count;
-            }
+            auto count = bag::count(counts, &option);
             if (count != option.min_required)
                 return status_t::missing_required_option;
             if (option.max_allowed > 0

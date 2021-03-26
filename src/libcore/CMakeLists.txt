@@ -53,6 +53,8 @@ set(
 
     ${CORE_INC_DIR}/assoc_array.h
 
+    ${CORE_INC_DIR}/bag.h
+
     ${CORE_INC_DIR}/defer.h
     ${CORE_INC_DIR}/types.h
     ${CORE_INC_DIR}/family.h

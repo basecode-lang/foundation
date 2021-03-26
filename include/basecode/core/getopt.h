@@ -37,7 +37,6 @@ namespace basecode {
         str::slice_t            description;
         s32                     max_allowed;
         s32                     min_required;
-        u32                     count;
         u8                      radix;
         s8                      short_name;
         arg_type_t              type;
@@ -138,5 +137,11 @@ namespace basecode {
         option_builder_t make_option(getopt_t& opt);
 
         u0 program_description(getopt_t& opt, str::slice_t description);
+    }
+}
+
+namespace basecode::hash {
+    inline u64 hash64(option_t* const& key) {
+        return murmur::hash64((const u0*) key, sizeof(u0*));
     }
 }
