@@ -3,10 +3,28 @@
 ;; support macros / functions
 ;;
 ;; -------------------------------------------------------------
-(= append (fn (l m)
+(= reverse (fn (l)
     (if (not l)
         '()
+        (append (reverse (cdr l)) (list (car l))))))
+
+(= append (fn (l m)
+    (if (not l)
+        m
         (cons (car l) (append (cdr l) m)))))
+
+(= append-reverse (fn (rev tail)
+    (if (not rev)
+        tail
+        (append-reverse (cdr rev) (cons (car rev) tail)))))
+
+(= cons* (fn (first . rest)
+    (= loop (fn (rev next rest)
+        (if (not rest)
+            (append-reverse rev next)
+            (loop (cons next rev) (car rest) (cdr rest)))))
+    (loop '() first rest)))
+(= list* cons*)
 
 (= for (mac (item lst . body)
     (list 'do
