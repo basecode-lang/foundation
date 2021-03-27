@@ -2,7 +2,6 @@ HIGH
 ---------
 - scm: implement tail call optimization
 - scm: adjust print primitive to not add spaces and line feeds
-- scm: add full quasiquote, unquote, unquote-splicing primitive support
 
 MEDIUM
 ---------
@@ -32,6 +31,7 @@ LOW
 
 DONE
 ----
+- scm: add full quasiquote, unquote, unquote-splicing primitive support
 - bag_t: set + counts
 - getopts: finish this!
 - wasm decoder

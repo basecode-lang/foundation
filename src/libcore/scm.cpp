@@ -47,6 +47,8 @@
 #define OBJ_AT(idx)             (&ctx->objects[(idx)])
 #define OBJ_IDX(x)              ((x) - ctx->objects)
 #define CAR(x)                  (&ctx->objects[(x)->pair.car_idx])
+#define CAAR(x)                 CAR(CAR(x))
+#define CADR(x)                 CAR(CDR(x))
 #define SET_CAR(x, o)           ((x)->pair.car_idx = OBJ_IDX(o))
 #define CDR(x)                  (&ctx->objects[(x)->pair.cdr_idx])
 #define SET_CDR(x, o)           ((x)->pair.cdr_idx = OBJ_IDX(o))
@@ -66,6 +68,7 @@
 #define SCRATCH_SIZE            (1024U)
 #define GC_STACK_SIZE           (1024U)
 #define NATIVE_PTR_SIZE         (256U)
+#define EVAL(o)                 eval(ctx, (o), env, nullptr)
 #define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env, nullptr)
 #define ARITH_INT_OP(op)        SAFE_SCOPE(                                                     \
                                     u32 x = NUMBER(EVAL_ARG());                                 \
@@ -83,6 +86,15 @@
                                     va = check_type(ctx, EVAL_ARG(), obj_type_t::number);       \
                                     vb = check_type(ctx, EVAL_ARG(), obj_type_t::number);       \
                                     res = make_bool(ctx, NUMBER(va) op NUMBER(vb));             \
+                                )
+#define SYM(o)                  make_symbol(ctx, (o))
+#define CONS1(a)                cons(ctx, (a), ctx->nil)
+#define CONS(a, d)              cons(ctx, (a), (d))
+#define PRINT(h, o)             SAFE_SCOPE(                                                     \
+                                    fprintf(stdout, (h));                                       \
+                                    write_fp(ctx, (o), stdout);                                 \
+                                    fprintf(stdout, "\n");                                      \
+                                    fflush(stdout);                                             \
                                 )
 
 namespace basecode::scm {
@@ -240,23 +252,6 @@ namespace basecode::scm {
 
     static obj_t* args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg, obj_t* env);
 
-    static b8 equal(obj_t* a, obj_t* b) {
-        if (a == b) {
-            return true;
-        }
-        if (TYPE(a) != TYPE(b)) {
-            return false;
-        }
-        if (TYPE(a) == obj_type_t::number) {
-            const auto e = std::numeric_limits<number_t>::epsilon();
-            auto d = NUMBER(b) - NUMBER(a);
-            return d <= e;
-        } else if (TYPE(a) == obj_type_t::string) {
-            return INTEGER(a) == INTEGER(b);
-        }
-        return false;
-    }
-
     static obj_t* make_object(ctx_t* ctx) {
         obj_t* obj;
         if (IS_NIL(ctx->free_list)) {
@@ -282,6 +277,40 @@ namespace basecode::scm {
         s32 chr;
         UNUSED(ctx);
         return (chr = fgetc((FILE*) udata)) == EOF ? '\0' : s8(chr);
+    }
+
+    static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b) {
+        if (a == b)                 return true;
+        if (TYPE(a) != TYPE(b))     return false;
+        switch (TYPE(a)) {
+            case obj_type_t::nil:
+            case obj_type_t::free:  return true;
+            case obj_type_t::pair:
+            case obj_type_t::func:
+            case obj_type_t::macro: {
+                while (!IS_NIL(a)) {
+                    if (IS_NIL(b))  return false;
+                    if (!equal(ctx, CAR(a), CAR(b))
+                        ||  !equal(ctx, CDR(a), CDR(b))) {
+                        return false;
+                    }
+                    next_arg(ctx, &a);
+                    next_arg(ctx, &b);
+                }
+                return true;
+            }
+            case obj_type_t::number: {
+                const auto e = std::numeric_limits<number_t>::epsilon();
+                auto d = NUMBER(b) - NUMBER(a);
+                return d <= e;
+            }
+            case obj_type_t::prim:      return PRIM(a) == PRIM(b);
+            case obj_type_t::ptr:
+            case obj_type_t::cfunc:
+            case obj_type_t::string:    return INTEGER(a) == INTEGER(b);
+            default:                    break;
+        }
+        return false;
     }
 
     static u0 write_fp(ctx_t* ctx, u0* udata, s8 chr) {
@@ -468,7 +497,7 @@ namespace basecode::scm {
         obj_t* tail = head;
         while (!IS_NIL(lst)) {
             auto r = cons(ctx,
-                         eval(ctx, next_arg(ctx, &lst), env, nullptr),
+                         EVAL(next_arg(ctx, &lst)),
                          ctx->nil);
             if (IS_NIL(tail)) {
                 head = r;
@@ -479,6 +508,25 @@ namespace basecode::scm {
             }
         }
         return head;
+    }
+
+    static obj_t* quasiquote(ctx_t* ctx, obj_t* obj, obj_t* env) {
+        if (TYPE(obj) != obj_type_t::pair)
+            return CONS(SYM("quote"), CONS1(obj));
+        auto a = CAR(obj);
+        if (equal(ctx, a, SYM("unquote-splicing")))
+            error(ctx, "unquote-splicing not valid in this context");
+        if (equal(ctx, a, SYM("unquote")))
+            return CADR(obj);
+        if (TYPE(a) == obj_type_t::pair) {
+            auto aa = CAAR(obj);
+            if (equal(ctx, aa, SYM("unquote-splicing"))) {
+                obj_t* t1[] = {SYM("append"), CADR(a), quasiquote(ctx, CDR(obj), env)};
+                return make_list(ctx, t1, 3);
+            }
+        }
+        obj_t* t1[] = {SYM("cons"), quasiquote(ctx, a, env), quasiquote(ctx, CDR(obj), env)};
+        return make_list(ctx, t1, 3);
     }
 
     static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type) {
@@ -512,7 +560,7 @@ namespace basecode::scm {
         ctx->call_list = cl;
 
         gc  = save_gc(ctx);
-        fn  = eval(ctx, CAR(obj), env, nullptr);
+        fn  = EVAL(CAR(obj));
         arg = CDR(obj);
         res = ctx->nil;
 
@@ -520,7 +568,7 @@ namespace basecode::scm {
             case obj_type_t::prim:
                 switch (PRIM(fn)) {
                     case prim_type_t::eval:
-                        res = eval(ctx, EVAL_ARG(), env, nullptr);
+                        res = EVAL(EVAL_ARG());
                         break;
 
                     case prim_type_t::let:
@@ -559,7 +607,7 @@ namespace basecode::scm {
                     case prim_type_t::while_:
                         va = next_arg(ctx, &arg);
                         n  = save_gc(ctx);
-                        while (!IS_NIL(eval(ctx, va, env, nullptr))) {
+                        while (!IS_NIL(EVAL(va))) {
                             do_list(ctx, arg, env);
                             restore_gc(ctx, n);
                         }
@@ -570,12 +618,15 @@ namespace basecode::scm {
                         break;
 
                     case prim_type_t::unquote:
+                        error(ctx, "unquote is not valid in this context.");
                         break;
 
                     case prim_type_t::quasiquote:
+                        res = EVAL(quasiquote(ctx, next_arg(ctx, &arg), env));
                         break;
 
                     case prim_type_t::unquote_splicing:
+                        error(ctx, "unquote-splicing is not valid in this context.");
                         break;
 
                     case prim_type_t::and_:
@@ -623,7 +674,7 @@ namespace basecode::scm {
 
                     case prim_type_t::is:
                         va  = EVAL_ARG();
-                        res = make_bool(ctx, equal(va, EVAL_ARG()));
+                        res = make_bool(ctx, equal(ctx, va, EVAL_ARG()));
                         break;
 
                     case prim_type_t::atom:
@@ -701,7 +752,7 @@ namespace basecode::scm {
                 *obj = *do_list(ctx, CDR(vb), args_to_env(ctx, CAR(vb), arg, CAR(va)));
                 restore_gc(ctx, gc);
                 ctx->call_list = CDR(cl);
-                return eval(ctx, obj, env, nullptr);
+                return EVAL(obj);
 
             default:
                 error(ctx, "tried to call non-callable value");

@@ -3,6 +3,12 @@
 ;; support macros / functions
 ;;
 ;; -------------------------------------------------------------
+(= add1 (mac (e)
+    `(+ ,e 1)))
+
+(= sub1 (mac (e)
+    `(- ,e 1)))
+
 (= reverse (fn (l)
     (if (not l)
         '()
@@ -27,45 +33,47 @@
 (= list* cons*)
 
 (= for (mac (item lst . body)
-    (list 'do
-        (list 'let 'for-iter lst)
-        (list 'while 'for-iter
-            (list 'let item '(car for-iter))
-            '(= for-iter (cdr for-iter))
-            (cons 'do body)))))
+    `(do
+        (let for-iter ,lst)
+        (while for-iter
+            (let ,item (car for-iter))
+            (= for-iter (cdr for-iter))
+            (do ,@body)))))
 
 (= test-suite (mac (title . body)
-    (list 'do
-        (list 'let 'pass-count 0)
-        (list 'let 'fail-count 0)
-        (list 'let 'sys-print 'print)
-        (list 'let 'print '(fn (args)
-                               (sys-print " "
-                                          (car args)
-                                          (car (cdr args)))))
-        (list 'sys-print "TEST SUITE:" title)
-        (list 'sys-print "----------------------------------------------------")
-        (list 'sys-print " PASS | FAIL | Assert Expression                    ")
-        (list 'sys-print "----------------------------------------------------")
+    `(do
+        (let pass-count 0)
+        (let fail-count 0)
+        (let sys-print print)
+        (let print (fn (args)
+            (sys-print " "
+                       (car args)
+                       (car (cdr args)))))
+        (sys-print "TEST SUITE:" ,title)
+        (sys-print "----------------------------------------------------")
+        (sys-print " PASS | FAIL | Assert Expression                    ")
+        (sys-print "----------------------------------------------------")
 
-        (list 'let 'results (cons 'list body))
-        (list 'for 'x 'results
-            (list 'if 'x
-                '(= pass-count (+ 1 pass-count))
-                '(= fail-count (+ 1 fail-count))))
+        (let results (list ,@body))
+        (for expr results
+            (if expr
+                (= pass-count (+ 1 pass-count))
+                (= fail-count (+ 1 fail-count))))
 
-        (list 'sys-print "====================================================")
-        (list 'sys-print "PASS:" 'pass-count " FAIL:" 'fail-count)
-        (list 'sys-print ""))))
+        (sys-print "====================================================")
+        (sys-print "PASS:" pass-count " FAIL:" fail-count)
+        (sys-print ""))))
 
 (= assert (mac (expr)
-    (list 'if (car (cdr expr))
-        (list 'do
-            (list 'print (list 'list " P          " expr))
-            #t)
-        (list 'do
-            (list 'print (list 'list "        F   " expr))
-            #f))))
+    `(do
+        (let result (eval ,expr))
+        (if result
+            (do
+                (print (list " P          " ,expr))
+                #t)
+            (do
+                (print (list "        F   " ,expr))
+                #f)))))
 
 ;; -------------------------------------------------------------
 ;;
@@ -218,37 +226,38 @@
 
 (= core-tests (fn ()
     (do
-        (do
-            (let i 0)
-            (for arg (current-command-line)
-                (print i "=" arg)
-                (= i (+ i 1))))
-
-        (do
-            (let a 42)
-            (print "(eval 'a) =" (eval 'a)))
-        (print "(eval '(+ 100 200)) =" (eval '(+ 100 200)))
-
-        (do
-            (let expr '(for x (list 1 2 3 4 5)
-                            (print "x =" x)))
-            (print "(eval expr) =" (eval expr)))
-
-        (localized-string 5000 'en_US "US: test localized string: 0={} 1={} 2={}")
-        (localized-string 5001 'en_US "duplicate cvar")
-        (localized-string 5002 'en_US "cvar not found")
-        (localized-string 5003 'en_US "invalid modification of constant: {}")
-        (localized-string 5004 'en_GB "GB: test localized string: 0={} 1={} 2={}")
-
-        (let str:undecl-msg (localized-string 5005 'en_US "undeclared identifier: {}"))
-        (localized-error 5000 'en_US 'BC001 str:undecl-msg)
-
         ; basic assertions around scheme terp
         (test-suite "scheme terp basic assertions"
             (assert '(is 2 2))
             (assert '(not (> 2 9)))
             (assert '(>= 2 2))
-            (assert '(is 0 (mod 10 2))))
+            (assert '(is 0 (mod 10 2)))
+            (assert '(is        '(10 20)
+                                (do
+                                    (let a 10)
+                                    (let b 20)
+                                    `(,a ,b))))
+            (assert '(is        '(10 20 30)
+                                (do
+                                    (let a 10)
+                                    (let b 20)
+                                    `(,a ,b ,(+ a b)))))
+            (assert '(is        '(0 1 2 3 4 5)
+                                `(0 1 ,@(list 2 3 4) 5)))
+            (assert '(is 300    (eval '(+ 100 200))))
+            (assert '(is 42     (do (let a 42) (eval 'a))))
+            (assert '(is 15     (do
+                                    (let sum 0)
+                                    (let expr '(for x (list 1 2 3 4 5)
+                                                    (= sum (add1 sum))))
+                                    (eval expr)
+                                    sum)))
+            (assert '(>         (do
+                                    (let count 0)
+                                    (for arg (current-command-line)
+                                        (= count (add1 count)))
+                                    count)
+                                0)))
 
         (test-suite "scheme + config module integration"
             (assert '(is "Basecode Foundation Core Library" (cvar-ref cvar:product-name)))
@@ -277,7 +286,18 @@
 
             (assert '(is #f (cvar-ref cvar:enable-console-color)))
             (assert '(is "/var/log/basecode" (cvar-ref cvar:log-path)))
-            (assert '(is 12.6566 (cvar-ref cvar:magick-weight))))
+            (assert '(is 12.6566 (cvar-ref cvar:magick-weight)))
+            (assert '(is #t (do
+                                (localized-string 5000 'en_US "US: test localized string: 0={} 1={} 2={}")
+                                (localized-string 5001 'en_US "duplicate cvar")
+                                (localized-string 5002 'en_US "cvar not found")
+                                (localized-string 5003 'en_US "invalid modification of constant: {}")
+                                (localized-string 5004 'en_GB "GB: test localized string: 0={} 1={} 2={}")
+
+                                (let str:undecl-msg (localized-string 5005 'en_US "undeclared identifier: {}"))
+                                (localized-error 5000 'en_US 'BC001 str:undecl-msg)
+                                #t)))
+            )
 
         (do
             (let parent-logger (current-logger))
