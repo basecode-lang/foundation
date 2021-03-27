@@ -301,8 +301,11 @@ namespace basecode::scm {
             }
             case obj_type_t::number: {
                 const auto e = std::numeric_limits<number_t>::epsilon();
-                auto d = NUMBER(b) - NUMBER(a);
-                return d <= e;
+                auto x = fabs(NUMBER(a));
+                auto y = fabs(NUMBER(b));
+                auto largest = (y > x) ? y : x;
+                auto diff = x - y;
+                return diff <= largest * e;
             }
             case obj_type_t::prim:      return PRIM(a) == PRIM(b);
             case obj_type_t::ptr:

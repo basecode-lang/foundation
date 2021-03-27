@@ -9,10 +9,42 @@
 (= sub1 (mac (e)
     `(- ,e 1)))
 
-(= reverse (fn (l)
-    (if (not l)
-        '()
-        (append (reverse (cdr l)) (list (car l))))))
+(= map (fn (proc lst)
+    (let res nil)
+    (while lst
+        (= res (cons (proc (car lst)) res))
+        (= lst (cdr lst)))
+    (reverse res)))
+
+(= range (fn (a b step)
+    (let lst '())
+    (while (<= a b)
+        (= lst (cons a lst))
+        (= a (+ a step)))
+    (reverse lst)))
+
+(= length (fn (ls)
+    (let count 0)
+    (while ls
+        (= count (add1 count))
+        (= ls (cdr ls)))
+    count))
+
+(= list-tail (fn (ls k)
+    (while (> k 0)
+        (= ls (cdr ls))
+        (= k (sub1 k)))
+    ls))
+
+(= list-ref (fn (ls k)
+    (car (list-tail ls k))))
+
+(= reverse (fn (lst)
+    (let res nil)
+    (while lst
+        (= res (cons (car lst) res))
+        (= lst (cdr lst)))
+    res))
 
 (= append (fn (l m)
     (if (not l)
@@ -31,6 +63,18 @@
             (loop (cons next rev) (car rest) (cdr rest)))))
     (loop '() first rest)))
 (= list* cons*)
+
+(= cond (mac args
+    (if (not args)
+        ''()
+        (do
+            (let next   (car args))
+            (let rest   (cdr args))
+            (let test   (if (is (car next) 'else)
+                            #t
+                            (car next)))
+            (let expr   (car (cdr next)))
+            `(if ,test ,expr (cond ,@rest))))))
 
 (= for (mac (item lst . body)
     `(do
@@ -226,12 +270,22 @@
 
 (= core-tests (fn ()
     (do
+        (do
+            (print "fizz buzz test:")
+            (for n (range 1 50 1)
+                (cond
+                    [(is (mod n 15) 0)      (print "fizz buzz")]
+                    [(is (mod n 3) 0)       (print "fizz")]
+                    [(is (mod n 5) 0)       (print "buzz")]
+                    [else                   (print n)])))
+
         ; basic assertions around scheme terp
         (test-suite "scheme terp basic assertions"
+            (assert '(is 5 (length '(1 2 3 4 5))))
             (assert '(is 2 2))
             (assert '(not (> 2 9)))
             (assert '(>= 2 2))
-            (assert '(is 0 (mod 10 2)))
+            (assert '(is (mod 10 2) 0))
             (assert '(is        '(10 20)
                                 (do
                                     (let a 10)
@@ -249,7 +303,7 @@
             (assert '(is 15     (do
                                     (let sum 0)
                                     (let expr '(for x (list 1 2 3 4 5)
-                                                    (= sum (add1 sum))))
+                                                    (= sum (+ sum x))))
                                     (eval expr)
                                     sum)))
             (assert '(>         (do
