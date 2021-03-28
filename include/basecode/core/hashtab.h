@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cassert>
 #include <algorithm>
 #include <basecode/core/str.h>
 #include <basecode/core/bits.h>
@@ -276,11 +275,13 @@ namespace basecode {
             for (u32 i = 0; i < table.capacity; ++i) {
                 if (!hash_common::read_flag(table.flags, i)) continue;
                 u32 bucket_index = hash_common::range_reduction(table.hashes[i], new_capacity);
-                assert(hash_common::find_free_bucket2(new_flags, new_capacity, bucket_index));
-                hash_common::write_flag(new_flags, bucket_index, true);
-                new_keys[bucket_index]   = table.keys[i];
-                new_values[bucket_index] = table.values[i];
-                new_hashes[bucket_index] = table.hashes[i];
+                b8  found = hash_common::find_free_bucket2(new_flags, new_capacity, bucket_index);
+                if (found) {
+                    hash_common::write_flag(new_flags, bucket_index, true);
+                    new_keys[bucket_index]   = table.keys[i];
+                    new_values[bucket_index] = table.values[i];
+                    new_hashes[bucket_index] = table.hashes[i];
+                }
             }
 
             memory::free(table.alloc, table.flags);
@@ -360,16 +361,20 @@ namespace basecode {
 
             u64 hash         = hash::hash64(key);
             u32 bucket_index = hash_common::range_reduction(hash, table.capacity);
-            assert(hash_common::find_free_bucket2(table.flags, table.capacity, bucket_index));
-            hash_common::write_flag(table.flags, bucket_index, true);
-            table.keys[bucket_index]   = key;
-            table.hashes[bucket_index] = hash;
-            ++table.size;
-            if constexpr (Is_Pointer) {
-                return table.values[bucket_index];
-            } else {
-                return &table.values[bucket_index];
+            b8  found        = hash_common::find_free_bucket2(table.flags, table.capacity, bucket_index);
+            if (found) {
+                hash_common::write_flag(table.flags, bucket_index, true);
+                table.keys[bucket_index]   = key;
+                table.hashes[bucket_index] = hash;
+                ++table.size;
+                if constexpr (Is_Pointer) {
+                    return table.values[bucket_index];
+                } else {
+                    return &table.values[bucket_index];
+                }
             }
+
+            return (Base_Value_Type) nullptr;
         }
 
         template <Hash_Table T,
@@ -386,16 +391,20 @@ namespace basecode {
 
             u64 hash         = hash::hash64(key);
             u32 bucket_index = hash_common::range_reduction(hash, table.capacity);
-            assert(hash_common::find_free_bucket2(table.flags, table.capacity, bucket_index));
-            hash_common::write_flag(table.flags, bucket_index, true);
-            table.keys[bucket_index]   = key;
-            table.hashes[bucket_index] = hash;
-            ++table.size;
-            if constexpr (Is_Pointer) {
-                return {table.values[bucket_index], true};
-            } else {
-                return {&table.values[bucket_index], true};
+            b8  found        = hash_common::find_free_bucket2(table.flags, table.capacity, bucket_index);
+            if (found) {
+                hash_common::write_flag(table.flags, bucket_index, true);
+                table.keys[bucket_index]   = key;
+                table.hashes[bucket_index] = hash;
+                ++table.size;
+                if constexpr (Is_Pointer) {
+                    return {table.values[bucket_index], true};
+                } else {
+                    return {&table.values[bucket_index], true};
+                }
             }
+
+            return {};
         }
 
         template <Hash_Table T,
@@ -413,17 +422,21 @@ namespace basecode {
 
             u64 hash         = hash::hash64(key);
             u32 bucket_index = hash_common::range_reduction(hash, table.capacity);
-            assert(hash_common::find_free_bucket2(table.flags, table.capacity, bucket_index));
-            hash_common::write_flag(table.flags, bucket_index, true);
-            table.keys[bucket_index]   = key;
-            table.hashes[bucket_index] = hash;
-            table.values[bucket_index] = value;
-            ++table.size;
-            if constexpr (Is_Pointer) {
-                return table.values[bucket_index];
-            } else {
-                return &table.values[bucket_index];
+            b8  found        = hash_common::find_free_bucket2(table.flags, table.capacity, bucket_index);
+            if (found) {
+                hash_common::write_flag(table.flags, bucket_index, true);
+                table.keys[bucket_index]   = key;
+                table.hashes[bucket_index] = hash;
+                table.values[bucket_index] = value;
+                ++table.size;
+                if constexpr (Is_Pointer) {
+                    return table.values[bucket_index];
+                } else {
+                    return &table.values[bucket_index];
+                }
             }
+
+            return (Base_Type_Value) nullptr;
         }
     }
 }

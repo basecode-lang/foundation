@@ -328,8 +328,9 @@
             (assert '(is 0 (cvar-ref cvar:version-revision)))
             (assert '(do
                         (let build-type (cvar-ref cvar:build-type))
-                        (or (is "Debug" build-type)
-                            (is "Release" build-type))))
+                        (or (is "Debug"             build-type)
+                            (is "RelWithDebInfo"    build-type)
+                            (is "Release"           build-type))))
             (assert '(do
                         (let platform (cvar-ref cvar:platform))
                         (or (is "Windows" platform)

@@ -47,6 +47,15 @@ namespace basecode {
         {t.load_factor}         -> same_as<f32>;
     };
 
+    struct bag_buf_size_t final {
+        u32                     total_size;
+        u32                     size_of_flags;
+        u32                     num_flag_words;
+        u32                     size_of_hashes;
+        u32                     size_of_counts;
+        u32                     size_of_values;
+    };
+
     template <typename T>
     struct bag_t final {
         using Value_Type        = T;
@@ -122,7 +131,7 @@ namespace basecode {
 
         template <Hash_Bag T,
                   typename Value_Type = typename T::Value_Type>
-        inline u32 size_of_buffer(T& bag, u32 capacity = 0);
+        inline bag_buf_size_t size_of_buffer(T& bag, u32 capacity = 0);
 
         template <Hash_Bag T,
                   b8 Is_Pointer = T::Is_Pointer::value,
@@ -147,8 +156,10 @@ namespace basecode {
 
         template <Hash_Bag T>
         u0 reset(T& bag) {
-            if (bag.hashes)
-                std::memset(bag.hashes, 0, size_of_buffer(bag));
+            if (bag.hashes) {
+                const auto buf_size = size_of_buffer(bag);
+                std::memset(bag.flags, 0, buf_size.total_size);
+            }
             bag.size = {};
         }
 
@@ -190,32 +201,31 @@ namespace basecode {
             bag.cap_idx = idx;
 
             const auto buf_size = size_of_buffer(bag, new_capacity);
-            auto buf = (u8*) memory::alloc(bag.alloc, buf_size, alignof(u64));
-            std::memset(buf, 0, buf_size);
+            auto buf = (u8*) memory::alloc(bag.alloc, buf_size.total_size, alignof(u64));
+            std::memset(buf, 0, buf_size.total_size);
 
-            u32  counts_align{}, values_align{};
+            u32  align{};
             auto new_flags  = (u64*) buf;
-            auto new_hashes = new_flags + hash_common::flag_words_for_capacity(new_capacity);
+            auto new_hashes = new_flags + buf_size.num_flag_words;
             auto new_counts = (u32*) memory::system::align_forward(
                 new_hashes + new_capacity,
                 alignof(u32),
-                counts_align);
+                align);
             auto new_values = (Value_Type*) memory::system::align_forward(
                 new_counts + new_capacity,
                 alignof(Value_Type),
-                values_align);
+                align);
 
             for (u32 i = 0; i < bag.capacity; ++i) {
                 if (!hash_common::read_flag(bag.flags, i)) continue;
-                u32 bucket_index = hash_common::range_reduction(bag.hashes[i],
-                                                                new_capacity);
-                assert(hash_common::find_free_bucket2(new_flags,
-                                                      new_capacity,
-                                                      bucket_index));
-                hash_common::write_flag(new_flags, bucket_index, true);
-                new_hashes[bucket_index] = bag.hashes[i];
-                new_values[bucket_index] = bag.values[i];
-                new_counts[bucket_index] = bag.counts[i];
+                u32 bucket_index = hash_common::range_reduction(bag.hashes[i], new_capacity);
+                b8  found        = hash_common::find_free_bucket2(new_flags, new_capacity, bucket_index);
+                if (found) {
+                    hash_common::write_flag(new_flags, bucket_index, true);
+                    new_hashes[bucket_index] = bag.hashes[i];
+                    new_values[bucket_index] = bag.values[i];
+                    new_counts[bucket_index] = bag.counts[i];
+                }
             }
 
             memory::free(bag.alloc, bag.flags);
@@ -260,17 +270,22 @@ namespace basecode {
         }
 
         template <Hash_Bag T, typename Value_Type>
-        inline u32 size_of_buffer(T& bag, u32 capacity) {
+        inline bag_buf_size_t size_of_buffer(T& bag, u32 capacity) {
             if (capacity == 0)
                 capacity = bag.capacity;
-            const auto size_of_hashes = capacity * sizeof(u64);
-            const auto size_of_counts = capacity * sizeof(u32);
-            const auto size_of_values = capacity * sizeof(Value_Type);
-            return (hash_common::flag_words_for_capacity(capacity) * sizeof(u64))
-                   + size_of_hashes
-                   + size_of_counts
-                   + alignof(Value_Type)
-                   + size_of_values;
+            bag_buf_size_t size{};
+            size.num_flag_words = hash_common::flag_words_for_capacity(capacity);
+            size.size_of_flags  = size.num_flag_words * sizeof(u64);
+            size.size_of_hashes = capacity * sizeof(u64);
+            size.size_of_counts = capacity * sizeof(u32);
+            size.size_of_values = capacity * sizeof(Value_Type);
+            size.total_size     = size.size_of_flags
+                                  + size.size_of_hashes
+                                  + alignof(u32)
+                                  + size.size_of_counts
+                                  + alignof(Value_Type)
+                                  + size.size_of_values;
+            return size;
         }
 
         template <Hash_Bag T>
@@ -304,19 +319,23 @@ namespace basecode {
             u64 hash         = hash::hash64(value);
             u32 bucket_index = hash_common::range_reduction(hash,
                                                             bag.capacity);
-            assert(hash_common::find_free_bucket2(bag.flags,
-                                                  bag.capacity,
-                                                  bucket_index));
-            hash_common::write_flag(bag.flags, bucket_index, true);
-            bag.hashes[bucket_index] = hash;
-            bag.values[bucket_index] = value;
-            bag.counts[bucket_index] = 1;
-            ++bag.size;
-            if constexpr (Is_Pointer) {
-                return bag.values[bucket_index];
-            } else {
-                return &bag.values[bucket_index];
+            b8  found        = hash_common::find_free_bucket2(bag.flags,
+                                                              bag.capacity,
+                                                              bucket_index);
+            if (found) {
+                hash_common::write_flag(bag.flags, bucket_index, true);
+                bag.hashes[bucket_index] = hash;
+                bag.values[bucket_index] = value;
+                bag.counts[bucket_index] = 1;
+                ++bag.size;
+                if constexpr (Is_Pointer) {
+                    return bag.values[bucket_index];
+                } else {
+                    return &bag.values[bucket_index];
+                }
             }
+
+            return (Value_Type_Base*) nullptr;
         }
 
         template <Hash_Bag T, b8 Is_Pointer, typename Value_Type, typename Value_Type_Base>

@@ -40,6 +40,14 @@ namespace basecode {
         {t.load_factor}         -> same_as<f32>;
     };
 
+    struct set_buf_size_t final {
+        u32                     total_size;
+        u32                     size_of_flags;
+        u32                     num_flag_words;
+        u32                     size_of_hashes;
+        u32                     size_of_values;
+    };
+
     template <typename T>
     struct set_t final {
         using Value_Type        = T;
@@ -108,15 +116,19 @@ namespace basecode {
 
         template <Hash_Set T,
                   typename Value_Type = typename T::Value_Type>
-        inline u32 size_of_buffer(T& set, u32 capacity = 0) {
+        inline set_buf_size_t size_of_buffer(T& set, u32 capacity = 0) {
             if (capacity == 0)
                 capacity = set.capacity;
-            const auto size_of_hashes = capacity * sizeof(u64);
-            const auto size_of_values = capacity * sizeof(Value_Type);
-            return (hash_common::flag_words_for_capacity(capacity) * sizeof(u64))
-                + size_of_hashes
-                + alignof(Value_Type)
-                + size_of_values;
+            set_buf_size_t size{};
+            size.num_flag_words = hash_common::flag_words_for_capacity(capacity);
+            size.size_of_flags  = size.num_flag_words * sizeof(u64);
+            size.size_of_hashes = capacity * sizeof(u64);
+            size.size_of_values = capacity * sizeof(Value_Type);
+            size.total_size     = size.size_of_flags
+                                  + size.size_of_hashes
+                                  + alignof(Value_Type)
+                                  + size.size_of_values;
+            return size;
         }
 
         template <Hash_Set T>
@@ -135,8 +147,10 @@ namespace basecode {
 
         template <Hash_Set T>
         u0 reset(T& set) {
-            if (set.hashes)
-                std::memset(set.hashes, 0, size_of_buffer(set));
+            if (set.hashes) {
+                const auto set_size = size_of_buffer(set);
+                std::memset(set.flags, 0, set_size.total_size);
+            }
             set.size = {};
         }
 
@@ -176,24 +190,29 @@ namespace basecode {
             set.cap_idx = idx;
 
             const auto buf_size = size_of_buffer(set, new_capacity);
-            auto buf = (u8*) memory::alloc(set.alloc, buf_size, alignof(u64));
-            std::memset(buf, 0, buf_size);
+            auto buf = (u8*) memory::alloc(set.alloc, buf_size.total_size, alignof(u64));
+            std::memset(buf, 0, buf_size.total_size);
 
-            u32  values_align{};
+            u32  align{};
             auto new_flags  = (u64*) buf;
-            auto new_hashes = new_flags + hash_common::flag_words_for_capacity(new_capacity);
+            auto new_hashes = (u64*) memory::system::align_forward(
+                new_flags + buf_size.num_flag_words,
+                alignof(u64),
+                align);
             auto new_values = (Value_Type*) memory::system::align_forward(
                 new_hashes + new_capacity,
                 alignof(Value_Type),
-                values_align);
+                align);
 
             for (u32 i = 0; i < set.capacity; ++i) {
                 if (!hash_common::read_flag(set.flags, i)) continue;
                 u32 bucket_index = hash_common::range_reduction(set.hashes[i], new_capacity);
-                assert(hash_common::find_free_bucket2(new_flags, new_capacity, bucket_index));
-                hash_common::write_flag(new_flags, bucket_index, true);
-                new_hashes[bucket_index] = set.hashes[i];
-                new_values[bucket_index] = set.values[i];
+                b8  found = hash_common::find_free_bucket2(new_flags, new_capacity, bucket_index);
+                if (found) {
+                    hash_common::write_flag(new_flags, bucket_index, true);
+                    new_hashes[bucket_index] = set.hashes[i];
+                    new_values[bucket_index] = set.values[i];
+                }
             }
 
             memory::free(set.alloc, set.flags);
@@ -270,16 +289,20 @@ namespace basecode {
 
             u64 hash         = hash::hash64(value);
             u32 bucket_index = hash_common::range_reduction(hash, set.capacity);
-            assert(hash_common::find_free_bucket2(set.flags, set.capacity, bucket_index));
-            hash_common::write_flag(set.flags, bucket_index, true);
-            set.hashes[bucket_index] = hash;
-            set.values[bucket_index] = value;
-            ++set.size;
-            if constexpr (Is_Pointer) {
-                return set.values[bucket_index];
-            } else {
-                return &set.values[bucket_index];
+            b8  found        = hash_common::find_free_bucket2(set.flags, set.capacity, bucket_index);
+            if (found) {
+                hash_common::write_flag(set.flags, bucket_index, true);
+                set.hashes[bucket_index] = hash;
+                set.values[bucket_index] = value;
+                ++set.size;
+                if constexpr (Is_Pointer) {
+                    return set.values[bucket_index];
+                } else {
+                    return &set.values[bucket_index];
+                }
             }
+
+            return (Value_Type_Base*) nullptr;
         }
 
         template <Hash_Set T, typename Value_Type>

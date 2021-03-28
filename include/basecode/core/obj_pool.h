@@ -24,21 +24,14 @@
 
 namespace basecode {
     struct obj_type_t;
-    struct obj_destroyer_t;
 
     using obj_array_t           = array_t<u0*>;
     using slab_table_t          = hashtab_t<u32, obj_type_t>;
-    using storage_table_t       = hashtab_t<u0*, obj_destroyer_t>;
     using destroy_callback_t    = u0 (*)(const u0*);
-
-    struct obj_destroyer_t final {
-        u0*                     obj;
-        alloc_t*                alloc;
-        destroy_callback_t      destroy;
-    };
 
     struct obj_type_t final {
         alloc_t*                alloc;
+        destroy_callback_t      destroyer;
         u32                     type_id;
         const s8*               type_name;
         obj_array_t             objects;
@@ -47,10 +40,9 @@ namespace basecode {
     struct obj_pool_t final {
         alloc_t*                alloc;
         slab_table_t            slabs;
-        storage_table_t         storage;
         u32                     size;
     };
-    static_assert(sizeof(obj_pool_t) <= 128, "obj_pool_t is now larger than 128 bytes!");
+    static_assert(sizeof(obj_pool_t) <= 72, "obj_pool_t is now larger than 72 bytes!");
 
     namespace obj_pool {
         enum class status_t : u32 {
@@ -62,15 +54,13 @@ namespace basecode {
         template <typename T>
         u0 destroy(obj_pool_t& pool, T* obj) {
             u0* o = obj;
-            auto d = hashtab::find(pool.storage, o);
-            if (d) {
-                const auto type_id = family_t<>::template type<T>;
-                auto type = hashtab::find(pool.slabs, type_id);
-                if (d->destroy)
-                    d->destroy(o);
-                hashtab::remove(pool.storage, o);
+            const auto type_id = family_t<>::template type<T>;
+            auto type = hashtab::find(pool.slabs, type_id);
+            if (type) {
+                if (type->destroyer)
+                    type->destroyer(o);
                 array::erase(type->objects, o);
-                memory::free(d->alloc, o);
+                memory::free(type->alloc, o);
                 --pool.size;
             }
         }
@@ -91,6 +81,13 @@ namespace basecode {
                 type->alloc     = memory::system::make(alloc_type_t::slab, &cfg);
                 type->type_id   = type_id;
                 type->type_name = typeid(T).name();
+                if constexpr (std::is_destructible_v<T>) {
+                    type->destroyer = [](const u0* x) -> u0 {
+                        static_cast<const T*>(x)->~T();
+                    };
+                } else {
+                    type->destroyer = nullptr;
+                }
                 array::init(type->objects, pool.alloc);
             }
             return type;
@@ -101,16 +98,6 @@ namespace basecode {
             auto type = register_type<T>(pool);
             u0* mem = memory::alloc(type->alloc);
             array::append(type->objects, mem);
-            auto d = hashtab::emplace(pool.storage, mem);
-            d->obj     = mem;
-            d->alloc   = type->alloc;
-            if constexpr (std::is_destructible_v<T>) {
-                d->destroy = [](const u0* x) -> u0 {
-                    static_cast<const T*>(x)->~T();
-                };
-            } else {
-                d->destroy = nullptr;
-            }
             ++pool.size;
             return new (mem) T(std::forward<Args>(args)...);
         }

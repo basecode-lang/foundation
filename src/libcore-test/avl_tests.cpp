@@ -38,7 +38,7 @@ static u0 print_avl_cursor(T& tree) {
     format::print("\n");
 }
 
-TEST_CASE("basecode::avl basics") {
+TEST_CASE("basecode::avl basics", "[avl]") {
     std::mt19937                       rg{std::random_device{}()};
     std::uniform_int_distribution<u32> pick(1, 4096);
 

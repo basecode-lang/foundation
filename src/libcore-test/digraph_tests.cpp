@@ -29,14 +29,23 @@ TEST_CASE("basecode::digraph basics") {
     digraph::init(g);
     defer(digraph::free(g));
 
-    auto n1 = digraph::make_node(g, 1U);
-    auto n2 = digraph::make_node(g, 2U);
-    auto n3 = digraph::make_node(g, 3U);
-    auto n4 = digraph::make_node(g, 4U);
-    auto n5 = digraph::make_node(g, 5U);
-    auto n6 = digraph::make_node(g, 6U);
-    auto n7 = digraph::make_node(g, 7U);
-    auto n8 = digraph::make_node(g, 8U);
+    u32 one   = 1U;
+    u32 two   = 2U;
+    u32 three = 3U;
+    u32 four  = 4U;
+    u32 five  = 5U;
+    u32 six   = 6U;
+    u32 seven = 7U;
+    u32 eight = 8U;
+
+    auto n1 = digraph::make_node(g, one);
+    auto n2 = digraph::make_node(g, two);
+    auto n3 = digraph::make_node(g, three);
+    auto n4 = digraph::make_node(g, four);
+    auto n5 = digraph::make_node(g, five);
+    auto n6 = digraph::make_node(g, six);
+    auto n7 = digraph::make_node(g, seven);
+    auto n8 = digraph::make_node(g, eight);
 
     //  N1 <---- N3 <------ N6 <---> N7
     //   |      * ^          ^        ^
@@ -68,9 +77,9 @@ TEST_CASE("basecode::digraph basics") {
         if (i > 0) format::print(", ");
         auto& comp = scc[i];
         format::print("{{");
-        for (auto i = 0; i < comp.size; ++i) {
-            if (i > 0) format::print(",");
-            format::print("{}", *comp[i]->value);
+        for (auto j = 0; j < comp.size; ++j) {
+            if (j > 0) format::print(",");
+            format::print("{}", *(comp[j]->value));
         }
         format::print("}}");
         array::free(comp);
