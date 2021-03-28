@@ -1,7 +1,13 @@
 HIGH
 ---------
-- scm: implement tail call optimization
 - scm: adjust print primitive to not add spaces and line feeds
+- config: review and clean up
+- config: remove cvar: prefix on variable names
+- config: use memory mapped buf_t for .scm files
+- scm: enhance native func support to accept an ffi_t*
+        and dynamically invoke it.
+- config: rework kernel funcs to take advantage of ffi based
+          callback mechanism.
 
 MEDIUM
 ---------
@@ -31,6 +37,10 @@ LOW
 
 DONE
 ----
+- scm: implement tail call optimization
+    * there are few items still not optimized but the groundwork
+      is now in place.  need to dig into do_list again to see if i can
+      get it reworked effectively.
 - scm: add full quasiquote, unquote, unquote-splicing primitive support
 - bag_t: set + counts
 - getopts: finish this!

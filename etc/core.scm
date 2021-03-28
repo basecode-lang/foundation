@@ -272,12 +272,20 @@
     (do
         (do
             (print "fizz buzz test:")
+            (let fizz-buzz  0)
+            (let fizz       0)
+            (let buzz       0)
+            (let numbers    0)
             (for n (range 1 50 1)
                 (cond
-                    [(is (mod n 15) 0)      (print "fizz buzz")]
-                    [(is (mod n 3) 0)       (print "fizz")]
-                    [(is (mod n 5) 0)       (print "buzz")]
-                    [else                   (print n)])))
+                    [(is (mod n 15) 0)      (= fizz-buzz    (add1 fizz-buzz))]
+                    [(is (mod n 3) 0)       (= fizz         (add1 fizz))]
+                    [(is (mod n 5) 0)       (= buzz         (add1 buzz))]
+                    [else                   (= numbers      (add1 numbers))]))
+            (print "  fizz buzz: " fizz-buzz)
+            (print "  fizz     : " fizz)
+            (print "  buzz     : " buzz)
+            (print "  numbers  : " numbers))
 
         ; basic assertions around scheme terp
         (test-suite "scheme terp basic assertions"
@@ -378,6 +386,6 @@
 (if (cvar-ref cvar:test-runner)
     (do
         (let product-name (cvar-ref cvar:product-name))
-        (if (is product-name "Basecode Foundation Binary Format Library") (binfmt-tests)
-            (is product-name "Basecode Foundation Core Library")          (core-tests)
-            nil)))
+        (cond
+            [(is product-name "Basecode Foundation Binary Format Library") (binfmt-tests)]
+            [(is product-name "Basecode Foundation Core Library")          (core-tests)])))

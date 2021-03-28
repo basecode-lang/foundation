@@ -49,6 +49,8 @@
 #define CAR(x)                  (&ctx->objects[(x)->pair.car_idx])
 #define CAAR(x)                 CAR(CAR(x))
 #define CADR(x)                 CAR(CDR(x))
+#define CDDR(x)                 CDR(CDR(x))
+#define CADDR(x)                CAR(CDR(CDR(x)))
 #define SET_CAR(x, o)           ((x)->pair.car_idx = OBJ_IDX(o))
 #define CDR(x)                  (&ctx->objects[(x)->pair.cdr_idx])
 #define SET_CDR(x, o)           ((x)->pair.cdr_idx = OBJ_IDX(o))
@@ -545,225 +547,225 @@ namespace basecode::scm {
     }
 
     static obj_t* eval(ctx_t* ctx, obj_t* obj, obj_t* env, obj_t** new_env) {
-        obj_t* fn;
-        obj_t* arg;
-        obj_t* res;
-        obj_t* va;
-        obj_t* vb;
-        u32   n;
-        u32   gc;
+        obj_t* fn   {};
+        obj_t* kar  {};
+        obj_t* arg  {};
+        obj_t* res  {};
+        obj_t* va   {};
+        obj_t* vb   {};
+        obj_t* cl   {};
+        u32    n    {};
+        u32    gc   {save_gc(ctx)};
 
-        if (TYPE(obj) == obj_type_t::symbol)
-            return CDR(get(ctx, obj, env));
+        while (!res) {
+            if (TYPE(obj) == obj_type_t::symbol)    return CDR(get(ctx, obj, env));
+            if (TYPE(obj) != obj_type_t::pair)      return obj;
 
-        if (TYPE(obj) != obj_type_t::pair)
-            return obj;
+            cl = cons(ctx, obj, ctx->call_list);
+            ctx->call_list = cl;
 
-        auto cl = cons(ctx, obj, ctx->call_list);
-        ctx->call_list = cl;
+            kar = CAR(obj);
+            arg = CDR(obj);
+            if (TYPE(kar) == obj_type_t::symbol)
+                    fn  = CDR(get(ctx, kar, env));
+            else    fn = kar;
 
-        gc  = save_gc(ctx);
-        fn  = EVAL(CAR(obj));
-        arg = CDR(obj);
-        res = ctx->nil;
+            switch (TYPE(fn)) {
+                case obj_type_t::prim:
+                    switch (PRIM(fn)) {
+                        case prim_type_t::eval:
+                            obj = EVAL_ARG();
+                            break;
 
-        switch (TYPE(fn)) {
-            case obj_type_t::prim:
-                switch (PRIM(fn)) {
-                    case prim_type_t::eval:
-                        res = EVAL(EVAL_ARG());
-                        break;
+                        case prim_type_t::let:
+                            va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
+                            if (new_env)
+                                *new_env = cons(ctx, cons(ctx, va, EVAL_ARG()), env);
+                            res = ctx->nil;
+                            break;
 
-                    case prim_type_t::let:
-                        va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
-                        if (new_env) {
-                            *new_env = cons(ctx, cons(ctx, va, EVAL_ARG()), env);
-                        }
-                        break;
+                        case prim_type_t::set:
+                            va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
+                            SET_CDR(get(ctx, va, env), EVAL_ARG());
+                            res = ctx->nil;
+                            break;
 
-                    case prim_type_t::set:
-                        va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
-                        SET_CDR(get(ctx, va, env), EVAL_ARG());
-                        break;
+                        case prim_type_t::if_:
+                            obj = !IS_NIL(EVAL(CAR(arg))) ? CADR(arg) : CADDR(arg);
+                            break;
 
-                    case prim_type_t::if_:
-                        while (!IS_NIL(arg)) {
-                            va = EVAL_ARG();
-                            if (!IS_NIL(va)) {
-                                res = IS_NIL(arg) ? va : EVAL_ARG();
-                                break;
+                        case prim_type_t::fn:
+                        case prim_type_t::mac:
+                            va = cons(ctx, env, arg);
+                            next_arg(ctx, &arg);
+                            res = make_object(ctx);
+                            SET_TYPE(res, PRIM(fn) == prim_type_t::fn ? obj_type_t::func : obj_type_t::macro);
+                            SET_CDR(res, va);
+                            break;
+
+                        case prim_type_t::while_:
+                            va = next_arg(ctx, &arg);
+                            n  = save_gc(ctx);
+                            while (!IS_NIL(EVAL(va))) {
+                                do_list(ctx, arg, env);
+                                restore_gc(ctx, n);
                             }
-                            if (IS_NIL(arg)) { break; }
-                            arg = CDR(arg);
-                        }
-                        break;
+                            res = ctx->nil;
+                            break;
 
-                    case prim_type_t::fn:
-                    case prim_type_t::mac:
-                        va = cons(ctx, env, arg);
-                        next_arg(ctx, &arg);
-                        res = make_object(ctx);
-                        SET_TYPE(res, PRIM(fn) == prim_type_t::fn ? obj_type_t::func : obj_type_t::macro);
-                        SET_CDR(res, va);
-                        break;
+                        case prim_type_t::quote:
+                            res = next_arg(ctx, &arg);
+                            break;
 
-                    case prim_type_t::while_:
-                        va = next_arg(ctx, &arg);
-                        n  = save_gc(ctx);
-                        while (!IS_NIL(EVAL(va))) {
-                            do_list(ctx, arg, env);
-                            restore_gc(ctx, n);
-                        }
-                        break;
+                        case prim_type_t::unquote:
+                            error(ctx, "unquote is not valid in this context.");
+                            break;
 
-                    case prim_type_t::quote:
-                        res = next_arg(ctx, &arg);
-                        break;
+                        case prim_type_t::quasiquote:
+                            obj = quasiquote(ctx, next_arg(ctx, &arg), env);
+                            break;
 
-                    case prim_type_t::unquote:
-                        error(ctx, "unquote is not valid in this context.");
-                        break;
+                        case prim_type_t::unquote_splicing:
+                            error(ctx, "unquote-splicing is not valid in this context.");
+                            break;
 
-                    case prim_type_t::quasiquote:
-                        res = EVAL(quasiquote(ctx, next_arg(ctx, &arg), env));
-                        break;
+                        case prim_type_t::and_:
+                            while (!IS_NIL(arg) && !IS_NIL(obj = EVAL_ARG()));
+                            break;
 
-                    case prim_type_t::unquote_splicing:
-                        error(ctx, "unquote-splicing is not valid in this context.");
-                        break;
+                        case prim_type_t::or_:
+                            while (!IS_NIL(arg) && IS_NIL(obj = EVAL_ARG()));
+                            break;
 
-                    case prim_type_t::and_:
-                        while (!IS_NIL(arg) && !IS_NIL(res = EVAL_ARG()));
-                        break;
+                        case prim_type_t::do_:
+                            res = do_list(ctx, arg, env);
+                            break;
 
-                    case prim_type_t::or_:
-                        while (!IS_NIL(arg) && IS_NIL(res = EVAL_ARG()));
-                        break;
+                        case prim_type_t::cons:
+                            va  = EVAL_ARG();
+                            res = cons(ctx, va, EVAL_ARG());
+                            break;
 
-                    case prim_type_t::do_:
-                        res = do_list(ctx, arg, env);
-                        break;
+                        case prim_type_t::car:
+                            res = car(ctx, EVAL_ARG());
+                            break;
 
-                    case prim_type_t::cons:
-                        va  = EVAL_ARG();
-                        res = cons(ctx, va, EVAL_ARG());
-                        break;
+                        case prim_type_t::cdr:
+                            res = cdr(ctx, EVAL_ARG());
+                            break;
 
-                    case prim_type_t::car:
-                        res = car(ctx, EVAL_ARG());
-                        break;
+                        case prim_type_t::setcar:
+                            va = check_type(ctx, EVAL_ARG(), obj_type_t::pair);
+                            SET_CAR(va, EVAL_ARG());
+                            res = ctx->nil;
+                            break;
 
-                    case prim_type_t::cdr:
-                        res = cdr(ctx, EVAL_ARG());
-                        break;
+                        case prim_type_t::setcdr:
+                            va = check_type(ctx, EVAL_ARG(), obj_type_t::pair);
+                            SET_CDR(va, EVAL_ARG());
+                            res = ctx->nil;
+                            break;
 
-                    case prim_type_t::setcar:
-                        va = check_type(ctx, EVAL_ARG(), obj_type_t::pair);
-                        SET_CAR(va, EVAL_ARG());
-                        break;
+                        case prim_type_t::list:
+                            res = eval_list(ctx, arg, env);
+                            break;
 
-                    case prim_type_t::setcdr:
-                        va = check_type(ctx, EVAL_ARG(), obj_type_t::pair);
-                        SET_CDR(va, EVAL_ARG());
-                        break;
+                        case prim_type_t::not_:
+                            res = make_bool(ctx, IS_NIL(EVAL_ARG()));
+                            break;
 
-                    case prim_type_t::list:
-                        res = eval_list(ctx, arg, env);
-                        break;
+                        case prim_type_t::is:
+                            va  = EVAL_ARG();
+                            res = make_bool(ctx, equal(ctx, va, EVAL_ARG()));
+                            break;
 
-                    case prim_type_t::not_:
-                        res = make_bool(ctx, IS_NIL(EVAL_ARG()));
-                        break;
+                        case prim_type_t::atom:
+                            res = make_bool(ctx, type(ctx, EVAL_ARG()) != obj_type_t::pair);
+                            break;
 
-                    case prim_type_t::is:
-                        va  = EVAL_ARG();
-                        res = make_bool(ctx, equal(ctx, va, EVAL_ARG()));
-                        break;
-
-                    case prim_type_t::atom:
-                        res = make_bool(ctx, type(ctx, EVAL_ARG()) != obj_type_t::pair);
-                        break;
-
-                    case prim_type_t::print:
-                        while (!IS_NIL(arg)) {
-                            write_fp(ctx, EVAL_ARG(), stdout);
-                            if (!IS_NIL(arg)) {
-                                printf(" ");
+                        case prim_type_t::print:
+                            while (!IS_NIL(arg)) {
+                                write_fp(ctx, EVAL_ARG(), stdout);
+                                if (!IS_NIL(arg)) {
+                                    printf(" ");
+                                }
                             }
-                        }
-                        printf("\n");
-                        break;
+                            printf("\n");
+                            res = ctx->nil;
+                            break;
 
-                    case prim_type_t::gt:
-                        NUM_CMP_OP(>);
-                        break;
+                        case prim_type_t::gt:
+                            NUM_CMP_OP(>);
+                            break;
 
-                    case prim_type_t::gte:
-                        NUM_CMP_OP(>=);
-                        break;
+                        case prim_type_t::gte:
+                            NUM_CMP_OP(>=);
+                            break;
 
-                    case prim_type_t::lt:
-                        NUM_CMP_OP(<);
-                        break;
+                        case prim_type_t::lt:
+                            NUM_CMP_OP(<);
+                            break;
 
-                    case prim_type_t::lte:
-                        NUM_CMP_OP(<=);
-                        break;
+                        case prim_type_t::lte:
+                            NUM_CMP_OP(<=);
+                            break;
 
-                    case prim_type_t::add:
-                        ARITH_NUM_OP(+);
-                        break;
+                        case prim_type_t::add:
+                            ARITH_NUM_OP(+);
+                            break;
 
-                    case prim_type_t::sub:
-                        ARITH_NUM_OP(-);
-                        break;
+                        case prim_type_t::sub:
+                            ARITH_NUM_OP(-);
+                            break;
 
-                    case prim_type_t::mul:
-                        ARITH_NUM_OP(*);
-                        break;
+                        case prim_type_t::mul:
+                            ARITH_NUM_OP(*);
+                            break;
 
-                    case prim_type_t::div:
-                        ARITH_NUM_OP(/);
-                        break;
+                        case prim_type_t::div:
+                            ARITH_NUM_OP(/);
+                            break;
 
-                    case prim_type_t::mod:
-                        ARITH_INT_OP(%);
-                        break;
+                        case prim_type_t::mod:
+                            ARITH_INT_OP(%);
+                            break;
 
-                    default:
-                        break;
-                }
-                break;
+                        default:
+                            break;
+                    }
+                    break;
 
-            case obj_type_t::cfunc: {
-                auto func = (native_func_t) NATIVE_PTR(fn);
-                res = func(ctx, eval_list(ctx, arg, env));
-                break;
+                case obj_type_t::cfunc:
+                    res = ((native_func_t) NATIVE_PTR(fn))(ctx, eval_list(ctx, arg, env));
+                    break;
+
+                case obj_type_t::func:
+                    arg  = eval_list(ctx, arg, env);
+                    va   = CDR(fn); /* (env params ...) */
+                    vb   = CDR(va); /* (params ...) */
+                    res  = do_list(ctx, CDR(vb), args_to_env(ctx, CAR(vb), arg, CAR(va)));
+                    break;
+
+                case obj_type_t::macro:
+                    va = CDR(fn); /* (env params ...) */
+                    vb = CDR(va); /* (params ...) */
+                    /* replace caller object with code generated by macro and re-eval */
+                    *obj = *do_list(ctx, CDR(vb), args_to_env(ctx, CAR(vb), arg, CAR(va)));
+                    restore_gc(ctx, gc);
+                    ctx->call_list = CDR(cl);
+                    break;
+
+                default:
+                    error(ctx, "tried to call non-callable value");
             }
 
-            case obj_type_t::func:
-                arg  = eval_list(ctx, arg, env);
-                va   = CDR(fn); /* (env params ...) */
-                vb   = CDR(va); /* (params ...) */
-                res  = do_list(ctx, CDR(vb), args_to_env(ctx, CAR(vb), arg, CAR(va)));
-                break;
-
-            case obj_type_t::macro:
-                va = CDR(fn); /* (env params ...) */
-                vb = CDR(va); /* (params ...) */
-                /* replace caller object with code generated by macro and re-eval */
-                *obj = *do_list(ctx, CDR(vb), args_to_env(ctx, CAR(vb), arg, CAR(va)));
-                restore_gc(ctx, gc);
-                ctx->call_list = CDR(cl);
-                return EVAL(obj);
-
-            default:
-                error(ctx, "tried to call non-callable value");
+            restore_gc(ctx, gc);
         }
 
         restore_gc(ctx, gc);
         push_gc(ctx, res);
         ctx->call_list = CDR(cl);
+
         return res;
     }
 
@@ -808,6 +810,7 @@ namespace basecode::scm {
     }
 
     u0 collect_garbage(ctx_t* ctx) {
+//        format::print("before: ctx->object_used = {}\n", ctx->object_used);
         for (u32 i = 0; i < ctx->gc_stack_idx; i++)
             mark(ctx, ctx->gc_stack[i]);
         mark(ctx, ctx->sym_list);
@@ -828,6 +831,7 @@ namespace basecode::scm {
                 SET_GC_MARK(obj, false);
             }
         }
+//        format::print("after : ctx->object_used = {}\n", ctx->object_used);
     }
 
     ctx_t* init(u0* ptr, u32 size) {

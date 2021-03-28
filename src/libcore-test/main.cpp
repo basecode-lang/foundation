@@ -77,6 +77,9 @@ s32 main(s32 argc, const s8** argv) {
     if (!OK(string::system::init()))    return 1;
     if (!OK(error::system::init()))     return 1;
 
+    stopwatch_t timer{};
+    stopwatch::start(timer);
+
     {
         config_settings_t settings{};
         settings.product_name  = string::interned::fold(CORE_PRODUCT_NAME);
@@ -108,7 +111,11 @@ s32 main(s32 argc, const s8** argv) {
     path_t config_path{};
     filesys::bin_rel_path(config_path, core_config_path);
     scm::obj_t* result{};
-    if (!OK(config::eval(config_path, &result))) return 1;
+    if (!OK(config::eval(config_path, &result)))
+        return 1;
+
+    stopwatch::stop(timer);
+    stopwatch::print_elapsed("config system setup time"_ss, 40, timer);
 
     if (!OK(profiler::init()))          return 1;
     if (!OK(memory::proxy::init()))     return 1;
