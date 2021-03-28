@@ -26,7 +26,11 @@ namespace basecode::uuid {
         uuid_t u{};
 #ifdef _MSC_VER
         auto hr = CoCreateGuid((GUID*) &u);
+#ifdef DEBUG
         assert(!FAILED(hr));
+#else
+        UNUSED(hr);
+#endif
 #else
         // XXX: *nix approach?
         //      find way to do this without libuuid

@@ -20,6 +20,11 @@
 
 #include <basecode/core/array.h>
 #include <basecode/core/memory.h>
+#ifdef __clang__
+#   include <basecode/core/getopt.h>            // XXX: only clang complains about not finding
+                                                //      the hash64 function unless i include the
+                                                //      header here.
+#endif
 #include <basecode/core/hashable.h>
 #include <basecode/core/iterator.h>
 #include <basecode/core/hash_common.h>
