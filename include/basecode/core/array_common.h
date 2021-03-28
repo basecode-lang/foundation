@@ -147,9 +147,13 @@ namespace basecode {
                   b8 Is_Floating_Point = std::is_floating_point_v<Value_Type>>
         s32 contains(T& array, const auto& value) {
             s32 idx = -1;
+            if (array.size == 0)
+                return idx;
             u32 i{};
 #if defined(__SSE4_2__) || defined(__SSE4_1__)
             if constexpr (Is_Integral || Is_Floating_Point || Is_Pointer) {
+                if (Size_Per_16 > array.size)
+                    goto remainder;
                 __m128i n{};
                 if constexpr (Size_Per_16 == 4) {
                     n = _mm_set1_epi32((s32) value);
@@ -191,6 +195,7 @@ namespace basecode {
                 }
             }
 #endif
+        remainder:
             if (idx == -1) {
                 for (; i < array.size; ++i) {
                     if (array.data[i] == value) {
