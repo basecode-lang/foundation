@@ -92,49 +92,43 @@ namespace basecode::buf {
     }
 
     u0 index(buf_t& buf) {
-        const __m128i cr = _mm_set1_epi8('\r');
         const __m128i lf = _mm_set1_epi8('\n');
-
-        m128i_bytes_t   dqw         {};
-        buf_line_t*     line;
-        u32             start_pos   {};
-        u32             end_pos;
-        u32             mask;
-        u32             i           {};
 
         array::reset(buf.lines);
         array::reserve(buf.lines, (buf.length / 80) * 3);
 
-        while (i < buf.length) {
-            dqw.value = _mm_loadu_si128((const __m128i*) (buf.data + i));
-            mask = _mm_movemask_epi8(_mm_or_si128(_mm_cmpeq_epi8(dqw.value, cr), _mm_cmpeq_epi8(dqw.value, lf)));
-            if (!mask) {
-                i += 16;
-            } else {
-                while (mask) {
-                    u32 bit = __builtin_ffs(mask) - 1;
-                    end_pos = i + bit;
-                    mask &= ~(u32(1) << bit);
-                    if (dqw.bytes[bit] == '\r') {
-                        dqw.bytes[bit] = ' ';
-                    } else {
-                        line = &array::append(buf.lines);
-                        line->pos = start_pos;
-                        line->len = end_pos - start_pos;
-                    }
-                    start_pos = end_pos + 1;
+        u32 idx{};
+        u32 start{};
+
+        for (u32 i = 0; i < buf.length; i += 16, idx += 16) {
+            u8* p           = buf.data + i;
+            __m128i value   = _mm_loadu_si128((const __m128i*) p);
+            __m128i matched = _mm_cmpeq_epi8(value, lf);
+            u32     mask    = _mm_movemask_epi8(matched);
+
+            while (mask) {
+                u32 bit = __builtin_ffs(mask) - 1;
+                mask &= ~(1U << bit);
+                u32 end = idx + bit;
+                s32 len = end - start;
+                if (len == 0 && buf[start] == '\n')
+                    len = 1;
+                if (buf[start + len - 1] == '\r')
+                    --len;
+                if (len > 0) {
+                    auto& line = array::append(buf.lines);
+                    line.pos = start;
+                    line.len = len;
                 }
-                _mm_storeu_si128((__m128i*) (buf.data + i), dqw.value);
-                i = start_pos;
+                start = end + 1;
             }
         }
     }
 
     status_t free(buf_t& buf) {
+        status_t status{};
         if (buf.mode == buf_mode_t::mapped) {
-            auto status = buf::unmap(buf);
-            if (!OK(status))
-                return status;
+            status = buf::unmap(buf);
         } else if (buf.mode == buf_mode_t::alloc) {
             memory::free(buf.alloc, buf.data);
             buf.data = {};
@@ -143,7 +137,7 @@ namespace basecode::buf {
         path::free(buf.path);
         array::free(buf.lines);
         array::free(buf.tokens);
-        return status_t::ok;
+        return status;
     }
 
     buf_t make(alloc_t* alloc) {
@@ -300,6 +294,15 @@ namespace basecode::buf {
         return status_t::ok;
     }
 
+    b8 each_line(const buf_t& buf, const line_callback_t& cb) {
+        for (const auto& line : buf.lines) {
+            auto slice = slice::make(buf.data + line.pos, line.len);
+            if (!cb(slice))
+                return false;
+        }
+        return true;
+    }
+
     status_t read(buf_t& buf, u32 offset, u0* data, u32 length) {
         std::memcpy(data, buf.data + offset, length);
         return status_t::ok;
@@ -382,21 +385,5 @@ namespace basecode::buf {
         fwrite(buf.data + offset, 1, length, file);
         fflush(file);
         return status_t::ok;
-    }
-
-    b8 each_line(const buf_t& buf, const line_callback_t& cb, str::slice_t sep) {
-        u32 i{}, start_pos{};
-        while (i < buf.length) {
-            if (std::memcmp(buf.data + i, sep.data, sep.length) == 0) {
-                str::slice_t line;
-                line.data = buf.data + start_pos;
-                line.length = (i - start_pos) - 1;
-                if (!cb(line))
-                    return false;
-                start_pos = i + sep.length;
-            }
-            ++i;
-        }
-        return true;
     }
 }

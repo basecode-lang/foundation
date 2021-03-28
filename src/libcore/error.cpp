@@ -96,10 +96,11 @@ namespace basecode::error {
                     term::emit_color_reset(str_buf);
                 }
             } else {
+                const auto& line = buf::line(*report.buf, i);
                 format::format_to(str_buf,
                                   "{:8d}: {}",
                                   line_number,
-                                  buf::line(*report.buf, i));
+                                  line);
             }
             format::format_to(str_buf, "\n");
         }

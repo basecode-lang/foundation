@@ -52,7 +52,7 @@ namespace basecode {
         using slice_t = slice_t<u8>;
     }
 
-    using line_callback_t = std::function<b8 (const str::slice_t&)>;
+    using line_callback_t = std::function<b8 (str::slice_t)>;
 
     template <typename T> inline b8 operator<(const slice_t<T>& lhs, const slice_t<T>& rhs) {
         if (&lhs == &rhs) return false;

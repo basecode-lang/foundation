@@ -51,7 +51,8 @@ namespace basecode::term {
                       u32 end) {
         const auto& line = buf->lines[line_number];
         const auto color_range_len = end - begin;
-        if (!g_term_sys.enabled) {
+        if (!g_term_sys.enabled
+        ||  line.pos > end) {
             format::format_to(str_buf, "{}", slice::make(buf->data + line.pos, line.len));
             return;
         }

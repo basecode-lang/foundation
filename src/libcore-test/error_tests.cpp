@@ -51,7 +51,7 @@ TEST_CASE("basecode::error add & find") {
     error::report::print_range(0, error::report::count());
 }
 
-TEST_CASE("basecode::error source formatted") {
+TEST_CASE("basecode::error source formatted", "[source_formatted]") {
     const auto source = R"(core :: module("../modules/core");
 
 #run {

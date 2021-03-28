@@ -25,8 +25,8 @@
 #define CRSR_POS(c)             ((c).pos)
 #define CRSR_PTR(c)             ((c).buf->data + (c).pos)
 #define CRSR_NEXT(c)            SAFE_SCOPE(++(c).pos; ++(c).column;)
-#define CRSR_READ(c)            ((c).buf->data[(c).pos])
-#define CRSR_PEEK(c)            ((c).buf->data[(c).pos + 1])
+#define CRSR_READ(c)            ((c).buf[(c).pos])
+#define CRSR_PEEK(c)            ((c).buf[(c).pos + 1])
 #define CRSR_MORE(c)            ((c).pos < (c).buf->length)
 #define CRSR_NEWLINE(c)         SAFE_SCOPE((c).column = 0; ++(c).line;)
 
@@ -104,6 +104,9 @@ namespace basecode {
         u32                     capacity;
         s32                     file;
         buf_mode_t              mode;
+
+        u8& operator[](u32 idx)      { return data[idx]; }
+        u8 operator[](u32 idx) const { return data[idx]; }
     };
     static_assert(sizeof(buf_t) <= 128, "buf_t is now larger than 128 bytes!");
 
@@ -215,6 +218,8 @@ namespace basecode {
 
         status_t map_existing(buf_t& buf, const path_t& path);
 
+        b8 each_line(const buf_t& buf, const line_callback_t& cb);
+
         u0 init(buf_t& buf, alloc_t* alloc = context::top()->alloc);
 
         status_t map_new(buf_t& buf, const path_t& path, usize size);
@@ -224,8 +229,6 @@ namespace basecode {
         }
 
         status_t save(buf_t& buf, const path_t& path, u32 offset = {}, u32 length = {});
-
-        b8 each_line(const buf_t& buf, const line_callback_t& cb, str::slice_t sep = "\n"_ss);
     }
 }
 

@@ -26,10 +26,11 @@
 
 using namespace basecode;
 
-TEST_CASE("basecode::hashtab names") {
+TEST_CASE("basecode::hashtab names", "[baby_names]") {
     auto path = "../etc/ut.txt"_path;
     auto buf = buf::make();
     REQUIRE(OK(buf::load(buf, path)));
+    buf::index(buf);
 
     hashtab_t<str::slice_t, baby_name_t> table{};
     hashtab::init(table);
@@ -50,7 +51,7 @@ TEST_CASE("basecode::hashtab names") {
 
     buf::each_line(
         buf,
-        [&fields, &records](const str::slice_t& line) {
+        [&fields, &records](str::slice_t line) {
             auto& record = array::append(records);
             record.idx = fields.size;
             slice::to_fields(line, fields);
