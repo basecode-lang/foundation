@@ -46,6 +46,11 @@ namespace basecode::scm {
         native_func_t           gc;
     };
 
+    enum class ffi_type_t : s32 {
+        none                    = 0,
+        context                 = 1,
+    };
+
     enum class obj_type_t : u32 {
         pair,
         free,

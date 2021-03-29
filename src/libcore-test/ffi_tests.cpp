@@ -18,9 +18,7 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/ffi.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/string.h>
-#include <basecode/core/format.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/stopwatch.h>
 

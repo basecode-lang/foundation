@@ -17,19 +17,18 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/ffi.h>
-#include <basecode/core/string.h>
 #include <basecode/core/stable_array.h>
 
 namespace basecode::ffi {
     struct lib_pair_t final {
         lib_t*                  lib;
         u32                     idx;
-    };
+    } __attribute__((aligned(16)));
 
     struct proto_pair_t final {
         proto_t*                proto;
         u32                     idx;
-    };
+    } __attribute__((aligned(16)));
 
     struct system_t final {
         alloc_t*                alloc;
@@ -38,7 +37,7 @@ namespace basecode::ffi {
         stable_array_t<proto_t> protos;
         symtab_t<lib_pair_t>    lib_map;
         symtab_t<proto_pair_t>  proto_map;
-    };
+    } __attribute__((aligned(128)));
 
     system_t                    g_ffi_system;
 
@@ -228,7 +227,8 @@ namespace basecode::ffi {
                     case param_size_t::none:    return status_t::invalid_int_size;
                 }
                 break;
-            case param_cls_t::ptr:              dcArgPointer(ffi.vm, arg.alias.p);          break;
+            case param_cls_t::ptr:
+            case param_cls_t::custom:           dcArgPointer(ffi.vm, arg.alias.p);          break;
             case param_cls_t::struct_:          return status_t::struct_by_value_not_implemented;
             case param_cls_t::float_:
                 switch (arg.type.size) {
@@ -249,12 +249,14 @@ namespace basecode::ffi {
     }
 
     status_t call(ffi_t& ffi, const proto_t* proto, param_alias_t& ret) {
+        if (!proto) return status_t::prototype_null;
         switch (proto->mode) {
             case call_mode_t::system:           dcMode(ffi.vm, DC_CALL_C_DEFAULT);              break;
             case call_mode_t::variadic:         dcMode(ffi.vm, DC_CALL_C_ELLIPSIS);             break;
         }
         switch (proto->ret_type.cls) {
-            case param_cls_t::ptr:              ret.p = dcCallPointer(ffi.vm, proto->func);     break;
+            case param_cls_t::ptr:
+            case param_cls_t::custom:           ret.p = dcCallPointer(ffi.vm, proto->func);     break;
             case param_cls_t::int_:
                 switch (proto->ret_type.size) {
                     case param_size_t::none:    dcCallVoid(ffi.vm, proto->func); ret.qw = {};   break;

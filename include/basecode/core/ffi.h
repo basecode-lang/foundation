@@ -41,6 +41,7 @@ namespace basecode {
         ptr                     = 1,
         int_,
         float_,
+        custom,
         struct_,
     };
 
@@ -55,6 +56,7 @@ namespace basecode {
     struct param_type_t final {
         param_cls_t             cls;
         param_size_t            size;
+        s32                     user;
     };
 
     union param_alias_t final {
@@ -136,8 +138,10 @@ namespace basecode {
                           b8 rest = {},
                           param_alias_t* dft_val = {});
 
-            inline param_type_t make_type(param_cls_t cls, param_size_t size) {
-                return param_type_t{.cls = cls, .size = size};
+            inline param_type_t make_type(param_cls_t cls,
+                                          param_size_t size,
+                                          s32 user = 0) {
+                return param_type_t{.cls = cls, .size = size, .user = user};
             }
         }
 
@@ -226,7 +230,6 @@ namespace basecode {
                 } else if constexpr (sizeof(T) == 8) {
                     dcArgDouble(ffi.vm, value);
                 }
-            } else if constexpr (std::is_aggregate_v<T>) {
             }
         }
 

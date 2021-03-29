@@ -409,12 +409,9 @@ namespace basecode::config {
         return scm::make_bool(ctx, true);
     }
 
-    static scm::obj_t* localized_string(scm::ctx_t* ctx,
-                                        u32 id,
-                                        str::slice_t* locale,
-                                        str::slice_t* value) {
+    static u32 localized_string(u32 id, str::slice_t* locale, str::slice_t* value) {
         string::localized::add(id, *locale, *value);
-        return scm::make_number(ctx, id);
+        return id;
     }
 
     static scm::obj_t* log_create_color(scm::ctx_t* ctx, scm::obj_t* arg) {
@@ -702,12 +699,16 @@ namespace basecode::config {
 
             {
                 auto u32_type = ffi::param::make_type(param_cls_t::int_, param_size_t::dword);
-                auto slice_ref_type = ffi::param::make_type(param_cls_t::ptr, param_size_t::qword);
+                auto ctx_ptr_type = ffi::param::make_type(param_cls_t::custom,
+                                                          param_size_t::qword,
+                                                          s32(scm::ffi_type_t::context));
                 auto obj_ptr_type = ffi::param::make_type(param_cls_t::ptr, param_size_t::qword);
+                auto slice_ref_type = ffi::param::make_type(param_cls_t::ptr, param_size_t::qword);
 
                 auto cvar_ref_proto = ffi::proto::make("cvar-ref"_ss);
                 cvar_ref_proto->func     = (u0*) cvar_ref;
                 cvar_ref_proto->ret_type = obj_ptr_type;
+                ffi::proto::append(cvar_ref_proto, ffi::param::make("ctx"_ss, ctx_ptr_type));
                 ffi::proto::append(cvar_ref_proto, ffi::param::make("id"_ss, u32_type));
                 scm::make_ffi(g_cfg_sys.ctx, cvar_ref_proto);
                 scm::set(g_cfg_sys.ctx,
@@ -716,7 +717,7 @@ namespace basecode::config {
 
                 auto localized_str_proto = ffi::proto::make("localized-string"_ss);
                 localized_str_proto->func     = (u0*) localized_string;
-                localized_str_proto->ret_type = obj_ptr_type;
+                localized_str_proto->ret_type = u32_type;
                 ffi::proto::append(localized_str_proto, ffi::param::make("id"_ss, u32_type));
                 ffi::proto::append(localized_str_proto, ffi::param::make("locale"_ss, slice_ref_type));
                 ffi::proto::append(localized_str_proto, ffi::param::make("value"_ss, slice_ref_type));

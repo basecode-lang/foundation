@@ -750,76 +750,66 @@ namespace basecode::scm {
                 case obj_type_t::ffi: {
                     auto proto = (proto_t*) NATIVE_PTR(fn);
                     ffi::reset(ctx->ffi);
-                    ffi::push(ctx->ffi, (u0*) ctx);
                     n = 0;
                     while (!IS_NIL(arg)) {
                         auto& param = proto->params[n];
-                        va = EVAL(CAR(arg));
-                        switch (param->value.type.cls) {
-                            case param_cls_t::ptr: {
-                                switch (TYPE(va)) {
-                                    case obj_type_t::symbol:
-                                    case obj_type_t::keyword: {
-                                        auto str = CADR(va);
-                                        auto s = string::interned::get_slice(INTEGER(str));
-                                        if (!s)
-                                            error(ctx, "ffi: invalid interned string id");
-                                        ffi::push(ctx->ffi, s);
-                                        break;
-                                    }
-                                    case obj_type_t::string: {
-                                        auto s = string::interned::get_slice(INTEGER(va));
-                                        if (!s)
-                                            error(ctx, "ffi: invalid interned string id");
-                                        ffi::push(ctx->ffi, s);
-                                        break;
-                                    }
-                                    default:
-                                        error(ctx, "ffi: unsupported scm object type");
-                                }
-                                break;
-                            }
-                            case param_cls_t::int_:
-                                switch (param->value.type.size) {
-                                    case param_size_t::byte:
-                                        if (IS_NIL(va)) {
-                                            ffi::push(ctx->ffi, false);
-                                        } else if (va == ctx->true_) {
-                                            ffi::push(ctx->ffi, true);
-                                        } else {
-                                            ffi::push(ctx->ffi, u8(NUMBER(va)));
-                                        }
-                                        break;
-                                    case param_size_t::word:
-                                        ffi::push(ctx->ffi, u16(NUMBER(va)));
-                                        break;
-                                    case param_size_t::dword:
-                                        ffi::push(ctx->ffi, u32(NUMBER(va)));
-                                        break;
-                                    case param_size_t::qword:
-                                        ffi::push(ctx->ffi, u64(NUMBER(va)));
-                                        break;
-                                    default:
-                                        error(ctx, "ffi: invalid byte parameter");
-                                }
-                                break;
-                            case param_cls_t::float_: {
-                                switch (param->value.type.size) {
-                                    case param_size_t::dword:
-                                        ffi::push(ctx->ffi, f32(NUMBER(va)));
-                                        break;
-                                    case param_size_t::qword:
-                                        ffi::push(ctx->ffi, f64(NUMBER(va)));
-                                        break;
-                                    default:
-                                        error(ctx, "ffi: invalid float parameter");
-                                }
-                                break;
-                            }
-                            case param_cls_t::struct_:
-                                break;
+                        if (param->value.type.cls == param_cls_t::custom
+                        &&  param->value.type.user == s32(ffi_type_t::context)) {
+                            ffi::push(ctx->ffi, ctx);
+                            ++n;
+                            continue;
                         }
-
+                        va = EVAL(CAR(arg));
+                        switch (TYPE(va)) {
+                            case obj_type_t::nil: {
+                                ffi::push(ctx->ffi, false);
+                                break;
+                            }
+                            case obj_type_t::ptr: {
+                                ffi::push(ctx->ffi, NATIVE_PTR(va));
+                                break;
+                            }
+                            case obj_type_t::keyword: {
+                                va = CADR(va);
+                                auto s = string::interned::get_slice(INTEGER(va));
+                                if (!s)
+                                    error(ctx, "ffi: invalid interned string id for keyword");
+                                break;
+                            }
+                            case obj_type_t::number: {
+                                auto a = param->value;
+                                if (a.type.cls == param_cls_t::float_) {
+                                    if (a.type.size == param_size_t::dword)
+                                        a.alias.fdw = NUMBER(va);
+                                    else if (a.type.size == param_size_t::qword)
+                                        a.alias.fdw = f64(NUMBER(va));
+                                } else {
+                                    a.alias.dw = u32(NUMBER(va));
+                                }
+                                ffi::push(ctx->ffi, a);
+                                break;
+                            }
+                            case obj_type_t::symbol:
+                                va = CADR(va);
+                                // N.B. fallthrough intentional
+                            case obj_type_t::string: {
+                                auto s = string::interned::get_slice(INTEGER(va));
+                                if (!s)
+                                    error(ctx, "ffi: invalid interned string id");
+                                ffi::push(ctx->ffi, s);
+                                break;
+                            }
+                            default: {
+                                switch (ffi_type_t(param->value.type.user)) {
+                                    case ffi_type_t::context:
+                                        ffi::push(ctx->ffi, ctx);
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                error(ctx, "ffi: unsupported scm object type");
+                            }
+                        }
                         arg = CDR(arg);
                         ++n;
                     }
@@ -827,7 +817,20 @@ namespace basecode::scm {
                     auto status = ffi::call(ctx->ffi, proto, ret);
                     if (!OK(status))
                         error(ctx, "ffi: call failed");
-                    obj = !ret.p ? ctx->nil : (obj_t*) ret.p;
+                    switch (proto->ret_type.cls) {
+                        case param_cls_t::ptr:
+                            obj = !ret.p ? ctx->nil : (obj_t*) ret.p;
+                            break;
+                        case param_cls_t::int_:
+                        case param_cls_t::float_:
+                            obj = make_number(ctx, ret.dw);
+                            break;
+                        case param_cls_t::custom:
+                            break;
+                        default:
+                            error(ctx, "ffi: unsupported return type");
+                            break;
+                    }
                     break;
                 }
 
