@@ -27,7 +27,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/core/ffi.h>
 
 namespace basecode::scm {
     struct obj_t;
@@ -58,7 +58,8 @@ namespace basecode::scm {
         prim,
         cfunc,
         ptr,
-        keyword
+        keyword,
+        ffi
     };
 
     u0 free(ctx_t* ctx);
@@ -114,6 +115,8 @@ namespace basecode::scm {
     number_t to_number(ctx_t* ctx, obj_t* obj);
 
     obj_t* make_number(ctx_t* ctx, number_t n);
+
+    obj_t* make_ffi(ctx_t* ctx, proto_t* proto);
 
     u32 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp);
 

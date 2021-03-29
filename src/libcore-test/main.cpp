@@ -76,6 +76,14 @@ s32 main(s32 argc, const s8** argv) {
     if (!OK(buf_pool::system::init()))  return 1;
     if (!OK(string::system::init()))    return 1;
     if (!OK(error::system::init()))     return 1;
+    if (!OK(profiler::init()))          return 1;
+    if (!OK(memory::proxy::init()))     return 1;
+    if (!OK(event::system::init()))     return 1;
+    if (!OK(thread::system::init()))    return 1;
+    if (!OK(job::system::init()))       return 1;
+    if (!OK(ffi::system::init()))       return 1;
+    if (!OK(filesys::init()))           return 1;
+    if (!OK(network::system::init()))   return 1;
 
     stopwatch_t timer{};
     stopwatch::start(timer);
@@ -116,15 +124,6 @@ s32 main(s32 argc, const s8** argv) {
 
     stopwatch::stop(timer);
     stopwatch::print_elapsed("config system setup time"_ss, 40, timer);
-
-    if (!OK(profiler::init()))          return 1;
-    if (!OK(memory::proxy::init()))     return 1;
-    if (!OK(event::system::init()))     return 1;
-    if (!OK(thread::system::init()))    return 1;
-    if (!OK(job::system::init()))       return 1;
-    if (!OK(ffi::system::init()))       return 1;
-    if (!OK(filesys::init()))           return 1;
-    if (!OK(network::system::init()))   return 1;
 
     auto rc = Catch::Session().run(argc, argv);
 

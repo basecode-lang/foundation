@@ -91,6 +91,11 @@ namespace basecode::string {
             return intern::get(g_str_sys.pool, id);
         }
 
+        str::slice_t* get_slice(u32 id) {
+            scoped_lock_t lock(&g_str_sys.lock);
+            return intern::get_slice(g_str_sys.pool, id);
+        }
+
         str::slice_t fold(const s8* value, s32 len) {
             scoped_lock_t lock(&g_str_sys.lock);
             len = len == -1 ? strlen(value) : len;

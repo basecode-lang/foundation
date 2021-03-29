@@ -184,7 +184,9 @@ namespace basecode::scm {
         "macro",
         "prim",
         "cfunc",
-        "ptr"
+        "ptr",
+        "keyword",
+        "ffi",
     };
 
     static const s8* s_delims   = " \n\t\r()[];";
@@ -234,6 +236,7 @@ namespace basecode::scm {
         obj_t*                  rbrac;
         obj_t*                  rparen;
         s8                      scratch[SCRATCH_SIZE];
+        ffi_t                   ffi;
         u32                     closer_idx;
         u32                     object_used;
         u32                     gc_stack_idx;
@@ -744,6 +747,90 @@ namespace basecode::scm {
                     }
                     break;
 
+                case obj_type_t::ffi: {
+                    auto proto = (proto_t*) NATIVE_PTR(fn);
+                    ffi::reset(ctx->ffi);
+                    ffi::push(ctx->ffi, (u0*) ctx);
+                    n = 0;
+                    while (!IS_NIL(arg)) {
+                        auto& param = proto->params[n];
+                        va = EVAL(CAR(arg));
+                        switch (param->value.type.cls) {
+                            case param_cls_t::ptr: {
+                                switch (TYPE(va)) {
+                                    case obj_type_t::symbol:
+                                    case obj_type_t::keyword: {
+                                        auto str = CADR(va);
+                                        auto s = string::interned::get_slice(INTEGER(str));
+                                        if (!s)
+                                            error(ctx, "ffi: invalid interned string id");
+                                        ffi::push(ctx->ffi, s);
+                                        break;
+                                    }
+                                    case obj_type_t::string: {
+                                        auto s = string::interned::get_slice(INTEGER(va));
+                                        if (!s)
+                                            error(ctx, "ffi: invalid interned string id");
+                                        ffi::push(ctx->ffi, s);
+                                        break;
+                                    }
+                                    default:
+                                        error(ctx, "ffi: unsupported scm object type");
+                                }
+                                break;
+                            }
+                            case param_cls_t::int_:
+                                switch (param->value.type.size) {
+                                    case param_size_t::byte:
+                                        if (IS_NIL(va)) {
+                                            ffi::push(ctx->ffi, false);
+                                        } else if (va == ctx->true_) {
+                                            ffi::push(ctx->ffi, true);
+                                        } else {
+                                            ffi::push(ctx->ffi, u8(NUMBER(va)));
+                                        }
+                                        break;
+                                    case param_size_t::word:
+                                        ffi::push(ctx->ffi, u16(NUMBER(va)));
+                                        break;
+                                    case param_size_t::dword:
+                                        ffi::push(ctx->ffi, u32(NUMBER(va)));
+                                        break;
+                                    case param_size_t::qword:
+                                        ffi::push(ctx->ffi, u64(NUMBER(va)));
+                                        break;
+                                    default:
+                                        error(ctx, "ffi: invalid byte parameter");
+                                }
+                                break;
+                            case param_cls_t::float_: {
+                                switch (param->value.type.size) {
+                                    case param_size_t::dword:
+                                        ffi::push(ctx->ffi, f32(NUMBER(va)));
+                                        break;
+                                    case param_size_t::qword:
+                                        ffi::push(ctx->ffi, f64(NUMBER(va)));
+                                        break;
+                                    default:
+                                        error(ctx, "ffi: invalid float parameter");
+                                }
+                                break;
+                            }
+                            case param_cls_t::struct_:
+                                break;
+                        }
+
+                        arg = CDR(arg);
+                        ++n;
+                    }
+                    param_alias_t ret{};
+                    auto status = ffi::call(ctx->ffi, proto, ret);
+                    if (!OK(status))
+                        error(ctx, "ffi: call failed");
+                    obj = !ret.p ? ctx->nil : (obj_t*) ret.p;
+                    break;
+                }
+
                 case obj_type_t::cfunc:
                     res = ((native_func_t) NATIVE_PTR(fn))(ctx, eval_list(ctx, arg, env));
                     break;
@@ -825,6 +912,7 @@ namespace basecode::scm {
         ctx->gc_stack_idx = 0;
         ctx->sym_list     = ctx->nil;
         collect_garbage(ctx);
+        ffi::free(ctx->ffi);
     }
 
     obj_t* nil(ctx_t* ctx) {
@@ -918,6 +1006,8 @@ namespace basecode::scm {
 
         ctx->native_ptr_idx = 0;
         ctx->closer_idx     = CLOSERS_SIZE - 1;
+
+        ffi::init(ctx->ffi);
 
         return ctx;
     }
@@ -1090,6 +1180,15 @@ namespace basecode::scm {
 
     number_t to_number(ctx_t* ctx, obj_t* obj) {
         return NUMBER(check_type(ctx, obj, obj_type_t::number));
+    }
+
+    obj_t* make_ffi(ctx_t* ctx, proto_t* proto) {
+        obj_t* obj = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::ffi);
+        SET_INTEGER(obj, ctx->native_ptr_idx);
+        NATIVE_PTR(obj) = proto;
+        ++ctx->native_ptr_idx;
+        return obj;
     }
 
     u32 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp) {

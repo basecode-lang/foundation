@@ -73,6 +73,8 @@ namespace basecode {
 
         result_t get(intern_t& pool, intern_id id);
 
+        str::slice_t* get_slice(intern_t& pool, intern_id id);
+
         intern_t make(alloc_t* alloc = context::top()->alloc);
 
         result_t fold(intern_t& pool, const s8* data, s32 len = -1);

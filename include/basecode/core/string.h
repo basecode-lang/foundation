@@ -44,6 +44,8 @@ namespace basecode::string {
 
         intern::result_t get(u32 id);
 
+        str::slice_t* get_slice(u32 id);
+
         str::slice_t fold(const s8* value, s32 len = -1);
 
         str::slice_t fold(const String_Concept auto& value) {

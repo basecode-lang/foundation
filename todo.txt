@@ -4,8 +4,6 @@ HIGH
 - config: review and clean up
 - config: remove cvar: prefix on variable names
 - config: use memory mapped buf_t for .scm files
-- scm: enhance native func support to accept an ffi_t*
-        and dynamically invoke it.
 - config: rework kernel funcs to take advantage of ffi based
           callback mechanism.
 
@@ -37,6 +35,8 @@ LOW
 
 DONE
 ----
+- scm: enhance native func support to accept an ffi_t*
+        and dynamically invoke it.
 - scm: implement tail call optimization
     * there are few items still not optimized but the groundwork
       is now in place.  need to dig into do_list again to see if i can

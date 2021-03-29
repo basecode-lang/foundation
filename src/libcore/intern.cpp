@@ -107,6 +107,12 @@ namespace basecode::intern {
         };
     }
 
+    str::slice_t* get_slice(intern_t& pool, intern_id id) {
+        if (id == 0 || id > pool.strings.size)
+            return nullptr;
+        return &pool.strings[id - 1].value;
+    }
+
     result_t fold(intern_t& pool, const s8* data, s32 len) {
         if (hash_common::requires_rehash(pool.size, pool.capacity, pool.load_factor)) {
             auto status = rehash(pool);

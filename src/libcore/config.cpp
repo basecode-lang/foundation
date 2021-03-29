@@ -254,16 +254,10 @@ namespace basecode::config {
         return scm::nil(ctx);
     }
 
-    static scm::obj_t* cvar_ref(scm::ctx_t* ctx, scm::obj_t* arg) {
-        auto id = scm::next_arg(ctx, &arg);
-        if (scm::type(ctx, id) != scm::obj_type_t::number)
-            scm::error(ctx, "id: expected a number");
-        auto native_id = scm::to_integer(ctx, id);
-
+    static scm::obj_t* cvar_ref(scm::ctx_t* ctx, u32 id) {
         cvar_t* cvar{};
-        if (!OK(cvar::get(native_id, &cvar))) {
+        if (!OK(cvar::get(id, &cvar)))
             scm::error(ctx, "XXX: unable to find cvar");
-        }
 
         switch (cvar->type) {
             case cvar_type_t::flag:
@@ -415,29 +409,12 @@ namespace basecode::config {
         return scm::make_bool(ctx, true);
     }
 
-    static scm::obj_t* localized_string(scm::ctx_t* ctx, scm::obj_t* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
-
-        auto id = get_map_arg(args, 0);
-        if (scm::type(ctx, id) != scm::obj_type_t::number)
-            scm::error(ctx, "id: expected number");
-
-        auto locale = get_map_arg(args, 1);
-        if (scm::type(ctx, locale) != scm::obj_type_t::symbol)
-            scm::error(ctx, "locale: expected symbol");
-        auto locale_str = string::interned::fold(to_str(ctx, locale));
-
-        auto value = get_map_arg(args, 2);
-        if (scm::type(ctx, value) != scm::obj_type_t::string)
-            scm::error(ctx, "value: expected string");
-        auto value_str = string::interned::fold(to_str(ctx, value));
-
-        string::localized::add(scm::to_integer(ctx, id), locale_str, value_str);
-
-        return id;
+    static scm::obj_t* localized_string(scm::ctx_t* ctx,
+                                        u32 id,
+                                        str::slice_t* locale,
+                                        str::slice_t* value) {
+        string::localized::add(id, *locale, *value);
+        return scm::make_number(ctx, id);
     }
 
     static scm::obj_t* log_create_color(scm::ctx_t* ctx, scm::obj_t* arg) {
@@ -695,8 +672,8 @@ namespace basecode::config {
         {"logger-append-child",      logger_append_child},
         {"syslog-create",            syslog_create},
         {"cvar-set!",                cvar_set},
-        {"cvar-ref",                 cvar_ref},
-        {"localized-string",         localized_string},
+//        {"cvar-ref",                 cvar_ref},
+//        {"localized-string",         localized_string},
         {"localized-error",          localized_error},
         {nullptr,                    nullptr}
     };
@@ -721,6 +698,34 @@ namespace basecode::config {
             str::reserve(g_cfg_sys.buf, 8192);
 
             scm::init(g_cfg_sys.ctx, g_cfg_sys.heap_size);
+
+
+            {
+                auto u32_type = ffi::param::make_type(param_cls_t::int_, param_size_t::dword);
+                auto slice_ref_type = ffi::param::make_type(param_cls_t::ptr, param_size_t::qword);
+                auto obj_ptr_type = ffi::param::make_type(param_cls_t::ptr, param_size_t::qword);
+
+                auto cvar_ref_proto = ffi::proto::make("cvar-ref"_ss);
+                cvar_ref_proto->func     = (u0*) cvar_ref;
+                cvar_ref_proto->ret_type = obj_ptr_type;
+                ffi::proto::append(cvar_ref_proto, ffi::param::make("id"_ss, u32_type));
+                scm::make_ffi(g_cfg_sys.ctx, cvar_ref_proto);
+                scm::set(g_cfg_sys.ctx,
+                         scm::make_symbol(g_cfg_sys.ctx, "cvar-ref"),
+                         scm::make_ffi(g_cfg_sys.ctx, cvar_ref_proto));
+
+                auto localized_str_proto = ffi::proto::make("localized-string"_ss);
+                localized_str_proto->func     = (u0*) localized_string;
+                localized_str_proto->ret_type = obj_ptr_type;
+                ffi::proto::append(localized_str_proto, ffi::param::make("id"_ss, u32_type));
+                ffi::proto::append(localized_str_proto, ffi::param::make("locale"_ss, slice_ref_type));
+                ffi::proto::append(localized_str_proto, ffi::param::make("value"_ss, slice_ref_type));
+                scm::make_ffi(g_cfg_sys.ctx, localized_str_proto);
+                scm::set(g_cfg_sys.ctx,
+                         scm::make_symbol(g_cfg_sys.ctx, "localized-string"),
+                         scm::make_ffi(g_cfg_sys.ctx, localized_str_proto));
+            }
+
             for (u32 i = 0; s_kernel_funcs[i].symbol != nullptr; ++i) {
                 auto symbol = scm::make_symbol(g_cfg_sys.ctx, s_kernel_funcs[i].symbol);
                 auto func = scm::make_native_func(g_cfg_sys.ctx, s_kernel_funcs[i].func);
