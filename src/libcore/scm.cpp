@@ -753,16 +753,28 @@ namespace basecode::scm {
                     n = 0;
                     while (!IS_NIL(arg)) {
                         auto& param = proto->params[n];
-                        if (param->value.type.cls == param_cls_t::custom
-                        &&  param->value.type.user == s32(ffi_type_t::context)) {
-                            ffi::push(ctx->ffi, ctx);
+                        va = EVAL(CAR(arg));
+                        if (param->value.type.cls == param_cls_t::custom) {
+                            switch (ffi_type_t(param->value.type.user)) {
+                                case ffi_type_t::object:
+                                    ffi::push(ctx->ffi, va);
+                                    arg = CDR(arg);
+                                    break;
+                                case ffi_type_t::context:
+                                    ffi::push(ctx->ffi, ctx);
+                                    break;
+                                default:
+                                    break;
+                            }
                             ++n;
                             continue;
                         }
-                        va = EVAL(CAR(arg));
                         switch (TYPE(va)) {
                             case obj_type_t::nil: {
-                                ffi::push(ctx->ffi, false);
+                                if (param->value.type.cls == param_cls_t::int_)
+                                    ffi::push(ctx->ffi, false);
+                                else if (param->value.type.cls == param_cls_t::ptr)
+                                    ffi::push(ctx->ffi, va);
                                 break;
                             }
                             case obj_type_t::ptr: {
@@ -826,10 +838,19 @@ namespace basecode::scm {
                             obj = make_number(ctx, ret.dw);
                             break;
                         case param_cls_t::custom:
+                            switch (ffi_type_t(proto->ret_type.user)) {
+                                case ffi_type_t::object:
+                                    obj = (obj_t*) ret.p;
+                                    break;
+                                case ffi_type_t::boolean:
+                                    obj = ret.b ? ctx->true_ : ctx->nil;
+                                    break;
+                                default:
+                                    error(ctx, "ffi: invalid custom return type");
+                            }
                             break;
                         default:
                             error(ctx, "ffi: unsupported return type");
-                            break;
                     }
                     break;
                 }

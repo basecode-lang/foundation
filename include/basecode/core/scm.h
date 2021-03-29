@@ -48,7 +48,9 @@ namespace basecode::scm {
 
     enum class ffi_type_t : s32 {
         none                    = 0,
-        context                 = 1,
+        object                  = 1,
+        context                 = 2,
+        boolean                 = 3,
     };
 
     enum class obj_type_t : u32 {
