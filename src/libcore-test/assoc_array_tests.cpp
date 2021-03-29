@@ -34,18 +34,13 @@ TEST_CASE("basecode::assoc_array basics") {
     str::reserve(temp, 32);
     defer(str::free(temp));
 
-    stopwatch_t time{};
-    stopwatch::start(time);
-
-    for (u32 i = 0; i < 100; ++i) {
-        str::append(temp, "key_");
-        str::random(temp, 4);
-        assoc_array::append(pairs, temp, i);
-        str::reset(temp);
-    }
-
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("assoc_array: append"_ss, 40, time);
+    TIME_BLOCK("assoc_array: append"_ss,
+        for (u32 i = 0; i < 100; ++i) {
+            str::append(temp, "key_");
+            str::random(temp, 4);
+            assoc_array::append(pairs, temp, i);
+            str::reset(temp);
+        });
 
 //    for (u32 i = 0; i < 100; ++i) {
 //        if (i > 0) format::print(",");
@@ -68,13 +63,9 @@ TEST_CASE("basecode::assoc_array find by key") {
     assoc_array::append(pairs, "test3"_ss, u32(30));
     assoc_array::append(pairs, "test4"_ss, u32(40));
 
-    stopwatch_t time{};
-    stopwatch::start(time);
-
-    auto value = assoc_array::find(pairs, "test4"_ss);
-
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("assoc_array: find"_ss, 40, time);
+    u32* value;
+    TIME_BLOCK("assoc_array: find"_ss,
+               value = assoc_array::find(pairs, "test4"_ss););
 
     REQUIRE(value);
     REQUIRE(*value == 40);

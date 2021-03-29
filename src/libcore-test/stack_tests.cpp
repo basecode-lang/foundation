@@ -65,26 +65,28 @@ TEST_CASE("basecode::stack force grow multiple times") {
     if (!stack::empty(numbers))
         REQUIRE(stack::empty(numbers));
 
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-    for (s32 i = 0; i < 1000; ++i)
-        stack::push(numbers, i);
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("total stack::push time"_ss, 40, timer);
+    TIME_BLOCK(
+        "stack: push 1000 s32 integers"_ss,
+        for (s32 i = 0; i < 1000; ++i) {
+            stack::push(numbers, i);
+        });
 
     if (numbers.size != 1000)
         REQUIRE(numbers.size == 1000);
 
-    stopwatch::start(timer);
     auto n = 999;
-    while (!stack::empty(numbers)) {
-        auto top = *stack::top(numbers);
-        if (top != n--)
-            REQUIRE(false);
-        stack::pop(numbers);
-    }
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("total first stack::pop time"_ss, 40, timer);
+    b8 mismatch{};
+    TIME_BLOCK(
+        "stack: pop & match 1000 s32 integers"_ss,
+        while (!stack::empty(numbers)) {
+            auto top = *stack::top(numbers);
+            if (top != n--) {
+                mismatch = true;
+                break;
+            }
+            stack::pop(numbers);
+        });
+    REQUIRE(!mismatch);
 
     if (!stack::empty(numbers))
         REQUIRE(stack::empty(numbers));
@@ -95,17 +97,19 @@ TEST_CASE("basecode::stack force grow multiple times") {
     if (numbers.size != 3)
         REQUIRE(numbers.size == 3);
 
-    stopwatch::start(timer);
     n = 300;
-    while (!stack::empty(numbers)) {
-        auto top = *stack::top(numbers);
-        if (top != n)
-            REQUIRE(false);
-        n -= 100;
-        stack::pop(numbers);
-    }
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("total second stack::pop time"_ss, 40, timer);
+    TIME_BLOCK(
+        "stack: pop & match 3 more s32 integers"_ss,
+        while (!stack::empty(numbers)) {
+            auto top = *stack::top(numbers);
+            if (top != n) {
+                mismatch = true;
+                break;
+            }
+            n -= 100;
+            stack::pop(numbers);
+        });
+    REQUIRE(!mismatch);
 
     stack::reset(numbers);
     if (!stack::empty(numbers))

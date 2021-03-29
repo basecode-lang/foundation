@@ -20,11 +20,35 @@
 
 #include <basecode/core/format.h>
 
+#define TIME_BLOCK_ALLOC(slug, alloc, ...)                                      \
+    do {                                                                        \
+        stopwatch_t timer{};                                                    \
+        stopwatch::start(timer);                                                \
+        __VA_ARGS__;                                                            \
+        stopwatch::stop(timer);                                                 \
+        stopwatch::print_elapsed(                                               \
+            (alloc) ? (alloc) : memory::system::default_alloc(),                \
+            stdout,                                                             \
+            slug,                                                               \
+            60,                                                                 \
+            timer);                                                             \
+    } while (false)
+#define TIME_BLOCK(slug, ...)                                                   \
+    do {                                                                        \
+        stopwatch_t timer{};                                                    \
+        stopwatch::start(timer);                                                \
+        __VA_ARGS__;                                                            \
+        stopwatch::stop(timer);                                                 \
+        stopwatch::print_elapsed(slug, 60, timer);                              \
+    } while (false)
+
 namespace basecode {
     struct stopwatch_t final {
         u64                     end;
         u64                     start;
     };
+
+    using timed_block_callable_t    = std::function<s32()>;
 
     namespace stopwatch {
         u0 init(stopwatch_t& w);
@@ -40,6 +64,7 @@ namespace basecode {
                          const String_Concept auto& label,
                          s32 width,
                          stopwatch_t& w) {
+            assert(s32(width - label.length) > 5);
             const auto sv_label = (std::string_view) label;
             const auto e = elapsed(w);
             if (e == 0) {
@@ -58,6 +83,19 @@ namespace basecode {
 
         u0 print_elapsed(const String_Concept auto& label, s32 width, stopwatch_t& w) {
             print_elapsed(context::top()->alloc, stdout, label, width, w);
+        }
+
+        s32 time_block(const String_Concept auto& slug, const timed_block_callable_t& cb, alloc_t* alloc = {}) {
+            stopwatch_t timer{};
+            start(timer);
+            auto rc = cb();
+            stop(timer);
+            print_elapsed(alloc ? alloc : memory::system::default_alloc(),
+                          stdout,
+                          slug,
+                          60,
+                          timer);
+            return rc;
         }
     }
 }

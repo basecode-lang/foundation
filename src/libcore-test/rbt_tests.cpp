@@ -20,6 +20,7 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/set.h>
 #include <basecode/core/rbt.h>
+#include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
@@ -46,46 +47,51 @@ TEST_CASE("basecode::rbt basics") {
     rbt::init(tree);
     defer(rbt::free(tree));
 
-    {
-        set_t<u32> set{};
-        set::init(set);
+    set_t<u32> set{};
+    set::init(set);
 
-        for (u32 i = 0; i < 64; ++i)
-            set::insert(set, pick(rg));
+    for (u32 i = 0; i < 64; ++i)
+        set::insert(set, pick(rg));
 
-        for (auto v : set)
-            rbt::insert(tree, v);
-
-        if (bintree::empty(tree))
-            REQUIRE(!bintree::empty(tree));
-
-        if (bintree::size(tree) != set.size) {
-            u32 values[set.size];
-            u32 x = {};
-            for (auto v : set)
-                values[x++] = v;
-            std::sort(
-                &values[0],
-                &values[set.size - 1],
-                [&](const auto lhs, const auto rhs) {
-                    return lhs < rhs;
-                });
-            print_rbt_cursor(tree);
-            format::print("rbt values: ");
-            for (u32 i = 0; i < set.size; ++i) {
-                if (i > 0) format::print(",");
-                format::print("{}", values[i]);
-            }
-            REQUIRE(bintree::size(tree) == set.size);
-        }
-
+    TIME_BLOCK(
+        "rbt: insert random integers"_ss,
         for (auto v : set) {
-            if (!bintree::find(tree, v))
-                REQUIRE(false);
-        }
+            rbt::insert(tree, v);
+        });
 
-        set::free(set);
+    if (bintree::empty(tree))
+        REQUIRE(!bintree::empty(tree));
+
+    if (bintree::size(tree) != set.size) {
+        u32 values[set.size];
+        u32 x = {};
+        for (auto v : set)
+            values[x++] = v;
+        std::sort(
+            &values[0],
+            &values[set.size - 1],
+            [&](const auto lhs, const auto rhs) {
+                return lhs < rhs;
+            });
+        print_rbt_cursor(tree);
+        format::print("rbt values: ");
+        for (u32 i = 0; i < set.size; ++i) {
+            if (i > 0) format::print(",");
+            format::print("{}", values[i]);
+        }
+        REQUIRE(bintree::size(tree) == set.size);
     }
+
+    u32 found{};
+    TIME_BLOCK(
+        "rbt: find all integers from set"_ss,
+        for (auto v : set) {
+            if (bintree::find(tree, v))
+                ++found;
+        });
+    REQUIRE(found == set.size);
+
+    set::free(set);
 
     bintree::print_whole_tree(tree, "red-black tree"_ss);
     print_rbt_cursor(tree);

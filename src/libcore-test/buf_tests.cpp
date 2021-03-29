@@ -18,8 +18,6 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/error.h>
-#include <basecode/core/defer.h>
-#include <basecode/core/format.h>
 #include <basecode/core/stopwatch.h>
 
 using namespace basecode;
@@ -33,14 +31,7 @@ TEST_CASE("basecode::buf basics") {
               path::free(path);
           });
 
-    stopwatch_t time{};
-    stopwatch::start(time);
-
-    buf::index(buf);
-
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("index buf"_ss, 40, time);
-
+    TIME_BLOCK("index buf"_ss, buf::index(buf););
 //    u32 lineno{};
 //    for (const auto& line : buf.lines) {
 //        format::print("{:04}: {}\n", ++lineno, slice::make(buf.data + line.pos, line.len));
@@ -60,13 +51,7 @@ TEST_CASE("basecode::buf extended indexing") {
               str::free(src);
           });
 
-    stopwatch_t time{};
-    stopwatch::start(time);
-
-    buf::index(buf);
-
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("index buf"_ss, 40, time);
+    TIME_BLOCK("index buf"_ss, buf::index(buf););
 
 //    u32 lineno{};
 //    for (const auto& line : buf.lines) {

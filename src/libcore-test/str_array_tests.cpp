@@ -37,14 +37,14 @@ TEST_CASE("basecode::str_array basics") {
     stopwatch_t time{};
     stopwatch::start(time);
 
-    for (u32 i = 0; i < 100; ++i) {
-        str::random(temp, 32);
-        str_array::append(array, temp);
-        str::reset(temp);
-    }
+    TIME_BLOCK(
+        "str_array: append 100 random strings"_ss,
+        for (u32 i = 0; i < 100; ++i) {
+            str::random(temp, 32);
+            str_array::append(array, temp);
+            str::reset(temp);
+        });
 
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("str_array: append"_ss, 40, time);
     //format::print("{}\n", array);
 
     REQUIRE(array.size == 100);

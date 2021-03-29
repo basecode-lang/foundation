@@ -35,21 +35,17 @@ TEST_CASE("basecode::memory::buddy basics") {
     //      from the buddy allocator without adding any unnecessary overhead.
     //      after the blocks are allocated and we stop the stopwatch, then it's
     //      ok to run the catch assertions.
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-
     const auto block_size = 32;
     const auto num_blocks = working_heap_size / block_size;
     u0* blocks[num_blocks];
-    for (u32 i = 0; i < num_blocks; ++i)
-        blocks[i] = memory::alloc(buddy_alloc, block_size);
-
-    stopwatch::stop(timer);
+    TIME_BLOCK("buddy alloc time"_ss,
+                   for (u32 i = 0; i < num_blocks; ++i) {
+                       blocks[i] = memory::alloc(buddy_alloc, block_size);
+                   });
     format::print("buddy alloc: heap_size = {}, block size = {}, # blocks = {}\n",
                   working_heap_size,
                   block_size,
                   num_blocks);
-    stopwatch::print_elapsed("buddy alloc time"_ss, 40, timer);
 
     // N.B. this allocation should return nullptr
     REQUIRE(!memory::alloc(buddy_alloc, block_size));
@@ -62,13 +58,10 @@ TEST_CASE("basecode::memory::buddy basics") {
             REQUIRE(false);
     }
 
-    stopwatch::start(timer);
-
-    for (u32 i = 0; i < num_blocks; ++i)
-        memory::free(buddy_alloc, blocks[i]);
-
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("buddy free time"_ss, 40, timer);
+    TIME_BLOCK("buddy free time"_ss,
+               for (u32 i = 0; i < num_blocks; ++i) {
+                   memory::free(buddy_alloc, blocks[i]);
+               });
 
     REQUIRE(buddy_alloc->total_allocated == buddy_alloc->subclass.buddy.metadata_size);
 

@@ -37,22 +37,6 @@
 
 using namespace basecode;
 
-using timed_block_callable_t    = std::function<s32()>;
-
-static s32 time_block(const String_Concept auto& slug,
-                      const timed_block_callable_t& cb) {
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-    auto rc = cb();
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed(memory::system::default_alloc(),
-                             stdout,
-                             slug,
-                             40,
-                             timer);
-    return rc;
-}
-
 s32 main(s32 argc, const s8** argv) {
     s32 rc;
 
@@ -78,7 +62,7 @@ s32 main(s32 argc, const s8** argv) {
                              memory::system::default_alloc());
     context::push(&ctx);
 
-    rc = time_block("log::system::init"_ss, [&argv]() -> s32 {
+    rc = stopwatch::time_block("log::system::init"_ss, [&argv]() -> s32 {
         default_config_t dft_config{};
         dft_config.file        = stderr;
         dft_config.process_arg = argv[0];
@@ -98,43 +82,43 @@ s32 main(s32 argc, const s8** argv) {
     });
     if (!OK(rc)) return rc;
 
-    rc = time_block("term::system::init"_ss,    []() -> s32 { return s32(term::system::init(true)); });
+    rc = stopwatch::time_block("term::system::init"_ss,    []() -> s32 { return s32(term::system::init(true)); });
     if (!OK(rc)) return rc;
 
-    rc = time_block("locale::system::init"_ss,      []() -> s32 { return s32(locale::system::init());            });
+    rc = stopwatch::time_block("locale::system::init"_ss,      []() -> s32 { return s32(locale::system::init());            });
     if (!OK(rc)) return rc;
 
-    rc = time_block("buf_pool::system::init"_ss,    []() -> s32 { return s32(buf_pool::system::init());          });
+    rc = stopwatch::time_block("buf_pool::system::init"_ss,    []() -> s32 { return s32(buf_pool::system::init());          });
     if (!OK(rc)) return rc;
 
-    rc = time_block("string::system::init"_ss,      []() -> s32 { return s32(string::system::init());            });
+    rc = stopwatch::time_block("string::system::init"_ss,      []() -> s32 { return s32(string::system::init());            });
     if (!OK(rc)) return rc;
 
-    rc = time_block("error::system::init"_ss,       []() -> s32 { return s32(error::system::init());             });
+    rc = stopwatch::time_block("error::system::init"_ss,       []() -> s32 { return s32(error::system::init());             });
     if (!OK(rc)) return rc;
 
-    rc = time_block("memory::system::init"_ss,      []() -> s32 { return s32(memory::proxy::init());             });
+    rc = stopwatch::time_block("memory::system::init"_ss,      []() -> s32 { return s32(memory::proxy::init());             });
     if (!OK(rc)) return rc;
 
-    rc = time_block("event::system::init"_ss,       []() -> s32 { return s32(event::system::init());             });
+    rc = stopwatch::time_block("event::system::init"_ss,       []() -> s32 { return s32(event::system::init());             });
     if (!OK(rc)) return rc;
 
-    rc = time_block("thread::system::init"_ss,      []() -> s32 { return s32(thread::system::init());            });
+    rc = stopwatch::time_block("thread::system::init"_ss,      []() -> s32 { return s32(thread::system::init());            });
     if (!OK(rc)) return rc;
 
-    rc = time_block("job::system::init"_ss,         []() -> s32 { return s32(job::system::init());               });
+    rc = stopwatch::time_block("job::system::init"_ss,         []() -> s32 { return s32(job::system::init());               });
     if (!OK(rc)) return rc;
 
-    rc = time_block("ffi::system::init"_ss,     []() -> s32 { return s32(ffi::system::init());               });
+    rc = stopwatch::time_block("ffi::system::init"_ss,     []() -> s32 { return s32(ffi::system::init());               });
     if (!OK(rc)) return rc;
 
-    rc = time_block("filesys::init"_ss,             []() -> s32 { return s32(filesys::init());                   });
+    rc = stopwatch::time_block("filesys::init"_ss,             []() -> s32 { return s32(filesys::init());                   });
     if (!OK(rc)) return rc;
 
-    rc = time_block("network::init"_ss,             []() -> s32 { return s32(network::system::init());           });
+    rc = stopwatch::time_block("network::init"_ss,             []() -> s32 { return s32(network::system::init());           });
     if (!OK(rc)) return rc;
 
-    rc = time_block("config::system::init"_ss,  []() -> s32 {
+    rc = stopwatch::time_block("config::system::init"_ss,  []() -> s32 {
         config_settings_t settings{};
         settings.product_name  = string::interned::fold(CORE_PRODUCT_NAME);
         settings.build_type    = string::interned::fold(CORE_BUILD_TYPE);
@@ -174,29 +158,29 @@ s32 main(s32 argc, const s8** argv) {
     });
     if (!OK(rc)) return rc;
 
-    rc = time_block("Catch::Session().run"_ss, [argc, &argv]() -> s32 {
+    rc = stopwatch::time_block("Catch::Session().run"_ss, [argc, &argv]() -> s32 {
         return Catch::Session().run(argc, argv);
     });
 
     log::notice("shutdown test program");
 
-    time_block("network::system::fini"_ss,  []() -> s32 { network::system::fini();      return 0; });
-    time_block("filesys::fini"_ss,          []() -> s32 { filesys::fini();              return 0; });
-    time_block("ffi::system::fini"_ss,      []() -> s32 { ffi::system::fini();          return 0; });
-    time_block("job::system::fini"_ss,      []() -> s32 { job::system::fini();          return 0; });
-    time_block("thread::system::fini"_ss,   []() -> s32 { thread::system::fini();       return 0; });
-    time_block("config::system::fini"_ss,   []() -> s32 { config::system::fini();       return 0; });
-    time_block("string::system::fini"_ss,   []() -> s32 { string::system::fini();       return 0; });
-    time_block("error::system::fini"_ss,    []() -> s32 { error::system::fini();        return 0; });
-    time_block("buf_pool::system::fini"_ss, []() -> s32 { buf_pool::system::fini();     return 0; });
-    time_block("locale::system::fini"_ss,   []() -> s32 { locale::system::fini();       return 0; });
-    time_block("log::system::fini"_ss,      []() -> s32 { log::system::fini();          return 0; });
-    time_block("term::system::fini"_ss,     []() -> s32 { term::system::fini();         return 0; });
-    time_block("event::system::fini"_ss,    []() -> s32 { event::system::fini();        return 0; });
-    time_block("memory::proxy::fini"_ss,    []() -> s32 { memory::proxy::fini();        return 0; });
-    time_block("memory::system::fini"_ss,   []() -> s32 { memory::system::fini();       return 0; });
-    time_block("context::pop"_ss,           []() -> s32 { context::pop();               return 0; });
-    time_block("profiler::fini"_ss,         []() -> s32 { profiler::fini();             return 0; });
+    stopwatch::time_block("network::system::fini"_ss,  []() -> s32 { network::system::fini();      return 0; });
+    stopwatch::time_block("filesys::fini"_ss,          []() -> s32 { filesys::fini();              return 0; });
+    stopwatch::time_block("ffi::system::fini"_ss,      []() -> s32 { ffi::system::fini();          return 0; });
+    stopwatch::time_block("job::system::fini"_ss,      []() -> s32 { job::system::fini();          return 0; });
+    stopwatch::time_block("thread::system::fini"_ss,   []() -> s32 { thread::system::fini();       return 0; });
+    stopwatch::time_block("config::system::fini"_ss,   []() -> s32 { config::system::fini();       return 0; });
+    stopwatch::time_block("string::system::fini"_ss,   []() -> s32 { string::system::fini();       return 0; });
+    stopwatch::time_block("error::system::fini"_ss,    []() -> s32 { error::system::fini();        return 0; });
+    stopwatch::time_block("buf_pool::system::fini"_ss, []() -> s32 { buf_pool::system::fini();     return 0; });
+    stopwatch::time_block("locale::system::fini"_ss,   []() -> s32 { locale::system::fini();       return 0; });
+    stopwatch::time_block("log::system::fini"_ss,      []() -> s32 { log::system::fini();          return 0; });
+    stopwatch::time_block("term::system::fini"_ss,     []() -> s32 { term::system::fini();         return 0; });
+    stopwatch::time_block("event::system::fini"_ss,    []() -> s32 { event::system::fini();        return 0; });
+    stopwatch::time_block("memory::proxy::fini"_ss,    []() -> s32 { memory::proxy::fini();        return 0; });
+    stopwatch::time_block("memory::system::fini"_ss,   []() -> s32 { memory::system::fini();       return 0; });
+    stopwatch::time_block("context::pop"_ss,           []() -> s32 { context::pop();               return 0; });
+    stopwatch::time_block("profiler::fini"_ss,         []() -> s32 { profiler::fini();             return 0; });
 
     return rc;
 }

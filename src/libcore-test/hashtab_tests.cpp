@@ -63,24 +63,24 @@ TEST_CASE("basecode::hashtab names", "[baby_names]") {
     stopwatch::start(emplace_time);
 
     u32 count{};
-    for (const auto& rec : records) {
-        auto [name, is_new] = hashtab::emplace2(table, fields[rec.idx + 3]);
-        if (is_new) {
-            ++count;
-            name->sex = fields[rec.idx + 1][0];
-            std::memcpy(name->year, fields[rec.idx + 2].data, 4);
-            name->year[4] = '\0';
-            std::memcpy(name->state, fields[rec.idx + 0].data, 2);
-            name->state[2] = '\0';
-        }
-    }
+    TIME_BLOCK(
+        "hashtab: total emplace time"_ss,
+        for (const auto& rec : records) {
+            auto[name, is_new] = hashtab::emplace2(table, fields[rec.idx + 3]);
+            if (is_new) {
+                ++count;
+                name->sex = fields[rec.idx + 1][0];
+                std::memcpy(name->year, fields[rec.idx + 2].data, 4);
+                name->year[4] = '\0';
+                std::memcpy(name->state, fields[rec.idx + 0].data, 2);
+                name->state[2] = '\0';
+            }
+        });
 
     if (count != table.size)
         REQUIRE(count == table.size);
 
-    stopwatch::stop(emplace_time);
     format::print("table.size = {}, table.capacity = {}\n", table.size, table.capacity);
-    stopwatch::print_elapsed("total hashtab emplace time"_ss, 40, emplace_time);
 }
 
 TEST_CASE("basecode::hashtab payload with random string keys") {
@@ -107,17 +107,12 @@ TEST_CASE("basecode::hashtab payload with random string keys") {
         str::reset(temp);
     }
 
-    stopwatch_t time{};
-    stopwatch::start(time);
-
-    for (u32 i = 0; i < 4096; ++i) {
-        auto payload = hashtab::emplace(table, strings[i]);
-        payload->ptr = {};
-        payload->offset = i * 100;
-    }
-
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("hashtab payload + string key"_ss, 40, time);
+    TIME_BLOCK("hashtab: payload + string key"_ss,
+               for (u32 i = 0; i < 4096; ++i) {
+                   auto payload = hashtab::emplace(table, strings[i]);
+                   payload->ptr    = {};
+                   payload->offset = i * 100;
+               });
 }
 
 TEST_CASE("basecode::hashtab payload with integer keys") {
@@ -125,84 +120,76 @@ TEST_CASE("basecode::hashtab payload with integer keys") {
     hashtab::init(table);
     defer(hashtab::free(table));
 
-    stopwatch_t time{};
-    stopwatch::start(time);
-
-    for (u32 i = 0; i < 4096; ++i) {
-        auto payload = hashtab::emplace(table, i * 4096);
-        payload->ptr = {};
-        payload->offset = i * 100;
-    }
-
-    for (u32 i = 0; i < 4096; ++i) {
-        auto payload = hashtab::find(table, i * 4096);
-        if (!payload) {
-            REQUIRE(payload != nullptr);
-        } else {
-            if (payload->offset != i * 100)
-                REQUIRE(payload->offset == i * 100);
+    TIME_BLOCK(
+        "hashtab: payload + int key"_ss,
+        for (u32 i = 0; i < 4096; ++i) {
+            auto payload = hashtab::emplace(table, i * 4096);
+            payload->ptr    = {};
+            payload->offset = i * 100;
         }
-    }
 
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("hashtab payload + int key"_ss, 40, time);
+        for (u32 i = 0; i < 4096; ++i) {
+            auto payload = hashtab::find(table, i * 4096);
+            if (!payload) {
+                REQUIRE(payload != nullptr);
+            } else {
+                if (payload->offset != i * 100)
+                    REQUIRE(payload->offset == i * 100);
+            }
+        });
 }
 
 TEST_CASE("basecode::hashtab basics") {
-    stopwatch_t time{};
-    stopwatch::start(time);
+    TIME_BLOCK(
+        "hashtab: insert + find"_ss,
+        hashtab_t<s32, str::slice_t> table{};
+        hashtab::init(table);
+        defer(hashtab::free(table));
 
-    hashtab_t<s32, str::slice_t> table{};
-    hashtab::init(table);
-    defer(hashtab::free(table));
+        const auto one   = "one"_ss;
+        const auto two   = "two"_ss;
+        const auto three = "three"_ss;
+        const auto four  = "four"_ss;
+        const auto five  = "five"_ss;
+        const auto six   = "six"_ss;
+        const auto seven = "seven"_ss;
 
-    const auto one = "one"_ss;
-    const auto two = "two"_ss;
-    const auto three = "three"_ss;
-    const auto four = "four"_ss;
-    const auto five = "five"_ss;
-    const auto six = "six"_ss;
-    const auto seven = "seven"_ss;
+        hashtab::insert(table, 1, one);
+        hashtab::insert(table, 2, two);
+        hashtab::insert(table, 3, three);
+        hashtab::insert(table, 4, four);
+        hashtab::insert(table, 5, five);
+        hashtab::insert(table, 6, six);
+        hashtab::insert(table, 7, seven);
+        REQUIRE(table.size == 7);
 
-    hashtab::insert(table, 1, one);
-    hashtab::insert(table, 2, two);
-    hashtab::insert(table, 3, three);
-    hashtab::insert(table, 4, four);
-    hashtab::insert(table, 5, five);
-    hashtab::insert(table, 6, six);
-    hashtab::insert(table, 7, seven);
-    REQUIRE(table.size == 7);
+        str::slice_t* s;
 
-    str::slice_t* s;
+        s = hashtab::find(table, 5);
+        REQUIRE(s);
+        REQUIRE(*s == five);
 
-    s = hashtab::find(table, 5);
-    REQUIRE(s);
-    REQUIRE(*s == five);
+        s = hashtab::find(table, 1);
+        REQUIRE(s);
+        REQUIRE(*s == one);
 
-    s = hashtab::find(table, 1);
-    REQUIRE(s);
-    REQUIRE(*s == one);
+        s = hashtab::find(table, 7);
+        REQUIRE(s);
+        REQUIRE(*s == seven);
 
-    s = hashtab::find(table, 7);
-    REQUIRE(s);
-    REQUIRE(*s == seven);
+        s = hashtab::find(table, 3);
+        REQUIRE(s);
+        REQUIRE(*s == three);
 
-    s = hashtab::find(table, 3);
-    REQUIRE(s);
-    REQUIRE(*s == three);
+        s = hashtab::find(table, 6);
+        REQUIRE(s);
+        REQUIRE(*s == six);
 
-    s = hashtab::find(table, 6);
-    REQUIRE(s);
-    REQUIRE(*s == six);
+        s = hashtab::find(table, 2);
+        REQUIRE(s);
+        REQUIRE(*s == two);
 
-    s = hashtab::find(table, 2);
-    REQUIRE(s);
-    REQUIRE(*s == two);
-
-    s = hashtab::find(table, 4);
-    REQUIRE(s);
-    REQUIRE(*s == four);
-
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("hashtab insert + find"_ss, 40, time);
+        s = hashtab::find(table, 4);
+        REQUIRE(s);
+        REQUIRE(*s == four););
 }

@@ -33,103 +33,97 @@ using namespace basecode;
 }
 
 static getopt::status_t config_gnu_tar(getopt_t& cl) {
-    stopwatch_t timer{};
-    stopwatch::start(timer);
+    getopt::status_t status;
+    TIME_BLOCK(
+        "getopt: config_gnu_tar"_ss,
+        getopt::program_description(
+            cl,
+            "GNU 'tar' saves many files together into a single\n"
+            "tape or disk archive, and can restore"
+            "individual files from the archive."_ss);
 
-    getopt::program_description(
-        cl,
-        "GNU 'tar' saves many files together into a single\n"
-        "tape or disk archive, and can restore"
-        "individual files from the archive."_ss);
+            status = getopt::make_option(cl)
+                .type(arg_type_t::flag)
+                .short_name('x')
+                .description("extract files from an archive"_ss)
+                .build();
+            if (!OK(status))
+                return status;
 
-    auto status = getopt::make_option(cl)
-        .type(arg_type_t::flag)
-        .short_name('x')
-        .description("extract files from an archive"_ss)
-        .build();
-    if (!OK(status))
-        return status;
+            status = getopt::make_option(cl)
+                .type(arg_type_t::flag)
+                .short_name('v')
+                .long_name("verbose"_ss)
+                .description("verbosely list files processed"_ss)
+                .build();
+            if (!OK(status))
+                return status;
 
-    status = getopt::make_option(cl)
-        .type(arg_type_t::flag)
-        .short_name('v')
-        .long_name("verbose"_ss)
-        .description("verbosely list files processed"_ss)
-        .build();
-    if (!OK(status))
-        return status;
+            status = getopt::make_option(cl)
+                .min_required(1)
+                .max_allowed(64)
+                .type(arg_type_t::file)
+                .short_name('f')
+                .long_name("file"_ss)
+                .value_name("ARCHIVE"_ss)
+                .description("use archive file or device ARCHIVE"_ss)
+                .build();
+            if (!OK(status))
+                return status;
 
-    status = getopt::make_option(cl)
-        .min_required(1)
-        .max_allowed(64)
-        .type(arg_type_t::file)
-        .short_name('f')
-        .long_name("file"_ss)
-        .value_name("ARCHIVE"_ss)
-        .description("use archive file or device ARCHIVE"_ss)
-        .build();
-    if (!OK(status))
-        return status;
+            status = getopt::make_option(cl)
+                .type(arg_type_t::flag)
+                .short_name('z')
+                .long_name("uncompress"_ss)
+                .description("filter the archive through compress"_ss)
+                .build();
+            if (!OK(status))
+                return status;
 
-    status = getopt::make_option(cl)
-        .type(arg_type_t::flag)
-        .short_name('z')
-        .long_name("uncompress"_ss)
-        .description("filter the archive through compress"_ss)
-        .build();
-    if (!OK(status))
-        return status;
-
-    status = getopt::make_option(cl)
-        .short_name('?')
-        .long_name("help"_ss)
-        .description("give this help list"_ss)
-        .build();
-
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("getopt 'tar' setup"_ss, 40, timer);
+            status = getopt::make_option(cl)
+                .short_name('?')
+                .long_name("help"_ss)
+                .description("give this help list"_ss)
+                .build(););
 
     return status;
 }
 
 static getopt::status_t config_add_two(getopt_t& cl) {
-    stopwatch_t timer{};
-    stopwatch::start(timer);
+    getopt::status_t status;
+    TIME_BLOCK(
+        "getopt: config_add_two"_ss,
+        getopt::program_description(
+            cl,
+            "The 'add-two' program takes in two arguments and adds them."_ss);
 
-    getopt::program_description(
-        cl,
-        "The 'add-two' program takes in two arguments and adds them."_ss);
+            status = getopt::make_option(cl)
+                .min_required(1)
+                .type(arg_type_t::integer)
+                .short_name('a')
+                .long_name("addend"_ss)
+                .description("the addend"_ss)
+                .build();
+            if (!OK(status))
+                return status;
 
-    auto status = getopt::make_option(cl)
-        .min_required(1)
-        .type(arg_type_t::integer)
-        .short_name('a')
-        .long_name("addend"_ss)
-        .description("the addend"_ss)
-        .build();
-    if (!OK(status))
-        return status;
+            status = getopt::make_option(cl)
+                .min_required(1)
+                .type(arg_type_t::integer)
+                .short_name('e')
+                .long_name("augend"_ss)
+                .description("the augend"_ss)
+                .build();
+            if (!OK(status))
+                return status;
 
-    status = getopt::make_option(cl)
-        .min_required(1)
-        .type(arg_type_t::integer)
-        .short_name('e')
-        .long_name("augend"_ss)
-        .description("the augend"_ss)
-        .build();
-    if (!OK(status))
-        return status;
-
-    status = getopt::make_option(cl)
-        .short_name('?')
-        .long_name("help"_ss)
-        .description("give this help list"_ss)
-        .build();
-    if (!OK(status))
-        return status;
-
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("getopt 'add-two' setup"_ss, 40, timer);
+            status = getopt::make_option(cl)
+                .short_name('?')
+                .long_name("help"_ss)
+                .description("give this help list"_ss)
+                .build();
+            if (!OK(status))
+                return status;);
 
     return status;
 }
@@ -147,12 +141,9 @@ TEST_CASE("basecode::getopt missing required arguments", "[getopt]") {
 
     REQUIRE(OK(config_add_two(cl)));
 
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-    auto status = getopt::parse(cl);
+    getopt::status_t status;
+    TIME_BLOCK("getopt: 'add-two' parse"_ss, status = getopt::parse(cl););
     REQUIRE(status == getopt::status_t::missing_required_option);
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("getopt 'add-two' parse"_ss, 40, timer);
 }
 
 TEST_CASE("basecode::getopt integer arguments", "[getopt]") {
@@ -169,12 +160,9 @@ TEST_CASE("basecode::getopt integer arguments", "[getopt]") {
 
     REQUIRE(OK(config_add_two(cl)));
 
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-    auto status = getopt::parse(cl);
+    getopt::status_t status;
+    TIME_BLOCK("getopt: 'add-two' parse"_ss, status = getopt::parse(cl););
     REQUIRE(OK(status));
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("getopt 'add-two' parse"_ss, 40, timer);
 }
 
 TEST_CASE("basecode::getopt immediate argument value", "[getopt]") {
@@ -194,12 +182,9 @@ TEST_CASE("basecode::getopt immediate argument value", "[getopt]") {
 
     REQUIRE(OK(config_gnu_tar(cl)));
 
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-    auto status = getopt::parse(cl);
+    getopt::status_t status;
+    TIME_BLOCK("getopt: 'tar' parse"_ss, status = getopt::parse(cl););
     REQUIRE(OK(status));
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("getopt 'tar' parse"_ss, 40, timer);
 }
 
 TEST_CASE("basecode::getopt deferred argument value", "[getopt]") {
@@ -219,10 +204,7 @@ TEST_CASE("basecode::getopt deferred argument value", "[getopt]") {
 
     REQUIRE(OK(config_gnu_tar(cl)));
 
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-    auto status = getopt::parse(cl);
+    getopt::status_t status;
+    TIME_BLOCK("getopt: 'tar' parse"_ss, status = getopt::parse(cl););
     REQUIRE(OK(status));
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("getopt 'tar' parse"_ss, 40, timer);
 }

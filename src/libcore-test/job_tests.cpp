@@ -63,8 +63,11 @@ TEST_CASE("basecode::job basics") {
             job_t* job{};
             if (!OK(job::get(jobs[i], &job)))
                 REQUIRE(false);
-            stopwatch::print_elapsed(label, 40, job->time);
-            format::print_ellipsis((std::string_view) label, 40, "result: {}\n", result);
+            stopwatch::print_elapsed(label, 60, job->time);
+            format::print_ellipsis((std::string_view) label,
+                                   60,
+                                   "result: {}\n",
+                                   result);
             ++i;
         }
     }

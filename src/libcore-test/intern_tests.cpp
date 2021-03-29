@@ -84,19 +84,17 @@ TEST_CASE("basecode::intern") {
     }
 
     const auto allocated_before = context::top()->alloc->total_allocated;
-    stopwatch_t intern_time{};
-    stopwatch::start(intern_time);
 
-    for (u32 i = 0; i < expected_intern_count; ++i) {
-        auto r = intern::fold(pool, strings[i]);
-        if (r.status != intern::status_t::ok)   REQUIRE(false);
-        if (!r.slice.data)                      REQUIRE(false);
-        if (r.slice.length == 0)                REQUIRE(false);
-        array::append(interned_list, r);
-    }
+    TIME_BLOCK(
+        "intern: total time"_ss,
+        for (u32 i = 0; i < expected_intern_count; ++i) {
+            auto r = intern::fold(pool, strings[i]);
+            if (r.status != intern::status_t::ok)   REQUIRE(false);
+            if (!r.slice.data)                      REQUIRE(false);
+            if (r.slice.length == 0)                REQUIRE(false);
+            array::append(interned_list, r);
+        });
 
-    stopwatch::stop(intern_time);
-    stopwatch::print_elapsed("total intern time"_ss, 40, intern_time);
     const auto memory_used = context::top()->alloc->total_allocated - allocated_before;
     format::print("memory_used = {}\n", memory_used);
 

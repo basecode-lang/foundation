@@ -33,46 +33,43 @@ TEST_CASE("basecode::string scope tests") {
     string::interned::fold("six");
     string::interned::fold("seven");
 
-    stopwatch_t timer{};
-    stopwatch::start(timer);
+    TIME_BLOCK(
+        "string: total intern/scope time"_ss,
+        auto scope_id = string::interned::scope_id();
+        REQUIRE(scope_id == start_scope_id + 7);
 
-    auto scope_id = string::interned::scope_id();
-    REQUIRE(scope_id == start_scope_id + 7);
+        intern::result_t r{};
+        r = string::interned::fold_for_result("junk1");
+        REQUIRE(r.new_value);
+        r = string::interned::fold_for_result("junk2");
+        REQUIRE(r.new_value);
+        r = string::interned::fold_for_result("junk3");
+        REQUIRE(r.new_value);
+        r = string::interned::fold_for_result("junk4");
+        REQUIRE(r.new_value);
 
-    intern::result_t r{};
-    r = string::interned::fold_for_result("junk1");
-    REQUIRE(r.new_value);
-    r = string::interned::fold_for_result("junk2");
-    REQUIRE(r.new_value);
-    r = string::interned::fold_for_result("junk3");
-    REQUIRE(r.new_value);
-    r = string::interned::fold_for_result("junk4");
-    REQUIRE(r.new_value);
+        r = string::interned::fold_for_result("junk1");
+        REQUIRE(!r.new_value);
+        r = string::interned::fold_for_result("junk2");
+        REQUIRE(!r.new_value);
+        r = string::interned::fold_for_result("junk3");
+        REQUIRE(!r.new_value);
+        r = string::interned::fold_for_result("junk4");
+        REQUIRE(!r.new_value);
 
-    r = string::interned::fold_for_result("junk1");
-    REQUIRE(!r.new_value);
-    r = string::interned::fold_for_result("junk2");
-    REQUIRE(!r.new_value);
-    r = string::interned::fold_for_result("junk3");
-    REQUIRE(!r.new_value);
-    r = string::interned::fold_for_result("junk4");
-    REQUIRE(!r.new_value);
+        string::interned::scope_id(scope_id);
+        scope_id = string::interned::scope_id();
 
-    string::interned::scope_id(scope_id);
-    scope_id = string::interned::scope_id();
+        r = string::interned::fold_for_result("junk1");
+        REQUIRE(r.new_value);
+        r = string::interned::fold_for_result("junk2");
+        REQUIRE(r.new_value);
+        r = string::interned::fold_for_result("junk3");
+        REQUIRE(r.new_value);
+        r = string::interned::fold_for_result("junk4");
+        REQUIRE(r.new_value);
 
-    r = string::interned::fold_for_result("junk1");
-    REQUIRE(r.new_value);
-    r = string::interned::fold_for_result("junk2");
-    REQUIRE(r.new_value);
-    r = string::interned::fold_for_result("junk3");
-    REQUIRE(r.new_value);
-    r = string::interned::fold_for_result("junk4");
-    REQUIRE(r.new_value);
-
-    string::interned::scope_id(scope_id);
-    REQUIRE(start_scope_id + 7 == scope_id);
-
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("total intern/scope free time"_ss, 40, timer);
+        string::interned::scope_id(scope_id);
+        REQUIRE(start_scope_id + 7 == scope_id);
+    );
 }

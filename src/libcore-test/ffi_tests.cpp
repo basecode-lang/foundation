@@ -67,19 +67,14 @@ TEST_CASE("basecode::ffi basics") {
     ffi::init(vm);
     defer(ffi::free(vm));
 
-    stopwatch_t time{};
-    stopwatch::start(time);
-
-    ffi::reset(vm);
-    ffi::push(vm, 5);
-    ffi::push(vm, 6);
-    param_alias_t ret{};
-    status = ffi::call(vm, simple_proto, ret);
-    REQUIRE(OK(status));
-    REQUIRE(ret.dw == 30);
-
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("ffi call simple function"_ss, 40, time);
+    TIME_BLOCK("ffi: call simple function"_ss,
+               ffi::reset(vm);
+                   ffi::push(vm, 5);
+                   ffi::push(vm, 6);
+                   param_alias_t ret{};
+                   status = ffi::call(vm, simple_proto, ret);
+                   REQUIRE(OK(status));
+                   REQUIRE(ret.dw == 30););
 }
 
 TEST_CASE("basecode::ffi status names") {

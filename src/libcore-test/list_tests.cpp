@@ -29,9 +29,17 @@ using namespace basecode;
 template <typename V>
 static u0 format_nodes(list_t<V>& list) {
     u32 n = 1;
-    format::print("list: size = {}, nodes.size = {}, values.size = {}\n", list.size, list.nodes.size, list.values.size);
+    format::print("list: size = {}, nodes.size = {}, values.size = {}\n",
+                  list.size,
+                  list.nodes.size,
+                  list.values.size);
     for (const auto& node : list.nodes) {
-        format::print("{:>4}: free: {} prev: {} next: {:>4} value: {:>4}\n", n++, node.free, node.prev, node.next, node.value);
+        format::print("{:>4}: free: {} prev: {} next: {:>4} value: {:>4}\n",
+                      n++,
+                      node.free,
+                      node.prev,
+                      node.next,
+                      node.value);
     }
 }
 

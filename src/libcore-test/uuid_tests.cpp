@@ -25,13 +25,8 @@ using namespace basecode;
 
 // Exemplar: {44332211-1234-ABCD-EFEF-001122334455}
 TEST_CASE("basecode::uuid make") {
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-
-    auto u1 = uuid::make();
-
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("uuid::make time"_ss, 40, timer);
+    basecode::uuid_t u1{};
+    TIME_BLOCK("uuid: make time"_ss, u1 = uuid::make());
 
     auto str = format::format("{}", u1);
     REQUIRE(str.length == 38);
@@ -52,14 +47,8 @@ TEST_CASE("basecode::uuid make") {
 TEST_CASE("basecode::uuid parse") {
     const auto exemplar = "{44332211-1234-ABCD-EFEF-001122334455}"_ss;
 
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-
     basecode::uuid_t u{};
-    REQUIRE(OK(uuid::parse(exemplar, &u)));
-
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("uuid::parse time"_ss, 40, timer);
+    TIME_BLOCK("uuid: parse time"_ss, REQUIRE(OK(uuid::parse(exemplar, &u))));
 
     auto str = format::format("{}", u);
     REQUIRE(str == exemplar);

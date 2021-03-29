@@ -19,7 +19,6 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/buf.h>
 #include <basecode/core/config.h>
-#include <basecode/core/format.h>
 #include <basecode/core/string.h>
 #include <basecode/core/stopwatch.h>
 
@@ -120,9 +119,8 @@ TEST_CASE("basecode::config find localized strings") {
 }
 
 TEST_CASE("basecode::config terp eval") {
-    stopwatch_t time{};
-    stopwatch::start(time);
-
+    TIME_BLOCK(
+        "scm test program"_ss,
     const auto source = R"(
 (do
     (let result 50)
@@ -133,11 +131,12 @@ TEST_CASE("basecode::config terp eval") {
     scm::ctx_t* ctx = config::system::context();
 
     config::eval(source, &obj);
-    if (!obj) REQUIRE(false);
-    if (scm::type(ctx, obj) != scm::obj_type_t::number) REQUIRE(false);
+    if (!obj)
+        REQUIRE(false);
+    if (scm::type(ctx, obj) != scm::obj_type_t::number)
+        REQUIRE(false);
     auto value = scm::to_number(ctx, obj);
-    if (value != 50) REQUIRE(false);
-
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("fe test program"_ss, 40, time);
+    if (value != 50)
+        REQUIRE(false);
+    );
 }

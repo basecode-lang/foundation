@@ -24,9 +24,6 @@
 using namespace basecode;
 
 TEST_CASE("basecode::obj_pool basics", "[obj_pool]") {
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-
     obj_pool_t pool{};
     obj_pool::init(pool);
 
@@ -36,22 +33,20 @@ TEST_CASE("basecode::obj_pool basics", "[obj_pool]") {
         array::free(strings);
         obj_pool::free(pool, false));
 
-    for (u32 i = 0; i < 100; ++i) {
-        array::append(strings, obj_pool::make<str_t>(pool, "hello world!"));
-    }
-
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("total obj_pool make time"_ss, 40, timer);
+    TIME_BLOCK(
+        "obj_pool: make 100 str_t instances"_ss,
+        for (u32 i = 0; i < 100; ++i) {
+            array::append(strings, obj_pool::make<str_t>(pool, "hello world!"));
+        });
 
     REQUIRE(!obj_pool::empty(pool));
     REQUIRE(strings.size == 100);
     REQUIRE(pool.size == strings.size);
 
-    stopwatch::start(timer);
-    for (u32 i = 0; i < strings.size; ++i)
-        obj_pool::destroy(pool, strings[i]);
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("total obj_pool destroy time"_ss, 40, timer);
+    TIME_BLOCK(
+        "obj_pool: destroy 100 str_t instances"_ss,
+        for (u32 i = 0; i < strings.size; ++i)
+            obj_pool::destroy(pool, strings[i]););
 
     REQUIRE(obj_pool::empty(pool));
 }

@@ -23,10 +23,10 @@
 #include <basecode/core/stack.h>
 
 #define CRSR_POS(c)             ((c).pos)
-#define CRSR_PTR(c)             ((c).buf->data + (c).pos)
+#define CRSR_PTR(c)             (*(c))
 #define CRSR_NEXT(c)            SAFE_SCOPE(++(c).pos; ++(c).column;)
-#define CRSR_READ(c)            ((c).buf[(c).pos])
-#define CRSR_PEEK(c)            ((c).buf[(c).pos + 1])
+#define CRSR_READ(c)            ((c)[(c).pos])
+#define CRSR_PEEK(c)            ((c)[(c).pos + 1])
 #define CRSR_MORE(c)            ((c).pos < (c).buf->length)
 #define CRSR_NEWLINE(c)         SAFE_SCOPE((c).column = 0; ++(c).line;)
 
@@ -116,6 +116,10 @@ namespace basecode {
         u32                     pos;
         u32                     line;
         u32                     column;
+
+        u8* operator*()                 { return buf->data + pos;   }
+        u8& operator[](u32 idx)         { return (*buf)[idx];       }
+        u8 operator[](u32 idx) const    { return (*buf)[idx];       }
     };
     static_assert(sizeof(buf_crsr_t) <= 56, "buf_crsr_t is now larger than 56 bytes!");
 

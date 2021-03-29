@@ -27,13 +27,9 @@ TEST_CASE("basecode::wasm basics", "[wasm]") {
     wasm::init(wasm);
     defer(wasm::free(wasm));
 
-    stopwatch_t timer{};
-    stopwatch::start(timer);
-
     module_t* test_mod;
-    {
-        stopwatch_t load_timer{};
-        stopwatch::start(load_timer);
+    TIME_BLOCK(
+        "wasm: load time"_ss,
         auto file_path = "C:/src/libs/emsdk/hello.wasm"_path;
         test_mod = wasm::load_module(wasm, file_path);
         if (!test_mod) {
@@ -42,22 +38,13 @@ TEST_CASE("basecode::wasm basics", "[wasm]") {
             if (test_mod->path != "C:/src/libs/emsdk/hello.wasm"_ss)
                 REQUIRE(test_mod->path == "C:/src/libs/emsdk/hello.wasm"_ss);
         }
-        path::free(file_path);
-        stopwatch::stop(load_timer);
-        stopwatch::print_elapsed("wasm load time"_ss, 40, load_timer);
-    }
-    {
-        stopwatch_t decode_timer{};
-        stopwatch::start(decode_timer);
+        path::free(file_path););
+    TIME_BLOCK(
+        "wasm: decode time"_ss,
         if (!OK(wasm::module::decode(*test_mod)))
             REQUIRE(false);
         if (test_mod->magic != 0x6d736100)
             REQUIRE(test_mod->magic == 0x6d736100);
         if (test_mod->version != 0x01)
-            REQUIRE(test_mod->version == 0x01);
-        stopwatch::stop(decode_timer);
-        stopwatch::print_elapsed("wasm decode time"_ss, 40, decode_timer);
-    }
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("wasm total time"_ss, 40, timer);
+            REQUIRE(test_mod->version == 0x01););
 }
