@@ -20,8 +20,25 @@
 #include <basecode/core/stable_array.h>
 
 namespace basecode::ffi {
+    struct lib_pair_t;
+    struct proto_pair_t;
+    struct overload_pair_t;
+
+    using lib_slab_t            = stable_array_t<lib_t>;
+    using lib_symtab_t          = symtab_t<lib_pair_t>;
+    using proto_symtab_t        = symtab_t<proto_pair_t>;
+    using param_slab_t          = stable_array_t<param_t>;
+    using proto_slab_t          = stable_array_t<proto_t>;
+    using overload_slab_t       = stable_array_t<overload_t>;
+    using overload_symtab_t     = symtab_t<overload_pair_t>;
+
     struct lib_pair_t final {
         lib_t*                  lib;
+        u32                     idx;
+    } __attribute__((aligned(16)));
+
+    struct overload_pair_t final {
+        overload_t*             overload;
         u32                     idx;
     } __attribute__((aligned(16)));
 
@@ -32,11 +49,13 @@ namespace basecode::ffi {
 
     struct system_t final {
         alloc_t*                alloc;
-        stable_array_t<lib_t>   libs;
-        stable_array_t<param_t> params;
-        stable_array_t<proto_t> protos;
-        symtab_t<lib_pair_t>    lib_map;
-        symtab_t<proto_pair_t>  proto_map;
+        lib_symtab_t            libs;
+        proto_symtab_t          protos;
+        overload_symtab_t       overloads;
+        lib_slab_t              lib_slab;
+        param_slab_t            param_slab;
+        proto_slab_t            proto_slab;
+        overload_slab_t         overload_slab;
     } __attribute__((aligned(128)));
 
     system_t                    g_ffi_system;
@@ -50,9 +69,9 @@ namespace basecode::ffi {
                 dlFreeLibrary(lib->handle);
             lib_pair_t pair{};
             const auto path_slice = slice::make(lib->path.str);
-            if (symtab::find(g_ffi_system.lib_map, path_slice, pair)) {
-                stable_array::erase(g_ffi_system.libs, pair.idx - 1);
-                symtab::remove(g_ffi_system.lib_map, path_slice);
+            if (symtab::find(g_ffi_system.libs, path_slice, pair)) {
+                stable_array::erase(g_ffi_system.lib_slab, pair.idx - 1);
+                symtab::remove(g_ffi_system.libs, path_slice);
                 path::free(lib->path);
                 return status_t::ok;
             }
@@ -62,14 +81,14 @@ namespace basecode::ffi {
         status_t load(const path_t& path, lib_t** lib) {
             lib_pair_t pair{};
             const auto path_slice = slice::make(path);
-            if (symtab::find(g_ffi_system.lib_map, path_slice, pair)) {
+            if (symtab::find(g_ffi_system.libs, path_slice, pair)) {
                 *lib = pair.lib;
                 return status_t::ok;
             }
             lib_pair_t* new_pair{};
-            if (symtab::emplace(g_ffi_system.lib_map, path_slice, &new_pair)) {
-                new_pair->lib         = &stable_array::append(g_ffi_system.libs);
-                new_pair->idx         = g_ffi_system.libs.size;
+            if (symtab::emplace(g_ffi_system.libs, path_slice, &new_pair)) {
+                new_pair->lib = &stable_array::append(g_ffi_system.lib_slab);
+                new_pair->idx = g_ffi_system.libs.size;
                 path::init(new_pair->lib->path, path_slice, g_ffi_system.alloc);
                 new_pair->lib->alloc  = g_ffi_system.alloc;
                 new_pair->lib->handle = dlLoadLibrary(str::c_str(const_cast<str_t&>(path.str)));
@@ -98,64 +117,6 @@ namespace basecode::ffi {
         }
     }
 
-    namespace proto {
-        u0 free(proto_t* proto) {
-            for (auto param : proto->params)
-                param::free(param);
-            array::free(proto->params);
-        }
-
-        b8 remove(str::slice_t symbol) {
-            proto_pair_t pair{};
-            if (symtab::find(g_ffi_system.proto_map, symbol, pair)) {
-                proto::free(pair.proto);
-                stable_array::erase(g_ffi_system.protos, pair.idx - 1);
-                symtab::remove(g_ffi_system.proto_map, symbol);
-                return true;
-            }
-            return false;
-        }
-
-        proto_t* find(str::slice_t symbol) {
-            proto_pair_t pair{};
-            return symtab::find(g_ffi_system.proto_map, symbol, pair) ? pair.proto : nullptr;
-        }
-
-        proto_t* make(str::slice_t symbol) {
-            proto_pair_t pair{};
-            if (symtab::find(g_ffi_system.proto_map, symbol, pair))
-                return pair.proto;
-            proto_pair_t* new_pair{};
-            if (symtab::emplace(g_ffi_system.proto_map, symbol, &new_pair)) {
-                auto proto = &stable_array::append(g_ffi_system.protos);
-                new_pair->idx   = g_ffi_system.protos.size;
-                new_pair->proto = proto;
-                proto->lib      = {};
-                proto->func     = {};
-                proto->ret_type = {};
-                proto->name     = symbol;
-                proto->mode     = call_mode_t::system;
-                array::init(proto->params, g_ffi_system.alloc);
-                return proto;
-            }
-            return nullptr;
-        }
-
-        status_t make(lib_t* lib, str::slice_t symbol, proto_t** proto) {
-            if (!proto)
-                return status_t::prototype_null;
-            auto new_proto = proto::make(symbol);
-            if (!new_proto->lib) {
-                auto status = lib::symaddr(lib, symbol, &new_proto->func);
-                if (!OK(status))
-                    return status;
-                new_proto->lib = lib;
-            }
-            *proto = new_proto;
-            return status_t::ok;
-        }
-    }
-
     namespace param {
         u0 free(param_t* param) {
             if (!param)
@@ -166,7 +127,7 @@ namespace basecode::ffi {
         }
 
         param_t* make(str::slice_t name, param_type_t type, b8 rest, param_alias_t* dft_val) {
-            auto param = &stable_array::append(g_ffi_system.params);
+            auto param = &stable_array::append(g_ffi_system.param_slab);
             param->pad        = {};
             param->name       = name;
             param->is_rest    = rest;
@@ -180,28 +141,134 @@ namespace basecode::ffi {
         }
     }
 
+    namespace proto {
+        u0 free(proto_t* proto) {
+            for (auto overload : proto->overloads)
+                overload::free(overload);
+            array::free(proto->overloads);
+        }
+
+        b8 remove(str::slice_t symbol) {
+            proto_pair_t pair{};
+            if (symtab::find(g_ffi_system.protos, symbol, pair)) {
+                proto::free(pair.proto);
+                stable_array::erase(g_ffi_system.proto_slab, pair.idx - 1);
+                symtab::remove(g_ffi_system.protos, symbol);
+                return true;
+            }
+            return false;
+        }
+
+        proto_t* find(str::slice_t symbol) {
+            proto_pair_t pair{};
+            return symtab::find(g_ffi_system.protos, symbol, pair) ? pair.proto : nullptr;
+        }
+
+        proto_t* make(str::slice_t symbol, lib_t* lib) {
+            proto_pair_t pair{};
+            if (symtab::find(g_ffi_system.protos, symbol, pair))
+                return pair.proto;
+            proto_pair_t* new_pair{};
+            if (symtab::emplace(g_ffi_system.protos, symbol, &new_pair)) {
+                auto proto = &stable_array::append(g_ffi_system.proto_slab);
+                new_pair->idx   = g_ffi_system.proto_slab.size;
+                new_pair->proto = proto;
+                proto->lib      = lib;
+                proto->name     = symbol;
+                array::init(proto->overloads, g_ffi_system.alloc);
+                return proto;
+            }
+            return nullptr;
+        }
+
+        status_t append(proto_t* proto, overload_t* ol) {
+            if (proto->lib && !ol->func) {
+                auto status = lib::symaddr(proto->lib, ol->name, &ol->func);
+                if (!OK(status))
+                    return status;
+            }
+            ol->proto = proto;
+            array::append(proto->overloads, ol);
+            return status_t::ok;
+        }
+    }
+
+    namespace overload {
+        u0 free(overload_t* ol) {
+            for (auto param : ol->params)
+                param::free(param);
+            array::free(ol->params);
+        }
+
+        b8 remove(str::slice_t symbol) {
+            overload_pair_t pair{};
+            if (symtab::find(g_ffi_system.overloads, symbol, pair)) {
+                array::erase(pair.overload->proto->overloads, pair.overload);
+                overload::free(pair.overload);
+                stable_array::erase(g_ffi_system.overload_slab, pair.idx - 1);
+                symtab::remove(g_ffi_system.overloads, symbol);
+                return true;
+            }
+            return false;
+        }
+
+        overload_t* find(str::slice_t symbol) {
+            overload_pair_t pair{};
+            return symtab::find(g_ffi_system.overloads, symbol, pair) ? pair.overload : nullptr;
+        }
+
+        u0 append(overload_t* overload, param_t* param) {
+            array::append(overload->params, param);
+        }
+
+        overload_t* make(str::slice_t symbol, param_type_t ret_type, u0* func) {
+            overload_pair_t pair{};
+            if (symtab::find(g_ffi_system.overloads, symbol, pair))
+                return pair.overload;
+            overload_pair_t* new_pair{};
+            if (symtab::emplace(g_ffi_system.overloads, symbol, &new_pair)) {
+                auto ol = &stable_array::append(g_ffi_system.overload_slab);
+                new_pair->idx      = g_ffi_system.overload_slab.size;
+                new_pair->overload = ol;
+                ol->func           = func;
+                ol->name           = symbol;
+                ol->mode           = call_mode_t::system;
+                ol->ret_type       = ret_type;
+                array::init(ol->params, g_ffi_system.alloc);
+                return ol;
+            }
+            return nullptr;
+        }
+    }
+
     namespace system {
         u0 fini() {
-            for (auto lib : g_ffi_system.libs)
+            for (auto lib : g_ffi_system.lib_slab)
                 lib::unload(lib);
-            for (auto param : g_ffi_system.params)
+            for (auto param : g_ffi_system.param_slab)
                 array::free(param->members);
-            for (auto proto : g_ffi_system.protos)
-                array::free(proto->params);
-            symtab::free(g_ffi_system.lib_map);
-            symtab::free(g_ffi_system.proto_map);
-            stable_array::free(g_ffi_system.libs);
-            stable_array::free(g_ffi_system.protos);
-            stable_array::free(g_ffi_system.params);
+            for (auto proto : g_ffi_system.proto_slab)
+                proto::free(proto);
+            for (auto overload : g_ffi_system.overload_slab)
+                overload::free(overload);
+            symtab::free(g_ffi_system.libs);
+            symtab::free(g_ffi_system.protos);
+            symtab::free(g_ffi_system.overloads);
+            stable_array::free(g_ffi_system.lib_slab);
+            stable_array::free(g_ffi_system.proto_slab);
+            stable_array::free(g_ffi_system.param_slab);
+            stable_array::free(g_ffi_system.overload_slab);
         }
 
         status_t init(alloc_t* alloc, u8 num_pages) {
             g_ffi_system.alloc = alloc;
-            stable_array::init(g_ffi_system.libs, g_ffi_system.alloc, num_pages);
-            stable_array::init(g_ffi_system.params, g_ffi_system.alloc, num_pages);
-            stable_array::init(g_ffi_system.protos, g_ffi_system.alloc, num_pages);
-            symtab::init(g_ffi_system.lib_map, g_ffi_system.alloc);
-            symtab::init(g_ffi_system.proto_map, g_ffi_system.alloc);
+            stable_array::init(g_ffi_system.lib_slab, g_ffi_system.alloc, num_pages);
+            stable_array::init(g_ffi_system.param_slab, g_ffi_system.alloc, num_pages);
+            stable_array::init(g_ffi_system.proto_slab, g_ffi_system.alloc, num_pages);
+            stable_array::init(g_ffi_system.overload_slab, g_ffi_system.alloc, num_pages);
+            symtab::init(g_ffi_system.libs, g_ffi_system.alloc);
+            symtab::init(g_ffi_system.protos, g_ffi_system.alloc);
+            symtab::init(g_ffi_system.overloads, g_ffi_system.alloc);
             return status_t::ok;
         }
     }
@@ -248,28 +315,28 @@ namespace basecode::ffi {
         return status_t::ok;
     }
 
-    status_t call(ffi_t& ffi, const proto_t* proto, param_alias_t& ret) {
-        if (!proto) return status_t::prototype_null;
-        switch (proto->mode) {
-            case call_mode_t::system:           dcMode(ffi.vm, DC_CALL_C_DEFAULT);              break;
-            case call_mode_t::variadic:         dcMode(ffi.vm, DC_CALL_C_ELLIPSIS);             break;
+    status_t call(ffi_t& ffi, const overload_t* ol, param_alias_t& ret) {
+        if (!ol) return status_t::prototype_null;
+        switch (ol->mode) {
+            case call_mode_t::system:           dcMode(ffi.vm, DC_CALL_C_DEFAULT);           break;
+            case call_mode_t::variadic:         dcMode(ffi.vm, DC_CALL_C_ELLIPSIS);          break;
         }
-        switch (proto->ret_type.cls) {
+        switch (ol->ret_type.cls) {
             case param_cls_t::ptr:
-            case param_cls_t::custom:           ret.p = dcCallPointer(ffi.vm, proto->func);     break;
+            case param_cls_t::custom:           ret.p = dcCallPointer(ffi.vm, ol->func);     break;
             case param_cls_t::int_:
-                switch (proto->ret_type.size) {
-                    case param_size_t::none:    dcCallVoid(ffi.vm, proto->func); ret.qw = {};   break;
-                    case param_size_t::byte:    ret.b = dcCallChar(ffi.vm, proto->func);        break;
-                    case param_size_t::word:    ret.w = dcCallShort(ffi.vm, proto->func);       break;
-                    case param_size_t::dword:   ret.dw = dcCallInt(ffi.vm, proto->func);        break;
-                    case param_size_t::qword:   ret.qw = dcCallLongLong(ffi.vm, proto->func);   break;
+                switch (ol->ret_type.size) {
+                    case param_size_t::none:    dcCallVoid(ffi.vm, ol->func); ret.qw = {};   break;
+                    case param_size_t::byte:    ret.b = dcCallChar(ffi.vm, ol->func);        break;
+                    case param_size_t::word:    ret.w = dcCallShort(ffi.vm, ol->func);       break;
+                    case param_size_t::dword:   ret.dw = dcCallInt(ffi.vm, ol->func);        break;
+                    case param_size_t::qword:   ret.qw = dcCallLongLong(ffi.vm, ol->func);   break;
                 }
                 break;
             case param_cls_t::float_:
-                switch (proto->ret_type.size) {
-                    case param_size_t::dword:   ret.fdw = dcCallFloat(ffi.vm, proto->func);     break;
-                    case param_size_t::qword:   ret.fqw = dcCallDouble(ffi.vm, proto->func);    break;
+                switch (ol->ret_type.size) {
+                    case param_size_t::dword:   ret.fdw = dcCallFloat(ffi.vm, ol->func);     break;
+                    case param_size_t::qword:   ret.fqw = dcCallDouble(ffi.vm, ol->func);    break;
                     default:                    return status_t::invalid_float_size;
                 }
                 break;

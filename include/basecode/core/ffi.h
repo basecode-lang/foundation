@@ -24,13 +24,21 @@
 #include <basecode/core/symtab.h>
 
 namespace basecode {
+    struct lib_t;
+    struct param_t;
+    struct proto_t;
+    struct overload_t;
+
+    using param_array_t         = array_t<param_t*>;
+    using symbol_array_t        = assoc_array_t<u0*>;
+    using overload_array_t      = array_t<overload_t*>;
+
     struct lib_t final {
         alloc_t*                alloc;
         DLLib*                  handle;
         symtab_t<u0*>           symbols;
         path_t                  path;
     };
-    using symbol_array_t        = assoc_array_t<u0*>;
 
     enum class call_mode_t : u8 {
         system                  = 1,
@@ -74,25 +82,28 @@ namespace basecode {
         param_type_t            type;
     };
 
-    struct param_t;
-    using param_list_t          = array_t<param_t*>;
-
     struct param_t final {
         param_value_t           value;
-        param_list_t            members;
+        param_array_t           members;
         str::slice_t            name;
         u8                      has_dft:    1;
         u8                      is_rest:    1;
         u8                      pad:        6;
     };
 
-    struct proto_t final {
-        lib_t*                  lib;
+    struct overload_t final {
+        proto_t*                proto;
         u0*                     func;
         str::slice_t            name;
-        param_list_t            params;
+        param_array_t           params;
         param_type_t            ret_type;
         call_mode_t             mode;
+    };
+
+    struct proto_t final {
+        lib_t*                  lib;
+        str::slice_t            name;
+        overload_array_t        overloads;
     };
 
     struct ffi_t final {
@@ -152,13 +163,21 @@ namespace basecode {
 
             proto_t* find(str::slice_t symbol);
 
-            proto_t* make(str::slice_t symbol);
+            status_t append(proto_t* proto, overload_t* ol);
 
-            inline u0 append(proto_t* proto, param_t* param) {
-                array::append(proto->params, param);
-            }
+            proto_t* make(str::slice_t symbol, lib_t* lib = {});
+        }
 
-            status_t make(lib_t* lib, str::slice_t symbol, proto_t** proto);
+        namespace overload {
+            u0 free(overload_t* ol);
+
+            b8 remove(str::slice_t symbol);
+
+            overload_t* find(str::slice_t symbol);
+
+            u0 append(overload_t* ol, param_t* param);
+
+            overload_t* make(str::slice_t symbol, param_type_t ret_type, u0* func = {});
         }
 
         u0 free(ffi_t& ffi);
@@ -233,7 +252,7 @@ namespace basecode {
             }
         }
 
-        status_t call(ffi_t& ffi, const proto_t* proto, param_alias_t& ret);
+        status_t call(ffi_t& ffi, const overload_t* ol, param_alias_t& ret);
 
         status_t init(ffi_t& ffi, u32 heap_size = 2 * 1024, alloc_t* alloc = context::top()->alloc);
     }

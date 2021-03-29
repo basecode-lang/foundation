@@ -688,8 +688,6 @@ namespace basecode::config {
             str::reserve(g_cfg_sys.buf, 8192);
 
             scm::init(g_cfg_sys.ctx, g_cfg_sys.heap_size);
-
-
             {
                 auto b8_type = ffi::param::make_type(param_cls_t::custom,
                                                      param_size_t::byte,
@@ -703,34 +701,40 @@ namespace basecode::config {
                                                       s32(scm::ffi_type_t::object));
                 auto slice_ref_type = ffi::param::make_type(param_cls_t::ptr, param_size_t::qword);
 
-                auto cvar_ref_proto = ffi::proto::make("cvar-ref"_ss);
-                cvar_ref_proto->func     = (u0*) cvar_ref;
-                cvar_ref_proto->ret_type = obj_type;
-                ffi::proto::append(cvar_ref_proto, ffi::param::make("ctx"_ss, ctx_type));
-                ffi::proto::append(cvar_ref_proto, ffi::param::make("id"_ss, u32_type));
-                scm::set(g_cfg_sys.ctx,
-                         scm::make_symbol(g_cfg_sys.ctx, "cvar-ref"),
-                         scm::make_ffi(g_cfg_sys.ctx, cvar_ref_proto));
+                {
+                    auto proto = ffi::proto::make("cvar_ref"_ss);
+                    auto ol    = ffi::overload::make("cvar_ref"_ss, obj_type, (u0*) cvar_ref);
+                    ffi::overload::append(ol, ffi::param::make("ctx"_ss, ctx_type));
+                    ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "cvar-ref"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
 
-                auto cvar_set_proto = ffi::proto::make("cvar-set!"_ss);
-                cvar_set_proto->func     = (u0*) cvar_set;
-                cvar_set_proto->ret_type = b8_type;
-                ffi::proto::append(cvar_set_proto, ffi::param::make("ctx"_ss, ctx_type));
-                ffi::proto::append(cvar_set_proto, ffi::param::make("id"_ss, u32_type));
-                ffi::proto::append(cvar_set_proto, ffi::param::make("value"_ss, obj_type));
-                scm::set(g_cfg_sys.ctx,
-                         scm::make_symbol(g_cfg_sys.ctx, "cvar-set!"),
-                         scm::make_ffi(g_cfg_sys.ctx, cvar_set_proto));
+                {
+                    auto proto = ffi::proto::make("cvar_set"_ss);
+                    auto ol    = ffi::overload::make("cvar_set"_ss, b8_type, (u0*) cvar_set);
+                    ffi::overload::append(ol, ffi::param::make("ctx"_ss, ctx_type));
+                    ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
+                    ffi::overload::append(ol, ffi::param::make("value"_ss, obj_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "cvar-set!"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
 
-                auto localized_str_proto = ffi::proto::make("localized-string"_ss);
-                localized_str_proto->func     = (u0*) localized_string;
-                localized_str_proto->ret_type = u32_type;
-                ffi::proto::append(localized_str_proto, ffi::param::make("id"_ss, u32_type));
-                ffi::proto::append(localized_str_proto, ffi::param::make("locale"_ss, slice_ref_type));
-                ffi::proto::append(localized_str_proto, ffi::param::make("value"_ss, slice_ref_type));
-                scm::set(g_cfg_sys.ctx,
-                         scm::make_symbol(g_cfg_sys.ctx, "localized-string"),
-                         scm::make_ffi(g_cfg_sys.ctx, localized_str_proto));
+                {
+                    auto proto = ffi::proto::make("localized_string"_ss);
+                    auto ol    = ffi::overload::make("localized_string"_ss, u32_type, (u0*) localized_string);
+                    ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
+                    ffi::overload::append(ol, ffi::param::make("locale"_ss, slice_ref_type));
+                    ffi::overload::append(ol, ffi::param::make("value"_ss, slice_ref_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "localized-string"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
             }
 
             for (u32 i = 0; s_kernel_funcs[i].symbol != nullptr; ++i) {

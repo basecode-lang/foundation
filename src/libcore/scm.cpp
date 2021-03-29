@@ -749,10 +749,13 @@ namespace basecode::scm {
 
                 case obj_type_t::ffi: {
                     auto proto = (proto_t*) NATIVE_PTR(fn);
+                    if (array::empty(proto->overloads))
+                        error(ctx, "ffi: proto has no overloads");
+                    auto ol = proto->overloads[0];
                     ffi::reset(ctx->ffi);
                     n = 0;
                     while (!IS_NIL(arg)) {
-                        auto& param = proto->params[n];
+                        auto& param = ol->params[n];
                         va = EVAL(CAR(arg));
                         if (param->value.type.cls == param_cls_t::custom) {
                             switch (ffi_type_t(param->value.type.user)) {
@@ -826,24 +829,24 @@ namespace basecode::scm {
                         ++n;
                     }
                     param_alias_t ret{};
-                    auto status = ffi::call(ctx->ffi, proto, ret);
+                    auto status = ffi::call(ctx->ffi, ol, ret);
                     if (!OK(status))
                         error(ctx, "ffi: call failed");
-                    switch (proto->ret_type.cls) {
+                    switch (ol->ret_type.cls) {
                         case param_cls_t::ptr:
-                            obj = !ret.p ? ctx->nil : (obj_t*) ret.p;
+                            res = !ret.p ? ctx->nil : (obj_t*) ret.p;
                             break;
                         case param_cls_t::int_:
                         case param_cls_t::float_:
-                            obj = make_number(ctx, ret.dw);
+                            res = make_number(ctx, ret.dw);
                             break;
                         case param_cls_t::custom:
-                            switch (ffi_type_t(proto->ret_type.user)) {
+                            switch (ffi_type_t(ol->ret_type.user)) {
                                 case ffi_type_t::object:
-                                    obj = (obj_t*) ret.p;
+                                    res = (obj_t*) ret.p;
                                     break;
                                 case ffi_type_t::boolean:
-                                    obj = ret.b ? ctx->true_ : ctx->nil;
+                                    res = ret.b ? ctx->true_ : ctx->nil;
                                     break;
                                 default:
                                     error(ctx, "ffi: invalid custom return type");

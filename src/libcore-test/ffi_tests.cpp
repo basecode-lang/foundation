@@ -24,7 +24,7 @@
 
 using namespace basecode;
 
-TEST_CASE("basecode::ffi basics") {
+TEST_CASE("basecode::ffi basics", "[ffi]") {
 #ifdef _MSC_VER
     auto lib_filename = "ffi-test-kernel.dll"_path;
 #elif _WIN32
@@ -43,7 +43,10 @@ TEST_CASE("basecode::ffi basics") {
     path::parent_path(proc_path, proc_path);
 #endif
     path::append(proc_path, lib_filename);
-    format::print_ellipsis("ffi test library path", 40, "{}\n", proc_path.str);
+    format::print_ellipsis("ffi test library path",
+                           60,
+                           "{}\n",
+                           proc_path.str);
 
     lib_t* proc_lib{};
     auto status = ffi::lib::load(proc_path, &proc_lib);
@@ -54,27 +57,29 @@ TEST_CASE("basecode::ffi basics") {
     });
     REQUIRE(OK(status));
 
-    proto_t* simple_proto{};
-    status = ffi::proto::make(proc_lib, "simple"_ss, &simple_proto);
-    REQUIRE(OK(status));
-
     auto u32_type = ffi::param::make_type(param_cls_t::int_, param_size_t::dword);
-    simple_proto->ret_type = u32_type;
-    ffi::proto::append(simple_proto, ffi::param::make("a"_ss, u32_type));
-    ffi::proto::append(simple_proto, ffi::param::make("b"_ss, u32_type));
+
+    auto simple_proto = ffi::proto::make("simple"_ss, proc_lib);
+    auto dft_overload = ffi::overload::make("simple"_ss, u32_type);
+    status = ffi::proto::append(simple_proto, dft_overload);
+    REQUIRE(OK(status));
+    REQUIRE(dft_overload->func);
+    ffi::overload::append(dft_overload, ffi::param::make("a"_ss, u32_type));
+    ffi::overload::append(dft_overload, ffi::param::make("b"_ss, u32_type));
 
     ffi_t vm{};
     ffi::init(vm);
     defer(ffi::free(vm));
 
-    TIME_BLOCK("ffi: call simple function"_ss,
-               ffi::reset(vm);
-                   ffi::push(vm, 5);
-                   ffi::push(vm, 6);
-                   param_alias_t ret{};
-                   status = ffi::call(vm, simple_proto, ret);
-                   REQUIRE(OK(status));
-                   REQUIRE(ret.dw == 30););
+    TIME_BLOCK(
+        "ffi: call simple function"_ss,
+        ffi::reset(vm);
+        ffi::push(vm, 5);
+        ffi::push(vm, 6);
+        param_alias_t ret{};
+        status = ffi::call(vm, dft_overload, ret);
+        REQUIRE(OK(status));
+        REQUIRE(ret.dw == 30););
 }
 
 TEST_CASE("basecode::ffi status names") {
