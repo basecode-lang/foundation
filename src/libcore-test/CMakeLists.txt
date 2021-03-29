@@ -65,5 +65,6 @@ add_custom_command(
 
     COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/etc
     COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_DIR_BASE}/etc/ut.txt ${CMAKE_BINARY_DIR}/etc
+    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_DIR_BASE}/etc/hello.wasm ${CMAKE_BINARY_DIR}/etc
     COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_DIR_BASE}/etc/instructions.ig ${CMAKE_BINARY_DIR}/etc
 )

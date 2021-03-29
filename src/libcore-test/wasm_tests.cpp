@@ -30,13 +30,13 @@ TEST_CASE("basecode::wasm basics", "[wasm]") {
     module_t* test_mod;
     TIME_BLOCK(
         "wasm: load time"_ss,
-        auto file_path = "C:/src/libs/emsdk/hello.wasm"_path;
+        auto file_path = "../etc/hello.wasm"_path;
         test_mod = wasm::load_module(wasm, file_path);
         if (!test_mod) {
             REQUIRE(test_mod);
         } else {
-            if (test_mod->path != "C:/src/libs/emsdk/hello.wasm"_ss)
-                REQUIRE(test_mod->path == "C:/src/libs/emsdk/hello.wasm"_ss);
+            if (test_mod->path != "../etc/hello.wasm"_ss)
+                REQUIRE(test_mod->path == "../etc/hello.wasm"_ss);
         }
         path::free(file_path););
     TIME_BLOCK(
