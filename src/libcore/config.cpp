@@ -17,10 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/log.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/error.h>
 #include <basecode/core/config.h>
-#include <basecode/core/symtab.h>
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/str_array.h>
@@ -824,13 +822,13 @@ namespace basecode::config {
 
     namespace cvar {
         static u0 add_binding(cvar_t* cvar) {
-            auto sym_name = format::format("cvar:{}", cvar->name);
+            auto sym_name = format::format("*{}*", cvar->name);
             auto symbol = scm::make_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
             scm::set(g_cfg_sys.ctx, symbol, scm::make_number(g_cfg_sys.ctx, cvar->id));
         }
 
         static u0 remove_binding(cvar_t* cvar) {
-            auto sym_name = format::format("cvar:{}", cvar->name);
+            auto sym_name = format::format("*{}*", cvar->name);
             auto symbol = scm::make_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
             scm::set(g_cfg_sys.ctx, symbol, scm::nil(g_cfg_sys.ctx));
         }

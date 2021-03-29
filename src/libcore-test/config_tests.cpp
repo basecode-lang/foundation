@@ -58,7 +58,7 @@ static u0 validate_cvar(scm::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
 TEST_CASE("basecode::config cvar add & remove") {
     const auto cvar_id                       = 20;
     const auto enable_console_color          = "enable-console-color"_ss;
-    const auto internal_enable_console_color = "cvar:enable-console-color";
+    const auto internal_enable_console_color = "*enable-console-color*";
 
     if (!OK(config::cvar::add(cvar_id, enable_console_color, cvar_type_t::flag)))
         REQUIRE(false);

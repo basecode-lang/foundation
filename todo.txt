@@ -2,7 +2,6 @@ HIGH
 ---------
 - scm: adjust print primitive to not add spaces and line feeds
 - config: review and clean up
-- config: remove cvar: prefix on variable names
 - config: use memory mapped buf_t for .scm files
 - config: rework kernel funcs to take advantage of ffi based
           callback mechanism.
@@ -35,6 +34,8 @@ LOW
 
 DONE
 ----
+- config: remove cvar: prefix on variable names
+    * changed to classic lisp/scheme global variable name, e.g. *product_name*
 - scm: enhance native func support to accept an ffi_t*
         and dynamically invoke it.
 - scm: implement tail call optimization
