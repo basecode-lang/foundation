@@ -18,5 +18,26 @@
 
 #include <basecode/core/wasm/encoder.h>
 
-namespace basecode {
+namespace basecode::wasm {
+    namespace module {
+        status_t encode(module_t& module) {
+            UNUSED(module);
+            return status_t::not_implemented;
+        }
+    }
+
+    namespace section {
+        status_t encode(section_t* sect) {
+            UNUSED(sect);
+            return status_t::not_implemented;
+        }
+    }
+
+    namespace instruction {
+        status_t encode(module_t& module, instruction_array_t& list) {
+            UNUSED(module);
+            UNUSED(list);
+            return status_t::not_implemented;
+        }
+    }
 }

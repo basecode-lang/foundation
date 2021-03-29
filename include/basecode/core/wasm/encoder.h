@@ -20,5 +20,16 @@
 
 #include <basecode/core/wasm/wasm.h>
 
-namespace basecode {
+namespace basecode::wasm {
+    namespace module {
+        status_t encode(module_t& module);
+    }
+
+    namespace section {
+        status_t encode(section_t* sect);
+    }
+
+    namespace instruction {
+        status_t encode(module_t& module, instruction_array_t& list);
+    }
 }

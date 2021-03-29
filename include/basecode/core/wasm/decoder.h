@@ -20,5 +20,42 @@
 
 #include <basecode/core/wasm/wasm.h>
 
-namespace basecode {
+namespace basecode::wasm {
+    namespace module {
+        status_t decode(module_t& module);
+    }
+
+    namespace section {
+        status_t decode(section_t* sect);
+
+        status_t read_code(section_t* sect);
+
+        status_t read_data(section_t* sect);
+
+        status_t read_start(section_t* sect);
+
+        status_t read_types(section_t* sect);
+
+        status_t read_table(section_t* sect);
+
+        status_t read_custom(section_t* sect);
+
+        status_t read_memory(section_t* sect);
+
+        status_t read_global(section_t* sect);
+
+        status_t read_exports(section_t* sect);
+
+        status_t read_imports(section_t* sect);
+
+        status_t read_elements(section_t* sect);
+
+        status_t read_functions(section_t* sect);
+
+        status_t read_data_count(section_t* sect);
+    }
+
+    namespace instruction {
+        status_t read_body(module_t& module, instruction_array_t& list);
+    }
 }

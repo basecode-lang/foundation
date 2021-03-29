@@ -20,6 +20,20 @@
 
 #include <basecode/core/buf.h>
 
+#define FILE_READ_SLEB128(t, v, c)          SAFE_SCOPE(                 \
+    static_assert(std::is_same_v<decltype(v), t>);                      \
+    if (!OK(leb::decode_signed(file.crsr, (v), (c))))                   \
+        return status_t::read_error;)
+#define FILE_READ_ULEB128(t, v, c)          SAFE_SCOPE(                 \
+    static_assert(std::is_same_v<decltype(v), t>);                      \
+    if (!OK(leb::decode_unsigned(file.crsr, (v), (c))))                 \
+        return status_t::read_error;)
+#define FILE_READ_SLICE(s, c)               SAFE_SCOPE(                 \
+    static_assert(std::is_same_v<decltype(s), str::slice_t>);           \
+    FILE_READ_ULEB128(u32, (s).length, (c));                            \
+    (s).data = FILE_PTR();                                              \
+    FILE_SEEK_FWD((s).length);)
+
 namespace basecode {
     struct leb128_t final {
         u8                      data[16];
