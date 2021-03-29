@@ -22,73 +22,119 @@
 #include <basecode/core/ffi.h>
 #include <basecode/core/job.h>
 #include <basecode/core/term.h>
-#include <basecode/core/event.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/error.h>
 #include <basecode/core/locale.h>
 #include <basecode/core/config.h>
 #include <basecode/core/thread.h>
-#include <basecode/core/memory.h>
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/network.h>
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
 #include <basecode/core/configure.h>
-#include <basecode/core/log/system/spdlog.h>
-#include <basecode/core/log/system/syslog.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
 
 using namespace basecode;
 
+using timed_block_callable_t    = std::function<s32()>;
+
+static s32 time_block(const String_Concept auto& slug,
+                      const timed_block_callable_t& cb) {
+    stopwatch_t timer{};
+    stopwatch::start(timer);
+    auto rc = cb();
+    stopwatch::stop(timer);
+    stopwatch::print_elapsed(memory::system::default_alloc(),
+                             stdout,
+                             slug,
+                             40,
+                             timer);
+    return rc;
+}
+
 s32 main(s32 argc, const s8** argv) {
-    {
-        auto status = memory::system::init(alloc_type_t::dlmalloc);
-        if (!OK(status)) {
-            format::print(stderr, "memory::system::init error: {}\n",
-                          memory::status_name(status));
-            return (s32) status;
-        }
+    s32 rc;
+
+    // N.B. must init the profiler first so the stopwatch_t
+    //      gives us meaningful results.
+    //
+    // !!! IMPORTANT !!!
+    //
+    // keep profiler dependency free!
+    //
+    if (!OK(profiler::init()))
+        return 1;
+
+    auto status = memory::system::init(alloc_type_t::dlmalloc);
+    if (!OK(status)) {
+        fmt::print(stderr,
+                   "memory::system::init error: {}\n",
+                   memory::status_name(status));
+        return (s32) status;
     }
-    {
+    auto ctx = context::make(argc,
+                             argv,
+                             memory::system::default_alloc());
+    context::push(&ctx);
+
+    rc = time_block("log::system::init"_ss, [&argv]() -> s32 {
         default_config_t dft_config{};
-        dft_config.file = stderr;
+        dft_config.file        = stderr;
         dft_config.process_arg = argv[0];
         auto status = log::system::init(logger_type_t::default_,
                                         &dft_config,
                                         log_level_t::debug,
                                         memory::system::default_alloc());
         if (!OK(status)) {
-            format::print(stderr, "log::system::init error: {}\n",
+            format::print(stderr,
+                          "log::system::init error: {}\n",
                           log::status_name(status));
         }
-    }
 
-    auto ctx = context::make(argc,
-                             argv,
-                             memory::system::default_alloc(),
-                             log::system::default_logger());
-    context::push(&ctx);
+        context::top()->logger = log::system::default_logger();
 
-    if (!OK(term::system::init(true)))  return 1;
-    if (!OK(locale::system::init()))    return 1;
-    if (!OK(buf_pool::system::init()))  return 1;
-    if (!OK(string::system::init()))    return 1;
-    if (!OK(error::system::init()))     return 1;
-    if (!OK(profiler::init()))          return 1;
-    if (!OK(memory::proxy::init()))     return 1;
-    if (!OK(event::system::init()))     return 1;
-    if (!OK(thread::system::init()))    return 1;
-    if (!OK(job::system::init()))       return 1;
-    if (!OK(ffi::system::init()))       return 1;
-    if (!OK(filesys::init()))           return 1;
-    if (!OK(network::system::init()))   return 1;
+        return 0;
+    });
+    if (!OK(rc)) return rc;
 
-    stopwatch_t timer{};
-    stopwatch::start(timer);
+    rc = time_block("term::system::init"_ss,    []() -> s32 { return s32(term::system::init(true)); });
+    if (!OK(rc)) return rc;
 
-    {
+    rc = time_block("locale::system::init"_ss,      []() -> s32 { return s32(locale::system::init());            });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("buf_pool::system::init"_ss,    []() -> s32 { return s32(buf_pool::system::init());          });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("string::system::init"_ss,      []() -> s32 { return s32(string::system::init());            });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("error::system::init"_ss,       []() -> s32 { return s32(error::system::init());             });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("memory::system::init"_ss,      []() -> s32 { return s32(memory::proxy::init());             });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("event::system::init"_ss,       []() -> s32 { return s32(event::system::init());             });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("thread::system::init"_ss,      []() -> s32 { return s32(thread::system::init());            });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("job::system::init"_ss,         []() -> s32 { return s32(job::system::init());               });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("ffi::system::init"_ss,     []() -> s32 { return s32(ffi::system::init());               });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("filesys::init"_ss,             []() -> s32 { return s32(filesys::init());                   });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("network::init"_ss,             []() -> s32 { return s32(network::system::init());           });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("config::system::init"_ss,  []() -> s32 {
         config_settings_t settings{};
         settings.product_name  = string::interned::fold(CORE_PRODUCT_NAME);
         settings.build_type    = string::interned::fold(CORE_BUILD_TYPE);
@@ -100,55 +146,57 @@ s32 main(s32 argc, const s8** argv) {
             format::print(stderr, "config::system::init error\n");
             return 1;
         }
-    }
 
-    cvar_t* cvar{};
-    config::cvar::add(1, "enable-console-color", cvar_type_t::flag);
-    config::cvar::get(1, &cvar);
-    cvar->value.flag = true;
+        cvar_t* cvar{};
+        config::cvar::add(1, "enable-console-color", cvar_type_t::flag);
+        config::cvar::get(1, &cvar);
+        cvar->value.flag = true;
 
-    config::cvar::add(2, "log-path", cvar_type_t::string);
-    config::cvar::get(2, &cvar);
-    cvar->value.ptr = (u8*) string::interned::fold("/var/log"_ss).data;
+        config::cvar::add(2, "log-path", cvar_type_t::string);
+        config::cvar::get(2, &cvar);
+        cvar->value.ptr = (u8*) string::interned::fold("/var/log"_ss).data;
 
-    config::cvar::add(3, "magick-weight", cvar_type_t::real);
-    config::cvar::get(3, &cvar);
-    cvar->value.real = 47.314f;
+        config::cvar::add(3, "magick-weight", cvar_type_t::real);
+        config::cvar::get(3, &cvar);
+        cvar->value.real = 47.314f;
 
-    auto core_config_path = "../etc/core.scm"_path;
-    path_t config_path{};
-    filesys::bin_rel_path(config_path, core_config_path);
-    scm::obj_t* result{};
-    if (!OK(config::eval(config_path, &result)))
-        return 1;
+        auto core_config_path = "../etc/core.scm"_path;
+        path_t config_path{};
+        filesys::bin_rel_path(config_path, core_config_path);
+        scm::obj_t* result{};
+        if (!OK(config::eval(config_path, &result)))
+            return 1;
 
-    stopwatch::stop(timer);
-    stopwatch::print_elapsed("config system setup time"_ss, 40, timer);
+        path::free(config_path);
+        path::free(core_config_path);
 
-    auto rc = Catch::Session().run(argc, argv);
+        return 0;
+    });
+    if (!OK(rc)) return rc;
+
+    rc = time_block("Catch::Session().run"_ss, [argc, &argv]() -> s32 {
+        return Catch::Session().run(argc, argv);
+    });
 
     log::notice("shutdown test program");
 
-    path::free(config_path);
-    path::free(core_config_path);
-
-    network::system::fini();
-    filesys::fini();
-    ffi::system::fini();
-    profiler::fini();
-    job::system::fini();
-    thread::system::fini();
-    config::system::fini();
-    string::system::fini();
-    error::system::fini();
-    buf_pool::system::fini();
-    locale::system::fini();
-    log::system::fini();
-    term::system::fini();
-    event::system::fini();
-    memory::proxy::fini();
-    memory::system::fini();
-    context::pop();
+    time_block("network::system::fini"_ss,  []() -> s32 { network::system::fini();      return 0; });
+    time_block("filesys::fini"_ss,          []() -> s32 { filesys::fini();              return 0; });
+    time_block("ffi::system::fini"_ss,      []() -> s32 { ffi::system::fini();          return 0; });
+    time_block("job::system::fini"_ss,      []() -> s32 { job::system::fini();          return 0; });
+    time_block("thread::system::fini"_ss,   []() -> s32 { thread::system::fini();       return 0; });
+    time_block("config::system::fini"_ss,   []() -> s32 { config::system::fini();       return 0; });
+    time_block("string::system::fini"_ss,   []() -> s32 { string::system::fini();       return 0; });
+    time_block("error::system::fini"_ss,    []() -> s32 { error::system::fini();        return 0; });
+    time_block("buf_pool::system::fini"_ss, []() -> s32 { buf_pool::system::fini();     return 0; });
+    time_block("locale::system::fini"_ss,   []() -> s32 { locale::system::fini();       return 0; });
+    time_block("log::system::fini"_ss,      []() -> s32 { log::system::fini();          return 0; });
+    time_block("term::system::fini"_ss,     []() -> s32 { term::system::fini();         return 0; });
+    time_block("event::system::fini"_ss,    []() -> s32 { event::system::fini();        return 0; });
+    time_block("memory::proxy::fini"_ss,    []() -> s32 { memory::proxy::fini();        return 0; });
+    time_block("memory::system::fini"_ss,   []() -> s32 { memory::system::fini();       return 0; });
+    time_block("context::pop"_ss,           []() -> s32 { context::pop();               return 0; });
+    time_block("profiler::fini"_ss,         []() -> s32 { profiler::fini();             return 0; });
 
     return rc;
 }

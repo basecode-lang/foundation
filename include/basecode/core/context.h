@@ -69,6 +69,6 @@ namespace basecode {
 
         u0 push(context_t* ctx);
 
-        context_t make(s32 argc, const s8** argv, alloc_t* alloc, logger_t* logger);
+        context_t make(s32 argc, const s8** argv, alloc_t* alloc, logger_t* logger = {});
     }
 }

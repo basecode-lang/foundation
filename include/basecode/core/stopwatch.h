@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/slice.h>
+#include <basecode/core/format.h>
 
 namespace basecode {
     struct stopwatch_t final {
@@ -36,6 +35,29 @@ namespace basecode {
 
         u64 elapsed(stopwatch_t& w);
 
-        u0 print_elapsed(str::slice_t label, s32 width, stopwatch_t& w);
+        u0 print_elapsed(alloc_t* alloc,
+                         FILE* file,
+                         const String_Concept auto& label,
+                         s32 width,
+                         stopwatch_t& w) {
+            const auto sv_label = (std::string_view) label;
+            const auto e = elapsed(w);
+            if (e == 0) {
+                format::print_ellipsis(alloc, file, sv_label, width, "---\n");
+            } else if (e < 1000) {
+                format::print_ellipsis(alloc, file, sv_label, width, "{}ns\n", e);
+            } else {
+                const auto us = e / 1000;
+                if (us >= 1000) {
+                    format::print_ellipsis(alloc, file, sv_label, width, "{}ms\n", us / 1000);
+                } else {
+                    format::print_ellipsis(alloc, file, sv_label, width, "{}us\n", us);
+                }
+            }
+        }
+
+        u0 print_elapsed(const String_Concept auto& label, s32 width, stopwatch_t& w) {
+            print_elapsed(context::top()->alloc, stdout, label, width, w);
+        }
     }
 }
