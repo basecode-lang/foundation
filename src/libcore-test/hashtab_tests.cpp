@@ -30,7 +30,9 @@ TEST_CASE("basecode::hashtab names", "[baby_names]") {
     auto path = "../etc/ut.txt"_path;
     auto buf = buf::make();
     REQUIRE(OK(buf::load(buf, path)));
-    buf::index(buf);
+    TIME_BLOCK(
+        "hashtab: buf index time"_ss,
+        buf::index(buf));
 
     hashtab_t<str::slice_t, baby_name_t> table{};
     hashtab::init(table);

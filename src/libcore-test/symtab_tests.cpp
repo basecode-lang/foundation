@@ -63,6 +63,9 @@ TEST_CASE("basecode::symtab_t names") {
     auto path = "../etc/ut.txt"_path;
     auto buf = buf::make();
     REQUIRE(OK(buf::load(buf, path)));
+    TIME_BLOCK(
+        "symtab: buf index time"_ss,
+        buf::index(buf));
 
     symtab_t<baby_name_t> symbols{};
     symtab::init(symbols);

@@ -92,19 +92,30 @@ namespace basecode::buf {
     }
 
     u0 index(buf_t& buf) {
-        const __m128i lf = _mm_set1_epi8('\n');
+#if defined(__AVX2__)
+        const __m256i lf        = _mm256_set1_epi8('\n');
+        const u32     lane_size = 32;
+#elif defined(__SSE4_2__)
+        const __m128i lf        = _mm_set1_epi8('\n');
+        const u32     lane_size = 16;
+#endif
 
         array::reset(buf.lines);
         array::reserve(buf.lines, (buf.length / 80) * 3);
 
-        u32 idx{};
         u32 start{};
 
-        for (u32 i = 0; i < buf.length; i += 16, idx += 16) {
-            u8* p           = buf.data + i;
-            __m128i value   = _mm_loadu_si128((const __m128i*) p);
+        for (u32 idx = 0; idx < buf.length; idx += lane_size) {
+            u8* p           = buf.data + idx;
+#if defined(__AVX2__)
+            __m256i value   = _mm256_load_si256((const __m256i*) p);
+            __m256i matched = _mm256_cmpeq_epi8(value, lf);
+            u32     mask    = _mm256_movemask_epi8(matched);
+#elif defined(__SSE4_2__)
+            __m128i value   = _mm_load_si128((const __m128i*) p);
             __m128i matched = _mm_cmpeq_epi8(value, lf);
             u32     mask    = _mm_movemask_epi8(matched);
+#endif
 
             while (mask) {
                 u32 bit = __builtin_ffs(mask) - 1;
@@ -212,7 +223,13 @@ namespace basecode::buf {
 
         new_capacity = std::max(buf.length, new_capacity);
         new_capacity = new_capacity + (-new_capacity & 15U);
+#if defined(__AVX2__)
+        buf.data = (u8*) memory::realloc(buf.alloc, buf.data, new_capacity, 32);
+#elif defined(__SSE4_2__)
         buf.data = (u8*) memory::realloc(buf.alloc, buf.data, new_capacity, 16);
+#else
+        buf.data = (u8*) memory::realloc(buf.alloc, buf.data, new_capacity, 8);
+#endif
         buf.capacity = new_capacity;
     }
 
