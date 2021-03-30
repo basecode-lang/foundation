@@ -28,10 +28,12 @@ namespace basecode {
     struct param_t;
     struct proto_t;
     struct overload_t;
+    struct param_value_t;
 
     using param_array_t         = array_t<param_t*>;
     using symbol_array_t        = assoc_array_t<u0*>;
     using overload_array_t      = array_t<overload_t*>;
+    using param_value_array_t   = array_t<param_value_t>;
 
     struct lib_t final {
         alloc_t*                alloc;
@@ -62,9 +64,9 @@ namespace basecode {
     };
 
     struct param_type_t final {
+        s32                     user;
         param_cls_t             cls;
         param_size_t            size;
-        s32                     user;
     };
 
     union param_alias_t final {
@@ -97,6 +99,8 @@ namespace basecode {
         str::slice_t            name;
         param_array_t           params;
         param_type_t            ret_type;
+        u32                     req_count;
+        b8                      has_rest;
         call_mode_t             mode;
     };
 
@@ -152,7 +156,7 @@ namespace basecode {
             inline param_type_t make_type(param_cls_t cls,
                                           param_size_t size,
                                           s32 user = 0) {
-                return param_type_t{.cls = cls, .size = size, .user = user};
+                return param_type_t{.user = user, .cls = cls, .size = size};
             }
         }
 

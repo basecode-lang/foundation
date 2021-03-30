@@ -41,54 +41,39 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/scm.h>
-#include <basecode/core/error.h>
 #include <basecode/core/string.h>
 
 #define OBJ_AT(idx)             (&ctx->objects[(idx)])
 #define OBJ_IDX(x)              ((x) - ctx->objects)
 #define CAR(x)                  (&ctx->objects[(x)->pair.car_idx])
+#define CDR(x)                  (&ctx->objects[(x)->pair.cdr_idx])
 #define CAAR(x)                 CAR(CAR(x))
 #define CADR(x)                 CAR(CDR(x))
 #define CDDR(x)                 CDR(CDR(x))
 #define CADDR(x)                CAR(CDR(CDR(x)))
 #define SET_CAR(x, o)           ((x)->pair.car_idx = OBJ_IDX(o))
-#define CDR(x)                  (&ctx->objects[(x)->pair.cdr_idx])
 #define SET_CDR(x, o)           ((x)->pair.cdr_idx = OBJ_IDX(o))
 #define IS_NIL(x)               ((x) == ctx->nil)
 #define TYPE(x)                 (obj_type_t((x)->hdr.type))
+#define IS_TRUE(x)              (!IS_NIL(x) && (x) == ctx->true_)
+#define IS_FALSE(x)             (IS_NIL(x)  || (x) == ctx->false_)
 #define IS_GC_MARKED(x)         ((x)->hdr.gc_mark)
 #define SET_GC_MARK(x, v)       ((x)->hdr.gc_mark = (v))
 #define SET_TYPE(x, t)          ((x)->hdr.type = u8((t)))
-#define INTEGER(x)              (u32((x)->number.value))
-#define NUMBER(x)               (numeric_alias_t{.dw = ((x)->number.value)}.fdw)
-#define SET_NUMBER(x, v)        ((x)->number.value = numeric_alias_t{.fdw = (v)}.dw)
-#define SET_INTEGER(x, v)       ((x)->number.value = u32(v))
+#define FIXNUM(x)               ((x)->number.value)
+#define FLONUM(x)               (numeric_alias_t{.dw = (x)->number.value}.fdw)
+#define STRING_ID(x)            (FIXNUM((x)))
+#define SET_FIXNUM(x, v)        ((x)->number.value = (v))
+#define SET_FLONUM(x, v)        ((x)->number.value = numeric_alias_t{.fdw =(v)}.dw)
 #define PRIM(x)                 (prim_type_t((x)->prim.code))
-#define SET_PRIM(x, p)          ((x)->prim.code = u32(p))
-#define NATIVE_PTR(x)           (ctx->native_ptrs[(x)->number.value])
+#define SET_PRIM(x, p)          ((x)->prim.code = fixnum_t((p)))
+#define NATIVE_PTR(x)           (ctx->native_ptrs[FIXNUM((x))])
 #define CLOSERS_SIZE            (256U)
 #define SCRATCH_SIZE            (1024U)
 #define GC_STACK_SIZE           (1024U)
 #define NATIVE_PTR_SIZE         (256U)
 #define EVAL(o)                 eval(ctx, (o), env, nullptr)
 #define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env, nullptr)
-#define ARITH_INT_OP(op)        SAFE_SCOPE(                                                     \
-                                    u32 x = NUMBER(EVAL_ARG());                                 \
-                                    while (!IS_NIL(arg))                                        \
-                                        x = x op u32(NUMBER(EVAL_ARG()));                       \
-                                    res = make_number(ctx, x);                                  \
-                                )
-#define ARITH_NUM_OP(op)        SAFE_SCOPE(                                                     \
-                                    number_t x = NUMBER(EVAL_ARG());                            \
-                                    while (!IS_NIL(arg))                                        \
-                                        x = x op NUMBER(EVAL_ARG());                            \
-                                    res = make_number(ctx, x);                                  \
-                                )
-#define NUM_CMP_OP(op)          SAFE_SCOPE(                                                     \
-                                    va = check_type(ctx, EVAL_ARG(), obj_type_t::number);       \
-                                    vb = check_type(ctx, EVAL_ARG(), obj_type_t::number);       \
-                                    res = make_bool(ctx, NUMBER(va) op NUMBER(vb));             \
-                                )
 #define SYM(o)                  make_symbol(ctx, (o))
 #define CONS1(a)                cons(ctx, (a), ctx->nil)
 #define CONS(a, d)              cons(ctx, (a), (d))
@@ -177,7 +162,8 @@ namespace basecode::scm {
         "pair",
         "free",
         "nil",
-        "number",
+        "fixnum",
+        "flonum",
         "symbol",
         "string",
         "func",
@@ -185,6 +171,7 @@ namespace basecode::scm {
         "prim",
         "cfunc",
         "ptr",
+        "boolean",
         "keyword",
         "ffi",
     };
@@ -233,6 +220,7 @@ namespace basecode::scm {
         obj_t*                  nil;
         obj_t*                  dot;
         obj_t*                  true_;
+        obj_t*                  false_;
         obj_t*                  rbrac;
         obj_t*                  rparen;
         s8                      scratch[SCRATCH_SIZE];
@@ -243,12 +231,12 @@ namespace basecode::scm {
         u32                     object_count;
         u32                     native_ptr_idx;
         s8                      next_chr;
-    };
+    } __attribute__((aligned(128)));
 
     struct char_ptr_int_t final {
         s8*                     p;
         u32                     n;
-    };
+    } __attribute__((aligned(16)));
 
     static obj_t* eval(ctx_t* ctx,
                        obj_t* obj,
@@ -271,8 +259,8 @@ namespace basecode::scm {
         return obj;
     }
 
-    static b8 str_eq(obj_t* obj, u32 str_id) {
-        auto obj_rc = string::interned::get(INTEGER(obj));
+    static b8 str_eq(ctx_t* ctx, obj_t* obj, u32 str_id) {
+        auto obj_rc = string::interned::get(STRING_ID(obj));
         if (!OK(obj_rc.status))
             return false;
         return obj_rc.id == str_id;
@@ -285,11 +273,31 @@ namespace basecode::scm {
     }
 
     static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b) {
-        if (a == b)                 return true;
-        if (TYPE(a) != TYPE(b))     return false;
+        if (a == b)
+            return true;
+        if ((TYPE(a) == obj_type_t::fixnum || TYPE(a) == obj_type_t::flonum)
+        &&  (TYPE(b) == obj_type_t::fixnum || TYPE(b) == obj_type_t::flonum)) {
+            switch (TYPE(a)) {
+                case obj_type_t::fixnum: {
+                    auto fa = to_fixnum(ctx, a);
+                    auto fb = to_fixnum(ctx, b);
+                    return fa == fb;
+                }
+                case obj_type_t::flonum: {
+                    const auto e = std::numeric_limits<flonum_t>::epsilon();
+                    auto x = fabs(to_flonum(ctx, a));
+                    auto y = fabs(to_flonum(ctx, b));
+                    auto largest = (y > x) ? y : x;
+                    auto diff = x - y;
+                    return diff <= largest * e;
+                }
+                default:                return false;
+            }
+        }
+        if (TYPE(a) != TYPE(b))         return false;
         switch (TYPE(a)) {
             case obj_type_t::nil:
-            case obj_type_t::free:  return true;
+            case obj_type_t::free:      return true;
             case obj_type_t::pair:
             case obj_type_t::func:
             case obj_type_t::macro: {
@@ -304,18 +312,10 @@ namespace basecode::scm {
                 }
                 return true;
             }
-            case obj_type_t::number: {
-                const auto e = std::numeric_limits<number_t>::epsilon();
-                auto x = fabs(NUMBER(a));
-                auto y = fabs(NUMBER(b));
-                auto largest = (y > x) ? y : x;
-                auto diff = x - y;
-                return diff <= largest * e;
-            }
             case obj_type_t::prim:      return PRIM(a) == PRIM(b);
             case obj_type_t::ptr:
             case obj_type_t::cfunc:
-            case obj_type_t::string:    return INTEGER(a) == INTEGER(b);
+            case obj_type_t::string:    return STRING_ID(a) == STRING_ID(b);
             default:                    break;
         }
         return false;
@@ -478,7 +478,7 @@ namespace basecode::scm {
                 const auto len = p - ctx->scratch;
                 auto n = strtod(ctx->scratch, &p);
                 if (p != ctx->scratch && strchr(s_delims, *p)) {
-                    return make_number(ctx, n);
+                    return make_flonum(ctx, n);
                 } else if (strncmp(ctx->scratch, "#:", 2) == 0) {
                     return make_keyword(ctx, ctx->scratch + 2, len - 2);
                 } else {
@@ -493,8 +493,8 @@ namespace basecode::scm {
         obj_t* tail = head;
         while (!IS_NIL(lst)) {
             auto r = cons(ctx,
-                         EVAL(next_arg(ctx, &lst)),
-                         ctx->nil);
+                          EVAL(next_arg(ctx, &lst)),
+                          ctx->nil);
             if (IS_NIL(tail)) {
                 head = r;
                 tail = head;
@@ -589,7 +589,7 @@ namespace basecode::scm {
                             break;
 
                         case prim_type_t::if_:
-                            obj = !IS_NIL(EVAL(CAR(arg))) ? CADR(arg) : CADDR(arg);
+                            obj = IS_TRUE(EVAL(CAR(arg))) ? CADR(arg) : CADDR(arg);
                             break;
 
                         case prim_type_t::fn:
@@ -604,7 +604,10 @@ namespace basecode::scm {
                         case prim_type_t::while_:
                             va = next_arg(ctx, &arg);
                             n  = save_gc(ctx);
-                            while (!IS_NIL(EVAL(va))) {
+                            while (true) {
+                                vb = EVAL(va);
+                                if (IS_NIL(vb) || IS_FALSE(vb))
+                                    break;
                                 vb = arg;
                                 for (; !IS_NIL(vb); vb = CDR(vb)) {
                                     restore_gc(ctx, n);
@@ -634,10 +637,12 @@ namespace basecode::scm {
                             break;
 
                         case prim_type_t::and_:
+                            // XXX: FIXME
                             while (!IS_NIL(arg) && !IS_NIL(obj = EVAL_ARG()));
                             break;
 
                         case prim_type_t::or_:
+                            // XXX: FIXME
                             while (!IS_NIL(arg) && IS_NIL(obj = EVAL_ARG()));
                             break;
 
@@ -683,7 +688,8 @@ namespace basecode::scm {
                             break;
 
                         case prim_type_t::not_:
-                            res = make_bool(ctx, IS_NIL(EVAL_ARG()));
+                            va = EVAL_ARG();
+                            res = make_bool(ctx, IS_FALSE(va));
                             break;
 
                         case prim_type_t::is:
@@ -707,40 +713,68 @@ namespace basecode::scm {
                             break;
 
                         case prim_type_t::gt:
-                            NUM_CMP_OP(>);
+                            va  = EVAL_ARG();
+                            vb  = EVAL_ARG();
+                            res = make_bool(ctx, to_flonum(ctx, va) > to_flonum(ctx, vb));
                             break;
 
                         case prim_type_t::gte:
-                            NUM_CMP_OP(>=);
+                            va  = EVAL_ARG();
+                            vb  = EVAL_ARG();
+                            res = make_bool(ctx, to_flonum(ctx, va) >= to_flonum(ctx, vb));
                             break;
 
                         case prim_type_t::lt:
-                            NUM_CMP_OP(<);
+                            va  = EVAL_ARG();
+                            vb  = EVAL_ARG();
+                            res = make_bool(ctx, to_flonum(ctx, va) < to_flonum(ctx, vb));
                             break;
 
                         case prim_type_t::lte:
-                            NUM_CMP_OP(<=);
+                            va  = EVAL_ARG();
+                            vb  = EVAL_ARG();
+                            res = make_bool(ctx, to_flonum(ctx, va) <= to_flonum(ctx, vb));
                             break;
 
-                        case prim_type_t::add:
-                            ARITH_NUM_OP(+);
+                        case prim_type_t::add: {
+                            flonum_t x = to_flonum(ctx, EVAL_ARG());
+                            while (!IS_NIL(arg))
+                                x += to_flonum(ctx, EVAL_ARG());
+                            res = make_flonum(ctx, x);
                             break;
+                        }
 
-                        case prim_type_t::sub:
-                            ARITH_NUM_OP(-);
+                        case prim_type_t::sub: {
+                            flonum_t x = to_flonum(ctx, EVAL_ARG());
+                            while (!IS_NIL(arg))
+                                x -= to_flonum(ctx, EVAL_ARG());
+                            res = make_flonum(ctx, x);
                             break;
+                        }
 
-                        case prim_type_t::mul:
-                            ARITH_NUM_OP(*);
+                        case prim_type_t::mul: {
+                            flonum_t x = to_flonum(ctx, EVAL_ARG());
+                            while (!IS_NIL(arg))
+                                x *= to_flonum(ctx, EVAL_ARG());
+                            res = make_flonum(ctx, x);
                             break;
+                        }
 
-                        case prim_type_t::div:
-                            ARITH_NUM_OP(/);
+                        case prim_type_t::div: {
+                            flonum_t x = to_flonum(ctx, EVAL_ARG());
+                            while (!IS_NIL(arg))
+                                x /= to_flonum(ctx, EVAL_ARG());
+                            res = make_flonum(ctx, x);
                             break;
+                        }
 
-                        case prim_type_t::mod:
-                            ARITH_INT_OP(%);
+                        case prim_type_t::mod: {
+                            fixnum_t x = to_fixnum(ctx, EVAL_ARG());
+                            while (!IS_NIL(arg))
+                                x %= to_fixnum(ctx, EVAL_ARG());
+                            res = make_fixnum(ctx, x);
                             break;
+                        }
 
                         default:
                             break;
@@ -773,47 +807,56 @@ namespace basecode::scm {
                             continue;
                         }
                         switch (TYPE(va)) {
-                            case obj_type_t::nil: {
-                                if (param->value.type.cls == param_cls_t::int_)
-                                    ffi::push(ctx->ffi, false);
-                                else if (param->value.type.cls == param_cls_t::ptr)
-                                    ffi::push(ctx->ffi, va);
+                            case obj_type_t::nil:
+                                ffi::push(ctx->ffi, va);
                                 break;
-                            }
-                            case obj_type_t::ptr: {
+                            case obj_type_t::ptr:
                                 ffi::push(ctx->ffi, NATIVE_PTR(va));
                                 break;
-                            }
                             case obj_type_t::keyword: {
                                 va = CADR(va);
-                                auto s = string::interned::get_slice(INTEGER(va));
+                                auto s = string::interned::get_slice(STRING_ID(va));
                                 if (!s)
                                     error(ctx, "ffi: invalid interned string id for keyword");
                                 break;
                             }
-                            case obj_type_t::number: {
-                                auto a = param->value;
-                                if (a.type.cls == param_cls_t::float_) {
-                                    if (a.type.size == param_size_t::dword)
-                                        a.alias.fdw = NUMBER(va);
-                                    else if (a.type.size == param_size_t::qword)
-                                        a.alias.fdw = f64(NUMBER(va));
-                                } else {
-                                    a.alias.dw = u32(NUMBER(va));
+                            case obj_type_t::fixnum:
+                                switch (param->value.type.cls) {
+                                    case param_cls_t::int_:
+                                        ffi::push(ctx->ffi, FIXNUM(va));
+                                        break;
+                                    case param_cls_t::float_:
+                                        ffi::push(ctx->ffi, flonum_t(FIXNUM(va)));
+                                        break;
+                                    default:
+                                        error(ctx, "ffi: invalid float conversion");
                                 }
-                                ffi::push(ctx->ffi, a);
                                 break;
-                            }
+                            case obj_type_t::flonum:
+                                switch (param->value.type.cls) {
+                                    case param_cls_t::int_:
+                                        ffi::push(ctx->ffi, fixnum_t(FLONUM(va)));
+                                        break;
+                                    case param_cls_t::float_:
+                                        ffi::push(ctx->ffi, FLONUM(va));
+                                        break;
+                                    default:
+                                        error(ctx, "ffi: invalid float conversion");
+                                }
+                                break;
                             case obj_type_t::symbol:
                                 va = CADR(va);
                                 // N.B. fallthrough intentional
                             case obj_type_t::string: {
-                                auto s = string::interned::get_slice(INTEGER(va));
+                                auto s = string::interned::get_slice(STRING_ID(va));
                                 if (!s)
                                     error(ctx, "ffi: invalid interned string id");
                                 ffi::push(ctx->ffi, s);
                                 break;
                             }
+                            case obj_type_t::boolean:
+                                ffi::push(ctx->ffi, va == ctx->true_ ? true : false);
+                                break;
                             default: {
                                 switch (ffi_type_t(param->value.type.user)) {
                                     case ffi_type_t::context:
@@ -837,8 +880,10 @@ namespace basecode::scm {
                             res = !ret.p ? ctx->nil : (obj_t*) ret.p;
                             break;
                         case param_cls_t::int_:
+                            res = make_fixnum(ctx, ret.dw);
+                            break;
                         case param_cls_t::float_:
-                            res = make_number(ctx, ret.dw);
+                            res = make_flonum(ctx, ret.fdw);
                             break;
                         case param_cls_t::custom:
                             switch (ffi_type_t(ol->ret_type.user)) {
@@ -846,7 +891,7 @@ namespace basecode::scm {
                                     res = (obj_t*) ret.p;
                                     break;
                                 case ffi_type_t::boolean:
-                                    res = ret.b ? ctx->true_ : ctx->nil;
+                                    res = make_bool(ctx, ret.b);
                                     break;
                                 default:
                                     error(ctx, "ffi: invalid custom return type");
@@ -1012,13 +1057,24 @@ namespace basecode::scm {
 
         // init objects
         auto save = save_gc(ctx);
+        /* true */ {
+            ctx->true_ = make_object(ctx);
+            SET_TYPE(ctx->true_, obj_type_t::boolean);
+            SET_FIXNUM(ctx->true_, 1);
+            set(ctx, make_symbol(ctx, "#t", 2), ctx->true_);
+        }
+
+        /* false */ {
+            ctx->false_ = make_object(ctx);
+            SET_TYPE(ctx->false_, obj_type_t::boolean);
+            SET_FIXNUM(ctx->false_, 0);
+            set(ctx, make_symbol(ctx, "#f", 2), ctx->false_);
+        }
+
         ctx->rbrac  = make_object(ctx);
         ctx->rparen = make_object(ctx);
         ctx->dot    = make_symbol(ctx, ".", 1);
-        ctx->true_  = make_symbol(ctx, "#t", 2);
         set(ctx, ctx->dot, ctx->dot);
-        set(ctx, ctx->true_, ctx->true_);
-        set(ctx, make_symbol(ctx, "#f", 2), ctx->nil);
         set(ctx, make_symbol(ctx, "nil", 3), ctx->nil);
         restore_gc(ctx, save);
 
@@ -1100,10 +1156,10 @@ namespace basecode::scm {
                 return len;
             }
             case obj_type_t::string: {
-                auto str_rc = string::interned::get(INTEGER(obj));
-                if (!OK(str_rc.status))
+                auto rc = string::interned::get(STRING_ID(obj));
+                if (!OK(rc.status))
                     error(ctx, "unable to find interned string");
-                return str_rc.slice.length;
+                return rc.slice.length;
             }
             default:
                 break;
@@ -1154,13 +1210,8 @@ namespace basecode::scm {
         return read(ctx, read_fp, fp);
     }
 
-    u32 to_integer(ctx_t* ctx, obj_t* obj) {
-        return u32(NUMBER(check_type(ctx, obj, obj_type_t::number)));
-    }
-
     obj_t* make_bool(ctx_t* ctx, b8 value) {
-        UNUSED(ctx);
-        return value ? ctx->true_ : ctx->nil;
+        return value ? ctx->true_ : ctx->false_;
     }
 
     obj_type_t type(ctx_t* ctx, obj_t* obj) {
@@ -1169,7 +1220,11 @@ namespace basecode::scm {
     }
 
     u0* to_user_ptr(ctx_t* ctx, obj_t* obj) {
-        return ctx->native_ptrs[INTEGER(check_type(ctx, obj, obj_type_t::ptr))];
+        return ctx->native_ptrs[FIXNUM(check_type(ctx, obj, obj_type_t::ptr))];
+    }
+
+    obj_t* make_bool(ctx_t* ctx, obj_t* obj) {
+        return IS_TRUE(obj) ? ctx->true_ : ctx->false_;
     }
 
     u0 set(ctx_t* ctx, obj_t* sym, obj_t* v) {
@@ -1192,27 +1247,46 @@ namespace basecode::scm {
     obj_t* make_user_ptr(ctx_t* ctx, u0* ptr) {
         obj_t* obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::ptr);
-        SET_INTEGER(obj, ctx->native_ptr_idx);
+        SET_FIXNUM(obj, ctx->native_ptr_idx);
         NATIVE_PTR(obj) = ptr;
         ++ctx->native_ptr_idx;
         return obj;
     }
 
-    obj_t* make_number(ctx_t* ctx, number_t n) {
+    fixnum_t to_fixnum(ctx_t* ctx, obj_t* obj) {
+        numeric_alias_t a{.dw = obj->number.value};
+        if (TYPE(obj) == obj_type_t::fixnum)
+            return a.dw;
+        else
+            return fixnum_t(a.fdw);
+    }
+
+    obj_t* make_fixnum(ctx_t* ctx, fixnum_t n) {
         obj_t* obj  = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::number);
-        SET_NUMBER(obj, n);
+        SET_TYPE(obj, obj_type_t::fixnum);
+        SET_FIXNUM(obj, n);
         return obj;
     }
 
-    number_t to_number(ctx_t* ctx, obj_t* obj) {
-        return NUMBER(check_type(ctx, obj, obj_type_t::number));
+    obj_t* make_flonum(ctx_t* ctx, flonum_t n) {
+        obj_t* obj  = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::flonum);
+        SET_FLONUM(obj, n);
+        return obj;
+    }
+
+    flonum_t to_flonum(ctx_t* ctx, obj_t* obj) {
+        numeric_alias_t a{.dw = obj->number.value};
+        if (TYPE(obj) == obj_type_t::flonum)
+            return a.fdw;
+        else
+            return flonum_t(a.dw);
     }
 
     obj_t* make_ffi(ctx_t* ctx, proto_t* proto) {
         obj_t* obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::ffi);
-        SET_INTEGER(obj, ctx->native_ptr_idx);
+        SET_FIXNUM(obj, ctx->native_ptr_idx);
         NATIVE_PTR(obj) = proto;
         ++ctx->native_ptr_idx;
         return obj;
@@ -1270,29 +1344,29 @@ namespace basecode::scm {
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn) {
         obj_t* obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::cfunc);
-        SET_INTEGER(obj, ctx->native_ptr_idx);
+        SET_FIXNUM(obj, ctx->native_ptr_idx);
         NATIVE_PTR(obj) = (u0*) fn;
         ++ctx->native_ptr_idx;
         return obj;
     }
 
     obj_t* make_string(ctx_t* ctx, const s8* str, s32 len) {
-        auto intern_rc = string::interned::fold_for_result(str, len);
-        if (!OK(intern_rc.status))
+        auto rc = string::interned::fold_for_result(str, len);
+        if (!OK(rc.status))
             error(ctx, "make_string unable to intern string");
         obj_t* obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::string);
-        SET_INTEGER(obj, intern_rc.id);
+        SET_FIXNUM(obj, rc.id);
         return obj;
     }
 
     obj_t* find_symbol(ctx_t* ctx, const s8* name, s32 len) {
-        const auto name_rc = string::interned::fold_for_result(name, len);
-        if (!OK(name_rc.status))
+        const auto rc = string::interned::fold_for_result(name, len);
+        if (!OK(rc.status))
             error(ctx, "find_symbol unable to intern string");
         for (obj_t* obj = ctx->sym_list; !IS_NIL(obj); obj = CDR(obj)) {
             auto str = CAR(CDR(CAR(obj)));
-            if (str_eq(str, name_rc.id))
+            if (str_eq(ctx, str, rc.id))
                 return CAR(obj);
         }
         return ctx->nil;
@@ -1336,8 +1410,12 @@ namespace basecode::scm {
             case obj_type_t::nil:
                 return write_str(ctx, fn, udata, "nil");
 
-            case obj_type_t::number:
-                sprintf(buf, "%.7g", NUMBER(obj));
+            case obj_type_t::fixnum:
+                sprintf(buf, "%d", FIXNUM(obj));
+                return write_str(ctx, fn, udata, buf);
+
+            case obj_type_t::flonum:
+                sprintf(buf, "%.7g", FLONUM(obj));
                 return write_str(ctx, fn, udata, buf);
 
             case obj_type_t::pair: {
@@ -1368,7 +1446,8 @@ namespace basecode::scm {
                 if (qt) {
                     fn(ctx, udata, '"');
                 }
-                auto intern_rc = string::interned::get(INTEGER(obj));
+                auto id = STRING_ID(obj);
+                auto intern_rc = string::interned::get(id);
                 if (!OK(intern_rc.status)) {
                     error(ctx, "unable to find interned string");
                 }
@@ -1379,12 +1458,8 @@ namespace basecode::scm {
                 return len + 2;
             }
 
-            case obj_type_t::prim:
-                if (obj == ctx->true_) {
-                    write_str(ctx, fn, udata, "#t");
-                    break;
-                }
-                // N.B. fallthrough intentional
+            case obj_type_t::boolean:
+                return write_str(ctx, fn, udata, obj == ctx->true_ ? "#t" : "#f");
 
             default:
                 sprintf(buf,

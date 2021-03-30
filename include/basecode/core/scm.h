@@ -33,7 +33,8 @@ namespace basecode::scm {
     struct obj_t;
     struct ctx_t;
 
-    using number_t              = f32;
+    using fixnum_t              = u32;
+    using flonum_t              = f32;
 
     using read_func_t           = s8 (*)(ctx_t*, u0*);
     using error_func_t          = u0 (*)(ctx_t*, const s8*, obj_t*);
@@ -57,7 +58,8 @@ namespace basecode::scm {
         pair,
         free,
         nil,
-        number,
+        fixnum,
+        flonum,
         symbol,
         string,
         func,
@@ -65,6 +67,7 @@ namespace basecode::scm {
         prim,
         cfunc,
         ptr,
+        boolean,
         keyword,
         ffi
     };
@@ -107,11 +110,11 @@ namespace basecode::scm {
 
     obj_t* make_bool(ctx_t* ctx, b8 value);
 
-    u32 to_integer(ctx_t* ctx, obj_t* obj);
-
     u0* to_user_ptr(ctx_t* ctx, obj_t* obj);
 
     obj_type_t type(ctx_t* ctx, obj_t* obj);
+
+    obj_t* make_bool(ctx_t* ctx, obj_t* obj);
 
     u0 set(ctx_t* ctx, obj_t* sym, obj_t* v);
 
@@ -119,9 +122,13 @@ namespace basecode::scm {
 
     obj_t* make_user_ptr(ctx_t* ctx, u0* ptr);
 
-    number_t to_number(ctx_t* ctx, obj_t* obj);
+    flonum_t to_flonum(ctx_t* ctx, obj_t* obj);
 
-    obj_t* make_number(ctx_t* ctx, number_t n);
+    obj_t* make_fixnum(ctx_t* ctx, fixnum_t n);
+
+    obj_t* make_flonum(ctx_t* ctx, flonum_t n);
+
+    fixnum_t to_fixnum(ctx_t* ctx, obj_t* obj);
 
     obj_t* make_ffi(ctx_t* ctx, proto_t* proto);
 

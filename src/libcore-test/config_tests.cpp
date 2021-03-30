@@ -28,9 +28,9 @@ static u0 validate_cvar(scm::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
     auto binding = scm::get(ctx, scm::make_symbol(ctx, name), scm::nil(ctx));
     auto cvar_value = scm::cdr(ctx, binding);
     if (expected) {
-        if (scm::type(ctx, cvar_value) != scm::obj_type_t::number)
+        if (scm::type(ctx, cvar_value) != scm::obj_type_t::flonum)
             REQUIRE(false);
-        auto native_value = u32(scm::to_number(ctx, cvar_value));
+        auto native_value = u32(scm::to_flonum(ctx, cvar_value));
         if (native_value != id)
             REQUIRE(false);
     } else {
@@ -51,7 +51,7 @@ static u0 validate_cvar(scm::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
     if (expected) {
         if (buf != "#t") REQUIRE(false);
     } else {
-        if (buf != "nil") REQUIRE(false);
+        if (buf != "#f") REQUIRE(false);
     }
 }
 
@@ -133,9 +133,9 @@ TEST_CASE("basecode::config terp eval") {
     config::eval(source, &obj);
     if (!obj)
         REQUIRE(false);
-    if (scm::type(ctx, obj) != scm::obj_type_t::number)
+    if (scm::type(ctx, obj) != scm::obj_type_t::flonum)
         REQUIRE(false);
-    auto value = scm::to_number(ctx, obj);
+    auto value = scm::to_flonum(ctx, obj);
     if (value != 50)
         REQUIRE(false);
     );

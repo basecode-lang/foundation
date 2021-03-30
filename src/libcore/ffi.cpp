@@ -219,6 +219,10 @@ namespace basecode::ffi {
 
         u0 append(overload_t* overload, param_t* param) {
             array::append(overload->params, param);
+            if (param->is_rest)
+                overload->has_rest = true;
+            if (!param->has_dft)
+                ++overload->req_count;
         }
 
         overload_t* make(str::slice_t symbol, param_type_t ret_type, u0* func) {
