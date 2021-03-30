@@ -259,13 +259,6 @@ namespace basecode::scm {
         return obj;
     }
 
-    static b8 str_eq(ctx_t* ctx, obj_t* obj, u32 str_id) {
-        auto obj_rc = string::interned::get(STRING_ID(obj));
-        if (!OK(obj_rc.status))
-            return false;
-        return obj_rc.id == str_id;
-    }
-
     static s8 read_fp(ctx_t* ctx, u0* udata) {
         s32 chr;
         UNUSED(ctx);
@@ -333,6 +326,13 @@ namespace basecode::scm {
             *x->p++ = chr;
             x->n--;
         }
+    }
+
+    static b8 str_eq(ctx_t* ctx, obj_t* obj, u32 str_id) {
+        auto obj_rc = string::interned::get(STRING_ID(obj));
+        if (!OK(obj_rc.status))
+            return false;
+        return obj_rc.id == str_id;
     }
 
     static obj_t* read_(ctx_t* ctx, read_func_t fn, u0* udata) {
@@ -637,12 +637,11 @@ namespace basecode::scm {
                             break;
 
                         case prim_type_t::and_:
-                            // XXX: FIXME
-                            while (!IS_NIL(arg) && !IS_NIL(obj = EVAL_ARG()));
+                            obj = ctx->nil;
+                            for (; !IS_NIL(arg) && !IS_NIL(va = EVAL_ARG()); obj = va);
                             break;
 
                         case prim_type_t::or_:
-                            // XXX: FIXME
                             while (!IS_NIL(arg) && IS_NIL(obj = EVAL_ARG()));
                             break;
 

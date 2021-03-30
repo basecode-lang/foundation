@@ -289,11 +289,13 @@
 
         ; basic assertions around scheme terp
         (test-suite "scheme terp basic assertions"
-            (assert '(is 5 (length '(1 2 3 4 5))))
-            (assert '(is 2 2))
-            (assert '(not (> 2 9)))
-            (assert '(>= 2 2))
-            (assert '(is (mod 10 2) 0))
+            (assert '(is    15  (and 3 5 15)))
+            (assert '(is    2   (or nil 2 nil 4 nil 6)))
+            (assert '(is    5   (length '(1 2 3 4 5))))
+            (assert '(is    2   2))
+            (assert '(not   (> 2 9)))
+            (assert '(>=    2   2))
+            (assert '(is        (mod 10 2) 0))
             (assert '(is        '(10 20)
                                 (do
                                     (let a 10)
