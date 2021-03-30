@@ -143,9 +143,18 @@ namespace basecode::ffi {
 
     namespace proto {
         u0 free(proto_t* proto) {
-            for (auto overload : proto->overloads)
-                overload::free(overload);
-            array::free(proto->overloads);
+            using Pair_Array = typename overload_symtab_t::Pair_Array;
+
+//            Pair_Array pairs{};
+//            assoc_array::init(pairs, g_ffi_system.alloc);
+//            symtab::find_prefix(proto->overloads, pairs);
+//            for (u32 i = 0; i < pairs.size; ++i) {
+//                auto pair = pairs[i];
+//                overload::free(pair.value->overload);
+//                stable_array::erase(g_ffi_system.overload_slab, pair.value->idx - 1);
+//            }
+
+            symtab::free(proto->overloads);
         }
 
         b8 remove(str::slice_t symbol) {
@@ -175,7 +184,7 @@ namespace basecode::ffi {
                 new_pair->proto = proto;
                 proto->lib      = lib;
                 proto->name     = symbol;
-                array::init(proto->overloads, g_ffi_system.alloc);
+                symtab::init(proto->overloads, g_ffi_system.alloc);
                 return proto;
             }
             return nullptr;
@@ -188,8 +197,17 @@ namespace basecode::ffi {
                     return status;
             }
             ol->proto = proto;
-            array::append(proto->overloads, ol);
+            auto key = slice::make(ol->key, ol->key_len);
+            if (!symtab::insert(proto->overloads, key, ol))
+                return status_t::duplicate_overload;
             return status_t::ok;
+        }
+
+        overload_t* match_signature(proto_t* proto, const u8* buf, u32 len) {
+            overload_t* ol{};
+            if (!symtab::find(proto->overloads, slice::make(buf, len), ol))
+                return nullptr;
+            return ol;
         }
     }
 
@@ -203,8 +221,10 @@ namespace basecode::ffi {
         b8 remove(str::slice_t symbol) {
             overload_pair_t pair{};
             if (symtab::find(g_ffi_system.overloads, symbol, pair)) {
-                array::erase(pair.overload->proto->overloads, pair.overload);
-                overload::free(pair.overload);
+                auto ol = pair.overload;
+                auto key = slice::make(ol->key, ol->key_len);
+                symtab::remove(ol->proto->overloads, key);
+                overload::free(ol);
                 stable_array::erase(g_ffi_system.overload_slab, pair.idx - 1);
                 symtab::remove(g_ffi_system.overloads, symbol);
                 return true;
@@ -217,12 +237,17 @@ namespace basecode::ffi {
             return symtab::find(g_ffi_system.overloads, symbol, pair) ? pair.overload : nullptr;
         }
 
-        u0 append(overload_t* overload, param_t* param) {
+        status_t append(overload_t* overload, param_t* param) {
             array::append(overload->params, param);
+            if (overload->key_len > 14)
+                return status_t::parameter_overflow;
+            overload->key[overload->key_len++] = u8(param->value.type.cls);
+            overload->key[overload->key_len++] = u8(param->value.type.size);
             if (param->is_rest)
                 overload->has_rest = true;
             if (!param->has_dft)
                 ++overload->req_count;
+            return status_t::ok;
         }
 
         overload_t* make(str::slice_t symbol, param_type_t ret_type, u0* func) {

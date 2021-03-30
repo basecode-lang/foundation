@@ -26,7 +26,6 @@
 #include <basecode/core/memory.h>
 #include <basecode/core/assoc_array.h>
 
-//#define GET_NODE(t, id)         (id == 0 || id > t.nodes.size ? nullptr : &t.nodes[id - 1])
 #define GET_NODE(t, id)         (&((t).nodes[(id) - 1]))
 
 namespace basecode {
@@ -46,6 +45,7 @@ namespace basecode {
     concept Symbol_Table = requires(const T& t) {
         typename                T::Value_Type;
         typename                T::Pair_Array;
+
         {t.alloc}               -> same_as<alloc_t*>;
         {t.nodes}               -> same_as<array_t<symtab_node_t>>;
         {t.values}              -> same_as<array_t<typename T::Value_Type>>;
@@ -73,43 +73,59 @@ namespace basecode {
     } __attribute__((aligned(32)));
 
     namespace symtab {
-        u0 free(Symbol_Table auto& table);
+        template <Symbol_Table T>
+        u0 free(T& table);
 
-        u0 clear(Symbol_Table auto& table);
+        template <Symbol_Table T>
+        u0 clear(T& table);
 
-        u0 reset(Symbol_Table auto& table);
+        template <Symbol_Table T>
+        u0 reset(T& table);
 
-        b8 has_children(const Symbol_Table auto& table,
+        template <Symbol_Table T>
+        b8 has_children(const T& table,
                         const symtab_node_t* node,
                         const symtab_node_t* end_node = {});
 
-        inline u32 append_node(Symbol_Table auto& table,
+        template <Symbol_Table T>
+        inline u32 append_node(T& table,
                                u8 sym = 0,
                                u32 next = 0,
                                u32 child = 0,
                                u8 type = empty);
 
-        u0 reserve(Symbol_Table auto& table, u32 capacity);
+        template <Symbol_Table T>
+        u0 reserve(T& table, u32 capacity);
 
-        u0 init(Symbol_Table auto& table, alloc_t* alloc = context::top()->alloc);
+        template <Symbol_Table T>
+        u0 init(T& table, alloc_t* alloc = context::top()->alloc);
 
-        b8 find_level_node(const Symbol_Table auto& table, find_level_result_t& r, u8 sym);
+        template <Symbol_Table T>
+        b8 find_level_node(const T& table, find_level_result_t& r, u8 sym);
 
-        const symtab_node_t* find_node(const Symbol_Table auto& table, str::slice_t prefix);
+        template <Symbol_Table T>
+        const symtab_node_t* find_node(const T& table, str::slice_t prefix);
 
-        b8 insert_key(Symbol_Table auto& table, str::slice_t key, symtab_node_t** leaf_node);
+        template <Symbol_Table T>
+        b8 insert_key(T& table, str::slice_t key, symtab_node_t** leaf_node);
 
-        template <typename T> requires Symbol_Table<T>
-        u0 find_prefix(const T& table, typename T::Pair_Array& pairs, str::slice_t prefix = {});
+        template <Symbol_Table T,
+                  typename Pair_Array = typename T::Pair_Array>
+        u0 find_prefix(const T& table, Pair_Array& pairs, str::slice_t prefix = {});
 
-        template <typename T> requires Symbol_Table<T>
-        u0 walk(const T& table, const symtab_node_t* node, str_t& key, typename T::Pair_Array& pairs);
+        template <Symbol_Table T,
+                  typename Pair_Array = typename T::Pair_Array,
+                  b8 Is_Pointer = std::is_pointer_v<typename T::Value_Type>,
+                  typename Bare_Value_Type = std::remove_pointer_t<typename T::Value_Type>>
+        u0 walk(const T& table, const symtab_node_t* node, str_t& key, Pair_Array& pairs);
 
-        u0 free(Symbol_Table auto& table) {
+        template <Symbol_Table T>
+        u0 free(T& table) {
             clear(table);
         }
 
-        u0 reset(Symbol_Table auto& table) {
+        template <Symbol_Table T>
+        u0 reset(T& table) {
             table.size = {};
             for (auto& node : table.nodes) {
                 node.sym  = {};
@@ -118,13 +134,15 @@ namespace basecode {
             array::reset(table.values);
         }
 
-        u0 clear(Symbol_Table auto& table) {
+        template <Symbol_Table T>
+        u0 clear(T& table) {
             array::free(table.nodes);
             array::free(table.values);
             table.size = {};
         }
 
-        b8 has_children(const Symbol_Table auto& table,
+        template <Symbol_Table T>
+        b8 has_children(const T& table,
                         const symtab_node_t* node,
                         const symtab_node_t* end_node) {
             while (true) {
@@ -142,7 +160,8 @@ namespace basecode {
             }
         }
 
-        u0 format_nodes(const Symbol_Table auto& table) {
+        template <Symbol_Table T>
+        u0 format_nodes(const T& table) {
             u32 n = 1;
             format::print("symtab: size = {}, nodes.size = {}, values.size = {}\n",
                           table.size,
@@ -161,7 +180,8 @@ namespace basecode {
             }
         }
 
-        u0 init(Symbol_Table auto& table, alloc_t* alloc) {
+        template <Symbol_Table T>
+        u0 init(T& table, alloc_t* alloc) {
             table.size  = {};
             table.alloc = alloc;
             array::init(table.nodes, table.alloc);
@@ -169,12 +189,14 @@ namespace basecode {
             append_node(table, 0, 0, 0, empty);
         }
 
-        u0 reserve(Symbol_Table auto& table, u32 capacity) {
+        template <Symbol_Table T>
+        u0 reserve(T& table, u32 capacity) {
             array::reserve(table.nodes, capacity);
             array::reserve(table.values, capacity);
         }
 
-        b8 remove(Symbol_Table auto& table, str::slice_t prefix) {
+        template <Symbol_Table T>
+        b8 remove(T& table, str::slice_t prefix) {
             symtab_node_t* node;
             u32 prefix_nodes[table.nodes.size];
             u32 prefix_count{};
@@ -217,20 +239,9 @@ namespace basecode {
             return false;
         }
 
-        template <typename T> requires Symbol_Table<T>
-        u0 format_pairs(const T& table, str::slice_t prefix = {}) {
-            typename T::Pair_Array pairs{};
-            assoc_array::init(pairs);
-            find_prefix(table, pairs, prefix);
-            defer(assoc_array::free(pairs));
-            for (u32 i = 0; i < pairs.size; ++i) {
-                auto pair = pairs[i];
-                format::print("{:<20}: {}\n", pair.key, *pair.value);
-            }
-        }
-
-        template <typename T> requires Symbol_Table<T>
-        b8 insert(T& table, str::slice_t key, typename T::Value_Type& value) {
+        template <Symbol_Table T,
+                  typename Value_Type = typename T::Value_Type>
+        b8 insert(T& table, str::slice_t key, Value_Type& value) {
             symtab_node_t* leaf_node{};
             if (!insert_key(table, key, &leaf_node))
                 return false;
@@ -241,8 +252,22 @@ namespace basecode {
             return true;
         }
 
-        template <typename T> requires Symbol_Table<T>
-        b8 emplace(T& table, str::slice_t key, typename T::Value_Type** value) {
+        template <Symbol_Table T,
+                  typename Pair_Array = typename T::Pair_Array>
+        u0 format_pairs(const T& table, str::slice_t prefix = {}) {
+            Pair_Array pairs{};
+            assoc_array::init(pairs);
+            find_prefix(table, pairs, prefix);
+            defer(assoc_array::free(pairs));
+            for (u32 i = 0; i < pairs.size; ++i) {
+                auto pair = pairs[i];
+                format::print("{:<20}: {}\n", pair.key, *pair.value);
+            }
+        }
+
+        template <Symbol_Table T,
+                  typename Value_Type = typename T::Value_Type>
+        b8 emplace(T& table, str::slice_t key, Value_Type** value) {
             if (!value)
                 return false;
             symtab_node_t* leaf_node{};
@@ -255,8 +280,9 @@ namespace basecode {
             return true;
         }
 
-        template <typename T> requires Symbol_Table<T>
-        b8 find(const T& table, str::slice_t key, typename T::Value_Type& value) {
+        template <Symbol_Table T,
+                  typename Value_Type = typename T::Value_Type>
+        b8 find(const T& table, str::slice_t key, Value_Type& value) {
             u32 next_node_id = 1;
             const symtab_node_t* level{};
             for (u32 i = 0; i < key.length; ++i) {
@@ -279,8 +305,9 @@ namespace basecode {
             return true;
         }
 
-        template <typename T> requires Symbol_Table<T>
-        b8 insert(T& table, str::slice_t key, const typename T::Value_Type& value) {
+        template <Symbol_Table T,
+                  typename Value_Type = typename T::Value_Type>
+        b8 insert(T& table, str::slice_t key, const Value_Type& value) {
             symtab_node_t* leaf_node{};
             if (!insert_key(table, key, &leaf_node))
                 return false;
@@ -291,7 +318,8 @@ namespace basecode {
             return true;
         }
 
-        b8 find_level_node(const Symbol_Table auto& table, find_level_result_t& r, u8 sym) {
+        template <Symbol_Table T>
+        b8 find_level_node(const T& table, find_level_result_t& r, u8 sym) {
             const symtab_node_t* curr_node = r.start_node;
             auto curr_id = r.node_id;
             r.avail_node = r.match_node = {};
@@ -311,7 +339,8 @@ namespace basecode {
             return false;
         }
 
-        const symtab_node_t* find_node(const Symbol_Table auto& table, str::slice_t prefix) {
+        template <Symbol_Table T>
+        const symtab_node_t* find_node(const T& table, str::slice_t prefix) {
             u32 next_node_id = 1;
             for (u32 i = 0; i < prefix.length; ++i) {
                 auto node = GET_NODE(table, next_node_id);
@@ -328,24 +357,8 @@ namespace basecode {
             return GET_NODE(table, next_node_id);
         }
 
-        template <typename T> requires Symbol_Table<T>
-        u0 find_prefix(const T& table, typename T::Pair_Array& pairs, str::slice_t prefix) {
-            str_t key{};
-            str::init(key, table.alloc);
-            str::reserve(key, 32);
-            defer(str::free(key));
-            if (!slice::empty(prefix)) {
-                auto node = find_node(table, prefix);
-                if (node) {
-                    str::append(key, prefix);
-                    walk(table, node, key, pairs);
-                }
-            } else {
-                walk(table, GET_NODE(table, 1), key, pairs);
-            }
-        }
-
-        b8 insert_key(Symbol_Table auto& table, str::slice_t key, symtab_node_t** leaf_node) {
+        template <Symbol_Table T>
+        b8 insert_key(T& table, str::slice_t key, symtab_node_t** leaf_node) {
             if (!leaf_node || key.length == 0)
                 return false;
             u32 next_node_id = 1;
@@ -397,7 +410,25 @@ namespace basecode {
             return node->type != leaf;
         }
 
-        inline u32 append_node(Symbol_Table auto& table, u8 sym, u32 next, u32 child, u8 type) {
+        template <Symbol_Table T, typename Pair_Array>
+        u0 find_prefix(const T& table, Pair_Array& pairs, str::slice_t prefix) {
+            str_t key{};
+            str::init(key, table.alloc);
+            str::reserve(key, 32);
+            defer(str::free(key));
+            if (!slice::empty(prefix)) {
+                auto node = find_node(table, prefix);
+                if (node) {
+                    str::append(key, prefix);
+                    walk(table, node, key, pairs);
+                }
+            } else {
+                walk(table, GET_NODE(table, 1), key, pairs);
+            }
+        }
+
+        template <Symbol_Table T>
+        inline u32 append_node(T& table, u8 sym, u32 next, u32 child, u8 type) {
             auto& node = array::append(table.nodes);
             node.sym   = sym;
             node.type  = type;
@@ -406,14 +437,15 @@ namespace basecode {
             return table.nodes.size;
         }
 
-        template <typename T> requires Symbol_Table<T>
-        u0 walk(const T& table, const symtab_node_t* node, str_t& key, typename T::Pair_Array& pairs) {
-            using Bare_Value_Type = std::remove_pointer_t<typename T::Value_Type>;
-
+        template <Symbol_Table T,
+                  typename Pair_Array,
+                   b8 Is_Pointer,
+                  typename Bare_Value_Type>
+        u0 walk(const T& table, const symtab_node_t* node, str_t& key, Pair_Array& pairs) {
             while (true) {
                 str::append(key, node->sym);
                 if (node->type == leaf) {
-                    if constexpr (std::is_pointer_v<typename T::Value_Type>) {
+                    if constexpr (Is_Pointer) {
                         assoc_array::append(pairs,
                                             key,
                                             (Bare_Value_Type*) table.values[node->value - 1]);

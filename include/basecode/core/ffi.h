@@ -33,6 +33,7 @@ namespace basecode {
     using param_array_t         = array_t<param_t*>;
     using symbol_array_t        = assoc_array_t<u0*>;
     using overload_array_t      = array_t<overload_t*>;
+    using overload_symtab_t     = symtab_t<overload_t*>;
     using param_value_array_t   = array_t<param_value_t>;
 
     struct lib_t final {
@@ -48,25 +49,25 @@ namespace basecode {
     };
 
     enum class param_cls_t : u8 {
-        ptr                     = 1,
-        int_,
-        float_,
-        custom,
-        struct_,
+        ptr                     = 'P',
+        int_                    = 'I',
+        float_                  = 'F',
+        custom                  = 'C',
+        struct_                 = 'S',
     };
 
     enum class param_size_t : u8 {
-        none,
-        byte,
-        word,
-        dword,
-        qword,
+        none                    = '-',
+        byte                    = 'b',
+        word                    = 'w',
+        dword                   = 'd',
+        qword                   = 'q',
     };
 
     struct param_type_t final {
-        s32                     user;
         param_cls_t             cls;
         param_size_t            size;
+        u8                      user;
     };
 
     union param_alias_t final {
@@ -96,9 +97,11 @@ namespace basecode {
     struct overload_t final {
         proto_t*                proto;
         u0*                     func;
+        u8                      key[16];
         str::slice_t            name;
         param_array_t           params;
         param_type_t            ret_type;
+        u32                     key_len;
         u32                     req_count;
         b8                      has_rest;
         call_mode_t             mode;
@@ -107,7 +110,7 @@ namespace basecode {
     struct proto_t final {
         lib_t*                  lib;
         str::slice_t            name;
-        overload_array_t        overloads;
+        overload_symtab_t       overloads;
     };
 
     struct ffi_t final {
@@ -125,6 +128,8 @@ namespace basecode {
             symbol_not_found                    = 111,
             invalid_int_size                    = 112,
             invalid_float_size                  = 113,
+            parameter_overflow                  = 117,
+            duplicate_overload                  = 116,
             load_library_failure                = 114,
             struct_by_value_not_implemented     = 115,
         };
@@ -155,8 +160,8 @@ namespace basecode {
 
             inline param_type_t make_type(param_cls_t cls,
                                           param_size_t size,
-                                          s32 user = 0) {
-                return param_type_t{.user = user, .cls = cls, .size = size};
+                                          u8 user = 0) {
+                return param_type_t{.cls = cls, .size = size, .user = user};
             }
         }
 
@@ -170,6 +175,8 @@ namespace basecode {
             status_t append(proto_t* proto, overload_t* ol);
 
             proto_t* make(str::slice_t symbol, lib_t* lib = {});
+
+            overload_t* match_signature(proto_t* proto, const u8* buf, u32 len);
         }
 
         namespace overload {
@@ -179,7 +186,7 @@ namespace basecode {
 
             overload_t* find(str::slice_t symbol);
 
-            u0 append(overload_t* ol, param_t* param);
+            status_t append(overload_t* ol, param_t* param);
 
             overload_t* make(str::slice_t symbol, param_type_t ret_type, u0* func = {});
         }

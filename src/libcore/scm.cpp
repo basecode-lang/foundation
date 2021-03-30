@@ -537,6 +537,32 @@ namespace basecode::scm {
         return obj;
     }
 
+    struct ffi_type_map_t final {
+        u8                      type;
+        u8                      size;
+    } __attribute__((aligned(2)));
+
+    static u32 make_ffi_signature(ctx_t* ctx, obj_t* args, u8* buf) {
+        static ffi_type_map_t s_types[] = {
+            [u32(obj_type_t::pair)]     = ffi_type_map_t{.type = 'P', .size = 'q'},
+            [u32(obj_type_t::nil)]      = ffi_type_map_t{.type = 'P', .size = 'q'},
+            [u32(obj_type_t::fixnum)]   = ffi_type_map_t{.type = 'I', .size = 'd'},
+            [u32(obj_type_t::flonum)]   = ffi_type_map_t{.type = 'F', .size = 'd'},
+            [u32(obj_type_t::symbol)]   = ffi_type_map_t{.type = 'P', .size = 'q'},
+            [u32(obj_type_t::string)]   = ffi_type_map_t{.type = 'P', .size = 'q'},
+            [u32(obj_type_t::boolean)]  = ffi_type_map_t{.type = 'I', .size = 'b'},
+        };
+
+        u32 len{};
+        while (!IS_NIL(args)) {
+            const auto& mapping = s_types[u32(TYPE(CAR(args)))];
+            buf[len++] = mapping.type;
+            buf[len++] = mapping.size;
+            args = CDR(args);
+        }
+        return len;
+    }
+
     static obj_t* eval(ctx_t* ctx, obj_t* obj, obj_t* env, obj_t** new_env) {
         obj_t* fn   {};
         obj_t* kar  {};
@@ -545,6 +571,7 @@ namespace basecode::scm {
         obj_t* va   {};
         obj_t* vb   {};
         obj_t* cl   {};
+        u8          buf[16]{};
         u32    n    {};
         u32    gc   {save_gc(ctx)};
 
@@ -782,9 +809,9 @@ namespace basecode::scm {
 
                 case obj_type_t::ffi: {
                     auto proto = (proto_t*) NATIVE_PTR(fn);
-                    if (array::empty(proto->overloads))
-                        error(ctx, "ffi: proto has no overloads");
-                    auto ol = proto->overloads[0];
+                    auto ol = ffi::proto::match_signature(proto, buf, make_ffi_signature(ctx, arg, buf));
+                    if (!ol)
+                        error(ctx, "ffi: no matching overload for function");
                     ffi::reset(ctx->ffi);
                     n = 0;
                     while (!IS_NIL(arg)) {
