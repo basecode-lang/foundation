@@ -382,9 +382,10 @@
             (logger-append-child parent-logger rotating-file-logger)
             (logger-append-child parent-logger syslog-logger)
 
-            (log-info "example log message!")
-            (log-warn "oh, shit!")
-            (log-error "this should really stick out")))))
+;            (log-info "example log message!")
+;            (log-warn "oh, shit!")
+;            (log-error "this should really stick out")
+            ))))
 
 (if (cvar-ref *test-runner*)
     (do

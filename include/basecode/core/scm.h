@@ -49,6 +49,7 @@ namespace basecode::scm {
 
     enum class ffi_type_t : u8 {
         none                    = 0,
+        list                    = 'L',
         string                  = 'S',
         object                  = 'O',
         context                 = 'C',

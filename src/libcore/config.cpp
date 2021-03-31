@@ -114,6 +114,27 @@ namespace basecode::config {
         {nullptr,       0},
     };
 
+    static scm::obj_t* current_user() {
+        return scm::make_user_ptr(g_cfg_sys.ctx, context::top()->user);
+    }
+
+    static scm::obj_t* current_alloc() {
+        return scm::make_user_ptr(g_cfg_sys.ctx, context::top()->alloc);
+    }
+
+    static scm::obj_t* current_logger() {
+        return scm::make_user_ptr(g_cfg_sys.ctx, context::top()->logger);
+    }
+
+    static scm::obj_t* current_command_line() {
+        const auto argc = context::top()->argc;
+        const auto argv = context::top()->argv;
+        scm::obj_t* objs[argc];
+        for (u32 i = 0; i < argc; ++i)
+            objs[i] = scm::make_string(g_cfg_sys.ctx, argv[i]);
+        return scm::make_list(g_cfg_sys.ctx, &objs[0], argc);
+    }
+
     static s32 find_log_level(const str_t& name) {
         for (u32 i = 0; s_log_level_map[i].name != nullptr; ++i) {
             if (name == s_log_level_map[i].name)
@@ -180,22 +201,19 @@ namespace basecode::config {
         return pos;
     }
 
-    static const s8* vlog(scm::ctx_t* ctx, scm::obj_t* arg) {
+    static const s8* vlog(str::slice_t fmt_str, scm::obj_t* arg) {
         using fmt_ctx = fmt::format_context;
         using fmt_arg = fmt::basic_format_arg<fmt_ctx>;
-
-        auto fmt_str_arg = to_str(ctx, scm::next_arg(ctx, &arg));
-        const auto fmt_str = (const s8*) string::interned::fold(fmt_str_arg).data;
 
         str_array_t strs{};
         str_array::init(strs, g_cfg_sys.alloc);
         defer(str_array::free(strs));
 
         while (true) {
-            auto obj = scm::next_arg_no_chk(ctx, &arg);
-            if (scm::type(ctx, obj) == scm::obj_type_t::nil)
+            auto obj = scm::next_arg_no_chk(g_cfg_sys.ctx, &arg);
+            if (scm::type(g_cfg_sys.ctx, obj) == scm::obj_type_t::nil)
                 break;
-            str_array::append(strs, to_str(ctx, obj));
+            str_array::append(strs, to_str(g_cfg_sys.ctx, obj));
         }
 
         array_t<fmt_arg> args{};
@@ -209,7 +227,7 @@ namespace basecode::config {
         str::reset(buf); {
             str_buf_t str_buf{&buf};
             fmt::vformat_to(str_buf,
-                            fmt_str,
+                            (std::string_view) fmt_str,
                             fmt::basic_format_args<fmt_ctx>(args.data, args.size));
         }
 
@@ -271,54 +289,36 @@ namespace basecode::config {
         return true;
     }
 
-    static scm::obj_t* log_warn(scm::ctx_t* ctx, scm::obj_t* arg) {
-        log::warn(vlog(ctx, arg));
-        return scm::nil(ctx);
+    static u0 log_warn(str::slice_t* fmt_msg, scm::obj_t* rest) {
+        log::warn(vlog(*fmt_msg, rest));
     }
 
-    static scm::obj_t* log_info(scm::ctx_t* ctx, scm::obj_t* arg) {
-        log::info(vlog(ctx, arg));
-        return scm::nil(ctx);
+    static u0 log_info(str::slice_t* fmt_msg, scm::obj_t* rest) {
+        log::info(vlog(*fmt_msg, rest));
     }
 
-    static scm::obj_t* log_alert(scm::ctx_t* ctx, scm::obj_t* arg) {
-        log::alert(vlog(ctx, arg));
-        return scm::nil(ctx);
+    static u0 log_alert(str::slice_t* fmt_msg, scm::obj_t* rest) {
+        log::alert(vlog(*fmt_msg, rest));
     }
 
-    static scm::obj_t* log_debug(scm::ctx_t* ctx, scm::obj_t* arg) {
-        log::debug(vlog(ctx, arg));
-        return scm::nil(ctx);
+    static u0 log_debug(str::slice_t* fmt_msg, scm::obj_t* rest) {
+        log::debug(vlog(*fmt_msg, rest));
     }
 
-    static scm::obj_t* log_error(scm::ctx_t* ctx, scm::obj_t* arg) {
-        log::error(vlog(ctx, arg));
-        return scm::nil(ctx);
+    static u0 log_error(str::slice_t* fmt_msg, scm::obj_t* rest) {
+        log::error(vlog(*fmt_msg, rest));
     }
 
-    static scm::obj_t* log_notice(scm::ctx_t* ctx, scm::obj_t* arg) {
-        log::notice(vlog(ctx, arg));
-        return scm::nil(ctx);
+    static u0 log_notice(str::slice_t* fmt_msg, scm::obj_t* rest) {
+        log::notice(vlog(*fmt_msg, rest));
     }
 
-    static scm::obj_t* current_user(scm::ctx_t* ctx, scm::obj_t* arg) {
-        UNUSED(arg);
-        return scm::make_user_ptr(ctx, context::top()->user);
+    static u0 log_critical(str::slice_t* fmt_msg, scm::obj_t* rest) {
+        log::critical(vlog(*fmt_msg, rest));
     }
 
-    static scm::obj_t* log_critical(scm::ctx_t* ctx, scm::obj_t* arg) {
-        log::critical(vlog(ctx, arg));
-        return scm::nil(ctx);
-    }
-
-    static scm::obj_t* log_emergency(scm::ctx_t* ctx, scm::obj_t* arg) {
-        log::emergency(vlog(ctx, arg));
-        return scm::nil(ctx);
-    }
-
-    static scm::obj_t* current_alloc(scm::ctx_t* ctx, scm::obj_t* arg) {
-        UNUSED(arg);
-        return scm::make_user_ptr(ctx, context::top()->alloc);
+    static u0 log_emergency(str::slice_t* fmt_msg, scm::obj_t* rest) {
+        log::emergency(vlog(*fmt_msg, rest));
     }
 
     static scm::obj_t* syslog_create(scm::ctx_t* ctx, scm::obj_t* arg) {
@@ -376,18 +376,22 @@ namespace basecode::config {
         return scm::make_user_ptr(ctx, logger);
     }
 
-    static scm::obj_t* current_logger(scm::ctx_t* ctx, scm::obj_t* arg) {
-        UNUSED(arg);
-        return scm::make_user_ptr(ctx, context::top()->logger);
-    }
-
-    static u32 localized_string(u32 id, str::slice_t* locale, str::slice_t* value) {
-        string::localized::add(id, *locale, *value);
-        return id;
-    }
-
-    static b8 localized_error(u32 id, str::slice_t* locale, str::slice_t* code, u32 str_id) {
-        return OK(error::localized::add(id, str_id, *locale, *code));
+    static u0 adjust_log_path(path_t& log_path, str::slice_t file_name) {
+        path_t tmp_path{};
+        path::init(tmp_path, file_name, g_cfg_sys.alloc);
+        defer(path::free(tmp_path));
+        if (!path::absolute(tmp_path)) {
+            path::set(tmp_path, format::format("../logs"));
+            filesys::bin_rel_path(log_path, tmp_path);
+            auto status = filesys::exists(log_path);
+            if (!OK(status)) {
+                filesys::mkdir(log_path);
+            }
+            path::set(tmp_path, file_name);
+            path::append(log_path, tmp_path);
+        } else {
+            path::init(log_path, file_name, g_cfg_sys.alloc);
+        }
     }
 
     static scm::obj_t* log_create_color(scm::ctx_t* ctx, scm::obj_t* arg) {
@@ -436,24 +440,6 @@ namespace basecode::config {
         return scm::make_user_ptr(ctx, logger);
     }
 
-    static u0 adjust_log_path(path_t& log_path, str::slice_t file_name) {
-        path_t tmp_path{};
-        path::init(tmp_path, file_name, g_cfg_sys.alloc);
-        defer(path::free(tmp_path));
-        if (!path::absolute(tmp_path)) {
-            path::set(tmp_path, format::format("../logs"));
-            filesys::bin_rel_path(log_path, tmp_path);
-            auto status = filesys::exists(log_path);
-            if (!OK(status)) {
-                filesys::mkdir(log_path);
-            }
-            path::set(tmp_path, file_name);
-            path::append(log_path, tmp_path);
-        } else {
-            path::init(log_path, file_name, g_cfg_sys.alloc);
-        }
-    }
-
     static scm::obj_t* logger_append_child(scm::ctx_t* ctx, scm::obj_t* arg) {
         auto parent = scm::next_arg(ctx, &arg);
         if (scm::type(ctx, parent) != scm::obj_type_t::ptr)
@@ -464,59 +450,6 @@ namespace basecode::config {
         log::append_child((logger_t*) scm::to_user_ptr(ctx, parent),
                           (logger_t*) scm::to_user_ptr(ctx, child));
         return scm::nil(ctx);
-    }
-
-    static scm::obj_t* current_command_line(scm::ctx_t* ctx, scm::obj_t* arg) {
-        UNUSED(arg);
-        const auto argc = context::top()->argc;
-        const auto argv = context::top()->argv;
-        scm::obj_t* objs[argc];
-        for (u32 i = 0; i < argc; ++i)
-            objs[i] = scm::make_string(ctx, argv[i]);
-        return scm::make_list(ctx, &objs[0], argc);
-    }
-
-    static scm::obj_t* log_create_basic_file(scm::ctx_t* ctx, scm::obj_t* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
-
-        log_level_t mask = log_level_t::debug;
-        spdlog_basic_file_config_t config{};
-        scm::obj_t* name;
-        if (symtab::find(args, "#:name"_ss, name))
-            config.name = string::interned::fold(to_str(ctx, name));
-        else
-            config.name = string::interned::fold("basic-file"_ss);
-
-        scm::obj_t* pattern;
-        if (symtab::find(args, "#:pattern"_ss, pattern))
-            config.pattern = string::interned::fold(to_str(ctx, pattern));
-
-        scm::obj_t* maskv;
-        if (symtab::find(args, "#:mask"_ss, maskv)) {
-            auto ll = find_log_level(to_str(ctx, maskv));
-            if (ll == -1)
-                scm::error(ctx, "#:mask invalid log level symbol");
-            mask = log_level_t(ll);
-        }
-
-        auto file_name = to_str(ctx, get_map_arg(args, 0));
-        path_t log_path{};
-        adjust_log_path(log_path, slice::make(file_name));
-        defer(path::free(log_path));
-        config.file_name = string::interned::fold(log_path.str);
-
-        logger_t* logger{};
-        auto status = log::system::make(&logger,
-                                        logger_type_t::spdlog,
-                                        &config,
-                                        mask);
-        if (!OK(status))
-            scm::error(ctx, "failed to create basic file logger");
-
-        return scm::make_user_ptr(ctx, logger);
     }
 
     static scm::obj_t* log_create_daily_file(scm::ctx_t* ctx, scm::obj_t* arg) {
@@ -564,6 +497,49 @@ namespace basecode::config {
                                         mask);
         if (!OK(status))
             scm::error(ctx, "failed to create daily file logger");
+
+        return scm::make_user_ptr(ctx, logger);
+    }
+
+    static scm::obj_t* log_create_basic_file(scm::ctx_t* ctx, scm::obj_t* arg) {
+        arg_map_t args{};
+        symtab::init(args, g_cfg_sys.alloc);
+        defer(symtab::free(args));
+        make_arg_map(ctx, arg, args);
+
+        log_level_t mask = log_level_t::debug;
+        spdlog_basic_file_config_t config{};
+        scm::obj_t* name;
+        if (symtab::find(args, "#:name"_ss, name))
+            config.name = string::interned::fold(to_str(ctx, name));
+        else
+            config.name = string::interned::fold("basic-file"_ss);
+
+        scm::obj_t* pattern;
+        if (symtab::find(args, "#:pattern"_ss, pattern))
+            config.pattern = string::interned::fold(to_str(ctx, pattern));
+
+        scm::obj_t* maskv;
+        if (symtab::find(args, "#:mask"_ss, maskv)) {
+            auto ll = find_log_level(to_str(ctx, maskv));
+            if (ll == -1)
+                scm::error(ctx, "#:mask invalid log level symbol");
+            mask = log_level_t(ll);
+        }
+
+        auto file_name = to_str(ctx, get_map_arg(args, 0));
+        path_t log_path{};
+        adjust_log_path(log_path, slice::make(file_name));
+        defer(path::free(log_path));
+        config.file_name = string::interned::fold(log_path.str);
+
+        logger_t* logger{};
+        auto status = log::system::make(&logger,
+                                        logger_type_t::spdlog,
+                                        &config,
+                                        mask);
+        if (!OK(status))
+            scm::error(ctx, "failed to create basic file logger");
 
         return scm::make_user_ptr(ctx, logger);
     }
@@ -617,29 +593,22 @@ namespace basecode::config {
         return scm::make_user_ptr(ctx, logger);
     }
 
+    static u32 localized_string(u32 id, str::slice_t* locale, str::slice_t* value) {
+        string::localized::add(id, *locale, *value);
+        return id;
+    }
+
+    static b8 localized_error(u32 id, str::slice_t* locale, str::slice_t* code, u32 str_id) {
+        return OK(error::localized::add(id, str_id, *locale, *code));
+    }
+
     static kernel_func_t s_kernel_funcs[] = {
-        {"current-user",             current_user},
-        {"current-alloc",            current_alloc},
-        {"current-logger",           current_logger},
-        {"current-command-line",     current_command_line},
-        {"log-info",                 log_info},
-        {"log-warn",                 log_warn},
-        {"log-error",                log_error},
-        {"log-alert",                log_alert},
-        {"log-debug",                log_debug},
-        {"log-notice",               log_notice},
-        {"log-critical",             log_critical},
-        {"log-emergency",            log_emergency},
         {"log-create-color",         log_create_color},
         {"log-create-daily-file",    log_create_daily_file},
         {"log-create-basic-file",    log_create_basic_file},
         {"log-create-rotating-file", log_create_rotating_file},
         {"logger-append-child",      logger_append_child},
         {"syslog-create",            syslog_create},
-//        {"cvar-set!",                cvar_set},
-//        {"cvar-ref",                 cvar_ref},
-//        {"localized-string",         localized_string},
-//        {"localized-error",          localized_error},
         {nullptr,                    nullptr}
     };
 
@@ -667,6 +636,7 @@ namespace basecode::config {
                 auto b8_type = ffi::param::make_type(param_cls_t::int_,
                                                      param_size_t::byte,
                                                      u8(scm::ffi_type_t::boolean));
+                auto u0_type = ffi::param::make_type(param_cls_t::void_, param_size_t::none);
                 auto u32_type = ffi::param::make_type(param_cls_t::int_, param_size_t::dword);
                 auto f32_type = ffi::param::make_type(param_cls_t::float_, param_size_t::dword);
 //                auto ctx_type = ffi::param::make_type(param_cls_t::ptr,
@@ -675,13 +645,18 @@ namespace basecode::config {
                 auto obj_type = ffi::param::make_type(param_cls_t::ptr,
                                                       param_size_t::qword,
                                                       u8(scm::ffi_type_t::object));
+                auto list_type = ffi::param::make_type(param_cls_t::ptr,
+                                                      param_size_t::qword,
+                                                      u8(scm::ffi_type_t::list));
                 auto slice_type = ffi::param::make_type(param_cls_t::ptr,
                                                         param_size_t::qword,
                                                         u8(scm::ffi_type_t::string));
 
                 {
                     auto proto = ffi::proto::make("cvar_ref"_ss);
-                    auto ol    = ffi::overload::make("cvar_ref"_ss, obj_type, (u0*) cvar_ref);
+                    auto ol    = ffi::overload::make("cvar_ref"_ss,
+                                                     obj_type,
+                                                     (u0*) cvar_ref);
                     ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
@@ -693,22 +668,30 @@ namespace basecode::config {
                     auto id_param  = ffi::param::make("id"_ss, u32_type);
 
                     auto proto = ffi::proto::make("cvar_set"_ss);
-                    auto ol_flag   = ffi::overload::make("cvar_set_flag"_ss, b8_type, (u0*) cvar_set_flag);
+                    auto ol_flag   = ffi::overload::make("cvar_set_flag"_ss,
+                                                         b8_type,
+                                                         (u0*) cvar_set_flag);
                     ffi::overload::append(ol_flag, id_param);
                     ffi::overload::append(ol_flag, ffi::param::make("value"_ss, b8_type));
                     ffi::proto::append(proto, ol_flag);
 
-                    auto ol_number = ffi::overload::make("cvar_set_number"_ss, b8_type, (u0*) cvar_set_number);
+                    auto ol_number = ffi::overload::make("cvar_set_number"_ss,
+                                                         b8_type,
+                                                         (u0*) cvar_set_number);
                     ffi::overload::append(ol_number, id_param);
                     ffi::overload::append(ol_number, ffi::param::make("value"_ss, f32_type));
                     ffi::proto::append(proto, ol_number);
 
-                    auto ol_integer = ffi::overload::make("cvar_set_integer"_ss, b8_type, (u0*) cvar_set_integer);
+                    auto ol_integer = ffi::overload::make("cvar_set_integer"_ss,
+                                                          b8_type,
+                                                          (u0*) cvar_set_integer);
                     ffi::overload::append(ol_integer, id_param);
                     ffi::overload::append(ol_integer, ffi::param::make("value"_ss, u32_type));
                     ffi::proto::append(proto, ol_integer);
 
-                    auto ol_string = ffi::overload::make("cvar_set_string"_ss, b8_type, (u0*) cvar_set_string);
+                    auto ol_string = ffi::overload::make("cvar_set_string"_ss,
+                                                         b8_type,
+                                                         (u0*) cvar_set_string);
                     ffi::overload::append(ol_string, id_param);
                     ffi::overload::append(ol_string, ffi::param::make("value"_ss, slice_type));
                     ffi::proto::append(proto, ol_string);
@@ -720,7 +703,9 @@ namespace basecode::config {
 
                 {
                     auto proto = ffi::proto::make("localized_string"_ss);
-                    auto ol    = ffi::overload::make("localized_string"_ss, u32_type, (u0*) localized_string);
+                    auto ol    = ffi::overload::make("localized_string"_ss,
+                                                     u32_type,
+                                                     (u0*) localized_string);
                     ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
                     ffi::overload::append(ol, ffi::param::make("locale"_ss, slice_type));
                     ffi::overload::append(ol, ffi::param::make("value"_ss, slice_type));
@@ -732,7 +717,9 @@ namespace basecode::config {
 
                 {
                     auto proto = ffi::proto::make("localized_error"_ss);
-                    auto ol    = ffi::overload::make("localized_error"_ss, u32_type, (u0*) localized_error);
+                    auto ol    = ffi::overload::make("localized_error"_ss,
+                                                     u32_type,
+                                                     (u0*) localized_error);
                     ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
                     ffi::overload::append(ol, ffi::param::make("locale"_ss, slice_type));
                     ffi::overload::append(ol, ffi::param::make("code"_ss, slice_type));
@@ -740,6 +727,154 @@ namespace basecode::config {
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "localized-error"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_info"_ss);
+                    auto ol    = ffi::overload::make("log_info"_ss,
+                                                     u0_type,
+                                                     (u0*) log_info);
+                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-info"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_warn"_ss);
+                    auto ol    = ffi::overload::make("log_warn"_ss,
+                                                     u0_type,
+                                                     (u0*) log_warn);
+                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-warn"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_error"_ss);
+                    auto ol    = ffi::overload::make("log_error"_ss,
+                                                     u0_type,
+                                                     (u0*) log_error);
+                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-error"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_alert"_ss);
+                    auto ol    = ffi::overload::make("log_alert"_ss,
+                                                     u0_type,
+                                                     (u0*) log_alert);
+                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-alert"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_debug"_ss);
+                    auto ol    = ffi::overload::make("log_debug"_ss,
+                                                     u0_type,
+                                                     (u0*) log_debug);
+                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-debug"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_notice"_ss);
+                    auto ol    = ffi::overload::make("log_notice"_ss,
+                                                     u0_type,
+                                                     (u0*) log_notice);
+                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-notice"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_critical"_ss);
+                    auto ol    = ffi::overload::make("log_critical"_ss,
+                                                     u0_type,
+                                                     (u0*) log_critical);
+                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-critical"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_emergency"_ss);
+                    auto ol    = ffi::overload::make("log_emergency"_ss,
+                                                     u0_type,
+                                                     (u0*) log_emergency);
+                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-emergency"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("current_user"_ss);
+                    auto ol    = ffi::overload::make("current_user"_ss,
+                                                     obj_type,
+                                                     (u0*) current_user);
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "current-user"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("current_alloc"_ss);
+                    auto ol    = ffi::overload::make("current_alloc"_ss,
+                                                     obj_type,
+                                                     (u0*) current_alloc);
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "current-alloc"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("current_logger"_ss);
+                    auto ol    = ffi::overload::make("current_logger"_ss,
+                                                     obj_type,
+                                                     (u0*) current_logger);
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "current-logger"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("current_command_line"_ss);
+                    auto ol    = ffi::overload::make("current_command_line"_ss,
+                                                     obj_type,
+                                                     (u0*) current_command_line);
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "current-command-line"),
                              scm::make_ffi(g_cfg_sys.ctx, proto));
                 }
             }

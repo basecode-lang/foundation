@@ -51,6 +51,7 @@ namespace basecode {
     enum class param_cls_t : u8 {
         ptr                     = 'P',
         int_                    = 'I',
+        void_                   = 'V',
         float_                  = 'F',
         struct_                 = 'S',
     };

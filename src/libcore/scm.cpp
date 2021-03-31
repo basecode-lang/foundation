@@ -591,6 +591,10 @@ namespace basecode::scm {
 
     static u32 make_ffi_signature(ctx_t* ctx, obj_t* args, obj_t* env, u8* buf) {
         u32 len{};
+        if (IS_NIL(args)) {
+            buf[len++] = u8(param_cls_t::void_);
+            return len;
+        }
         while (!IS_NIL(args)) {
             const auto type = TYPE(EVAL(CAR(args)));
             const auto& mapping = s_types[u32(type)];
@@ -876,13 +880,16 @@ namespace basecode::scm {
                                         break;
                                 }
                                 break;
-                            case obj_type_t::keyword: {
-                                va = CADR(va);
-                                auto s = string::interned::get_slice(STRING_ID(va));
-                                if (!s)
-                                    error(ctx, "ffi: invalid interned string id for keyword");
+                            case obj_type_t::pair:
+                                switch (ffi_type_t(param->value.type.user)) {
+                                    case ffi_type_t::list:
+                                        ffi::push(ctx->ffi, arg);
+                                        break;
+                                    default:
+                                        error(ctx, "ffi: invalid pair argument");
+                                        break;
+                                }
                                 break;
-                            }
                             case obj_type_t::fixnum:
                                 switch (param->value.type.cls) {
                                     case param_cls_t::int_:
@@ -920,6 +927,13 @@ namespace basecode::scm {
                             case obj_type_t::boolean:
                                 ffi::push(ctx->ffi, va == ctx->true_ ? true : false);
                                 break;
+                            case obj_type_t::keyword: {
+                                va = CADR(va);
+                                auto s = string::interned::get_slice(STRING_ID(va));
+                                if (!s)
+                                    error(ctx, "ffi: invalid interned string id for keyword");
+                                break;
+                            }
                             default: {
                                 switch (ffi_type_t(param->value.type.user)) {
                                     case ffi_type_t::context:
@@ -948,6 +962,9 @@ namespace basecode::scm {
                             } else {
                                 res = make_fixnum(ctx, ret.dw);
                             }
+                            break;
+                        case param_cls_t::void_:
+                            res = ctx->nil;
                             break;
                         case param_cls_t::float_:
                             res = make_flonum(ctx, ret.fdw);

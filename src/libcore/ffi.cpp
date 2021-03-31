@@ -194,6 +194,8 @@ namespace basecode::ffi {
                     return status;
             }
             ol->proto = proto;
+            if (ol->key_len == 0)
+                ol->key[ol->key_len++] = u8(param_cls_t::void_);
             auto key = slice::make(ol->key, ol->key_len);
             if (!symtab::insert(proto->overloads, key, ol))
                 return status_t::duplicate_overload;
@@ -335,6 +337,8 @@ namespace basecode::ffi {
                     default:                    return status_t::invalid_float_size;
                 }
                 break;
+            default:
+                break;
         }
         return status_t::ok;
     }
@@ -371,6 +375,8 @@ namespace basecode::ffi {
                 }
                 break;
             case param_cls_t::struct_:          return status_t::struct_by_value_not_implemented;
+            default:
+                break;
         }
         return status_t::ok;
     }

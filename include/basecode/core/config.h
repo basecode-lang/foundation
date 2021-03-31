@@ -41,7 +41,7 @@ namespace basecode {
             u32                 minor           {};
             u32                 revision        {};
         }                       version         {};
-        u32                     heap_size       {64 * 1024};
+        u32                     heap_size       {128 * 1024};
         b8                      test_runner     {};
     };
 
