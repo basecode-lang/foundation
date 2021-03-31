@@ -143,18 +143,13 @@ namespace basecode::ffi {
 
     namespace proto {
         u0 free(proto_t* proto) {
-            using Pair_Array = typename overload_symtab_t::Pair_Array;
-
-//            Pair_Array pairs{};
-//            assoc_array::init(pairs, g_ffi_system.alloc);
-//            symtab::find_prefix(proto->overloads, pairs);
-//            for (u32 i = 0; i < pairs.size; ++i) {
-//                auto pair = pairs[i];
-//                overload::free(pair.value->overload);
-//                stable_array::erase(g_ffi_system.overload_slab, pair.value->idx - 1);
-//            }
-
+            assoc_array_t<overload_t*> pairs{};
+            assoc_array::init(pairs, g_ffi_system.alloc);
+            symtab::find_prefix(proto->overloads, pairs);
+            for (u32 i = 0; i < pairs.size; ++i)
+                overload::free(pairs[i].value);
             symtab::free(proto->overloads);
+            assoc_array::free(pairs);
         }
 
         b8 remove(str::slice_t symbol) {
@@ -184,6 +179,8 @@ namespace basecode::ffi {
                 new_pair->proto = proto;
                 proto->lib      = lib;
                 proto->name     = symbol;
+                proto->min_req  = {};
+                proto->max_req  = {};
                 symtab::init(proto->overloads, g_ffi_system.alloc);
                 return proto;
             }
@@ -200,6 +197,10 @@ namespace basecode::ffi {
             auto key = slice::make(ol->key, ol->key_len);
             if (!symtab::insert(proto->overloads, key, ol))
                 return status_t::duplicate_overload;
+            if (ol->params.size > proto->min_req)
+                proto->min_req = ol->params.size;
+            if (ol->params.size > proto->max_req)
+                proto->max_req = ol->params.size;
             return status_t::ok;
         }
 
@@ -241,7 +242,9 @@ namespace basecode::ffi {
             array::append(overload->params, param);
             if (overload->key_len > 14)
                 return status_t::parameter_overflow;
-            overload->key[overload->key_len++] = u8(param->value.type.cls);
+            overload->key[overload->key_len++] = param->value.type.user != 0 ?
+                param->value.type.user :
+                u8(param->value.type.cls);
             overload->key[overload->key_len++] = u8(param->value.type.size);
             if (param->is_rest)
                 overload->has_rest = true;
@@ -323,8 +326,7 @@ namespace basecode::ffi {
                     case param_size_t::none:    return status_t::invalid_int_size;
                 }
                 break;
-            case param_cls_t::ptr:
-            case param_cls_t::custom:           dcArgPointer(ffi.vm, arg.alias.p);          break;
+            case param_cls_t::ptr:              dcArgPointer(ffi.vm, arg.alias.p);          break;
             case param_cls_t::struct_:          return status_t::struct_by_value_not_implemented;
             case param_cls_t::float_:
                 switch (arg.type.size) {
@@ -351,8 +353,7 @@ namespace basecode::ffi {
             case call_mode_t::variadic:         dcMode(ffi.vm, DC_CALL_C_ELLIPSIS);          break;
         }
         switch (ol->ret_type.cls) {
-            case param_cls_t::ptr:
-            case param_cls_t::custom:           ret.p = dcCallPointer(ffi.vm, ol->func);     break;
+            case param_cls_t::ptr:              ret.p = dcCallPointer(ffi.vm, ol->func);     break;
             case param_cls_t::int_:
                 switch (ol->ret_type.size) {
                     case param_size_t::none:    dcCallVoid(ffi.vm, ol->func); ret.qw = {};   break;

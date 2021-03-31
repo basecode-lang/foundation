@@ -176,6 +176,12 @@ namespace basecode::scm {
         "ffi",
     };
 
+    enum class numtype_t : u8 {
+        none,
+        fixnum,
+        flonum,
+    };
+
     static const s8* s_delims   = " \n\t\r()[];";
 
     struct obj_t {
@@ -238,6 +244,21 @@ namespace basecode::scm {
         u32                     n;
     } __attribute__((aligned(16)));
 
+    struct ffi_type_map_t final {
+        u8                      type;
+        u8                      size;
+    } __attribute__((aligned(2)));
+
+    static ffi_type_map_t s_types[] = {
+        [u32(obj_type_t::pair)]     = ffi_type_map_t{.type = 'P', .size = 'q'},
+        [u32(obj_type_t::nil)]      = ffi_type_map_t{.type = 'P', .size = 'q'},
+        [u32(obj_type_t::fixnum)]   = ffi_type_map_t{.type = 'I', .size = 'd'},
+        [u32(obj_type_t::flonum)]   = ffi_type_map_t{.type = 'F', .size = 'd'},
+        [u32(obj_type_t::symbol)]   = ffi_type_map_t{.type = 'S', .size = 'q'},
+        [u32(obj_type_t::string)]   = ffi_type_map_t{.type = 'S', .size = 'q'},
+        [u32(obj_type_t::boolean)]  = ffi_type_map_t{.type = 'B', .size = 'b'},
+    };
+
     static obj_t* eval(ctx_t* ctx,
                        obj_t* obj,
                        obj_t* env,
@@ -263,6 +284,27 @@ namespace basecode::scm {
         s32 chr;
         UNUSED(ctx);
         return (chr = fgetc((FILE*) udata)) == EOF ? '\0' : s8(chr);
+    }
+
+    static numtype_t get_numtype(const s8* buf, u32 len) {
+        const s8* p = buf;
+        s8 ch = *p;
+        numtype_t type = ((ch == '+' && len > 1)
+                    || (ch == '-' && len > 1)
+                    || isdigit(ch)) ? numtype_t::fixnum : numtype_t::none;
+        if (type == numtype_t::none)
+            return type;
+        ch = *(++p);
+        while (ch) {
+            if (ch == '.' || ch == 'e' || ch == 'E' || ch == '-') {
+                type = numtype_t::flonum;
+            } else if (ch < 48 || ch > 57) {
+                type = numtype_t::none;
+                break;
+            }
+            ch = *(++p);
+        }
+        return type;
     }
 
     static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b) {
@@ -476,16 +518,26 @@ namespace basecode::scm {
                 ctx->next_chr = chr;
                 *p = '\0';
                 const auto len = p - ctx->scratch;
-                auto n = strtod(ctx->scratch, &p);
-                if (p != ctx->scratch && strchr(s_delims, *p)) {
-                    return make_flonum(ctx, n);
-                } else if (strncmp(ctx->scratch, "#:", 2) == 0) {
-                    return make_keyword(ctx, ctx->scratch + 2, len - 2);
+                if (p != ctx->scratch) {
+                    switch (get_numtype(ctx->scratch, p - ctx->scratch)) {
+                        case numtype_t::none:
+                            if (strncmp(ctx->scratch, "#:", 2) == 0) {
+                                return make_keyword(ctx, ctx->scratch + 2, len - 2);
+                            } else {
+                                return make_symbol(ctx, ctx->scratch, len);
+                            }
+                        case numtype_t::fixnum:
+                            return make_fixnum(ctx, strtol(ctx->scratch, &p, 10));
+                        case numtype_t::flonum:
+                            return make_flonum(ctx, strtod(ctx->scratch, &p));
+                    }
                 } else {
-                    return make_symbol(ctx, ctx->scratch, len);
+                    error(ctx, "expected flonum, fixnum, keyword, or symbol");
                 }
             }
         }
+
+        return ctx->nil;
     }
 
     static obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env) {
@@ -537,25 +589,11 @@ namespace basecode::scm {
         return obj;
     }
 
-    struct ffi_type_map_t final {
-        u8                      type;
-        u8                      size;
-    } __attribute__((aligned(2)));
-
-    static u32 make_ffi_signature(ctx_t* ctx, obj_t* args, u8* buf) {
-        static ffi_type_map_t s_types[] = {
-            [u32(obj_type_t::pair)]     = ffi_type_map_t{.type = 'P', .size = 'q'},
-            [u32(obj_type_t::nil)]      = ffi_type_map_t{.type = 'P', .size = 'q'},
-            [u32(obj_type_t::fixnum)]   = ffi_type_map_t{.type = 'I', .size = 'd'},
-            [u32(obj_type_t::flonum)]   = ffi_type_map_t{.type = 'F', .size = 'd'},
-            [u32(obj_type_t::symbol)]   = ffi_type_map_t{.type = 'P', .size = 'q'},
-            [u32(obj_type_t::string)]   = ffi_type_map_t{.type = 'P', .size = 'q'},
-            [u32(obj_type_t::boolean)]  = ffi_type_map_t{.type = 'I', .size = 'b'},
-        };
-
+    static u32 make_ffi_signature(ctx_t* ctx, obj_t* args, obj_t* env, u8* buf) {
         u32 len{};
         while (!IS_NIL(args)) {
-            const auto& mapping = s_types[u32(TYPE(CAR(args)))];
+            const auto type = TYPE(EVAL(CAR(args)));
+            const auto& mapping = s_types[u32(type)];
             buf[len++] = mapping.type;
             buf[len++] = mapping.size;
             args = CDR(args);
@@ -809,35 +847,34 @@ namespace basecode::scm {
 
                 case obj_type_t::ffi: {
                     auto proto = (proto_t*) NATIVE_PTR(fn);
-                    auto ol = ffi::proto::match_signature(proto, buf, make_ffi_signature(ctx, arg, buf));
+                    auto ol = ffi::proto::match_signature(proto,
+                                                          buf,
+                                                          make_ffi_signature(ctx, arg, env, buf));
                     if (!ol)
                         error(ctx, "ffi: no matching overload for function");
-                    ffi::reset(ctx->ffi);
                     n = 0;
+                    ffi::reset(ctx->ffi);
                     while (!IS_NIL(arg)) {
+                        if (n >= ol->params.size)
+                            error(ctx, "ffi: too many arguments");
                         auto& param = ol->params[n];
-                        va = EVAL(CAR(arg));
-                        if (param->value.type.cls == param_cls_t::custom) {
-                            switch (ffi_type_t(param->value.type.user)) {
-                                case ffi_type_t::object:
-                                    ffi::push(ctx->ffi, va);
-                                    arg = CDR(arg);
-                                    break;
-                                case ffi_type_t::context:
-                                    ffi::push(ctx->ffi, ctx);
-                                    break;
-                                default:
-                                    break;
-                            }
-                            ++n;
-                            continue;
-                        }
+                        va          = EVAL(CAR(arg));
                         switch (TYPE(va)) {
                             case obj_type_t::nil:
-                                ffi::push(ctx->ffi, va);
+                                ffi::push(ctx->ffi, (u0*) nullptr);
                                 break;
                             case obj_type_t::ptr:
-                                ffi::push(ctx->ffi, NATIVE_PTR(va));
+                                switch (ffi_type_t(param->value.type.user)) {
+                                    case ffi_type_t::object:
+                                        ffi::push(ctx->ffi, va);
+                                        break;
+                                    case ffi_type_t::context:
+                                        ffi::push(ctx->ffi, ctx);
+                                        break;
+                                    default:
+                                        ffi::push(ctx->ffi, NATIVE_PTR(va));
+                                        break;
+                                }
                                 break;
                             case obj_type_t::keyword: {
                                 va = CADR(va);
@@ -906,22 +943,14 @@ namespace basecode::scm {
                             res = !ret.p ? ctx->nil : (obj_t*) ret.p;
                             break;
                         case param_cls_t::int_:
-                            res = make_fixnum(ctx, ret.dw);
+                            if (ffi_type_t(ol->ret_type.user) == ffi_type_t::boolean) {
+                                res = make_bool(ctx, ret.b);
+                            } else {
+                                res = make_fixnum(ctx, ret.dw);
+                            }
                             break;
                         case param_cls_t::float_:
                             res = make_flonum(ctx, ret.fdw);
-                            break;
-                        case param_cls_t::custom:
-                            switch (ffi_type_t(ol->ret_type.user)) {
-                                case ffi_type_t::object:
-                                    res = (obj_t*) ret.p;
-                                    break;
-                                case ffi_type_t::boolean:
-                                    res = make_bool(ctx, ret.b);
-                                    break;
-                                default:
-                                    error(ctx, "ffi: invalid custom return type");
-                            }
                             break;
                         default:
                             error(ctx, "ffi: unsupported return type");

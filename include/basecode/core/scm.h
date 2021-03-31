@@ -47,11 +47,12 @@ namespace basecode::scm {
         native_func_t           gc;
     };
 
-    enum class ffi_type_t : s32 {
+    enum class ffi_type_t : u8 {
         none                    = 0,
-        object                  = 1,
-        context                 = 2,
-        boolean                 = 3,
+        string                  = 'S',
+        object                  = 'O',
+        context                 = 'C',
+        boolean                 = 'B',
     };
 
     enum class obj_type_t : u32 {

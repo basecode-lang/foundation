@@ -345,7 +345,7 @@
             (assert '(is "/var/log" (cvar-ref *log-path*)))
             (assert '(is 47.314 (cvar-ref *magick-weight*)))
 
-            (cvar-set! *enable-console-color*   nil)
+            (cvar-set! *enable-console-color*   #f)
             (cvar-set! *log-path*               "/var/log/basecode")
             (cvar-set! *magick-weight*          12.6566)
 

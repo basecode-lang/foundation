@@ -216,83 +216,58 @@ namespace basecode::config {
         return str::c_str(g_cfg_sys.buf);
     }
 
-    static b8 cvar_set_flag(scm::ctx_t* ctx, u32 id, b8 value) {
+    static scm::obj_t* cvar_ref(u32 id) {
         cvar_t* cvar{};
         if (!OK(cvar::get(id, &cvar)))
-            scm::error(ctx, "XXX: unable to find cvar");
+            scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
+
+        switch (cvar->type) {
+            case cvar_type_t::flag:
+                return scm::make_bool(g_cfg_sys.ctx, cvar->value.flag);
+            case cvar_type_t::real:
+                return scm::make_flonum(g_cfg_sys.ctx, cvar->value.real);
+            case cvar_type_t::integer:
+                return scm::make_fixnum(g_cfg_sys.ctx, cvar->value.integer);
+            case cvar_type_t::string:
+                return scm::make_string(g_cfg_sys.ctx, (const s8*) cvar->value.ptr);
+            case cvar_type_t::pointer:
+                return scm::make_user_ptr(g_cfg_sys.ctx, (u0*) cvar->value.ptr);
+            default:
+                scm::error(g_cfg_sys.ctx, "invalid cvar type");
+        }
+
+        return scm::nil(g_cfg_sys.ctx);
+    }
+
+    static b8 cvar_set_flag(u32 id, b8 value) {
+        cvar_t* cvar{};
+        if (!OK(cvar::get(id, &cvar)))
+            scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
         cvar->value.flag = value;
         return true;
     }
 
-    static b8 cvar_set_number(scm::ctx_t* ctx, u32 id, f32 value) {
+    static b8 cvar_set_number(u32 id, f32 value) {
         cvar_t* cvar{};
         if (!OK(cvar::get(id, &cvar)))
-            scm::error(ctx, "XXX: unable to find cvar");
+            scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
         cvar->value.real = value;
         return true;
     }
 
-    static b8 cvar_set_integer(scm::ctx_t* ctx, u32 id, u32 value) {
+    static b8 cvar_set_integer(u32 id, u32 value) {
         cvar_t* cvar{};
         if (!OK(cvar::get(id, &cvar)))
-            scm::error(ctx, "XXX: unable to find cvar");
+            scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
         cvar->value.integer = value;
         return true;
     }
 
-    static b8 cvar_set_string(scm::ctx_t* ctx, u32 id, str::slice_t* value) {
+    static b8 cvar_set_string(u32 id, str::slice_t* value) {
         cvar_t* cvar{};
         if (!OK(cvar::get(id, &cvar)))
-            scm::error(ctx, "XXX: unable to find cvar");
+            scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
         cvar->value.ptr = value->data;
-        return true;
-    }
-
-    static b8 cvar_set(scm::ctx_t* ctx, u32 id, scm::obj_t* value) {
-        cvar_t* cvar{};
-        if (!OK(cvar::get(id, &cvar)))
-            scm::error(ctx, "XXX: unable to find cvar");
-
-        auto value_type = scm::type(ctx, value);
-        switch (cvar->type) {
-            case cvar_type_t::flag: {
-                if (scm::is_true(ctx, value))
-                    cvar->value.flag = true;
-                else if (scm::is_nil(ctx, value))
-                    cvar->value.flag = false;
-                else
-                    scm::error(ctx, "invalid cvar value: flag must be #t or nil");
-                break;
-            }
-            case cvar_type_t::real: {
-                if (value_type != scm::obj_type_t::flonum)
-                    scm::error(ctx, "invalid cvar value: must be a valid number");
-                cvar->value.real = scm::to_flonum(ctx, value);
-                break;
-            }
-            case cvar_type_t::integer: {
-                if (value_type != scm::obj_type_t::fixnum)
-                    scm::error(ctx, "invalid cvar value: must be a valid number");
-                cvar->value.integer = u64(scm::to_fixnum(ctx, value));
-                break;
-            }
-            case cvar_type_t::string: {
-                if (value_type != scm::obj_type_t::string
-                &&  value_type != scm::obj_type_t::symbol) {
-                    scm::error(ctx, "invalid cvar value: must be a string or symbol");
-                }
-                auto str = to_str(ctx, value);
-                cvar->value.ptr = string::interned::fold(str).data;
-                break;
-            }
-            case cvar_type_t::pointer: {
-                scm::error(ctx, "invalid cvar value: cannot directly set pointer type");
-            }
-            default: {
-                scm::error(ctx, "invalid cvar type");
-            }
-        }
-
         return true;
     }
 
@@ -303,29 +278,6 @@ namespace basecode::config {
 
     static scm::obj_t* log_info(scm::ctx_t* ctx, scm::obj_t* arg) {
         log::info(vlog(ctx, arg));
-        return scm::nil(ctx);
-    }
-
-    static scm::obj_t* cvar_ref(scm::ctx_t* ctx, u32 id) {
-        cvar_t* cvar{};
-        if (!OK(cvar::get(id, &cvar)))
-            scm::error(ctx, "XXX: unable to find cvar");
-
-        switch (cvar->type) {
-            case cvar_type_t::flag:
-                return scm::make_bool(ctx, cvar->value.flag);
-            case cvar_type_t::real:
-                return scm::make_flonum(ctx, cvar->value.real);
-            case cvar_type_t::integer:
-                return scm::make_fixnum(ctx, cvar->value.integer);
-            case cvar_type_t::string:
-                return scm::make_string(ctx, (const s8*) cvar->value.ptr);
-            case cvar_type_t::pointer:
-                return scm::make_user_ptr(ctx, (u0*) cvar->value.ptr);
-            default:
-                scm::error(ctx, "invalid cvar type");
-        }
-
         return scm::nil(ctx);
     }
 
@@ -600,14 +552,10 @@ namespace basecode::config {
         config.file_name = string::interned::fold(log_path.str);
 
         auto hour = get_map_arg(args, 1);
-        if (scm::type(ctx, hour) != scm::obj_type_t::flonum)
-            scm::error(ctx, "hour: expected number");
-        config.hour = scm::to_flonum(ctx, hour);
+        config.hour = scm::to_fixnum(ctx, hour);
 
         auto minute = get_map_arg(args, 1);
-        if (scm::type(ctx, minute) != scm::obj_type_t::flonum)
-            scm::error(ctx, "minute: expected number");
-        config.minute = scm::to_flonum(ctx, minute);
+        config.minute = scm::to_fixnum(ctx, minute);
 
         logger_t* logger{};
         auto status = log::system::make(&logger,
@@ -653,14 +601,10 @@ namespace basecode::config {
         config.file_name = string::interned::fold(log_path.str);
 
         auto max_size = get_map_arg(args, 1);
-        if (scm::type(ctx, max_size) != scm::obj_type_t::flonum)
-            scm::error(ctx, "max_size: expected number");
-        config.max_size  = scm::to_flonum(ctx, max_size);
+        config.max_size  = scm::to_fixnum(ctx, max_size);
 
         auto max_files = get_map_arg(args, 2);
-        if (scm::type(ctx, max_files)!= scm::obj_type_t::flonum)
-            scm::error(ctx, "max_files: expected number");
-        config.max_files = scm::to_flonum(ctx, max_files);
+        config.max_files = scm::to_fixnum(ctx, max_files);
 
         logger_t* logger{};
         auto status = log::system::make(&logger,
@@ -720,23 +664,24 @@ namespace basecode::config {
 
             scm::init(g_cfg_sys.ctx, g_cfg_sys.heap_size);
             {
-                auto b8_type = ffi::param::make_type(param_cls_t::custom,
+                auto b8_type = ffi::param::make_type(param_cls_t::int_,
                                                      param_size_t::byte,
-                                                     s32(scm::ffi_type_t::boolean));
+                                                     u8(scm::ffi_type_t::boolean));
                 auto u32_type = ffi::param::make_type(param_cls_t::int_, param_size_t::dword);
                 auto f32_type = ffi::param::make_type(param_cls_t::float_, param_size_t::dword);
-                auto ctx_type = ffi::param::make_type(param_cls_t::custom,
+//                auto ctx_type = ffi::param::make_type(param_cls_t::ptr,
+//                                                      param_size_t::qword,
+//                                                      u8(scm::ffi_type_t::context));
+                auto obj_type = ffi::param::make_type(param_cls_t::ptr,
                                                       param_size_t::qword,
-                                                      s32(scm::ffi_type_t::context));
-                auto obj_type = ffi::param::make_type(param_cls_t::custom,
-                                                      param_size_t::qword,
-                                                      s32(scm::ffi_type_t::object));
-                auto slice_type = ffi::param::make_type(param_cls_t::ptr, param_size_t::qword);
+                                                      u8(scm::ffi_type_t::object));
+                auto slice_type = ffi::param::make_type(param_cls_t::ptr,
+                                                        param_size_t::qword,
+                                                        u8(scm::ffi_type_t::string));
 
                 {
                     auto proto = ffi::proto::make("cvar_ref"_ss);
                     auto ol    = ffi::overload::make("cvar_ref"_ss, obj_type, (u0*) cvar_ref);
-                    ffi::overload::append(ol, ffi::param::make("ctx"_ss, ctx_type));
                     ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
@@ -745,12 +690,29 @@ namespace basecode::config {
                 }
 
                 {
+                    auto id_param  = ffi::param::make("id"_ss, u32_type);
+
                     auto proto = ffi::proto::make("cvar_set"_ss);
-                    auto ol    = ffi::overload::make("cvar_set"_ss, b8_type, (u0*) cvar_set);
-                    ffi::overload::append(ol, ffi::param::make("ctx"_ss, ctx_type));
-                    ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
-                    ffi::overload::append(ol, ffi::param::make("value"_ss, obj_type));
-                    ffi::proto::append(proto, ol);
+                    auto ol_flag   = ffi::overload::make("cvar_set_flag"_ss, b8_type, (u0*) cvar_set_flag);
+                    ffi::overload::append(ol_flag, id_param);
+                    ffi::overload::append(ol_flag, ffi::param::make("value"_ss, b8_type));
+                    ffi::proto::append(proto, ol_flag);
+
+                    auto ol_number = ffi::overload::make("cvar_set_number"_ss, b8_type, (u0*) cvar_set_number);
+                    ffi::overload::append(ol_number, id_param);
+                    ffi::overload::append(ol_number, ffi::param::make("value"_ss, f32_type));
+                    ffi::proto::append(proto, ol_number);
+
+                    auto ol_integer = ffi::overload::make("cvar_set_integer"_ss, b8_type, (u0*) cvar_set_integer);
+                    ffi::overload::append(ol_integer, id_param);
+                    ffi::overload::append(ol_integer, ffi::param::make("value"_ss, u32_type));
+                    ffi::proto::append(proto, ol_integer);
+
+                    auto ol_string = ffi::overload::make("cvar_set_string"_ss, b8_type, (u0*) cvar_set_string);
+                    ffi::overload::append(ol_string, id_param);
+                    ffi::overload::append(ol_string, ffi::param::make("value"_ss, slice_type));
+                    ffi::proto::append(proto, ol_string);
+
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "cvar-set!"),
                              scm::make_ffi(g_cfg_sys.ctx, proto));
@@ -871,7 +833,7 @@ namespace basecode::config {
         static u0 add_binding(cvar_t* cvar) {
             auto sym_name = format::format("*{}*", cvar->name);
             auto symbol = scm::make_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
-            scm::set(g_cfg_sys.ctx, symbol, scm::make_flonum(g_cfg_sys.ctx, cvar->id));
+            scm::set(g_cfg_sys.ctx, symbol, scm::make_fixnum(g_cfg_sys.ctx, cvar->id));
         }
 
         static u0 remove_binding(cvar_t* cvar) {

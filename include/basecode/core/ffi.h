@@ -52,7 +52,6 @@ namespace basecode {
         ptr                     = 'P',
         int_                    = 'I',
         float_                  = 'F',
-        custom                  = 'C',
         struct_                 = 'S',
     };
 
@@ -111,6 +110,8 @@ namespace basecode {
         lib_t*                  lib;
         str::slice_t            name;
         overload_symtab_t       overloads;
+        u32                     min_req;
+        u32                     max_req;
     };
 
     struct ffi_t final {

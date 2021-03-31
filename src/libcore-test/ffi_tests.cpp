@@ -61,11 +61,11 @@ TEST_CASE("basecode::ffi basics", "[ffi]") {
 
     auto simple_proto = ffi::proto::make("simple"_ss, proc_lib);
     auto dft_overload = ffi::overload::make("simple"_ss, u32_type);
+    ffi::overload::append(dft_overload, ffi::param::make("a"_ss, u32_type));
+    ffi::overload::append(dft_overload, ffi::param::make("b"_ss, u32_type));
     status = ffi::proto::append(simple_proto, dft_overload);
     REQUIRE(OK(status));
     REQUIRE(dft_overload->func);
-    ffi::overload::append(dft_overload, ffi::param::make("a"_ss, u32_type));
-    ffi::overload::append(dft_overload, ffi::param::make("b"_ss, u32_type));
 
     ffi_t vm{};
     ffi::init(vm);
