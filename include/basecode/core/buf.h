@@ -23,11 +23,21 @@
 #include <basecode/core/stack.h>
 
 #define CRSR_POS(c)             ((c).pos)
+#define CRSR_END(c)             ((c).buf->length - 1)
 #define CRSR_PTR(c)             (*(c))
-#define CRSR_NEXT(c)            SAFE_SCOPE(++(c).pos; ++(c).column;)
-#define CRSR_READ(c)            ((c)[(c).pos])
-#define CRSR_PEEK(c)            ((c)[(c).pos + 1])
 #define CRSR_MORE(c)            ((c).pos < (c).buf->length)
+#define CRSR_PREV(c)            SAFE_SCOPE(                 \
+        if ((c).pos >= 0) {                                 \
+            --(c).pos;                                      \
+            --(c).column;                                   \
+        })
+#define CRSR_NEXT(c)            SAFE_SCOPE(                 \
+        if (CRSR_MORE(c)) {                                 \
+            ++(c).pos;                                      \
+            ++(c).column;                                   \
+        })
+#define CRSR_READ(c)            ((c).pos == (c).buf->length ? 0 : (c)[(c).pos])
+#define CRSR_PEEK(c)            ((c).pos < (c).buf->length ? (c)[(c).pos + 1] : 0)
 #define CRSR_NEWLINE(c)         SAFE_SCOPE((c).column = 0; ++(c).line;)
 
 #define FILE_ALIAS(f)           auto& file = f

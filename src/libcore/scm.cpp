@@ -69,7 +69,6 @@
 #define SET_PRIM(x, p)          ((x)->prim.code = fixnum_t((p)))
 #define NATIVE_PTR(x)           (ctx->native_ptrs[FIXNUM((x))])
 #define CLOSERS_SIZE            (256U)
-#define SCRATCH_SIZE            (1024U)
 #define GC_STACK_SIZE           (1024U)
 #define NATIVE_PTR_SIZE         (256U)
 #define EVAL(o)                 eval(ctx, (o), env, nullptr)
@@ -229,14 +228,12 @@ namespace basecode::scm {
         obj_t*                  false_;
         obj_t*                  rbrac;
         obj_t*                  rparen;
-        s8                      scratch[SCRATCH_SIZE];
         ffi_t                   ffi;
         u32                     closer_idx;
         u32                     object_used;
         u32                     gc_stack_idx;
         u32                     object_count;
         u32                     native_ptr_idx;
-        s8                      next_chr;
     } __attribute__((aligned(128)));
 
     struct char_ptr_int_t final {
@@ -280,13 +277,7 @@ namespace basecode::scm {
         return obj;
     }
 
-    static s8 read_fp(ctx_t* ctx, u0* udata) {
-        s32 chr;
-        UNUSED(ctx);
-        return (chr = fgetc((FILE*) udata)) == EOF ? '\0' : s8(chr);
-    }
-
-    static numtype_t get_numtype(const s8* buf, u32 len) {
+    static numtype_t get_numtype(const s8* buf, s32 len) {
         const s8* p = buf;
         s8 ch = *p;
         numtype_t type = ((ch == '+' && len > 1)
@@ -294,15 +285,14 @@ namespace basecode::scm {
                     || isdigit(ch)) ? numtype_t::fixnum : numtype_t::none;
         if (type == numtype_t::none)
             return type;
-        ch = *(++p);
-        while (ch) {
+        while (--len > 0) {
+            ch = *(++p);
             if (ch == '.' || ch == 'e' || ch == 'E' || ch == '-') {
                 type = numtype_t::flonum;
             } else if (ch < 48 || ch > 57) {
                 type = numtype_t::none;
                 break;
             }
-            ch = *(++p);
         }
         return type;
     }
@@ -375,169 +365,6 @@ namespace basecode::scm {
         if (!OK(obj_rc.status))
             return false;
         return obj_rc.id == str_id;
-    }
-
-    static obj_t* read_(ctx_t* ctx, read_func_t fn, u0* udata) {
-        obj_t* v;
-
-        s8 chr = ctx->next_chr ? ctx->next_chr : fn(ctx, udata);
-        ctx->next_chr = '\0';
-
-        while (chr && strchr(" \n\t\r", chr)) {
-            chr = fn(ctx, udata);
-        }
-
-        switch (chr) {
-            case '\0':
-                return nullptr;
-
-            case ';':
-                while (chr && chr != '\n') {
-                    chr = fn(ctx, udata);
-                }
-                return read_(ctx, fn, udata);
-
-            case ']':
-                if (ctx->closers[ctx->closer_idx++] == ctx->rparen)
-                    error(ctx, "expected closing paren but found closing bracket");
-                return ctx->rbrac;
-
-            case ')':
-                if (ctx->closers[ctx->closer_idx++] == ctx->rbrac)
-                    error(ctx, "expected closing bracket but found closing paren");
-                return ctx->rparen;
-
-            case '[':
-                ctx->closers[--ctx->closer_idx] = ctx->rbrac;
-                goto _skip;
-
-            case '(':
-                ctx->closers[--ctx->closer_idx] = ctx->rparen;
-            _skip: {
-                obj_t* head = ctx->nil;
-                obj_t* tail = head;
-                auto gc = save_gc(ctx);
-                /* to cause error on too-deep nesting */
-                push_gc(ctx, head);
-                while (true) {
-                    v = read_(ctx, fn, udata);
-                    if (v == ctx->rparen || v == ctx->rbrac)
-                        break;
-                    if (v == nullptr) {
-                        error(ctx, "unclosed list");
-                    }
-                    if (v == ctx->dot) {
-                        /* dotted pair */
-                        SET_CDR(tail, read(ctx, fn, udata));
-                    } else {
-                        /* proper pair */
-                        v = cons(ctx, v, ctx->nil);
-                        if (IS_NIL(tail)) {
-                            head = v;
-                            tail = head;
-                        } else {
-                            SET_CDR(tail, v);
-                            tail = v;
-                        }
-                    }
-                    restore_gc(ctx, gc);
-                    push_gc(ctx, head);
-                }
-                return head;
-            }
-
-            case '`': {
-                v = read(ctx, fn, udata);
-                if (!v)
-                    error(ctx, "stray '`'");
-                return cons(ctx,
-                            make_symbol(ctx, "quasiquote", 10),
-                            cons(ctx, v, ctx->nil));
-            }
-
-            case ',': {
-                obj_t* sym;
-                chr = fn(ctx, udata);
-                if (chr == '@') {
-                    v = read(ctx, fn, udata);
-                    if (!v)
-                        error(ctx, "stray ',@'");
-                    sym = make_symbol(ctx, "unquote-splicing", 16);
-                } else {
-                    ctx->next_chr = chr;
-                    v = read(ctx, fn, udata);
-                    if (!v)
-                        error(ctx, "stray ','");
-                    sym = make_symbol(ctx, "unquote", 7);
-                }
-                return cons(ctx, sym, cons(ctx, v, ctx->nil));
-            }
-
-            case '\'': {
-                v = read(ctx, fn, udata);
-                if (!v) {
-                    error(ctx, "stray '''");
-                }
-                return cons(ctx,
-                            make_symbol(ctx, "quote", 5),
-                            cons(ctx, v, ctx->nil));
-            }
-
-            case '"': {
-                s8* p = ctx->scratch;
-                const s8* e = p + (SCRATCH_SIZE - 1);
-                chr = fn(ctx, udata);
-                while (chr != '"') {
-                    if (p == e) {
-                        error(ctx, "string too long");
-                    }
-                    if (chr == '\0') {
-                        error(ctx, "unclosed string");
-                    }
-                    if (chr == '\\') {
-                        chr = fn(ctx, udata);
-                        if (strchr("nrt", chr)) {
-                            chr = strchr("n\nr\rt\t", chr)[1];
-                        }
-                    }
-                    *p++ = chr;
-                    chr = fn(ctx, udata);
-                }
-                return make_string(ctx, ctx->scratch, p - ctx->scratch);
-            }
-
-            default: {
-                s8* p = ctx->scratch;
-                const s8* e = p + (SCRATCH_SIZE - 1);
-                do {
-                    if (p == e)
-                        error(ctx, "symbol too long");
-                    *p++ = chr;
-                    chr = fn(ctx, udata);
-                } while (chr && !strchr(s_delims, chr));
-                ctx->next_chr = chr;
-                *p = '\0';
-                const auto len = p - ctx->scratch;
-                if (p != ctx->scratch) {
-                    switch (get_numtype(ctx->scratch, p - ctx->scratch)) {
-                        case numtype_t::none:
-                            if (strncmp(ctx->scratch, "#:", 2) == 0) {
-                                return make_keyword(ctx, ctx->scratch + 2, len - 2);
-                            } else {
-                                return make_symbol(ctx, ctx->scratch, len);
-                            }
-                        case numtype_t::fixnum:
-                            return make_fixnum(ctx, strtol(ctx->scratch, &p, 10));
-                        case numtype_t::flonum:
-                            return make_flonum(ctx, strtod(ctx->scratch, &p));
-                    }
-                } else {
-                    error(ctx, "expected flonum, fixnum, keyword, or symbol");
-                }
-            }
-        }
-
-        return ctx->nil;
     }
 
     static obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env) {
@@ -1265,6 +1092,7 @@ namespace basecode::scm {
     }
 
     u0 error(ctx_t* ctx, const s8* msg) {
+        s8 scratch[1024];
         obj_t* cl = ctx->call_list;
         ctx->call_list = ctx->nil;
         if (ctx->handlers.error) {
@@ -1272,14 +1100,10 @@ namespace basecode::scm {
         }
         fprintf(stderr, "error: %s\n", msg);
         for (; !IS_NIL(cl); cl = CDR(cl)) {
-            to_string(ctx, CAR(cl), ctx->scratch, sizeof(ctx->scratch));
-            fprintf(stderr, "=> %s\n", ctx->scratch);
+            to_string(ctx, CAR(cl), scratch, sizeof(scratch));
+            fprintf(stderr, "=> %s\n", scratch);
         }
         exit(EXIT_FAILURE);
-    }
-
-    obj_t* read_fp(ctx_t* ctx, FILE* fp) {
-        return read(ctx, read_fp, fp);
     }
 
     obj_t* make_bool(ctx_t* ctx, b8 value) {
@@ -1364,6 +1188,188 @@ namespace basecode::scm {
         return obj;
     }
 
+    static obj_t* read_expr(ctx_t* ctx, buf_crsr_t& crsr) {
+        obj_t* v;
+        s8 chr{};
+
+    next:
+        chr = CRSR_READ(crsr);
+
+        while (chr && isspace(chr)) {
+            if (chr == '\n')
+                CRSR_NEWLINE(crsr);
+            CRSR_NEXT(crsr);
+            chr = CRSR_READ(crsr);
+        }
+
+        switch (chr) {
+            case '\0':
+                return nullptr;
+
+            case ';':
+                do {
+                    CRSR_NEXT(crsr);
+                    chr = CRSR_READ(crsr);
+                } while (chr && chr != '\n');
+                CRSR_NEXT(crsr); CRSR_NEWLINE(crsr);
+                goto next;
+
+            case ']':
+                CRSR_NEXT(crsr);
+                if (ctx->closers[ctx->closer_idx++] == ctx->rparen)
+                    error(ctx, "expected closing paren but found closing bracket");
+                return ctx->rbrac;
+
+            case ')':
+                CRSR_NEXT(crsr);
+                if (ctx->closers[ctx->closer_idx++] == ctx->rbrac)
+                    error(ctx, "expected closing bracket but found closing paren");
+                return ctx->rparen;
+
+            case '[':
+                ctx->closers[--ctx->closer_idx] = ctx->rbrac;
+                goto _skip;
+
+            case '(':
+                ctx->closers[--ctx->closer_idx] = ctx->rparen;
+            _skip: {
+                CRSR_NEXT(crsr);
+                obj_t* head = ctx->nil;
+                obj_t* tail = head;
+                auto gc = save_gc(ctx);
+                /* to cause error on too-deep nesting */
+                push_gc(ctx, head);
+                while (true) {
+                    v = read_expr(ctx, crsr);
+                    if (v == ctx->rparen || v == ctx->rbrac)
+                        break;
+                    if (v == nullptr)
+                        error(ctx, "unclosed list");
+                    if (v == ctx->dot) {
+                        /* dotted pair */
+                        SET_CDR(tail, read(ctx, crsr));
+                    } else {
+                        /* proper pair */
+                        v = cons(ctx, v, ctx->nil);
+                        if (IS_NIL(tail)) {
+                            head = v;
+                            tail = head;
+                        } else {
+                            SET_CDR(tail, v);
+                            tail = v;
+                        }
+                    }
+                    restore_gc(ctx, gc);
+                    push_gc(ctx, head);
+                }
+                return head;
+            }
+
+            case '`': {
+                CRSR_NEXT(crsr);
+                v = read(ctx, crsr);
+                if (!v)
+                    error(ctx, "stray '`'");
+                return cons(ctx,
+                            make_symbol(ctx, "quasiquote", 10),
+                            cons(ctx, v, ctx->nil));
+            }
+
+            case ',': {
+                CRSR_NEXT(crsr);
+                obj_t* sym;
+                if (CRSR_READ(crsr) == '@') {
+                    CRSR_NEXT(crsr);
+                    v = read(ctx, crsr);
+                    if (!v)
+                        error(ctx, "stray ',@'");
+                    sym = make_symbol(ctx, "unquote-splicing", 16);
+                } else {
+                    v = read(ctx, crsr);
+                    if (!v)
+                        error(ctx, "stray ','");
+                    sym = make_symbol(ctx, "unquote", 7);
+                }
+                return cons(ctx, sym, cons(ctx, v, ctx->nil));
+            }
+
+            case '\'': {
+                CRSR_NEXT(crsr);
+                v = read(ctx, crsr);
+                if (!v)
+                    error(ctx, "stray '''");
+                return cons(ctx,
+                            make_symbol(ctx, "quote", 5),
+                            cons(ctx, v, ctx->nil));
+            }
+
+            case '"': {
+                CRSR_NEXT(crsr);
+                u32 s = CRSR_POS(crsr);
+                u32 e = CRSR_END(crsr);
+                u32 p = s;
+                while ((chr = CRSR_READ(crsr) != '"')) {
+                    if (p == e)
+                        error(ctx, "string too long");
+                    if (chr == '\0')
+                        error(ctx, "unclosed string");
+                    if (chr == '\\') {
+                        CRSR_NEXT(crsr); chr = CRSR_READ(crsr);
+                        if (strchr("nrt", chr))
+                            chr = strchr("n\nr\rt\t", chr)[1];
+                    }
+                    CRSR_NEXT(crsr); p = CRSR_POS(crsr);
+                }
+                CRSR_NEXT(crsr);
+                return make_string(ctx, (const s8*) crsr.buf->data + s, p - s);
+            }
+
+            default: {
+                u32 s = CRSR_POS(crsr);
+                u32 e = CRSR_END(crsr);
+                u32 p = s;
+                do {
+                    if (p == e)
+                        error(ctx, "symbol too long");
+                    CRSR_NEXT(crsr); chr = CRSR_READ(crsr);
+                    p = CRSR_POS(crsr);
+                } while (chr && !strchr(s_delims, chr));
+                const s8*  start = (const s8*) (crsr.buf->data + s);
+                const auto len = p - s;
+                s8* end = (s8*) (start + len);
+                if (p != s) {
+                    switch (get_numtype(start, len)) {
+                        case numtype_t::none:
+                            if (strncmp(start, "#:", 2) == 0) {
+                                return make_keyword(ctx, start + 2, len - 2);
+                            } else {
+                                return make_symbol(ctx, start, len);
+                            }
+                        case numtype_t::fixnum:
+                            return make_fixnum(ctx, strtol(start, &end, 10));
+                        case numtype_t::flonum:
+                            return make_flonum(ctx, strtod(start, &end));
+                    }
+                } else {
+                    error(ctx, "expected flonum, fixnum, keyword, or symbol");
+                }
+            }
+        }
+
+        return ctx->nil;
+    }
+
+    obj_t* read(ctx_t* ctx, buf_crsr_t& crsr) {
+        obj_t* obj = read_expr(ctx, crsr);
+        if (obj == ctx->rparen) {
+            error(ctx, "stray ')'");
+        }
+        if (obj == ctx->rbrac) {
+            error(ctx, "stray ']'");
+        }
+        return obj;
+    }
+
     u32 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp) {
         return write(ctx, obj, write_fp, fp, 0);
     }
@@ -1392,17 +1398,6 @@ namespace basecode::scm {
         SET_TYPE(obj, obj_type_t::pair);
         SET_CAR(obj, car);
         SET_CDR(obj, cdr);
-        return obj;
-    }
-
-    obj_t* read(ctx_t* ctx, read_func_t fn, u0* udata) {
-        obj_t* obj = read_(ctx, fn, udata);
-        if (obj == ctx->rparen) {
-            error(ctx, "stray ')'");
-        }
-        if (obj == ctx->rbrac) {
-            error(ctx, "stray ']'");
-        }
         return obj;
     }
 

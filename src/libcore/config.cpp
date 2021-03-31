@@ -22,6 +22,7 @@
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/str_array.h>
+#include <basecode/core/stopwatch.h>
 #include <basecode/core/log/system/spdlog.h>
 #include <basecode/core/log/system/syslog.h>
 
@@ -1026,29 +1027,50 @@ namespace basecode::config {
     }
 
     status_t eval(const path_t& path, scm::obj_t** obj) {
-        auto file = fopen(path::c_str(path), "r");
-        if (!file) return status_t::bad_input;
+        buf_t buf{};
+        buf::init(buf, g_cfg_sys.alloc);
+        auto status = buf::map_existing(buf, path);
+        if (!OK(status))
+            return status_t::bad_input;
+        buf_crsr_t crsr{};
+        buf::cursor::init(crsr, buf);
         auto gc = scm::save_gc(g_cfg_sys.ctx);
         defer(
             scm::restore_gc(g_cfg_sys.ctx, gc);
-            fclose(file)
+            buf::cursor::free(crsr);
+            buf::free(buf);
         );
         while (true) {
-            auto expr = scm::read_fp(g_cfg_sys.ctx, file);
+            scm::obj_t* expr;
+//            TIME_BLOCK(
+//                "eval::scm::read"_ss,
+                expr = scm::read(g_cfg_sys.ctx, crsr);
+//                    );
             if (!expr) break;
-            *obj = scm::eval(g_cfg_sys.ctx, expr);
+//            scm::write_fp(g_cfg_sys.ctx, expr, stdout); fprintf(stdout, "\n");
+//            TIME_BLOCK(
+//                "eval::scm::eval"_ss,
+                *obj = scm::eval(g_cfg_sys.ctx, expr);
+//                    );
             scm::restore_gc(g_cfg_sys.ctx, gc);
         }
         return status_t::ok;
     }
 
     status_t eval(const u8* source, u32 len, scm::obj_t** obj) {
+        buf_t buf{};
+        buf::init(buf, g_cfg_sys.alloc);
+        auto status = buf::load(buf, source, len);
+        if (!OK(status))
+            return status_t::bad_input;
+        buf_crsr_t crsr{};
+        buf::cursor::init(crsr, buf);
         auto gc = scm::save_gc(g_cfg_sys.ctx);
-        defer(scm::restore_gc(g_cfg_sys.ctx, gc));
-        auto file = ::fmemopen((u0*) source, len, "r");
-        if (!file) return status_t::bad_input;
-        defer(fclose(file));
-        auto expr = scm::read_fp(g_cfg_sys.ctx, file);
+        defer(
+            scm::restore_gc(g_cfg_sys.ctx, gc);
+            buf::cursor::free(crsr);
+            buf::free(buf));
+        auto expr = scm::read(g_cfg_sys.ctx, crsr);
         if (!expr) {
             *obj = scm::nil(g_cfg_sys.ctx);
             return status_t::ok;

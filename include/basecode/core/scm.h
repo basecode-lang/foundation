@@ -28,6 +28,7 @@
 #pragma once
 
 #include <basecode/core/ffi.h>
+#include <basecode/core/buf.h>
 
 namespace basecode::scm {
     struct obj_t;
@@ -36,9 +37,7 @@ namespace basecode::scm {
     using fixnum_t              = u32;
     using flonum_t              = f32;
 
-    using read_func_t           = s8 (*)(ctx_t*, u0*);
     using error_func_t          = u0 (*)(ctx_t*, const s8*, obj_t*);
-    using write_func_t          = u0 (*)(ctx_t*, u0*, s8);
     using native_func_t         = obj_t* (*)(ctx_t*, obj_t*);
 
     struct handlers_t {
@@ -108,8 +107,6 @@ namespace basecode::scm {
 
     u0 error(ctx_t* ctx, const s8* msg);
 
-    obj_t* read_fp(ctx_t* ctx, FILE* fp);
-
     obj_t* make_bool(ctx_t* ctx, b8 value);
 
     u0* to_user_ptr(ctx_t* ctx, obj_t* obj);
@@ -121,6 +118,8 @@ namespace basecode::scm {
     u0 set(ctx_t* ctx, obj_t* sym, obj_t* v);
 
     obj_t* next_arg(ctx_t* ctx, obj_t** arg);
+
+    obj_t* read(ctx_t* ctx, buf_crsr_t& crsr);
 
     obj_t* make_user_ptr(ctx_t* ctx, u0* ptr);
 
@@ -134,15 +133,11 @@ namespace basecode::scm {
 
     obj_t* make_ffi(ctx_t* ctx, proto_t* proto);
 
-    u32 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp);
-
     obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env);
 
     obj_t* next_arg_no_chk(ctx_t* ctx, obj_t** arg);
 
     obj_t* cons(ctx_t* ctx, obj_t* car, obj_t* cdr);
-
-    obj_t* read(ctx_t* ctx, read_func_t fn, u0* udata);
 
     obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size);
 
@@ -157,6 +152,16 @@ namespace basecode::scm {
     obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len = -1);
 
     obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len = -1);
+
+    // XXX: OLD
+//    using read_func_t           = s8 (*)(ctx_t*, u0*);
+    using write_func_t          = u0 (*)(ctx_t*, u0*, s8);
+
+//    obj_t* read_fp(ctx_t* ctx, FILE* fp);
+
+//    obj_t* read(ctx_t* ctx, read_func_t fn, u0* udata);
+
+    u32 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp);
 
     u32 write(ctx_t* ctx, obj_t* obj, write_func_t fn, u0* udata, u32 qt);
 }
