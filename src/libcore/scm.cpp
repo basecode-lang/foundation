@@ -238,11 +238,6 @@ namespace basecode::scm {
         u32                     object_count;
     };
 
-    struct char_ptr_int_t final {
-        s8*                     p;
-        u32                     n;
-    } __attribute__((aligned(16)));
-
     struct ffi_type_map_t final {
         u8                      type;
         u8                      size;
@@ -263,7 +258,199 @@ namespace basecode::scm {
                        obj_t* env,
                        obj_t** new_env);
 
+    static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b);
+
+    static numtype_t get_numtype(const s8* buf, s32 len);
+
+    static obj_t* read_expr(ctx_t* ctx, buf_crsr_t& crsr);
+
+    static obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env);
+
+    static obj_t* quasiquote(ctx_t* ctx, obj_t* obj, obj_t* env);
+
+    static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type);
+
     static obj_t* args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg, obj_t* env);
+
+    static u32 make_ffi_signature(ctx_t* ctx, obj_t* args, obj_t* env, u8* buf);
+
+    u0 free(ctx_t* ctx) {
+        ctx->sym_list = ctx->nil;
+        ctx->str_list = ctx->nil;
+        collect_garbage(ctx);
+        array::free(ctx->native_ptrs);
+        stack::free(ctx->cl_stack);
+        stack::free(ctx->gc_stack);
+        ffi::free(ctx->ffi);
+    }
+
+    obj_t* nil(ctx_t* ctx) {
+        return ctx->nil;
+    }
+
+    u32 save_gc(ctx_t* ctx) {
+        return ctx->gc_stack.size;
+    }
+
+    obj_t* pop_gc(ctx_t* ctx) {
+        return stack::pop(ctx->gc_stack);
+    }
+
+    obj_type_t type(obj_t* obj) {
+        return TYPE(obj);
+    }
+
+    u0 collect_garbage(ctx_t* ctx) {
+//        format::print("before: ctx->object_used = {}\n", ctx->object_used);
+        for (u32 i = 0; i < ctx->gc_stack.size; i++)
+            mark(ctx, ctx->gc_stack[i]);
+        mark(ctx, ctx->sym_list);
+        mark(ctx, ctx->str_list);
+        for (u32 i = 0; i < ctx->object_count; i++) {
+            obj_t* obj = &ctx->objects[i];
+            if (TYPE(obj) == obj_type_t::free)
+                continue;
+            if (!IS_GC_MARKED(obj)) {
+                if (TYPE(obj) == obj_type_t::ptr
+                &&  ctx->handlers.gc) {
+                    ctx->handlers.gc(ctx, obj);
+                }
+                SET_TYPE(obj, obj_type_t::free);
+                SET_CDR(obj, ctx->free_list);
+                ctx->free_list = obj;
+                --ctx->object_used;
+            } else {
+                SET_GC_MARK(obj, false);
+            }
+        }
+//        format::print("after : ctx->object_used = {}\n", ctx->object_used);
+    }
+
+    fixnum_t to_fixnum(obj_t* obj) {
+        if (TYPE(obj) == obj_type_t::fixnum)
+            return fixnum_t(u32(obj->number.value));
+        else
+            return fixnum_t(std::bit_cast<f32>(u32(obj->number.value)));
+    }
+
+    flonum_t to_flonum(obj_t* obj) {
+        if (TYPE(obj) == obj_type_t::flonum)
+            return std::bit_cast<f32>(u32(obj->number.value));
+        else
+            return flonum_t(u32(obj->number.value));
+    }
+
+    u0 mark(ctx_t* ctx, obj_t* obj) {
+        if (!obj)
+            return;
+        obj_t* car;
+        begin:
+        if (IS_GC_MARKED(obj))
+            return;
+
+        car = CAR(obj);
+        SET_GC_MARK(obj, true);
+
+        switch (TYPE(obj)) {
+            case obj_type_t::string:
+                break;
+
+            case obj_type_t::pair:
+                mark(ctx, car);
+                /* fall through */
+            case obj_type_t::func:
+            case obj_type_t::macro:
+            case obj_type_t::symbol:
+            case obj_type_t::keyword:
+                obj = CDR(obj);
+                goto begin;
+
+            case obj_type_t::ptr:
+                if (ctx->handlers.mark) {
+                    ctx->handlers.mark(ctx, obj);
+                }
+                break;
+
+            default:
+                break;
+        }
+    }
+
+    handlers_t* handlers(ctx_t* ctx) {
+        return &ctx->handlers;
+    }
+
+    b8 is_nil(ctx_t* ctx, obj_t* obj) {
+        return IS_NIL(obj);
+    }
+
+    u0 restore_gc(ctx_t* ctx, u32 idx) {
+        stack::truncate(ctx->gc_stack, idx);
+    }
+
+    b8 is_true(ctx_t* ctx, obj_t* obj) {
+        return ctx->true_ == obj;
+    }
+
+    u32 length(ctx_t* ctx, obj_t* obj) {
+        switch (TYPE(obj)) {
+            case obj_type_t::pair: {
+                u32 len = 0;
+                for (obj_t* pair = obj; !IS_NIL(pair); pair = CDR(pair))
+                    ++len;
+                return len;
+            }
+            case obj_type_t::string: {
+                auto rc = string::interned::get(STRING_ID(obj));
+                if (!OK(rc.status))
+                    error(ctx, "unable to find interned string");
+                return rc.slice.length;
+            }
+            default:
+                break;
+        }
+        return 0;
+    }
+
+    u0 push_gc(ctx_t* ctx, obj_t* obj) {
+//        if (ctx->gc_stack_idx == GC_STACK_SIZE) {
+//            error(ctx, "gc stack overflow");
+//        }
+        stack::push(ctx->gc_stack, obj);
+    }
+
+    obj_t* car(ctx_t* ctx, obj_t* obj) {
+        if (IS_NIL(obj)) {
+            return obj;
+        }
+        return CAR(check_type(ctx, obj, obj_type_t::pair));
+    }
+
+    const s8* type_name(obj_t* obj) {
+        return s_type_names[u32(TYPE(obj))];
+    }
+
+    obj_t* cdr(ctx_t* ctx, obj_t* obj) {
+        if (IS_NIL(obj)) {
+            return obj;
+        }
+        return CDR(check_type(ctx, obj, obj_type_t::pair));
+    }
+
+    obj_t* eval(ctx_t* ctx, obj_t* obj) {
+        return eval(ctx, obj, ctx->nil, nullptr);
+    }
+
+    u0 error(ctx_t* ctx, const s8* msg) {
+        obj_t* cl = ctx->call_list;
+        ctx->call_list = ctx->nil;
+        if (ctx->handlers.error)
+            ctx->handlers.error(ctx, msg, cl);
+        format::print(stderr, "error: {}\n", msg);
+        for (; !IS_NIL(cl); cl = CDR(cl))
+            format::print(stderr, "=> {}\n", printable_t{ctx, CAR(cl)});
+        exit(EXIT_FAILURE);
+    }
 
     static obj_t* make_object(ctx_t* ctx) {
         obj_t* obj;
@@ -279,6 +466,204 @@ namespace basecode::scm {
         return obj;
     }
 
+    obj_t* make_bool(ctx_t* ctx, b8 value) {
+        return value ? ctx->true_ : ctx->false_;
+    }
+
+    u0* to_user_ptr(ctx_t* ctx, obj_t* obj) {
+        return ctx->native_ptrs[FIXNUM(check_type(ctx, obj, obj_type_t::ptr))];
+    }
+
+    obj_t* make_bool(ctx_t* ctx, obj_t* obj) {
+        return IS_TRUE(obj) ? ctx->true_ : ctx->false_;
+    }
+
+    u0 set(ctx_t* ctx, obj_t* sym, obj_t* v) {
+        UNUSED(ctx);
+        sym = get(ctx, sym, ctx->nil);
+        SET_CDR(sym, v);
+    }
+
+    obj_t* next_arg(ctx_t* ctx, obj_t** arg) {
+        obj_t* a = *arg;
+        if (TYPE(a) != obj_type_t::pair) {
+            if (IS_NIL(a))
+                error(ctx, "too few arguments");
+            error(ctx, "dotted pair in argument list");
+        }
+        *arg = CDR(a);
+        return CAR(a);
+    }
+
+    obj_t* make_user_ptr(ctx_t* ctx, u0* ptr) {
+        obj_t* obj = make_object(ctx);
+        array::append(ctx->native_ptrs, ptr);
+        SET_TYPE(obj, obj_type_t::ptr);
+        SET_FIXNUM(obj, ctx->native_ptrs.size - 1);
+        return obj;
+    }
+
+    obj_t* read(ctx_t* ctx, buf_crsr_t& crsr) {
+        obj_t* obj = read_expr(ctx, crsr);
+        if (obj == ctx->rparen) {
+            error(ctx, "stray ')'");
+        }
+        if (obj == ctx->rbrac) {
+            error(ctx, "stray ']'");
+        }
+        return obj;
+    }
+
+    obj_t* make_fixnum(ctx_t* ctx, fixnum_t n) {
+        obj_t* obj  = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::fixnum);
+        SET_FIXNUM(obj, n);
+        return obj;
+    }
+
+    obj_t* make_flonum(ctx_t* ctx, flonum_t n) {
+        obj_t* obj  = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::flonum);
+        SET_FLONUM(obj, n);
+        return obj;
+    }
+
+    obj_t* make_ffi(ctx_t* ctx, proto_t* proto) {
+        obj_t* obj = make_object(ctx);
+        array::append(ctx->native_ptrs, proto);
+        SET_TYPE(obj, obj_type_t::ffi);
+        SET_FIXNUM(obj, ctx->native_ptrs.size - 1);
+        return obj;
+    }
+
+    u0 print(FILE* file, ctx_t* ctx, obj_t* obj) {
+        format::print(file, "{}\n", printable_t{ctx, obj});
+    }
+
+    u0 write(FILE* file, ctx_t* ctx, obj_t* obj) {
+        format::print(file, "{}", printable_t{ctx, obj});
+    }
+
+    ctx_t* init(u0* ptr, u32 size, alloc_t* alloc) {
+        // init context struct
+        auto ctx = (ctx_t*) ptr;
+        std::memset(ctx, 0, sizeof(ctx_t));
+        u32 align;
+        ptr = (u8*) memory::system::align_forward(
+            (u8*) ptr + sizeof(ctx_t),
+            alignof(obj_t),
+            align);
+        size -= (sizeof(ctx_t) + align);
+
+        // init objects memory region
+        ctx->objects      = (obj_t*) ptr;
+        ctx->object_used  = 0;
+        ctx->object_count = (size / sizeof(obj_t)) - 1;
+        if ((ctx->object_count % 2) != 0)
+            --ctx->object_count;
+
+        // the nil object is a special case that
+        // we manually allocate from the heap
+        ctx->nil       = &ctx->objects[ctx->object_used++];
+        ctx->nil->full = 0;
+        SET_TYPE(ctx->nil, obj_type_t::nil);
+
+        ctx->alloc = alloc;
+        array::init(ctx->native_ptrs, ctx->alloc);
+        array::reserve(ctx->native_ptrs, 256);
+        stack::init(ctx->gc_stack, ctx->alloc);
+        stack::reserve(ctx->gc_stack, 1024);
+        stack::init(ctx->cl_stack, ctx->alloc);
+        stack::reserve(ctx->cl_stack, 1024);
+
+        // init lists
+        ctx->sym_list  = ctx->nil;
+        ctx->str_list  = ctx->nil;
+        ctx->call_list = ctx->nil;
+        ctx->free_list = ctx->nil;
+
+        // populate freelist
+        for (u32 i = ctx->object_used; i < ctx->object_count; i++) {
+            obj_t* obj = &ctx->objects[i];
+            SET_TYPE(obj, obj_type_t::free);
+            SET_CDR(obj, ctx->free_list);
+            ctx->free_list = obj;
+        }
+
+        // init objects
+        auto save = save_gc(ctx);
+        /* true */ {
+            ctx->true_ = make_object(ctx);
+            SET_TYPE(ctx->true_, obj_type_t::boolean);
+            SET_FIXNUM(ctx->true_, 1);
+            set(ctx, make_symbol(ctx, "#t", 2), ctx->true_);
+        }
+
+        /* false */ {
+            ctx->false_ = make_object(ctx);
+            SET_TYPE(ctx->false_, obj_type_t::boolean);
+            SET_FIXNUM(ctx->false_, 0);
+            set(ctx, make_symbol(ctx, "#f", 2), ctx->false_);
+        }
+
+        ctx->rbrac  = SYM("]");
+        ctx->rparen = SYM(")");
+        ctx->dot    = SYM(".");
+        set(ctx, ctx->dot, ctx->dot);
+        set(ctx, ctx->rbrac, ctx->rbrac);
+        set(ctx, SYM("nil"), ctx->nil);
+        set(ctx, ctx->rparen, ctx->rparen);
+        restore_gc(ctx, save);
+
+        // register built in primitives
+        for (u32 i = 0; i < u32(prim_type_t::max); i++) {
+            obj_t* v = make_object(ctx);
+            SET_TYPE(v, obj_type_t::prim);
+            SET_PRIM(v, i);
+            set(ctx, make_symbol(ctx, s_prim_names[i]), v);
+            restore_gc(ctx, save);
+        }
+
+        ffi::init(ctx->ffi);
+
+        return ctx;
+    }
+
+    str::slice_t to_string(ctx_t* ctx, obj_t* obj) {
+        switch (TYPE(obj)) {
+            case obj_type_t::nil:
+                return "nil"_ss;
+            case obj_type_t::symbol:
+            case obj_type_t::keyword:
+                return *string::interned::get_slice(STRING_ID(CAR(CDR(obj))));
+            case obj_type_t::string:
+                return *string::interned::get_slice(STRING_ID(obj));
+            case obj_type_t::boolean:
+                return IS_TRUE(obj) ? "#t"_ss : "#f"_ss;
+            default:
+                return str::slice_t{};
+        }
+    }
+
+    obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env) {
+        UNUSED(ctx);
+        for (; !IS_NIL(env); env = CDR(env)) {
+            obj_t* x = CAR(env);
+            if (CAR(x) == sym) {
+                return x;
+            }
+        }
+        return CDR(sym);
+    }
+
+    obj_t* next_arg_no_chk(ctx_t* ctx, obj_t** arg) {
+        obj_t* a = *arg;
+        if (TYPE(a) != obj_type_t::pair)
+            return ctx->nil;
+        *arg = CDR(a);
+        return CAR(a);
+    }
+
     static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b) {
         if (a == b)
             return true;
@@ -286,14 +671,14 @@ namespace basecode::scm {
         &&  (TYPE(b) == obj_type_t::fixnum || TYPE(b) == obj_type_t::flonum)) {
             switch (TYPE(a)) {
                 case obj_type_t::fixnum: {
-                    auto fa = to_fixnum(ctx, a);
-                    auto fb = to_fixnum(ctx, b);
+                    auto fa = to_fixnum(a);
+                    auto fb = to_fixnum(b);
                     return fa == fb;
                 }
                 case obj_type_t::flonum: {
                     const auto e = std::numeric_limits<flonum_t>::epsilon();
-                    auto x = fabs(to_flonum(ctx, a));
-                    auto y = fabs(to_flonum(ctx, b));
+                    auto x = fabs(to_flonum(a));
+                    auto y = fabs(to_flonum(b));
                     auto largest = (y > x) ? y : x;
                     auto diff = x - y;
                     return diff <= largest * e;
@@ -328,12 +713,35 @@ namespace basecode::scm {
         return false;
     }
 
+    obj_t* cons(ctx_t* ctx, obj_t* car, obj_t* cdr) {
+        obj_t* obj = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::pair);
+        SET_CAR(obj, car);
+        SET_CDR(obj, cdr);
+        return obj;
+    }
+
+    u0 print(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj) {
+        format::format_to(buf, "{}\n", printable_t{ctx, obj});
+    }
+
+    u0 write(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj) {
+        format::format_to(buf, "{}", printable_t{ctx, obj});
+    }
+
+    obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size) {
+        obj_t* res = ctx->nil;
+        while (size--)
+            res = cons(ctx, objs[size], res);
+        return res;
+    }
+
     static numtype_t get_numtype(const s8* buf, s32 len) {
         const s8* p = buf;
         s8 ch = *p;
         numtype_t type = ((ch == '+' && len > 1)
-                    || (ch == '-' && len > 1)
-                    || isdigit(ch)) ? numtype_t::fixnum : numtype_t::none;
+                          || (ch == '-' && len > 1)
+                          || isdigit(ch)) ? numtype_t::fixnum : numtype_t::none;
         if (type == numtype_t::none)
             return type;
         while (--len > 0) {
@@ -348,18 +756,208 @@ namespace basecode::scm {
         return type;
     }
 
-    static u0 write_fp(ctx_t* ctx, u0* udata, s8 chr) {
-        UNUSED(ctx);
-        fputc(chr, (FILE*) udata);
+    obj_t* make_native_func(ctx_t* ctx, native_func_t fn) {
+        obj_t* obj = make_object(ctx);
+        array::append(ctx->native_ptrs, (u0*) fn);
+        SET_TYPE(obj, obj_type_t::cfunc);
+        SET_FIXNUM(obj, ctx->native_ptrs.size - 1);
+        return obj;
     }
 
-    static u0 write_buf(ctx_t* ctx, u0* udata, s8 chr) {
-        auto x = (char_ptr_int_t*) udata;
-        UNUSED(ctx);
-        if (x->n) {
-            *x->p++ = chr;
-            x->n--;
+    static obj_t* read_expr(ctx_t* ctx, buf_crsr_t& crsr) {
+        obj_t* v;
+        s8 chr{};
+
+        next:
+        chr = CRSR_READ(crsr);
+
+        while (chr && isspace(chr)) {
+            if (chr == '\n')
+                CRSR_NEWLINE(crsr);
+            CRSR_NEXT(crsr);
+            chr = CRSR_READ(crsr);
         }
+
+        switch (chr) {
+            case '\0':
+                return nullptr;
+
+            case ';':
+                do {
+                    CRSR_NEXT(crsr);
+                    chr = CRSR_READ(crsr);
+                } while (chr && chr != '\n');
+                CRSR_NEXT(crsr); CRSR_NEWLINE(crsr);
+                goto next;
+
+            case ']': {
+                CRSR_NEXT(crsr);
+                auto tos = stack::pop(ctx->cl_stack);
+                if (tos == ctx->rparen)
+                    error(ctx, "expected closing paren but found closing bracket");
+                return ctx->rbrac;
+            }
+
+            case ')': {
+                CRSR_NEXT(crsr);
+                auto tos = stack::pop(ctx->cl_stack);
+                if (tos == ctx->rbrac)
+                    error(ctx, "expected closing bracket but found closing paren");
+                return ctx->rparen;
+            }
+
+            case '[':
+                stack::push(ctx->cl_stack, ctx->rbrac);
+                goto _skip;
+
+            case '(':
+                stack::push(ctx->cl_stack, ctx->rparen);
+            _skip: {
+                CRSR_NEXT(crsr);
+                obj_t* head = ctx->nil;
+                obj_t* tail = head;
+                auto gc = save_gc(ctx);
+                push_gc(ctx, head);
+                while (true) {
+                    v = read_expr(ctx, crsr);
+                    if (v == ctx->rparen || v == ctx->rbrac)
+                        break;
+                    if (v == nullptr)
+                        error(ctx, "unclosed list");
+                    if (v == ctx->dot) {
+                        SET_CDR(tail, read(ctx, crsr));
+                    } else {
+                        v = cons(ctx, v, ctx->nil);
+                        if (IS_NIL(tail)) {
+                            head = v;
+                            tail = head;
+                        } else {
+                            SET_CDR(tail, v);
+                            tail = v;
+                        }
+                    }
+                    restore_gc(ctx, gc);
+                    push_gc(ctx, head);
+                }
+                return head;
+            }
+
+            case '`': {
+                CRSR_NEXT(crsr);
+                v = read(ctx, crsr);
+                if (!v)
+                    error(ctx, "stray '`'");
+                return cons(ctx,
+                            make_symbol(ctx, "quasiquote", 10),
+                            cons(ctx, v, ctx->nil));
+            }
+
+            case ',': {
+                CRSR_NEXT(crsr);
+                obj_t* sym;
+                if (CRSR_READ(crsr) == '@') {
+                    CRSR_NEXT(crsr);
+                    v = read(ctx, crsr);
+                    if (!v)
+                        error(ctx, "stray ',@'");
+                    sym = make_symbol(ctx, "unquote-splicing", 16);
+                } else {
+                    v = read(ctx, crsr);
+                    if (!v)
+                        error(ctx, "stray ','");
+                    sym = make_symbol(ctx, "unquote", 7);
+                }
+                return cons(ctx, sym, cons(ctx, v, ctx->nil));
+            }
+
+            case '\'': {
+                CRSR_NEXT(crsr);
+                v = read(ctx, crsr);
+                if (!v)
+                    error(ctx, "stray '''");
+                return cons(ctx,
+                            make_symbol(ctx, "quote", 5),
+                            cons(ctx, v, ctx->nil));
+            }
+
+            case '"': {
+                CRSR_NEXT(crsr);
+                u32 s = CRSR_POS(crsr);
+                u32 e = CRSR_END(crsr);
+                u32 p = s;
+                while ((chr = CRSR_READ(crsr) != '"')) {
+                    if (p == e)
+                        error(ctx, "string too long");
+                    if (chr == '\0')
+                        error(ctx, "unclosed string");
+                    if (chr == '\\') {
+                        CRSR_NEXT(crsr); chr = CRSR_READ(crsr);
+                        if (strchr("nrt", chr))
+                            chr = strchr("n\nr\rt\t", chr)[1];
+                    }
+                    CRSR_NEXT(crsr); p = CRSR_POS(crsr);
+                }
+                CRSR_NEXT(crsr);
+                return make_string(ctx, (const s8*) crsr.buf->data + s, p - s);
+            }
+
+            default: {
+                u32 s = CRSR_POS(crsr);
+                u32 e = CRSR_END(crsr);
+                u32 p = s;
+                do {
+                    if (p == e)
+                        error(ctx, "symbol too long");
+                    CRSR_NEXT(crsr); chr = CRSR_READ(crsr);
+                    p = CRSR_POS(crsr);
+                } while (chr && !strchr(s_delims, chr));
+                const s8*  start = (const s8*) (crsr.buf->data + s);
+                const auto len = p - s;
+                s8* end = (s8*) (start + len);
+                if (p != s) {
+                    switch (get_numtype(start, len)) {
+                        case numtype_t::none:
+                            if (strncmp(start, "#:", 2) == 0) {
+                                return make_keyword(ctx, start + 2, len - 2);
+                            } else {
+                                return make_symbol(ctx, start, len);
+                            }
+                        case numtype_t::fixnum:
+                            return make_fixnum(ctx, strtol(start, &end, 10));
+                        case numtype_t::flonum:
+                            return make_flonum(ctx, strtod(start, &end));
+                    }
+                } else {
+                    error(ctx, "expected flonum, fixnum, keyword, or symbol");
+                }
+            }
+        }
+
+        return ctx->nil;
+    }
+
+    obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len) {
+        u32 id{};
+        obj_t* obj = find_symbol(ctx, name, id, len);
+        if (!IS_NIL(obj))
+            return obj;
+        obj = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::symbol);
+        SET_CDR(obj, cons(ctx, make_string(ctx, name, len, id), ctx->nil));
+        ctx->sym_list = cons(ctx, obj, ctx->sym_list);
+        return obj;
+    }
+
+    obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len) {
+        u32 id{};
+        obj_t* obj = find_symbol(ctx, name, id, len);
+        if (!IS_NIL(obj))
+            return obj;
+        obj = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::keyword);
+        SET_CDR(obj, cons(ctx, make_string(ctx, name, len, id), ctx->nil));
+        ctx->sym_list = cons(ctx, obj, ctx->sym_list);
+        return obj;
     }
 
     static obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env) {
@@ -399,6 +997,49 @@ namespace basecode::scm {
         return make_list(ctx, t1, 3);
     }
 
+    obj_t* make_string(ctx_t* ctx, const s8* str, s32 len, u32 id) {
+        auto obj = find_string(ctx, str, id, len);
+        if (!IS_NIL(obj))
+            return obj;
+        obj = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::string);
+        SET_FIXNUM(obj, id);
+        ctx->str_list = cons(ctx, obj, ctx->str_list);
+        return obj;
+    }
+
+    obj_t* find_string(ctx_t* ctx, const s8* str, u32& id, s32 len) {
+        if (!id) {
+            const auto rc = string::interned::fold_for_result(str, len);
+            if (!OK(rc.status))
+                error(ctx, "find_string unable to intern string");
+            id = rc.id;
+        }
+        for (obj_t* obj = ctx->str_list; !IS_NIL(obj); obj = CDR(obj)) {
+            auto kar = CAR(obj);
+            const auto intern_id = FIXNUM(kar);
+            if (intern_id == id)
+                return kar;
+        }
+        return ctx->nil;
+    }
+
+    obj_t* find_symbol(ctx_t* ctx, const s8* name, u32& id, s32 len) {
+        if (!id) {
+            const auto rc = string::interned::fold_for_result(name, len);
+            if (!OK(rc.status))
+                error(ctx, "find_symbol unable to intern string");
+            id = rc.id;
+        }
+        for (obj_t* obj = ctx->sym_list; !IS_NIL(obj); obj = CDR(obj)) {
+            auto str = CAR(CDR(CAR(obj)));
+            const auto intern_id = FIXNUM(str);
+            if (intern_id == id)
+                return CAR(obj);
+        }
+        return ctx->nil;
+    }
+
     static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type) {
         s8 buf[64];
         if (TYPE(obj) != type) {
@@ -409,22 +1050,6 @@ namespace basecode::scm {
             error(ctx, buf);
         }
         return obj;
-    }
-
-    static u32 make_ffi_signature(ctx_t* ctx, obj_t* args, obj_t* env, u8* buf) {
-        u32 len{};
-        if (IS_NIL(args)) {
-            buf[len++] = u8(param_cls_t::void_);
-            return len;
-        }
-        while (!IS_NIL(args)) {
-            const auto type = TYPE(EVAL(CAR(args)));
-            const auto& mapping = s_types[u32(type)];
-            buf[len++] = mapping.type;
-            buf[len++] = mapping.size;
-            args = CDR(args);
-        }
-        return len;
     }
 
     static obj_t* eval(ctx_t* ctx, obj_t* obj, obj_t* env, obj_t** new_env) {
@@ -456,7 +1081,7 @@ namespace basecode::scm {
             kar = CAR(obj);
             arg = CDR(obj);
             if (TYPE(kar) == obj_type_t::symbol)
-                    fn  = CDR(get(ctx, kar, env));
+                fn  = CDR(get(ctx, kar, env));
             else    fn = kar;
 
             switch (TYPE(fn)) {
@@ -588,80 +1213,79 @@ namespace basecode::scm {
                             break;
 
                         case prim_type_t::atom:
-                            res = make_bool(ctx, type(ctx, EVAL_ARG()) != obj_type_t::pair);
+                            res = make_bool(ctx, TYPE(EVAL_ARG()) != obj_type_t::pair);
                             break;
 
                         case prim_type_t::print:
                             while (!IS_NIL(arg)) {
-                                write_fp(ctx, EVAL_ARG(), stdout);
-                                if (!IS_NIL(arg)) {
-                                    printf(" ");
-                                }
+                                format::print("{}", printable_t{ctx, EVAL_ARG()});
+                                if (!IS_NIL(arg))
+                                    format::print(" ");
                             }
-                            printf("\n");
+                            format::print("\n");
                             res = ctx->nil;
                             break;
 
                         case prim_type_t::gt:
                             va  = EVAL_ARG();
                             vb  = EVAL_ARG();
-                            res = make_bool(ctx, to_flonum(ctx, va) > to_flonum(ctx, vb));
+                            res = make_bool(ctx, to_flonum(va) > to_flonum(vb));
                             break;
 
                         case prim_type_t::gte:
                             va  = EVAL_ARG();
                             vb  = EVAL_ARG();
-                            res = make_bool(ctx, to_flonum(ctx, va) >= to_flonum(ctx, vb));
+                            res = make_bool(ctx, to_flonum(va) >= to_flonum(vb));
                             break;
 
                         case prim_type_t::lt:
                             va  = EVAL_ARG();
                             vb  = EVAL_ARG();
-                            res = make_bool(ctx, to_flonum(ctx, va) < to_flonum(ctx, vb));
+                            res = make_bool(ctx, to_flonum(va) < to_flonum(vb));
                             break;
 
                         case prim_type_t::lte:
                             va  = EVAL_ARG();
                             vb  = EVAL_ARG();
-                            res = make_bool(ctx, to_flonum(ctx, va) <= to_flonum(ctx, vb));
+                            res = make_bool(ctx, to_flonum(va) <= to_flonum(vb));
                             break;
 
                         case prim_type_t::add: {
-                            flonum_t x = to_flonum(ctx, EVAL_ARG());
+                            flonum_t x = to_flonum(EVAL_ARG());
                             while (!IS_NIL(arg))
-                                x += to_flonum(ctx, EVAL_ARG());
+                                x += to_flonum(EVAL_ARG());
                             res = make_flonum(ctx, x);
                             break;
                         }
 
                         case prim_type_t::sub: {
-                            flonum_t x = to_flonum(ctx, EVAL_ARG());
+                            flonum_t x = to_flonum(EVAL_ARG());
                             while (!IS_NIL(arg))
-                                x -= to_flonum(ctx, EVAL_ARG());
+                                x -= to_flonum(EVAL_ARG());
                             res = make_flonum(ctx, x);
                             break;
                         }
 
                         case prim_type_t::mul: {
-                            flonum_t x = to_flonum(ctx, EVAL_ARG());
+                            flonum_t x = to_flonum(EVAL_ARG());
                             while (!IS_NIL(arg))
-                                x *= to_flonum(ctx, EVAL_ARG());
+                                x *= to_flonum(EVAL_ARG());
                             res = make_flonum(ctx, x);
                             break;
                         }
 
                         case prim_type_t::div: {
-                            flonum_t x = to_flonum(ctx, EVAL_ARG());
+                            flonum_t x = to_flonum(EVAL_ARG());
                             while (!IS_NIL(arg))
-                                x /= to_flonum(ctx, EVAL_ARG());
+                                x /= to_flonum(EVAL_ARG());
                             res = make_flonum(ctx, x);
                             break;
                         }
 
                         case prim_type_t::mod: {
-                            fixnum_t x = to_fixnum(ctx, EVAL_ARG());
+                            fixnum_t x = to_fixnum(EVAL_ARG());
                             while (!IS_NIL(arg))
-                                x %= to_fixnum(ctx, EVAL_ARG());
+                                x %= to_fixnum(EVAL_ARG());
                             res = make_fixnum(ctx, x);
                             break;
                         }
@@ -852,15 +1476,6 @@ namespace basecode::scm {
         return res;
     }
 
-    static u32 write_str(ctx_t* ctx, write_func_t fn, u0* udata, const s8* s) {
-        u32 len{};
-        while (*s) {
-            fn(ctx, udata, *s++);
-            ++len;
-        }
-        return len;
-    }
-
     static obj_t* args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg, obj_t* env) {
         while (!IS_NIL(prm)) {
             if (TYPE(prm) != obj_type_t::pair) {
@@ -874,705 +1489,21 @@ namespace basecode::scm {
         return env;
     }
 
-    u0 free(ctx_t* ctx) {
-        ctx->sym_list = ctx->nil;
-        ctx->str_list = ctx->nil;
-        collect_garbage(ctx);
-        array::free(ctx->native_ptrs);
-        stack::free(ctx->cl_stack);
-        stack::free(ctx->gc_stack);
-        ffi::free(ctx->ffi);
-    }
 
-    obj_t* nil(ctx_t* ctx) {
-        return ctx->nil;
-    }
-
-    u32 save_gc(ctx_t* ctx) {
-        return ctx->gc_stack.size;
-    }
-
-    obj_t* pop_gc(ctx_t* ctx) {
-        return stack::pop(ctx->gc_stack);
-    }
-
-    u0 collect_garbage(ctx_t* ctx) {
-//        format::print("before: ctx->object_used = {}\n", ctx->object_used);
-        for (u32 i = 0; i < ctx->gc_stack.size; i++)
-            mark(ctx, ctx->gc_stack[i]);
-        mark(ctx, ctx->sym_list);
-        mark(ctx, ctx->str_list);
-        for (u32 i = 0; i < ctx->object_count; i++) {
-            obj_t* obj = &ctx->objects[i];
-            if (TYPE(obj) == obj_type_t::free)
-                continue;
-            if (!IS_GC_MARKED(obj)) {
-                if (TYPE(obj) == obj_type_t::ptr
-                &&  ctx->handlers.gc) {
-                    ctx->handlers.gc(ctx, obj);
-                }
-                SET_TYPE(obj, obj_type_t::free);
-                SET_CDR(obj, ctx->free_list);
-                ctx->free_list = obj;
-                --ctx->object_used;
-            } else {
-                SET_GC_MARK(obj, false);
-            }
+    static u32 make_ffi_signature(ctx_t* ctx, obj_t* args, obj_t* env, u8* buf) {
+        u32 len{};
+        if (IS_NIL(args)) {
+            buf[len++] = u8(param_cls_t::void_);
+            return len;
         }
-//        format::print("after : ctx->object_used = {}\n", ctx->object_used);
-    }
-
-    ctx_t* init(u0* ptr, u32 size, alloc_t* alloc) {
-        // init context struct
-        auto ctx = (ctx_t*) ptr;
-        std::memset(ctx, 0, sizeof(ctx_t));
-        u32 align;
-        ptr = (u8*) memory::system::align_forward(
-            (u8*) ptr + sizeof(ctx_t),
-            alignof(obj_t),
-            align);
-        size -= (sizeof(ctx_t) + align);
-
-        // init objects memory region
-        ctx->objects      = (obj_t*) ptr;
-        ctx->object_used  = 0;
-        ctx->object_count = (size / sizeof(obj_t)) - 1;
-        if ((ctx->object_count % 2) != 0)
-            --ctx->object_count;
-
-        // the nil object is a special case that
-        // we manually allocate from the heap
-        ctx->nil       = &ctx->objects[ctx->object_used++];
-        ctx->nil->full = 0;
-        SET_TYPE(ctx->nil, obj_type_t::nil);
-
-        ctx->alloc = alloc;
-        array::init(ctx->native_ptrs, ctx->alloc);
-        array::reserve(ctx->native_ptrs, 256);
-        stack::init(ctx->gc_stack, ctx->alloc);
-        stack::reserve(ctx->gc_stack, 1024);
-        stack::init(ctx->cl_stack, ctx->alloc);
-        stack::reserve(ctx->cl_stack, 1024);
-
-        // init lists
-        ctx->sym_list  = ctx->nil;
-        ctx->str_list  = ctx->nil;
-        ctx->call_list = ctx->nil;
-        ctx->free_list = ctx->nil;
-
-        // populate freelist
-        for (u32 i = ctx->object_used; i < ctx->object_count; i++) {
-            obj_t* obj = &ctx->objects[i];
-            SET_TYPE(obj, obj_type_t::free);
-            SET_CDR(obj, ctx->free_list);
-            ctx->free_list = obj;
+        while (!IS_NIL(args)) {
+            const auto type = TYPE(EVAL(CAR(args)));
+            const auto& mapping = s_types[u32(type)];
+            buf[len++] = mapping.type;
+            buf[len++] = mapping.size;
+            args = CDR(args);
         }
-
-        // init objects
-        auto save = save_gc(ctx);
-        /* true */ {
-            ctx->true_ = make_object(ctx);
-            SET_TYPE(ctx->true_, obj_type_t::boolean);
-            SET_FIXNUM(ctx->true_, 1);
-            set(ctx, make_symbol(ctx, "#t", 2), ctx->true_);
-        }
-
-        /* false */ {
-            ctx->false_ = make_object(ctx);
-            SET_TYPE(ctx->false_, obj_type_t::boolean);
-            SET_FIXNUM(ctx->false_, 0);
-            set(ctx, make_symbol(ctx, "#f", 2), ctx->false_);
-        }
-
-        ctx->rbrac  = SYM("]");
-        ctx->rparen = SYM(")");
-        ctx->dot    = SYM(".");
-        set(ctx, ctx->dot, ctx->dot);
-        set(ctx, ctx->rbrac, ctx->rbrac);
-        set(ctx, SYM("nil"), ctx->nil);
-        set(ctx, ctx->rparen, ctx->rparen);
-        restore_gc(ctx, save);
-
-        // register built in primitives
-        for (u32 i = 0; i < u32(prim_type_t::max); i++) {
-            obj_t* v = make_object(ctx);
-            SET_TYPE(v, obj_type_t::prim);
-            SET_PRIM(v, i);
-            set(ctx, make_symbol(ctx, s_prim_names[i]), v);
-            restore_gc(ctx, save);
-        }
-
-        ffi::init(ctx->ffi);
-
-        return ctx;
-    }
-
-    u0 mark(ctx_t* ctx, obj_t* obj) {
-        if (!obj)
-            return;
-        obj_t* car;
-    begin:
-        if (IS_GC_MARKED(obj))
-            return;
-
-        car = CAR(obj);
-        SET_GC_MARK(obj, true);
-
-        switch (TYPE(obj)) {
-            case obj_type_t::string:
-                break;
-
-            case obj_type_t::pair:
-                mark(ctx, car);
-                /* fall through */
-            case obj_type_t::func:
-            case obj_type_t::macro:
-            case obj_type_t::symbol:
-            case obj_type_t::keyword:
-                obj = CDR(obj);
-                goto begin;
-
-            case obj_type_t::ptr:
-                if (ctx->handlers.mark) {
-                    ctx->handlers.mark(ctx, obj);
-                }
-                break;
-
-            default:
-                break;
-        }
-    }
-
-    handlers_t* handlers(ctx_t* ctx) {
-        return &ctx->handlers;
-    }
-
-    b8 is_nil(ctx_t* ctx, obj_t* obj) {
-        UNUSED(ctx);
-        return IS_NIL(obj);
-    }
-
-    u0 restore_gc(ctx_t* ctx, u32 idx) {
-        stack::truncate(ctx->gc_stack, idx);
-    }
-
-    b8 is_true(ctx_t* ctx, obj_t* obj) {
-        UNUSED(ctx);
-        return ctx->true_ == obj;
-    }
-
-    u32 length(ctx_t* ctx, obj_t* obj) {
-        switch (TYPE(obj)) {
-            case obj_type_t::pair: {
-                u32 len = 0;
-                for (obj_t* pair = obj; !IS_NIL(pair); pair = CDR(pair))
-                    ++len;
-                return len;
-            }
-            case obj_type_t::string: {
-                auto rc = string::interned::get(STRING_ID(obj));
-                if (!OK(rc.status))
-                    error(ctx, "unable to find interned string");
-                return rc.slice.length;
-            }
-            default:
-                break;
-        }
-        return 0;
-    }
-
-    u0 push_gc(ctx_t* ctx, obj_t* obj) {
-//        if (ctx->gc_stack_idx == GC_STACK_SIZE) {
-//            error(ctx, "gc stack overflow");
-//        }
-        stack::push(ctx->gc_stack, obj);
-    }
-
-    obj_t* car(ctx_t* ctx, obj_t* obj) {
-        if (IS_NIL(obj)) {
-            return obj;
-        }
-        return CAR(check_type(ctx, obj, obj_type_t::pair));
-    }
-
-    obj_t* cdr(ctx_t* ctx, obj_t* obj) {
-        if (IS_NIL(obj)) {
-            return obj;
-        }
-        return CDR(check_type(ctx, obj, obj_type_t::pair));
-    }
-
-    obj_t* eval(ctx_t* ctx, obj_t* obj) {
-        return eval(ctx, obj, ctx->nil, nullptr);
-    }
-
-    u0 error(ctx_t* ctx, const s8* msg) {
-        s8 scratch[1024];
-        obj_t* cl = ctx->call_list;
-        ctx->call_list = ctx->nil;
-        if (ctx->handlers.error) {
-            ctx->handlers.error(ctx, msg, cl);
-        }
-        fprintf(stderr, "error: %s\n", msg);
-        for (; !IS_NIL(cl); cl = CDR(cl)) {
-            to_string(ctx, CAR(cl), scratch, sizeof(scratch));
-            fprintf(stderr, "=> %s\n", scratch);
-        }
-        exit(EXIT_FAILURE);
-    }
-
-    obj_t* make_bool(ctx_t* ctx, b8 value) {
-        return value ? ctx->true_ : ctx->false_;
-    }
-
-    obj_type_t type(ctx_t* ctx, obj_t* obj) {
-        UNUSED(ctx);
-        return TYPE(obj);
-    }
-
-    u0* to_user_ptr(ctx_t* ctx, obj_t* obj) {
-        return ctx->native_ptrs[FIXNUM(check_type(ctx, obj, obj_type_t::ptr))];
-    }
-
-    obj_t* make_bool(ctx_t* ctx, obj_t* obj) {
-        return IS_TRUE(obj) ? ctx->true_ : ctx->false_;
-    }
-
-    u0 set(ctx_t* ctx, obj_t* sym, obj_t* v) {
-        UNUSED(ctx);
-        sym = get(ctx, sym, ctx->nil);
-        SET_CDR(sym, v);
-    }
-
-    obj_t* next_arg(ctx_t* ctx, obj_t** arg) {
-        obj_t* a = *arg;
-        if (TYPE(a) != obj_type_t::pair) {
-            if (IS_NIL(a))
-                error(ctx, "too few arguments");
-            error(ctx, "dotted pair in argument list");
-        }
-        *arg = CDR(a);
-        return CAR(a);
-    }
-
-    obj_t* make_user_ptr(ctx_t* ctx, u0* ptr) {
-        obj_t* obj = make_object(ctx);
-        array::append(ctx->native_ptrs, ptr);
-        SET_TYPE(obj, obj_type_t::ptr);
-        SET_FIXNUM(obj, ctx->native_ptrs.size - 1);
-        return obj;
-    }
-
-    fixnum_t to_fixnum(ctx_t* ctx, obj_t* obj) {
-        numeric_alias_t a{.dw = obj->number.value};
-        if (TYPE(obj) == obj_type_t::fixnum)
-            return a.dw;
-        else
-            return fixnum_t(a.fdw);
-    }
-
-    obj_t* make_fixnum(ctx_t* ctx, fixnum_t n) {
-        obj_t* obj  = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::fixnum);
-        SET_FIXNUM(obj, n);
-        return obj;
-    }
-
-    obj_t* make_flonum(ctx_t* ctx, flonum_t n) {
-        obj_t* obj  = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::flonum);
-        SET_FLONUM(obj, n);
-        return obj;
-    }
-
-    flonum_t to_flonum(ctx_t* ctx, obj_t* obj) {
-        numeric_alias_t a{.dw = obj->number.value};
-        if (TYPE(obj) == obj_type_t::flonum)
-            return a.fdw;
-        else
-            return flonum_t(a.dw);
-    }
-
-    obj_t* make_ffi(ctx_t* ctx, proto_t* proto) {
-        obj_t* obj = make_object(ctx);
-        array::append(ctx->native_ptrs, proto);
-        SET_TYPE(obj, obj_type_t::ffi);
-        SET_FIXNUM(obj, ctx->native_ptrs.size - 1);
-        return obj;
-    }
-
-    static obj_t* read_expr(ctx_t* ctx, buf_crsr_t& crsr) {
-        obj_t* v;
-        s8 chr{};
-
-    next:
-        chr = CRSR_READ(crsr);
-
-        while (chr && isspace(chr)) {
-            if (chr == '\n')
-                CRSR_NEWLINE(crsr);
-            CRSR_NEXT(crsr);
-            chr = CRSR_READ(crsr);
-        }
-
-        switch (chr) {
-            case '\0':
-                return nullptr;
-
-            case ';':
-                do {
-                    CRSR_NEXT(crsr);
-                    chr = CRSR_READ(crsr);
-                } while (chr && chr != '\n');
-                CRSR_NEXT(crsr); CRSR_NEWLINE(crsr);
-                goto next;
-
-            case ']': {
-                CRSR_NEXT(crsr);
-                auto tos = stack::pop(ctx->cl_stack);
-                if (tos == ctx->rparen)
-                    error(ctx, "expected closing paren but found closing bracket");
-                return ctx->rbrac;
-            }
-
-            case ')': {
-                CRSR_NEXT(crsr);
-                auto tos = stack::pop(ctx->cl_stack);
-                if (tos == ctx->rbrac)
-                    error(ctx, "expected closing bracket but found closing paren");
-                return ctx->rparen;
-            }
-
-            case '[':
-                stack::push(ctx->cl_stack, ctx->rbrac);
-                goto _skip;
-
-            case '(':
-                stack::push(ctx->cl_stack, ctx->rparen);
-            _skip: {
-                CRSR_NEXT(crsr);
-                obj_t* head = ctx->nil;
-                obj_t* tail = head;
-                auto gc = save_gc(ctx);
-                push_gc(ctx, head);
-                while (true) {
-                    v = read_expr(ctx, crsr);
-                    if (v == ctx->rparen || v == ctx->rbrac)
-                        break;
-                    if (v == nullptr)
-                        error(ctx, "unclosed list");
-                    if (v == ctx->dot) {
-                        SET_CDR(tail, read(ctx, crsr));
-                    } else {
-                        v = cons(ctx, v, ctx->nil);
-                        if (IS_NIL(tail)) {
-                            head = v;
-                            tail = head;
-                        } else {
-                            SET_CDR(tail, v);
-                            tail = v;
-                        }
-                    }
-                    restore_gc(ctx, gc);
-                    push_gc(ctx, head);
-                }
-                return head;
-            }
-
-            case '`': {
-                CRSR_NEXT(crsr);
-                v = read(ctx, crsr);
-                if (!v)
-                    error(ctx, "stray '`'");
-                return cons(ctx,
-                            make_symbol(ctx, "quasiquote", 10),
-                            cons(ctx, v, ctx->nil));
-            }
-
-            case ',': {
-                CRSR_NEXT(crsr);
-                obj_t* sym;
-                if (CRSR_READ(crsr) == '@') {
-                    CRSR_NEXT(crsr);
-                    v = read(ctx, crsr);
-                    if (!v)
-                        error(ctx, "stray ',@'");
-                    sym = make_symbol(ctx, "unquote-splicing", 16);
-                } else {
-                    v = read(ctx, crsr);
-                    if (!v)
-                        error(ctx, "stray ','");
-                    sym = make_symbol(ctx, "unquote", 7);
-                }
-                return cons(ctx, sym, cons(ctx, v, ctx->nil));
-            }
-
-            case '\'': {
-                CRSR_NEXT(crsr);
-                v = read(ctx, crsr);
-                if (!v)
-                    error(ctx, "stray '''");
-                return cons(ctx,
-                            make_symbol(ctx, "quote", 5),
-                            cons(ctx, v, ctx->nil));
-            }
-
-            case '"': {
-                CRSR_NEXT(crsr);
-                u32 s = CRSR_POS(crsr);
-                u32 e = CRSR_END(crsr);
-                u32 p = s;
-                while ((chr = CRSR_READ(crsr) != '"')) {
-                    if (p == e)
-                        error(ctx, "string too long");
-                    if (chr == '\0')
-                        error(ctx, "unclosed string");
-                    if (chr == '\\') {
-                        CRSR_NEXT(crsr); chr = CRSR_READ(crsr);
-                        if (strchr("nrt", chr))
-                            chr = strchr("n\nr\rt\t", chr)[1];
-                    }
-                    CRSR_NEXT(crsr); p = CRSR_POS(crsr);
-                }
-                CRSR_NEXT(crsr);
-                return make_string(ctx, (const s8*) crsr.buf->data + s, p - s);
-            }
-
-            default: {
-                u32 s = CRSR_POS(crsr);
-                u32 e = CRSR_END(crsr);
-                u32 p = s;
-                do {
-                    if (p == e)
-                        error(ctx, "symbol too long");
-                    CRSR_NEXT(crsr); chr = CRSR_READ(crsr);
-                    p = CRSR_POS(crsr);
-                } while (chr && !strchr(s_delims, chr));
-                const s8*  start = (const s8*) (crsr.buf->data + s);
-                const auto len = p - s;
-                s8* end = (s8*) (start + len);
-                if (p != s) {
-                    switch (get_numtype(start, len)) {
-                        case numtype_t::none:
-                            if (strncmp(start, "#:", 2) == 0) {
-                                return make_keyword(ctx, start + 2, len - 2);
-                            } else {
-                                return make_symbol(ctx, start, len);
-                            }
-                        case numtype_t::fixnum:
-                            return make_fixnum(ctx, strtol(start, &end, 10));
-                        case numtype_t::flonum:
-                            return make_flonum(ctx, strtod(start, &end));
-                    }
-                } else {
-                    error(ctx, "expected flonum, fixnum, keyword, or symbol");
-                }
-            }
-        }
-
-        return ctx->nil;
-    }
-
-    obj_t* read(ctx_t* ctx, buf_crsr_t& crsr) {
-        obj_t* obj = read_expr(ctx, crsr);
-        if (obj == ctx->rparen) {
-            error(ctx, "stray ')'");
-        }
-        if (obj == ctx->rbrac) {
-            error(ctx, "stray ']'");
-        }
-        return obj;
-    }
-
-    u32 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp) {
-        return write(ctx, obj, write_fp, fp, 0);
-    }
-
-    obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env) {
-        UNUSED(ctx);
-        for (; !IS_NIL(env); env = CDR(env)) {
-            obj_t* x = CAR(env);
-            if (CAR(x) == sym) {
-                return x;
-            }
-        }
-        return CDR(sym);
-    }
-
-    obj_t* next_arg_no_chk(ctx_t* ctx, obj_t** arg) {
-        obj_t* a = *arg;
-        if (TYPE(a) != obj_type_t::pair)
-            return ctx->nil;
-        *arg = CDR(a);
-        return CAR(a);
-    }
-
-    obj_t* cons(ctx_t* ctx, obj_t* car, obj_t* cdr) {
-        obj_t* obj = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::pair);
-        SET_CAR(obj, car);
-        SET_CDR(obj, cdr);
-        return obj;
-    }
-
-    obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size) {
-        obj_t* res = ctx->nil;
-        while (size--)
-            res = cons(ctx, objs[size], res);
-        return res;
-    }
-
-    obj_t* make_native_func(ctx_t* ctx, native_func_t fn) {
-        obj_t* obj = make_object(ctx);
-        array::append(ctx->native_ptrs, (u0*) fn);
-        SET_TYPE(obj, obj_type_t::cfunc);
-        SET_FIXNUM(obj, ctx->native_ptrs.size - 1);
-        return obj;
-    }
-
-    obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len) {
-        u32 id{};
-        obj_t* obj = find_symbol(ctx, name, id, len);
-        if (!IS_NIL(obj))
-            return obj;
-        obj = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::symbol);
-        SET_CDR(obj, cons(ctx, make_string(ctx, name, len, id), ctx->nil));
-        ctx->sym_list = cons(ctx, obj, ctx->sym_list);
-        return obj;
-    }
-
-    u32 to_string(ctx_t* ctx, obj_t* obj, s8* dst, u32 size) {
-        char_ptr_int_t x{};
-        x.p = dst;
-        x.n = size - 1;
-        write(ctx, obj, write_buf, &x, 0);
-        *x.p = '\0';
-        return size - x.n - 1;
-    }
-
-    obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len) {
-        u32 id{};
-        obj_t* obj = find_symbol(ctx, name, id, len);
-        if (!IS_NIL(obj))
-            return obj;
-        obj = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::keyword);
-        SET_CDR(obj, cons(ctx, make_string(ctx, name, len, id), ctx->nil));
-        ctx->sym_list = cons(ctx, obj, ctx->sym_list);
-        return obj;
-    }
-
-    obj_t* make_string(ctx_t* ctx, const s8* str, s32 len, u32 id) {
-        auto obj = find_string(ctx, str, id, len);
-        if (!IS_NIL(obj))
-            return obj;
-        obj = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::string);
-        SET_FIXNUM(obj, id);
-        ctx->str_list = cons(ctx, obj, ctx->str_list);
-        return obj;
-    }
-
-    obj_t* find_string(ctx_t* ctx, const s8* str, u32& id, s32 len) {
-        if (!id) {
-            const auto rc = string::interned::fold_for_result(str, len);
-            if (!OK(rc.status))
-                error(ctx, "find_string unable to intern string");
-            id = rc.id;
-        }
-        for (obj_t* obj = ctx->str_list; !IS_NIL(obj); obj = CDR(obj)) {
-            auto kar = CAR(obj);
-            const auto intern_id = FIXNUM(kar);
-            if (intern_id == id)
-                return kar;
-        }
-        return ctx->nil;
-    }
-
-    obj_t* find_symbol(ctx_t* ctx, const s8* name, u32& id, s32 len) {
-        if (!id) {
-            const auto rc = string::interned::fold_for_result(name, len);
-            if (!OK(rc.status))
-                error(ctx, "find_symbol unable to intern string");
-            id = rc.id;
-        }
-        for (obj_t* obj = ctx->sym_list; !IS_NIL(obj); obj = CDR(obj)) {
-            auto str = CAR(CDR(CAR(obj)));
-            const auto intern_id = FIXNUM(str);
-            if (intern_id == id)
-                return CAR(obj);
-        }
-        return ctx->nil;
-    }
-
-    u32 write(ctx_t* ctx, obj_t* obj, write_func_t fn, u0* udata, u32 qt) {
-        s8 buf[32];
-
-        switch (TYPE(obj)) {
-            case obj_type_t::nil:
-                return write_str(ctx, fn, udata, "nil");
-
-            case obj_type_t::fixnum:
-                sprintf(buf, "%d", FIXNUM(obj));
-                return write_str(ctx, fn, udata, buf);
-
-            case obj_type_t::flonum:
-                sprintf(buf, "%.7g", FLONUM(obj));
-                return write_str(ctx, fn, udata, buf);
-
-            case obj_type_t::pair: {
-                u32 len = 2;
-                fn(ctx, udata, '(');
-                for (;;) {
-                    len += write(ctx, CAR(obj), fn, udata, 1);
-                    obj = CDR(obj);
-                    if (TYPE(obj) != obj_type_t::pair) {
-                        break;
-                    }
-                    fn(ctx, udata, ' ');
-                }
-                if (!IS_NIL(obj)) {
-                    len += write_str(ctx, fn, udata, " . ");
-                    len += write(ctx, obj, fn, udata, 1);
-                }
-                fn(ctx, udata, ')');
-                return len;
-            }
-
-            case obj_type_t::keyword:
-                write_str(ctx, fn, udata, "#:");
-            case obj_type_t::symbol:
-                return write(ctx, CAR(CDR(obj)), fn, udata, 0) + 2;
-
-            case obj_type_t::string: {
-                if (qt) {
-                    fn(ctx, udata, '"');
-                }
-                auto id = STRING_ID(obj);
-                auto intern_rc = string::interned::get(id);
-                if (!OK(intern_rc.status)) {
-                    error(ctx, "unable to find interned string");
-                }
-                auto len = write_str(ctx, fn, udata, (s8*) intern_rc.slice.data);
-                if (qt) {
-                    fn(ctx, udata, '"');
-                }
-                return len + 2;
-            }
-
-            case obj_type_t::boolean:
-                return write_str(ctx, fn, udata, obj == ctx->true_ ? "#t" : "#f");
-
-            default:
-                sprintf(buf,
-                        "[%s %p]",
-                        s_type_names[u32(TYPE(obj))],
-                        (u0*) obj);
-                return write_str(ctx, fn, udata, buf);
-        }
-
-        return 0;
+        return len;
     }
 }
 

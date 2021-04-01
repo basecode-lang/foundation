@@ -41,10 +41,16 @@ namespace basecode::scm {
     using error_func_t          = u0 (*)(ctx_t*, const s8*, obj_t*);
     using native_func_t         = obj_t* (*)(ctx_t*, obj_t*);
 
-    struct handlers_t {
+    struct handlers_t final {
         error_func_t            error;
         native_func_t           mark;
         native_func_t           gc;
+    };
+
+    struct printable_t final {
+        ctx_t*                  ctx;
+        obj_t*                  obj;
+        b8                      quote;
     };
 
     enum class ffi_type_t : u8 {
@@ -82,7 +88,15 @@ namespace basecode::scm {
 
     obj_t* pop_gc(ctx_t* ctx);
 
+    obj_type_t type(obj_t* obj);
+
+    fixnum_t to_fixnum(obj_t* obj);
+
+    flonum_t to_flonum(obj_t* obj);
+
     u0 collect_garbage(ctx_t* ctx);
+
+    const s8* type_name(obj_t* obj);
 
     u0 mark(ctx_t* ctx, obj_t* obj);
 
@@ -110,8 +124,6 @@ namespace basecode::scm {
 
     u0* to_user_ptr(ctx_t* ctx, obj_t* obj);
 
-    obj_type_t type(ctx_t* ctx, obj_t* obj);
-
     obj_t* make_bool(ctx_t* ctx, obj_t* obj);
 
     u0 set(ctx_t* ctx, obj_t* sym, obj_t* v);
@@ -122,15 +134,17 @@ namespace basecode::scm {
 
     obj_t* make_user_ptr(ctx_t* ctx, u0* ptr);
 
-    flonum_t to_flonum(ctx_t* ctx, obj_t* obj);
-
     obj_t* make_fixnum(ctx_t* ctx, fixnum_t n);
 
     obj_t* make_flonum(ctx_t* ctx, flonum_t n);
 
-    fixnum_t to_fixnum(ctx_t* ctx, obj_t* obj);
-
     obj_t* make_ffi(ctx_t* ctx, proto_t* proto);
+
+    u0 write(FILE* file, ctx_t* ctx, obj_t* obj);
+
+    u0 print(FILE* file, ctx_t* ctx, obj_t* obj);
+
+    str::slice_t to_string(ctx_t* ctx, obj_t* obj);
 
     obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env);
 
@@ -138,11 +152,13 @@ namespace basecode::scm {
 
     obj_t* cons(ctx_t* ctx, obj_t* car, obj_t* cdr);
 
+    u0 write(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj);
+
+    u0 print(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj);
+
     obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size);
 
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn);
-
-    u32 to_string(ctx_t* ctx, obj_t* obj, s8* dst, u32 size);
 
     obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len = -1);
 
@@ -155,16 +171,62 @@ namespace basecode::scm {
     ctx_t* init(u0* ptr, u32 size, alloc_t* alloc = context::top()->alloc);
 
     obj_t* make_string(ctx_t* ctx, const s8* str, s32 len = -1, u32 id = {});
-
-    // XXX: OLD
-//    using read_func_t           = s8 (*)(ctx_t*, u0*);
-    using write_func_t          = u0 (*)(ctx_t*, u0*, s8);
-
-//    obj_t* read_fp(ctx_t* ctx, FILE* fp);
-
-//    obj_t* read(ctx_t* ctx, read_func_t fn, u0* udata);
-
-    u32 write_fp(ctx_t* ctx, obj_t* obj, FILE* fp);
-
-    u32 write(ctx_t* ctx, obj_t* obj, write_func_t fn, u0* udata, u32 qt);
 }
+
+FORMAT_TYPE(
+    basecode::scm::printable_t,
+    {
+        using namespace basecode;
+        using namespace basecode::scm;
+
+        auto o = ctx.out();
+        switch (type(data.obj)) {
+            case obj_type_t::nil:
+                format_to(o, "nil");
+                break;
+
+            case obj_type_t::pair: {
+                obj_t* p = data.obj;
+                format_to(o, "(");
+                for (;;) {
+                    format_to(o, "{}", printable_t{data.ctx, car(data.ctx, p), true});
+                    p = cdr(data.ctx, p);
+                    if (type(p) != obj_type_t::pair)
+                        break;
+                    format_to(o, " ");
+                }
+                if (!is_nil(data.ctx, p))
+                    format_to(o, " . {}", printable_t{data.ctx, p, true});
+                format_to(o, ")");
+                break;
+            }
+
+            case obj_type_t::fixnum:
+                format_to(o, "{}", to_fixnum(data.obj));
+                break;
+
+            case obj_type_t::flonum:
+                format_to(o, "{:.7g}", to_flonum(data.obj));
+                break;
+
+            case obj_type_t::symbol:
+            case obj_type_t::keyword:
+                format_to(o, "{}", to_string(data.ctx, data.obj));
+                break;
+
+            case obj_type_t::string:
+                if (data.quote)
+                    format_to(o, "\"{}\"", to_string(data.ctx, data.obj));
+                else
+                    format_to(o, "{}", to_string(data.ctx, data.obj));
+                break;
+
+            case obj_type_t::boolean:
+                format_to(o, "{}", to_string(data.ctx, data.obj));
+                break;
+
+            default:
+                format_to(o, "[{} {}]", type_name(data.obj), (u0*) data.obj);
+                break;
+        }
+    });
