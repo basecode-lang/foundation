@@ -143,11 +143,6 @@ namespace basecode {
         }
 
         template <typename T>
-        u0 trim(stack_t<T>& stack) {
-            reserve(stack, stack.size);
-        }
-
-        template <typename T>
         u0 free(fixed_stack_t<T>& stack) {
             stack.size = {};
         }
@@ -198,6 +193,18 @@ namespace basecode {
             auto top = stack.data[stack.size - 1];
             stack.data[stack.size++] = top;
             return top;
+        }
+
+        template <typename T>
+        u0 trim(stack_t<T>& stack, u32 size) {
+            reserve(stack, std::max<u32>(0, size));
+        }
+
+        template <typename T>
+        u0 truncate(stack_t<T>& stack, u32 size) {
+            if (size >= stack.size)
+                return;
+            stack.size = size;
         }
 
         template <typename T>

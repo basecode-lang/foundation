@@ -37,6 +37,7 @@ namespace basecode::scm {
     using fixnum_t              = u32;
     using flonum_t              = f32;
 
+    using obj_stack_t           = stack_t<obj_t*>;
     using error_func_t          = u0 (*)(ctx_t*, const s8*, obj_t*);
     using native_func_t         = obj_t* (*)(ctx_t*, obj_t*);
 
@@ -82,8 +83,6 @@ namespace basecode::scm {
     obj_t* pop_gc(ctx_t* ctx);
 
     u0 collect_garbage(ctx_t* ctx);
-
-    ctx_t* init(u0* ptr, u32 size);
 
     u0 mark(ctx_t* ctx, obj_t* obj);
 
@@ -145,13 +144,17 @@ namespace basecode::scm {
 
     u32 to_string(ctx_t* ctx, obj_t* obj, s8* dst, u32 size);
 
-    obj_t* make_string(ctx_t* ctx, const s8* str, s32 len = -1);
-
-    obj_t* find_symbol(ctx_t* ctx, const s8* name, s32 len = -1);
-
     obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len = -1);
 
     obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len = -1);
+
+    obj_t* find_string(ctx_t* ctx, const s8* str, u32& id, s32 len = -1);
+
+    obj_t* find_symbol(ctx_t* ctx, const s8* name, u32& id, s32 len = -1);
+
+    ctx_t* init(u0* ptr, u32 size, alloc_t* alloc = context::top()->alloc);
+
+    obj_t* make_string(ctx_t* ctx, const s8* str, s32 len = -1, u32 id = {});
 
     // XXX: OLD
 //    using read_func_t           = s8 (*)(ctx_t*, u0*);

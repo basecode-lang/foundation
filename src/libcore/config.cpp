@@ -632,7 +632,7 @@ namespace basecode::config {
             str::init(g_cfg_sys.buf, g_cfg_sys.alloc);
             str::reserve(g_cfg_sys.buf, 8192);
 
-            scm::init(g_cfg_sys.ctx, g_cfg_sys.heap_size);
+            scm::init(g_cfg_sys.ctx, g_cfg_sys.heap_size, g_cfg_sys.alloc);
             {
                 auto b8_type = ffi::param::make_type(param_cls_t::int_,
                                                      param_size_t::byte,

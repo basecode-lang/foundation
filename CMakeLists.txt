@@ -44,6 +44,7 @@ if (MSVC)
             -Wno-signed-enum-bitfield
             -Wno-nonportable-system-include-path
             -Wno-newline-eof
+            -Wno-unknown-pragmas
             -Wno-deprecated-declarations
             -Wno-documentation-unknown-command
             -Wno-c99-designator

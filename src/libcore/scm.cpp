@@ -40,6 +40,10 @@
 //
 // ----------------------------------------------------------------------------
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "altera-struct-pack-align"
+
+#include <bit>
 #include <basecode/core/scm.h>
 #include <basecode/core/string.h>
 
@@ -61,16 +65,13 @@
 #define SET_GC_MARK(x, v)       ((x)->hdr.gc_mark = (v))
 #define SET_TYPE(x, t)          ((x)->hdr.type = u8((t)))
 #define FIXNUM(x)               ((x)->number.value)
-#define FLONUM(x)               (numeric_alias_t{.dw = (x)->number.value}.fdw)
+#define FLONUM(x)               (std::bit_cast<f32>(u32((x)->number.value)))
 #define STRING_ID(x)            (FIXNUM((x)))
 #define SET_FIXNUM(x, v)        ((x)->number.value = (v))
-#define SET_FLONUM(x, v)        ((x)->number.value = numeric_alias_t{.fdw =(v)}.dw)
+#define SET_FLONUM(x, v)        ((x)->number.value = std::bit_cast<u32>(f32(v)))
 #define PRIM(x)                 (prim_type_t((x)->prim.code))
 #define SET_PRIM(x, p)          ((x)->prim.code = fixnum_t((p)))
 #define NATIVE_PTR(x)           (ctx->native_ptrs[FIXNUM((x))])
-#define CLOSERS_SIZE            (256U)
-#define GC_STACK_SIZE           (1024U)
-#define NATIVE_PTR_SIZE         (256U)
 #define EVAL(o)                 eval(ctx, (o), env, nullptr)
 #define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env, nullptr)
 #define SYM(o)                  make_symbol(ctx, (o))
@@ -84,6 +85,8 @@
                                 )
 
 namespace basecode::scm {
+    using ptr_array_t           = array_t<u0*>;
+
     enum class prim_type_t : u8 {
         eval,
         let,
@@ -214,12 +217,14 @@ namespace basecode::scm {
     static_assert(sizeof(obj_t) == 8, "obj_t is no longer 8 bytes!");
 
     struct ctx_t {
+        alloc_t*                alloc;
         handlers_t              handlers;
-        u0*                     native_ptrs[NATIVE_PTR_SIZE];
-        obj_t*                  gc_stack[GC_STACK_SIZE];
-        obj_t*                  closers[CLOSERS_SIZE];
+        obj_stack_t             gc_stack;
+        obj_stack_t             cl_stack;
+        ptr_array_t             native_ptrs;
         obj_t*                  objects;
         obj_t*                  sym_list;
+        obj_t*                  str_list;
         obj_t*                  call_list;
         obj_t*                  free_list;
         obj_t*                  nil;
@@ -229,12 +234,9 @@ namespace basecode::scm {
         obj_t*                  rbrac;
         obj_t*                  rparen;
         ffi_t                   ffi;
-        u32                     closer_idx;
         u32                     object_used;
-        u32                     gc_stack_idx;
         u32                     object_count;
-        u32                     native_ptr_idx;
-    } __attribute__((aligned(128)));
+    };
 
     struct char_ptr_int_t final {
         s8*                     p;
@@ -275,26 +277,6 @@ namespace basecode::scm {
         push_gc(ctx, obj);
         ++ctx->object_used;
         return obj;
-    }
-
-    static numtype_t get_numtype(const s8* buf, s32 len) {
-        const s8* p = buf;
-        s8 ch = *p;
-        numtype_t type = ((ch == '+' && len > 1)
-                    || (ch == '-' && len > 1)
-                    || isdigit(ch)) ? numtype_t::fixnum : numtype_t::none;
-        if (type == numtype_t::none)
-            return type;
-        while (--len > 0) {
-            ch = *(++p);
-            if (ch == '.' || ch == 'e' || ch == 'E' || ch == '-') {
-                type = numtype_t::flonum;
-            } else if (ch < 48 || ch > 57) {
-                type = numtype_t::none;
-                break;
-            }
-        }
-        return type;
     }
 
     static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b) {
@@ -346,6 +328,26 @@ namespace basecode::scm {
         return false;
     }
 
+    static numtype_t get_numtype(const s8* buf, s32 len) {
+        const s8* p = buf;
+        s8 ch = *p;
+        numtype_t type = ((ch == '+' && len > 1)
+                    || (ch == '-' && len > 1)
+                    || isdigit(ch)) ? numtype_t::fixnum : numtype_t::none;
+        if (type == numtype_t::none)
+            return type;
+        while (--len > 0) {
+            ch = *(++p);
+            if (ch == '.' || ch == 'e' || ch == 'E' || ch == '-') {
+                type = numtype_t::flonum;
+            } else if (ch < 48 || ch > 57) {
+                type = numtype_t::none;
+                break;
+            }
+        }
+        return type;
+    }
+
     static u0 write_fp(ctx_t* ctx, u0* udata, s8 chr) {
         UNUSED(ctx);
         fputc(chr, (FILE*) udata);
@@ -358,13 +360,6 @@ namespace basecode::scm {
             *x->p++ = chr;
             x->n--;
         }
-    }
-
-    static b8 str_eq(ctx_t* ctx, obj_t* obj, u32 str_id) {
-        auto obj_rc = string::interned::get(STRING_ID(obj));
-        if (!OK(obj_rc.status))
-            return false;
-        return obj_rc.id == str_id;
     }
 
     static obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env) {
@@ -880,9 +875,12 @@ namespace basecode::scm {
     }
 
     u0 free(ctx_t* ctx) {
-        ctx->gc_stack_idx = 0;
-        ctx->sym_list     = ctx->nil;
+        ctx->sym_list = ctx->nil;
+        ctx->str_list = ctx->nil;
         collect_garbage(ctx);
+        array::free(ctx->native_ptrs);
+        stack::free(ctx->cl_stack);
+        stack::free(ctx->gc_stack);
         ffi::free(ctx->ffi);
     }
 
@@ -891,18 +889,19 @@ namespace basecode::scm {
     }
 
     u32 save_gc(ctx_t* ctx) {
-        return ctx->gc_stack_idx;
+        return ctx->gc_stack.size;
     }
 
     obj_t* pop_gc(ctx_t* ctx) {
-        return ctx->gc_stack_idx > 0 ? ctx->gc_stack[ctx->gc_stack_idx--] : nullptr;
+        return stack::pop(ctx->gc_stack);
     }
 
     u0 collect_garbage(ctx_t* ctx) {
 //        format::print("before: ctx->object_used = {}\n", ctx->object_used);
-        for (u32 i = 0; i < ctx->gc_stack_idx; i++)
+        for (u32 i = 0; i < ctx->gc_stack.size; i++)
             mark(ctx, ctx->gc_stack[i]);
         mark(ctx, ctx->sym_list);
+        mark(ctx, ctx->str_list);
         for (u32 i = 0; i < ctx->object_count; i++) {
             obj_t* obj = &ctx->objects[i];
             if (TYPE(obj) == obj_type_t::free)
@@ -923,17 +922,23 @@ namespace basecode::scm {
 //        format::print("after : ctx->object_used = {}\n", ctx->object_used);
     }
 
-    ctx_t* init(u0* ptr, u32 size) {
+    ctx_t* init(u0* ptr, u32 size, alloc_t* alloc) {
         // init context struct
         auto ctx = (ctx_t*) ptr;
         std::memset(ctx, 0, sizeof(ctx_t));
-        ptr = (u8*) ptr + sizeof(ctx_t);
-        size -= sizeof(ctx_t);
+        u32 align;
+        ptr = (u8*) memory::system::align_forward(
+            (u8*) ptr + sizeof(ctx_t),
+            alignof(obj_t),
+            align);
+        size -= (sizeof(ctx_t) + align);
 
         // init objects memory region
         ctx->objects      = (obj_t*) ptr;
         ctx->object_used  = 0;
-        ctx->object_count = size / sizeof(obj_t);
+        ctx->object_count = (size / sizeof(obj_t)) - 1;
+        if ((ctx->object_count % 2) != 0)
+            --ctx->object_count;
 
         // the nil object is a special case that
         // we manually allocate from the heap
@@ -941,8 +946,17 @@ namespace basecode::scm {
         ctx->nil->full = 0;
         SET_TYPE(ctx->nil, obj_type_t::nil);
 
+        ctx->alloc = alloc;
+        array::init(ctx->native_ptrs, ctx->alloc);
+        array::reserve(ctx->native_ptrs, 256);
+        stack::init(ctx->gc_stack, ctx->alloc);
+        stack::reserve(ctx->gc_stack, 1024);
+        stack::init(ctx->cl_stack, ctx->alloc);
+        stack::reserve(ctx->cl_stack, 1024);
+
         // init lists
         ctx->sym_list  = ctx->nil;
+        ctx->str_list  = ctx->nil;
         ctx->call_list = ctx->nil;
         ctx->free_list = ctx->nil;
 
@@ -970,11 +984,13 @@ namespace basecode::scm {
             set(ctx, make_symbol(ctx, "#f", 2), ctx->false_);
         }
 
-        ctx->rbrac  = make_object(ctx);
-        ctx->rparen = make_object(ctx);
-        ctx->dot    = make_symbol(ctx, ".", 1);
+        ctx->rbrac  = SYM("]");
+        ctx->rparen = SYM(")");
+        ctx->dot    = SYM(".");
         set(ctx, ctx->dot, ctx->dot);
-        set(ctx, make_symbol(ctx, "nil", 3), ctx->nil);
+        set(ctx, ctx->rbrac, ctx->rbrac);
+        set(ctx, SYM("nil"), ctx->nil);
+        set(ctx, ctx->rparen, ctx->rparen);
         restore_gc(ctx, save);
 
         // register built in primitives
@@ -986,15 +1002,14 @@ namespace basecode::scm {
             restore_gc(ctx, save);
         }
 
-        ctx->native_ptr_idx = 0;
-        ctx->closer_idx     = CLOSERS_SIZE - 1;
-
         ffi::init(ctx->ffi);
 
         return ctx;
     }
 
     u0 mark(ctx_t* ctx, obj_t* obj) {
+        if (!obj)
+            return;
         obj_t* car;
     begin:
         if (IS_GC_MARKED(obj))
@@ -1038,7 +1053,7 @@ namespace basecode::scm {
     }
 
     u0 restore_gc(ctx_t* ctx, u32 idx) {
-        ctx->gc_stack_idx = idx;
+        stack::truncate(ctx->gc_stack, idx);
     }
 
     b8 is_true(ctx_t* ctx, obj_t* obj) {
@@ -1067,10 +1082,10 @@ namespace basecode::scm {
     }
 
     u0 push_gc(ctx_t* ctx, obj_t* obj) {
-        if (ctx->gc_stack_idx == GC_STACK_SIZE) {
-            error(ctx, "gc stack overflow");
-        }
-        ctx->gc_stack[ctx->gc_stack_idx++] = obj;
+//        if (ctx->gc_stack_idx == GC_STACK_SIZE) {
+//            error(ctx, "gc stack overflow");
+//        }
+        stack::push(ctx->gc_stack, obj);
     }
 
     obj_t* car(ctx_t* ctx, obj_t* obj) {
@@ -1142,10 +1157,9 @@ namespace basecode::scm {
 
     obj_t* make_user_ptr(ctx_t* ctx, u0* ptr) {
         obj_t* obj = make_object(ctx);
+        array::append(ctx->native_ptrs, ptr);
         SET_TYPE(obj, obj_type_t::ptr);
-        SET_FIXNUM(obj, ctx->native_ptr_idx);
-        NATIVE_PTR(obj) = ptr;
-        ++ctx->native_ptr_idx;
+        SET_FIXNUM(obj, ctx->native_ptrs.size - 1);
         return obj;
     }
 
@@ -1181,10 +1195,9 @@ namespace basecode::scm {
 
     obj_t* make_ffi(ctx_t* ctx, proto_t* proto) {
         obj_t* obj = make_object(ctx);
+        array::append(ctx->native_ptrs, proto);
         SET_TYPE(obj, obj_type_t::ffi);
-        SET_FIXNUM(obj, ctx->native_ptr_idx);
-        NATIVE_PTR(obj) = proto;
-        ++ctx->native_ptr_idx;
+        SET_FIXNUM(obj, ctx->native_ptrs.size - 1);
         return obj;
     }
 
@@ -1214,30 +1227,33 @@ namespace basecode::scm {
                 CRSR_NEXT(crsr); CRSR_NEWLINE(crsr);
                 goto next;
 
-            case ']':
+            case ']': {
                 CRSR_NEXT(crsr);
-                if (ctx->closers[ctx->closer_idx++] == ctx->rparen)
+                auto tos = stack::pop(ctx->cl_stack);
+                if (tos == ctx->rparen)
                     error(ctx, "expected closing paren but found closing bracket");
                 return ctx->rbrac;
+            }
 
-            case ')':
+            case ')': {
                 CRSR_NEXT(crsr);
-                if (ctx->closers[ctx->closer_idx++] == ctx->rbrac)
+                auto tos = stack::pop(ctx->cl_stack);
+                if (tos == ctx->rbrac)
                     error(ctx, "expected closing bracket but found closing paren");
                 return ctx->rparen;
+            }
 
             case '[':
-                ctx->closers[--ctx->closer_idx] = ctx->rbrac;
+                stack::push(ctx->cl_stack, ctx->rbrac);
                 goto _skip;
 
             case '(':
-                ctx->closers[--ctx->closer_idx] = ctx->rparen;
+                stack::push(ctx->cl_stack, ctx->rparen);
             _skip: {
                 CRSR_NEXT(crsr);
                 obj_t* head = ctx->nil;
                 obj_t* tail = head;
                 auto gc = save_gc(ctx);
-                /* to cause error on too-deep nesting */
                 push_gc(ctx, head);
                 while (true) {
                     v = read_expr(ctx, crsr);
@@ -1246,10 +1262,8 @@ namespace basecode::scm {
                     if (v == nullptr)
                         error(ctx, "unclosed list");
                     if (v == ctx->dot) {
-                        /* dotted pair */
                         SET_CDR(tail, read(ctx, crsr));
                     } else {
-                        /* proper pair */
                         v = cons(ctx, v, ctx->nil);
                         if (IS_NIL(tail)) {
                             head = v;
@@ -1410,53 +1424,20 @@ namespace basecode::scm {
 
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn) {
         obj_t* obj = make_object(ctx);
+        array::append(ctx->native_ptrs, (u0*) fn);
         SET_TYPE(obj, obj_type_t::cfunc);
-        SET_FIXNUM(obj, ctx->native_ptr_idx);
-        NATIVE_PTR(obj) = (u0*) fn;
-        ++ctx->native_ptr_idx;
+        SET_FIXNUM(obj, ctx->native_ptrs.size - 1);
         return obj;
-    }
-
-    obj_t* make_string(ctx_t* ctx, const s8* str, s32 len) {
-        auto rc = string::interned::fold_for_result(str, len);
-        if (!OK(rc.status))
-            error(ctx, "make_string unable to intern string");
-        obj_t* obj = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::string);
-        SET_FIXNUM(obj, rc.id);
-        return obj;
-    }
-
-    obj_t* find_symbol(ctx_t* ctx, const s8* name, s32 len) {
-        const auto rc = string::interned::fold_for_result(name, len);
-        if (!OK(rc.status))
-            error(ctx, "find_symbol unable to intern string");
-        for (obj_t* obj = ctx->sym_list; !IS_NIL(obj); obj = CDR(obj)) {
-            auto str = CAR(CDR(CAR(obj)));
-            if (str_eq(ctx, str, rc.id))
-                return CAR(obj);
-        }
-        return ctx->nil;
     }
 
     obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len) {
-        obj_t* obj = find_symbol(ctx, name, len);
+        u32 id{};
+        obj_t* obj = find_symbol(ctx, name, id, len);
         if (!IS_NIL(obj))
             return obj;
         obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::symbol);
-        SET_CDR(obj, cons(ctx, make_string(ctx, name, len), ctx->nil));
-        ctx->sym_list = cons(ctx, obj, ctx->sym_list);
-        return obj;
-    }
-
-    obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len) {
-        obj_t* obj = find_symbol(ctx, name, len);
-        if (!IS_NIL(obj))
-            return obj;
-        obj = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::keyword);
-        SET_CDR(obj, cons(ctx, make_string(ctx, name, len), ctx->nil));
+        SET_CDR(obj, cons(ctx, make_string(ctx, name, len, id), ctx->nil));
         ctx->sym_list = cons(ctx, obj, ctx->sym_list);
         return obj;
     }
@@ -1468,6 +1449,61 @@ namespace basecode::scm {
         write(ctx, obj, write_buf, &x, 0);
         *x.p = '\0';
         return size - x.n - 1;
+    }
+
+    obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len) {
+        u32 id{};
+        obj_t* obj = find_symbol(ctx, name, id, len);
+        if (!IS_NIL(obj))
+            return obj;
+        obj = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::keyword);
+        SET_CDR(obj, cons(ctx, make_string(ctx, name, len, id), ctx->nil));
+        ctx->sym_list = cons(ctx, obj, ctx->sym_list);
+        return obj;
+    }
+
+    obj_t* make_string(ctx_t* ctx, const s8* str, s32 len, u32 id) {
+        auto obj = find_string(ctx, str, id, len);
+        if (!IS_NIL(obj))
+            return obj;
+        obj = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::string);
+        SET_FIXNUM(obj, id);
+        ctx->str_list = cons(ctx, obj, ctx->str_list);
+        return obj;
+    }
+
+    obj_t* find_string(ctx_t* ctx, const s8* str, u32& id, s32 len) {
+        if (!id) {
+            const auto rc = string::interned::fold_for_result(str, len);
+            if (!OK(rc.status))
+                error(ctx, "find_string unable to intern string");
+            id = rc.id;
+        }
+        for (obj_t* obj = ctx->str_list; !IS_NIL(obj); obj = CDR(obj)) {
+            auto kar = CAR(obj);
+            const auto intern_id = FIXNUM(kar);
+            if (intern_id == id)
+                return kar;
+        }
+        return ctx->nil;
+    }
+
+    obj_t* find_symbol(ctx_t* ctx, const s8* name, u32& id, s32 len) {
+        if (!id) {
+            const auto rc = string::interned::fold_for_result(name, len);
+            if (!OK(rc.status))
+                error(ctx, "find_symbol unable to intern string");
+            id = rc.id;
+        }
+        for (obj_t* obj = ctx->sym_list; !IS_NIL(obj); obj = CDR(obj)) {
+            auto str = CAR(CDR(CAR(obj)));
+            const auto intern_id = FIXNUM(str);
+            if (intern_id == id)
+                return CAR(obj);
+        }
+        return ctx->nil;
     }
 
     u32 write(ctx_t* ctx, obj_t* obj, write_func_t fn, u0* udata, u32 qt) {
@@ -1539,3 +1575,5 @@ namespace basecode::scm {
         return 0;
     }
 }
+
+#pragma clang diagnostic pop
