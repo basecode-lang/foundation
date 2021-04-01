@@ -95,6 +95,7 @@ namespace basecode::scm {
         fn,
         mac,
         while_,
+        error,
         quote,
         unquote,
         quasiquote,
@@ -132,6 +133,7 @@ namespace basecode::scm {
         "fn",
         "mac",
         "while",
+        "error",
         "quote",
         "unquote",
         "quasiquote",
@@ -176,6 +178,7 @@ namespace basecode::scm {
         "boolean",
         "keyword",
         "ffi",
+        "error",
     };
 
     enum class numtype_t : u8 {
@@ -189,27 +192,28 @@ namespace basecode::scm {
     struct obj_t {
         union {
             struct {
-                u64             type:       5;
+                u64             type:       6;
                 u64             gc_mark:    1;
-                u64             pad:        58;
+                u64             pad:        57;
             }                   hdr;
             struct {
-                u64             type:       5;
+                u64             type:       6;
                 u64             gc_mark:    1;
                 u64             code:       32;
-                u64             pad:        26;
+                u64             pad:        25;
             }                   prim;
             struct {
-                u64             type:       5;
+                u64             type:       6;
                 u64             gc_mark:    1;
-                u64             car_idx:    29;
-                u64             cdr_idx:    29;
+                u64             car_idx:    28;
+                u64             cdr_idx:    28;
+                u64             pad:        1;
             }                   pair;
             struct {
-                u64             type:       5;
+                u64             type:       6;
                 u64             gc_mark:    1;
                 u64             value:      32;
-                u64             pad:        26;
+                u64             pad:        25;
             }                   number;
             u64                 full;
         };
@@ -417,10 +421,7 @@ namespace basecode::scm {
     }
 
     obj_t* car(ctx_t* ctx, obj_t* obj) {
-        if (IS_NIL(obj)) {
-            return obj;
-        }
-        return CAR(check_type(ctx, obj, obj_type_t::pair));
+        return IS_NIL(obj) ? obj : CAR(check_type(ctx, obj, obj_type_t::pair));
     }
 
     const s8* type_name(obj_t* obj) {
@@ -428,10 +429,7 @@ namespace basecode::scm {
     }
 
     obj_t* cdr(ctx_t* ctx, obj_t* obj) {
-        if (IS_NIL(obj)) {
-            return obj;
-        }
-        return CDR(check_type(ctx, obj, obj_type_t::pair));
+        return IS_NIL(obj) ? obj : CDR(check_type(ctx, obj, obj_type_t::pair));
     }
 
     obj_t* eval(ctx_t* ctx, obj_t* obj) {
@@ -487,6 +485,10 @@ namespace basecode::scm {
         SET_TYPE(obj, obj_type_t::ptr);
         SET_FIXNUM(obj, ctx->native_ptrs.size - 1);
         return obj;
+    }
+
+    obj_t* error_args(ctx_t* ctx, obj_t* obj) {
+        return CDR(check_type(ctx, obj, obj_type_t::error));
     }
 
     obj_t* read(ctx_t* ctx, buf_crsr_t& crsr) {
@@ -996,6 +998,13 @@ namespace basecode::scm {
         exit(EXIT_FAILURE);
     }
 
+    obj_t* make_error(ctx_t* ctx, obj_t* args, obj_t* call_stack) {
+        obj_t* obj = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::error);
+        SET_CDR(obj, cons(ctx, args, cons(ctx, call_stack, ctx->nil)));
+        return obj;
+    }
+
     obj_t* make_string(ctx_t* ctx, const s8* str, s32 len, u32 id) {
         auto obj = find_string(ctx, str, id, len);
         if (!IS_NIL(obj))
@@ -1112,6 +1121,10 @@ namespace basecode::scm {
                             res = make_object(ctx);
                             SET_TYPE(res, PRIM(fn) == prim_type_t::fn ? obj_type_t::func : obj_type_t::macro);
                             SET_CDR(res, va);
+                            break;
+
+                        case prim_type_t::error:
+                            res = make_error(ctx, arg, cl);
                             break;
 
                         case prim_type_t::while_:

@@ -77,7 +77,8 @@ namespace basecode::scm {
         ptr,
         boolean,
         keyword,
-        ffi
+        ffi,
+        error,
     };
 
     u0 free(ctx_t* ctx);
@@ -130,6 +131,8 @@ namespace basecode::scm {
 
     obj_t* read(ctx_t* ctx, buf_crsr_t& crsr);
 
+    obj_t* error_args(ctx_t* ctx, obj_t* obj);
+
     obj_t* make_user_ptr(ctx_t* ctx, u0* ptr);
 
     obj_t* make_fixnum(ctx_t* ctx, fixnum_t n);
@@ -163,6 +166,8 @@ namespace basecode::scm {
     obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len = -1);
 
     obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len = -1);
+
+    obj_t* make_error(ctx_t* ctx, obj_t* args, obj_t* call_stack);
 
     template <typename... Args>
     u0 error(ctx_t* ctx, fmt_str_t fmt_msg, const Args&... args) {
@@ -213,6 +218,21 @@ FORMAT_TYPE(
             case obj_type_t::flonum:
                 format_to(o, "{:.7g}", to_flonum(data.obj));
                 break;
+
+            case obj_type_t::error: {
+                auto err_args   = error_args(data.ctx, data.obj);
+                auto args       = car(data.ctx, err_args);
+                auto call_stack = car(data.ctx, cdr(data.ctx, err_args));
+                format_to(o, "error: ");
+                for (; !is_nil(data.ctx, args); args = cdr(data.ctx, args)) {
+                    auto expr = eval(data.ctx, car(data.ctx, args));
+                    format_to(o, "{} ", printable_t{data.ctx, expr});
+                }
+                format_to(o, "\n");
+                for (; !is_nil(data.ctx, call_stack); call_stack = cdr(data.ctx, call_stack))
+                    format_to(o, "=> {}\n", printable_t{data.ctx, car(data.ctx, call_stack)});
+                break;
+            }
 
             case obj_type_t::symbol:
             case obj_type_t::keyword:
