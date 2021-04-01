@@ -403,7 +403,7 @@ namespace basecode::scm {
             case obj_type_t::string: {
                 auto rc = string::interned::get(STRING_ID(obj));
                 if (!OK(rc.status))
-                    error(ctx, "unable to find interned string");
+                    error(ctx, "unable to find interned string: {}", STRING_ID(obj));
                 return rc.slice.length;
             }
             default:
@@ -413,9 +413,6 @@ namespace basecode::scm {
     }
 
     u0 push_gc(ctx_t* ctx, obj_t* obj) {
-//        if (ctx->gc_stack_idx == GC_STACK_SIZE) {
-//            error(ctx, "gc stack overflow");
-//        }
         stack::push(ctx->gc_stack, obj);
     }
 
@@ -439,17 +436,6 @@ namespace basecode::scm {
 
     obj_t* eval(ctx_t* ctx, obj_t* obj) {
         return eval(ctx, obj, ctx->nil, nullptr);
-    }
-
-    u0 error(ctx_t* ctx, const s8* msg) {
-        obj_t* cl = ctx->call_list;
-        ctx->call_list = ctx->nil;
-        if (ctx->handlers.error)
-            ctx->handlers.error(ctx, msg, cl);
-        format::print(stderr, "error: {}\n", msg);
-        for (; !IS_NIL(cl); cl = CDR(cl))
-            format::print(stderr, "=> {}\n", printable_t{ctx, CAR(cl)});
-        exit(EXIT_FAILURE);
     }
 
     static obj_t* make_object(ctx_t* ctx) {
@@ -997,6 +983,19 @@ namespace basecode::scm {
         return make_list(ctx, t1, 3);
     }
 
+    u0 fmt_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args) {
+        obj_t* cl = ctx->call_list;
+        ctx->call_list = ctx->nil;
+        if (ctx->handlers.error)
+            ctx->handlers.error(ctx, fmt_msg.data(), cl);
+        format::print(stderr, "error: ");
+        format::vprint(ctx->alloc, stderr, fmt_msg, args);
+        format::print(stderr, "\n");
+        for (; !IS_NIL(cl); cl = CDR(cl))
+            format::print(stderr, "=> {}\n", printable_t{ctx, CAR(cl)});
+        exit(EXIT_FAILURE);
+    }
+
     obj_t* make_string(ctx_t* ctx, const s8* str, s32 len, u32 id) {
         auto obj = find_string(ctx, str, id, len);
         if (!IS_NIL(obj))
@@ -1012,7 +1011,7 @@ namespace basecode::scm {
         if (!id) {
             const auto rc = string::interned::fold_for_result(str, len);
             if (!OK(rc.status))
-                error(ctx, "find_string unable to intern string");
+                error(ctx, "find_string unable to intern string: {}", str);
             id = rc.id;
         }
         for (obj_t* obj = ctx->str_list; !IS_NIL(obj); obj = CDR(obj)) {
@@ -1028,7 +1027,7 @@ namespace basecode::scm {
         if (!id) {
             const auto rc = string::interned::fold_for_result(name, len);
             if (!OK(rc.status))
-                error(ctx, "find_symbol unable to intern string");
+                error(ctx, "find_symbol unable to intern string: {}", name);
             id = rc.id;
         }
         for (obj_t* obj = ctx->sym_list; !IS_NIL(obj); obj = CDR(obj)) {
@@ -1041,13 +1040,11 @@ namespace basecode::scm {
     }
 
     static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type) {
-        s8 buf[64];
         if (TYPE(obj) != type) {
-            sprintf(buf,
-                    "expected %s, got %s",
-                    s_type_names[u32(type)],
-                    s_type_names[u32(TYPE(obj))]);
-            error(ctx, buf);
+            error(ctx,
+                  "expected {}, got {}",
+                  s_type_names[u32(type)],
+                  s_type_names[u32(TYPE(obj))]);
         }
         return obj;
     }
@@ -1301,12 +1298,12 @@ namespace basecode::scm {
                                                           buf,
                                                           make_ffi_signature(ctx, arg, env, buf));
                     if (!ol)
-                        error(ctx, "ffi: no matching overload for function");
+                        error(ctx, "ffi: no matching overload for function: {}", proto->name);
                     n = 0;
                     ffi::reset(ctx->ffi);
                     while (!IS_NIL(arg)) {
                         if (n >= ol->params.size)
-                            error(ctx, "ffi: too many arguments");
+                            error(ctx, "ffi: too many arguments: {}@{}", ol->name, proto->name);
                         auto& param = ol->params[n];
                         va          = EVAL(CAR(arg));
                         switch (TYPE(va)) {
@@ -1366,7 +1363,7 @@ namespace basecode::scm {
                             case obj_type_t::string: {
                                 auto s = string::interned::get_slice(STRING_ID(va));
                                 if (!s)
-                                    error(ctx, "ffi: invalid interned string id");
+                                    error(ctx, "ffi: invalid interned string id: {}", STRING_ID(va));
                                 ffi::push(ctx->ffi, s);
                                 break;
                             }
@@ -1377,7 +1374,7 @@ namespace basecode::scm {
                                 va = CADR(va);
                                 auto s = string::interned::get_slice(STRING_ID(va));
                                 if (!s)
-                                    error(ctx, "ffi: invalid interned string id for keyword");
+                                    error(ctx, "ffi: invalid interned string id for keyword: {}", STRING_ID(va));
                                 break;
                             }
                             default: {
@@ -1397,7 +1394,7 @@ namespace basecode::scm {
                     param_alias_t ret{};
                     auto status = ffi::call(ctx->ffi, ol, ret);
                     if (!OK(status))
-                        error(ctx, "ffi: call failed");
+                        error(ctx, "ffi: call failed: {}", ol->name);
                     switch (ol->ret_type.cls) {
                         case param_cls_t::ptr:
                             res = !ret.p ? ctx->nil : (obj_t*) ret.p;

@@ -118,8 +118,6 @@ namespace basecode::scm {
 
     obj_t* eval(ctx_t* ctx, obj_t* obj);
 
-    u0 error(ctx_t* ctx, const s8* msg);
-
     obj_t* make_bool(ctx_t* ctx, b8 value);
 
     u0* to_user_ptr(ctx_t* ctx, obj_t* obj);
@@ -160,9 +158,16 @@ namespace basecode::scm {
 
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn);
 
+    u0 fmt_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args);
+
     obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len = -1);
 
     obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len = -1);
+
+    template <typename... Args>
+    u0 error(ctx_t* ctx, fmt_str_t fmt_msg, const Args&... args) {
+        fmt_error(ctx, fmt_msg, fmt::make_format_args(args...));
+    }
 
     obj_t* find_string(ctx_t* ctx, const s8* str, u32& id, s32 len = -1);
 
