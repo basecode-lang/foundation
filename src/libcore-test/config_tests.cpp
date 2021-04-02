@@ -52,7 +52,7 @@ static u0 validate_cvar(scm::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
     }
 }
 
-TEST_CASE("basecode::config cvar add & remove") {
+TEST_CASE("basecode::config cvar add & remove", "[!hide]") {
     const auto cvar_id                       = 20;
     const auto enable_console_color          = "enable-console-color"_ss;
     const auto internal_enable_console_color = "*enable-console-color*";
@@ -78,7 +78,7 @@ TEST_CASE("basecode::config cvar add & remove") {
         REQUIRE(false);
 }
 
-TEST_CASE("basecode::config find localized strings") {
+TEST_CASE("basecode::config find localized strings", "[!hide]") {
     str::slice_t* value{};
 
     if (!OK(string::localized::find(0, &value)))

@@ -139,6 +139,7 @@ namespace basecode::scm {
         constexpr u8 op_gc              = 103;
         constexpr u8 op_gc_reg1         = 104;
         constexpr u8 op_gc_reg2         = 105;
+        constexpr u8 op_apply_reg2      = 106;
         constexpr u8 op_error           = 255;
 
         static u8 s_op_decode[][2][8] = {
@@ -375,6 +376,10 @@ namespace basecode::scm {
                 {op_gc,         op_error,       op_gc_reg1,     op_gc_reg2,     op_error,       op_error,       op_error,       op_error},
                 {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
             },
+            [instruction::type::apply] = {
+                {op_gc,         op_error,       op_error,       op_apply_reg2,  op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+            },
         };
 
         u0 free(vm_t& vm) {
@@ -530,6 +535,7 @@ namespace basecode::scm {
                 [op_gc]                 = &&gc,
                 [op_gc_reg1]            = &&gc_reg1,
                 [op_gc_reg2]            = &&gc_reg2,
+                [op_apply_reg2]         = &&apply_reg2,
                 [op_error]              = &&error,
             };
 
@@ -1209,11 +1215,6 @@ namespace basecode::scm {
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }
-            eval_reg2:
-            {
-                PC += sizeof(instruction_t);
-                EXEC_NEXT();
-            }
             error_reg2:
             {
                 G(opers->reg2.dest) = u64(make_error(ctx,
@@ -1297,6 +1298,18 @@ namespace basecode::scm {
             gc_reg2:
             {
                 G(opers->reg2.dest) = u64(pop_gc(ctx));
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            eval_reg2:
+            {
+                // XXX:
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            apply_reg2:
+            {
+                // XXX:
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }

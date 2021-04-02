@@ -127,6 +127,7 @@ namespace basecode::scm {
             constexpr u8 qt     = 55;
             constexpr u8 qq     = 56;
             constexpr u8 gc     = 57;
+            constexpr u8 apply  = 58;
 
             str::slice_t name(u8 op);
         }

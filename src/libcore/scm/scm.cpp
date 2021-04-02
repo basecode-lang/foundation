@@ -614,8 +614,6 @@ namespace basecode::scm {
             cl = cons(ctx, obj, ctx->call_list);
             ctx->call_list = cl;
 
-            PRINT("cl = ", CAR(cl));
-
             kar = CAR(obj);
             arg = CDR(obj);
             if (TYPE(kar) == obj_type_t::symbol)

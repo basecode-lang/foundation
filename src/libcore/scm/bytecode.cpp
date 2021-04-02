@@ -80,6 +80,7 @@ namespace basecode::scm {
                 [qt]        = "QT"_ss,
                 [qq]        = "QQ"_ss,
                 [gc]        = "GC"_ss,
+                [apply]     = "APPLY"_ss,
             };
 
             str::slice_t name(u8 op) {
