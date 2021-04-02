@@ -1002,7 +1002,8 @@ namespace basecode::config {
                 expr = scm::read(g_cfg_sys.ctx, crsr);
 //                    );
             if (!expr) break;
-//            scm::write_fp(g_cfg_sys.ctx, expr, stdout); fprintf(stdout, "\n");
+//            format::print("read::expr = {}\n", scm::printable_t{g_cfg_sys.ctx, expr, true});
+//            fflush(stdout);
 //            TIME_BLOCK(
 //                "eval::scm::eval"_ss,
                 *obj = scm::eval(g_cfg_sys.ctx, expr);

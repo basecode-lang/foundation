@@ -406,7 +406,6 @@ namespace basecode {
 
             return {};
         }
-
         template <Hash_Table T,
                   typename Key_Type = typename T::Key_Type,
                   typename Value_Type = typename T::Value_Type,
@@ -437,6 +436,26 @@ namespace basecode {
             }
 
             return (Base_Type_Value) nullptr;
+        }
+
+        template <Hash_Table T,
+                  typename Key_Type = typename T::Key_Type,
+                  typename Value_Type = typename T::Value_Type>
+        b8 set(T& table, const Key_Type& key, const Value_Type& value) {
+            if (table.size == 0) {
+                insert(table, key, value);
+                return false;
+            }
+            u64 hash         = hash::hash64(key);
+            u32 bucket_index = hash_common::range_reduction(hash, table.capacity);
+            u32 found_index{};
+            if (find_key(table, bucket_index, hash, key, &found_index)) {
+                table.values[found_index] = value;
+                return true;
+            } else {
+                insert(table, key, value);
+            }
+            return false;
         }
     }
 }

@@ -59,13 +59,8 @@ namespace basecode {
         u32                     size;
         u32                     capacity = Size;
 
-        T& operator[](u32 index) {
-            return data[(index < 0 ? size + (-index - 1) : size - index)];
-        }
-
-        const T& operator[](u32 index) const {
-            return data[(index < 0 ? size + (-index - 1) : size - index)];
-        }
+        T& operator[](u32 index)                { return data[index]; }
+        const T& operator[](u32 index) const    { return data[index]; }
     };
 
     template <typename T>
@@ -78,13 +73,8 @@ namespace basecode {
         u32                     size;
         u32                     capacity;
 
-        T& operator[](u32 index) {
-            return data[(index < 0 ? size + (-index - 1) : size - index)];
-        }
-
-        const T& operator[](u32 index) const {
-            return data[(index < 0 ? size + (-index - 1) : size - index)];
-        }
+        T& operator[](u32 index)                { return data[index]; }
+        const T& operator[](u32 index) const    { return data[index]; }
     };
     static_assert(sizeof(stack_t<s32>) <= 24, "stack_t<T> is now larger than 24 bytes!");
 
@@ -99,8 +89,9 @@ namespace basecode {
                   b8 Is_Pointer = std::is_pointer_v<Value_Type>>
         inline auto top(const T& stack);
 
-        template <typename T>
-        u0 reserve(stack_t<T>& stack, u32 new_capacity);
+        template <Dynamic_Stack T,
+                  typename Value_Type = typename T::Value_Type>
+        u0 reserve(T& stack, u32 new_capacity);
 
         template <typename T>
         u0 grow(stack_t<T>& stack, u32 min_capacity = 16);
@@ -143,11 +134,6 @@ namespace basecode {
         }
 
         template <typename T>
-        u0 free(fixed_stack_t<T>& stack) {
-            stack.size = {};
-        }
-
-        template <typename T>
         inline auto push(stack_t<T>& stack) {
             if (stack.size + 1 > stack.capacity)
                 grow(stack);
@@ -178,9 +164,9 @@ namespace basecode {
 
         template <Stack T>
         u0 init(T& stack, alloc_t* alloc) {
-            stack.data = {};
+            stack.data  = {};
             stack.alloc = alloc;
-            stack.size = stack.capacity = {};
+            stack.size  = stack.capacity = {};
         }
 
         template <typename T>
@@ -202,27 +188,9 @@ namespace basecode {
 
         template <typename T>
         u0 truncate(stack_t<T>& stack, u32 size) {
-            if (size >= stack.size)
+            if (size > stack.size)
                 return;
             stack.size = size;
-        }
-
-        template <typename T>
-        inline auto dup(fixed_stack_t<T>& stack) {
-            using Value_Type = typename stack_t<T>::Value_Type;
-            if (stack.size == 0)
-                return Value_Type({});
-            assert(stack.size + 1 < stack.capacity);
-            auto top = stack.data[stack.size - 1];
-            stack.data[stack.size++] = top;
-            return top;
-        }
-
-        template <typename T>
-        inline auto push(fixed_stack_t<T>& stack) {
-            assert(stack.size + 1 < stack.capacity);
-            ++stack.size;
-            return top(stack);
         }
 
         template <Stack T, typename Value_Type, b8 Is_Pointer>
@@ -247,10 +215,8 @@ namespace basecode {
             reserve(stack, min_capacity * 3 + 16);
         }
 
-        template <typename T>
-        u0 reserve(stack_t<T>& stack, u32 new_capacity) {
-            using Value_Type = typename stack_t<T>::Value_Type;
-
+        template <Dynamic_Stack T, typename Value_Type>
+        u0 reserve(T& stack, u32 new_capacity) {
             if (new_capacity == 0) {
                 memory::free(stack.alloc, stack.data);
                 stack.data     = {};
@@ -262,10 +228,11 @@ namespace basecode {
                 return;
 
             new_capacity = std::max(stack.size, new_capacity);
-            stack.data = (Value_Type*) memory::realloc(stack.alloc,
-                                                       stack.data,
-                                                       new_capacity * sizeof(Value_Type),
-                                                       alignof(Value_Type));
+            stack.data = (Value_Type*) memory::realloc(
+                stack.alloc,
+                stack.data,
+                new_capacity * sizeof(Value_Type),
+                alignof(Value_Type));
             const auto data          = stack.data + stack.size;
             const auto size_to_clear = new_capacity > stack.capacity ? new_capacity - stack.capacity : 0;
             std::memset(data, 0, size_to_clear * sizeof(Value_Type));
@@ -302,42 +269,9 @@ namespace basecode {
         }
 
         template <typename T>
-        inline u32 push(fixed_stack_t<T>& stack, auto&& value) {
-            assert(stack.size + 1 < stack.capacity);
-            stack.data[stack.size++] = value;
-            return stack.size;
-        }
-
-        template <typename T>
-        inline u32 push(fixed_stack_t<T>& stack, auto& value) {
-            assert(stack.size + 1 < stack.capacity);
-            stack.data[stack.size++] = value;
-            return stack.size;
-        }
-
-        template <typename T>
         inline u32 push(stack_t<T>& stack, const auto& value) {
             if (stack.size + 1 > stack.capacity)
                 grow(stack);
-            stack.data[stack.size++] = value;
-            return stack.size;
-        }
-
-        template <typename T>
-        u0 insert(fixed_stack_t<T>& stack, u32 index, auto& value) {
-            assert(stack.size + 1 < stack.capacity);
-            auto target  = stack.data + index;
-            auto current = stack.data + stack.size;
-            auto prev    = current + 1;
-            while (prev <= target)
-                *current++ = *prev++;
-            *target = value;
-            ++stack.size;
-        }
-
-        template <typename T>
-        inline u32 push(fixed_stack_t<T>& stack, const auto& value) {
-            assert(stack.size + 1 < stack.capacity);
             stack.data[stack.size++] = value;
             return stack.size;
         }

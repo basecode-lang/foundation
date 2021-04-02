@@ -46,10 +46,13 @@
         (= lst (cdr lst)))
     res))
 
-(= append (fn (l m)
-    (if (not l)
-        m
-        (cons (car l) (append (cdr l) m)))))
+(= append (fn (a b)
+    (let a1 (reverse a))
+    (let b1 b)
+    (while a1
+        (= b1 (cons (car a1) b1))
+        (= a1 (cdr a1)))
+    b1))
 
 (= append-reverse (fn (rev tail)
     (if (not rev)

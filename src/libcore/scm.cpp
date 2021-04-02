@@ -46,6 +46,7 @@
 #include <bit>
 #include <basecode/core/scm.h>
 #include <basecode/core/string.h>
+#include <basecode/core/hashtab.h>
 
 #define OBJ_AT(idx)             (&ctx->objects[(idx)])
 #define OBJ_IDX(x)              ((x) - ctx->objects)
@@ -72,20 +73,29 @@
 #define PRIM(x)                 (prim_type_t((x)->prim.code))
 #define SET_PRIM(x, p)          ((x)->prim.code = fixnum_t((p)))
 #define NATIVE_PTR(x)           (ctx->native_ptrs[FIXNUM((x))])
-#define EVAL(o)                 eval(ctx, (o), env, nullptr)
-#define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env, nullptr)
+#define EVAL(o)                 eval(ctx, (o), env)
+#define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env)
 #define SYM(o)                  make_symbol(ctx, (o))
 #define CONS1(a)                cons(ctx, (a), ctx->nil)
 #define CONS(a, d)              cons(ctx, (a), (d))
-#define PRINT(h, o)             SAFE_SCOPE(                                                     \
-                                    fprintf(stdout, (h));                                       \
-                                    write_fp(ctx, (o), stdout);                                 \
-                                    fprintf(stdout, "\n");                                      \
-                                    fflush(stdout);                                             \
-                                )
+#define PRINT(h, o)             SAFE_SCOPE( \
+    str_t str{};                            \
+    str::init(str, ctx->alloc);             \
+    {                                       \
+        str_buf_t _buf{&str};                \
+        format::format_to(_buf, "{}{}\n", (h), printable_t{ctx, (o), true});\
+    }                                       \
+    format::print(stdout, "{}", str);\
+    fflush(stdout);)
 
 namespace basecode::scm {
+    struct env_t;
+
     using ptr_array_t           = array_t<u0*>;
+    using env_array_t           = array_t<env_t>;
+    using bind_table_t          = hashtab_t<u32, obj_t*>;
+    using symbol_table_t        = hashtab_t<u32, obj_t*>;
+    using string_table_t        = hashtab_t<u32, obj_t*>;
 
     enum class prim_type_t : u8 {
         eval,
@@ -179,6 +189,7 @@ namespace basecode::scm {
         "keyword",
         "ffi",
         "error",
+        "environment",
     };
 
     enum class numtype_t : u8 {
@@ -189,7 +200,14 @@ namespace basecode::scm {
 
     static const s8* s_delims   = " \n\t\r()[];";
 
-    struct obj_t {
+    struct env_t final {
+        obj_t*                  params;
+        obj_t*                  parent;
+        bind_table_t            bindings;
+        b8                      gc_protect;
+    };
+
+    struct obj_t final {
         union {
             struct {
                 u64             type:       6;
@@ -220,24 +238,26 @@ namespace basecode::scm {
     };
     static_assert(sizeof(obj_t) == 8, "obj_t is no longer 8 bytes!");
 
-    struct ctx_t {
+    struct ctx_t final {
         alloc_t*                alloc;
+        ffi_t                   ffi;
         handlers_t              handlers;
         obj_stack_t             gc_stack;
         obj_stack_t             cl_stack;
+        env_array_t             environments;
         ptr_array_t             native_ptrs;
+        string_table_t          strtab;
+        symbol_table_t          symtab;
         obj_t*                  objects;
-        obj_t*                  sym_list;
-        obj_t*                  str_list;
-        obj_t*                  call_list;
-        obj_t*                  free_list;
+        obj_t*                  env;
         obj_t*                  nil;
         obj_t*                  dot;
         obj_t*                  true_;
         obj_t*                  false_;
         obj_t*                  rbrac;
         obj_t*                  rparen;
-        ffi_t                   ffi;
+        obj_t*                  call_list;
+        obj_t*                  free_list;
         u32                     object_used;
         u32                     object_count;
     };
@@ -257,10 +277,7 @@ namespace basecode::scm {
         [u32(obj_type_t::boolean)]  = ffi_type_map_t{.type = 'B', .size = 'b'},
     };
 
-    static obj_t* eval(ctx_t* ctx,
-                       obj_t* obj,
-                       obj_t* env,
-                       obj_t** new_env);
+    static obj_t* reverse(ctx_t* ctx, obj_t* obj);
 
     static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b);
 
@@ -268,23 +285,30 @@ namespace basecode::scm {
 
     static obj_t* read_expr(ctx_t* ctx, buf_crsr_t& crsr);
 
+    static u0 finalize_environment(ctx_t* ctx, obj_t* env);
+
     static obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env);
 
     static obj_t* quasiquote(ctx_t* ctx, obj_t* obj, obj_t* env);
 
     static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type);
 
-    static obj_t* args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg, obj_t* env);
+    static u0 args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg, obj_t* env);
 
     static u32 make_ffi_signature(ctx_t* ctx, obj_t* args, obj_t* env, u8* buf);
 
+    static u0 format_environment(ctx_t* ctx, obj_t* env, fmt_ctx_t& fmt_ctx, u32 indent);
+
     u0 free(ctx_t* ctx) {
-        ctx->sym_list = ctx->nil;
-        ctx->str_list = ctx->nil;
         collect_garbage(ctx);
         array::free(ctx->native_ptrs);
         stack::free(ctx->cl_stack);
         stack::free(ctx->gc_stack);
+        hashtab::free(ctx->strtab);
+        hashtab::free(ctx->symtab);
+        for (auto& env : ctx->environments)
+            hashtab::free(env.bindings);
+        array::free(ctx->environments);
         ffi::free(ctx->ffi);
     }
 
@@ -305,19 +329,40 @@ namespace basecode::scm {
     }
 
     u0 collect_garbage(ctx_t* ctx) {
+        fflush(stdout);
 //        format::print("before: ctx->object_used = {}\n", ctx->object_used);
+        for (const auto& pair : ctx->strtab)
+            mark(ctx, pair.value);
+        for (const auto& pair : ctx->symtab)
+            mark(ctx, pair.value);
+        for (auto& env : ctx->environments) {
+            if (!env.gc_protect)
+                continue;
+            for (const auto& pair : env.bindings)
+                mark(ctx, pair.value);
+        }
         for (u32 i = 0; i < ctx->gc_stack.size; i++)
             mark(ctx, ctx->gc_stack[i]);
-        mark(ctx, ctx->sym_list);
-        mark(ctx, ctx->str_list);
         for (u32 i = 0; i < ctx->object_count; i++) {
             obj_t* obj = &ctx->objects[i];
             if (TYPE(obj) == obj_type_t::free)
                 continue;
             if (!IS_GC_MARKED(obj)) {
-                if (TYPE(obj) == obj_type_t::ptr
-                &&  ctx->handlers.gc) {
-                    ctx->handlers.gc(ctx, obj);
+                switch (TYPE(obj)) {
+                    case obj_type_t::ptr:
+                        if (ctx->handlers.gc)
+                            ctx->handlers.gc(ctx, obj);
+                        break;
+
+                    case obj_type_t::environment: {
+                        auto e = (env_t*) NATIVE_PTR(CDR(obj));
+                        e->parent = ctx->nil;
+                        hashtab::free(e->bindings);
+                        break;
+                    }
+
+                    default:
+                        break;
                 }
                 SET_TYPE(obj, obj_type_t::free);
                 SET_CDR(obj, ctx->free_list);
@@ -344,11 +389,15 @@ namespace basecode::scm {
             return flonum_t(u32(obj->number.value));
     }
 
+    const s8* type_name(obj_t* obj) {
+        return s_type_names[u32(TYPE(obj))];
+    }
+
     u0 mark(ctx_t* ctx, obj_t* obj) {
         if (!obj)
             return;
         obj_t* car;
-        begin:
+    begin:
         if (IS_GC_MARKED(obj))
             return;
 
@@ -356,23 +405,16 @@ namespace basecode::scm {
         SET_GC_MARK(obj, true);
 
         switch (TYPE(obj)) {
-            case obj_type_t::string:
-                break;
-
             case obj_type_t::pair:
-                mark(ctx, car);
-                /* fall through */
+                mark(ctx, car);         /* fall through */
             case obj_type_t::func:
             case obj_type_t::macro:
-            case obj_type_t::symbol:
-            case obj_type_t::keyword:
                 obj = CDR(obj);
                 goto begin;
 
             case obj_type_t::ptr:
-                if (ctx->handlers.mark) {
+                if (ctx->handlers.mark)
                     ctx->handlers.mark(ctx, obj);
-                }
                 break;
 
             default:
@@ -404,7 +446,9 @@ namespace basecode::scm {
                     ++len;
                 return len;
             }
-            case obj_type_t::string: {
+            case obj_type_t::symbol:
+            case obj_type_t::string:
+            case obj_type_t::keyword: {
                 auto rc = string::interned::get(STRING_ID(obj));
                 if (!OK(rc.status))
                     error(ctx, "unable to find interned string: {}", STRING_ID(obj));
@@ -417,23 +461,27 @@ namespace basecode::scm {
     }
 
     u0 push_gc(ctx_t* ctx, obj_t* obj) {
+        if (obj < ctx->objects || obj >= ctx->objects + ctx->object_count)
+            error(ctx, "fatal: obj address outside of heap range! {}", (u0*) obj);
         stack::push(ctx->gc_stack, obj);
     }
 
     obj_t* car(ctx_t* ctx, obj_t* obj) {
-        return IS_NIL(obj) ? obj : CAR(check_type(ctx, obj, obj_type_t::pair));
-    }
-
-    const s8* type_name(obj_t* obj) {
-        return s_type_names[u32(TYPE(obj))];
+        // FIXME: check_type was removed
+        return IS_NIL(obj) ? obj : CAR(obj);
     }
 
     obj_t* cdr(ctx_t* ctx, obj_t* obj) {
-        return IS_NIL(obj) ? obj : CDR(check_type(ctx, obj, obj_type_t::pair));
+        // FIXME: check_type was removed
+        return IS_NIL(obj) ? obj : CDR(obj);
+    }
+
+    obj_t* get(ctx_t* ctx, obj_t* sym) {
+        return get(ctx, sym, ctx->env);
     }
 
     obj_t* eval(ctx_t* ctx, obj_t* obj) {
-        return eval(ctx, obj, ctx->nil, nullptr);
+        return eval(ctx, obj, ctx->env);
     }
 
     static obj_t* make_object(ctx_t* ctx) {
@@ -463,9 +511,7 @@ namespace basecode::scm {
     }
 
     u0 set(ctx_t* ctx, obj_t* sym, obj_t* v) {
-        UNUSED(ctx);
-        sym = get(ctx, sym, ctx->nil);
-        SET_CDR(sym, v);
+        set(ctx, sym, v, ctx->env);
     }
 
     obj_t* next_arg(ctx_t* ctx, obj_t** arg) {
@@ -550,11 +596,17 @@ namespace basecode::scm {
         if ((ctx->object_count % 2) != 0)
             --ctx->object_count;
 
-        // the nil object is a special case that
-        // we manually allocate from the heap
-        ctx->nil       = &ctx->objects[ctx->object_used++];
-        ctx->nil->full = 0;
-        SET_TYPE(ctx->nil, obj_type_t::nil);
+        // init lists
+        ctx->call_list = ctx->nil;
+        ctx->free_list = ctx->nil;
+
+        // populate freelist
+        for (u32 i = 0; i < ctx->object_count; i++) {
+            obj_t* obj = &ctx->objects[i];
+            SET_TYPE(obj, obj_type_t::free);
+            SET_CDR(obj, ctx->free_list);
+            ctx->free_list = obj;
+        }
 
         ctx->alloc = alloc;
         array::init(ctx->native_ptrs, ctx->alloc);
@@ -563,23 +615,17 @@ namespace basecode::scm {
         stack::reserve(ctx->gc_stack, 1024);
         stack::init(ctx->cl_stack, ctx->alloc);
         stack::reserve(ctx->cl_stack, 1024);
-
-        // init lists
-        ctx->sym_list  = ctx->nil;
-        ctx->str_list  = ctx->nil;
-        ctx->call_list = ctx->nil;
-        ctx->free_list = ctx->nil;
-
-        // populate freelist
-        for (u32 i = ctx->object_used; i < ctx->object_count; i++) {
-            obj_t* obj = &ctx->objects[i];
-            SET_TYPE(obj, obj_type_t::free);
-            SET_CDR(obj, ctx->free_list);
-            ctx->free_list = obj;
-        }
+        hashtab::init(ctx->strtab, ctx->alloc);
+        hashtab::init(ctx->symtab, ctx->alloc);
+        array::init(ctx->environments, ctx->alloc);
 
         // init objects
-        auto save = save_gc(ctx);
+        ctx->nil       = make_object(ctx);
+        ctx->nil->full = 0;
+        SET_TYPE(ctx->nil, obj_type_t::nil);
+
+        ctx->env       = make_environment(ctx, ctx->nil);
+
         /* true */ {
             ctx->true_ = make_object(ctx);
             SET_TYPE(ctx->true_, obj_type_t::boolean);
@@ -601,7 +647,6 @@ namespace basecode::scm {
         set(ctx, ctx->rbrac, ctx->rbrac);
         set(ctx, SYM("nil"), ctx->nil);
         set(ctx, ctx->rparen, ctx->rparen);
-        restore_gc(ctx, save);
 
         // register built in primitives
         for (u32 i = 0; i < u32(prim_type_t::max); i++) {
@@ -609,7 +654,6 @@ namespace basecode::scm {
             SET_TYPE(v, obj_type_t::prim);
             SET_PRIM(v, i);
             set(ctx, make_symbol(ctx, s_prim_names[i]), v);
-            restore_gc(ctx, save);
         }
 
         ffi::init(ctx->ffi);
@@ -617,14 +661,20 @@ namespace basecode::scm {
         return ctx;
     }
 
+    static obj_t* reverse(ctx_t* ctx, obj_t* obj) {
+        obj_t* res;
+        for (res = ctx->nil; !IS_NIL(obj); obj = CDR(obj))
+            res = cons(ctx, CAR(obj), res);
+        return res;
+    }
+
     str::slice_t to_string(ctx_t* ctx, obj_t* obj) {
         switch (TYPE(obj)) {
             case obj_type_t::nil:
                 return "nil"_ss;
             case obj_type_t::symbol:
-            case obj_type_t::keyword:
-                return *string::interned::get_slice(STRING_ID(CAR(CDR(obj))));
             case obj_type_t::string:
+            case obj_type_t::keyword:
                 return *string::interned::get_slice(STRING_ID(obj));
             case obj_type_t::boolean:
                 return IS_TRUE(obj) ? "#t"_ss : "#f"_ss;
@@ -634,14 +684,14 @@ namespace basecode::scm {
     }
 
     obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env) {
-        UNUSED(ctx);
-        for (; !IS_NIL(env); env = CDR(env)) {
-            obj_t* x = CAR(env);
-            if (CAR(x) == sym) {
-                return x;
-            }
-        }
-        return CDR(sym);
+        check_type(ctx, env, obj_type_t::environment);
+        auto e     = (env_t*) NATIVE_PTR(CDR(env));
+        auto value = hashtab::find(e->bindings, FIXNUM(sym));
+        if (value)
+            return value;
+        if (IS_NIL(e->parent))
+            return ctx->nil;
+        return get(ctx, sym, e->parent);
     }
 
     obj_t* next_arg_no_chk(ctx_t* ctx, obj_t** arg) {
@@ -694,8 +744,7 @@ namespace basecode::scm {
             }
             case obj_type_t::prim:      return PRIM(a) == PRIM(b);
             case obj_type_t::ptr:
-            case obj_type_t::cfunc:
-            case obj_type_t::string:    return STRING_ID(a) == STRING_ID(b);
+            case obj_type_t::cfunc:     return NATIVE_PTR(a) == NATIVE_PTR(b);
             default:                    break;
         }
         return false;
@@ -709,12 +758,456 @@ namespace basecode::scm {
         return obj;
     }
 
+    obj_t* eval(ctx_t* ctx, obj_t* obj, obj_t* env) {
+        obj_t* fn   {};
+        obj_t* kar  {};
+        obj_t* arg  {};
+        obj_t* res  {};
+        obj_t* va   {};
+        obj_t* vb   {};
+        obj_t* cl   {};
+        u8          buf[16]{};
+        u32    n    {};
+        u32    gc   {save_gc(ctx)};
+
+        while (!res) {
+            if (TYPE(obj) == obj_type_t::symbol) {
+                res = get(ctx, obj, env);
+                break;
+            }
+
+            if (TYPE(obj) != obj_type_t::pair) {
+                res = obj;
+                break;
+            }
+
+            cl = cons(ctx, obj, ctx->call_list);
+            ctx->call_list = cl;
+
+            PRINT("cl = ", CAR(cl));
+
+            kar = CAR(obj);
+            arg = CDR(obj);
+            if (TYPE(kar) == obj_type_t::symbol)
+                    fn = get(ctx, kar, env);
+            else    fn = kar;
+
+            switch (TYPE(fn)) {
+                case obj_type_t::prim:
+                    switch (PRIM(fn)) {
+                        case prim_type_t::eval:
+                            obj = EVAL_ARG();
+                            break;
+
+                        case prim_type_t::let:
+                        case prim_type_t::set:
+                            va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
+                            set(ctx, va, EVAL_ARG(), env);
+                            res = ctx->nil;
+                            break;
+
+                        case prim_type_t::if_:
+                            obj = IS_TRUE(EVAL(CAR(arg))) ? CADR(arg) : CADDR(arg);
+                            break;
+
+                        case prim_type_t::fn:
+                        case prim_type_t::mac: {
+                            auto new_env = make_environment(ctx, env);
+                            auto param   = CAR(arg);
+                            while (!IS_NIL(param)) {
+                                if (TYPE(param) != obj_type_t::pair) {
+                                    set(ctx, param, ctx->false_, new_env);
+                                    break;
+                                }
+                                set(ctx, CAR(param), ctx->false_, new_env);
+                                param = CDR(param);
+                            }
+                            auto e = (env_t*) NATIVE_PTR(CDR(new_env));
+                            e->params = arg;
+                            next_arg(ctx, &arg);
+                            res = make_object(ctx);
+                            SET_TYPE(res, PRIM(fn) == prim_type_t::fn ? obj_type_t::func : obj_type_t::macro);
+                            SET_CDR(res, new_env);
+                            break;
+                        }
+
+                        case prim_type_t::error:
+                            res = make_error(ctx, arg, cl);
+                            break;
+
+                        case prim_type_t::while_:
+                            va = next_arg(ctx, &arg);
+                            n  = save_gc(ctx);
+                            while (true) {
+                                vb = EVAL(va);
+                                if (IS_NIL(vb) || IS_FALSE(vb))
+                                    break;
+                                vb = arg;
+                                for (; !IS_NIL(vb); vb = CDR(vb)) {
+                                    restore_gc(ctx, n);
+                                    push_gc(ctx, vb);
+                                    push_gc(ctx, env);
+                                    eval(ctx, CAR(vb), env);
+                                }
+                                restore_gc(ctx, n);
+                            }
+                            res = ctx->nil;
+                            break;
+
+                        case prim_type_t::quote:
+                            res = next_arg(ctx, &arg);
+                            break;
+
+                        case prim_type_t::unquote:
+                            error(ctx, "unquote is not valid in this context.");
+                            break;
+
+                        case prim_type_t::quasiquote:
+                            obj = quasiquote(ctx, next_arg(ctx, &arg), env);
+                            break;
+
+                        case prim_type_t::unquote_splicing:
+                            error(ctx, "unquote-splicing is not valid in this context.");
+                            break;
+
+                        case prim_type_t::and_:
+                            obj = ctx->nil;
+                            for (; !IS_NIL(arg) && !IS_NIL(va = EVAL_ARG()); obj = va);
+                            break;
+
+                        case prim_type_t::or_:
+                            while (!IS_NIL(arg) && IS_NIL(obj = EVAL_ARG()));
+                            break;
+
+                        case prim_type_t::do_: {
+                            u32 save = save_gc(ctx);
+                            for (; !IS_NIL(CDR(arg)); arg = CDR(arg)) {
+                                restore_gc(ctx, save);
+                                push_gc(ctx, arg);
+                                push_gc(ctx, env);
+                                eval(ctx, CAR(arg), env);
+                            }
+                            obj = CAR(arg);
+                            break;
+                        }
+
+                        case prim_type_t::cons:
+                            va  = EVAL_ARG();
+                            res = cons(ctx, va, EVAL_ARG());
+                            break;
+
+                        case prim_type_t::car:
+                            va = EVAL_ARG();
+                            res = car(ctx, va);
+                            break;
+
+                        case prim_type_t::cdr:
+                            va = EVAL_ARG();
+                            res = cdr(ctx, va);
+                            break;
+
+                        case prim_type_t::setcar:
+                            va = check_type(ctx, EVAL_ARG(), obj_type_t::pair);
+                            SET_CAR(va, EVAL_ARG());
+                            res = ctx->nil;
+                            break;
+
+                        case prim_type_t::setcdr:
+                            va = check_type(ctx, EVAL_ARG(), obj_type_t::pair);
+                            SET_CDR(va, EVAL_ARG());
+                            res = ctx->nil;
+                            break;
+
+                        case prim_type_t::list:
+                            res = eval_list(ctx, arg, env);
+                            break;
+
+                        case prim_type_t::not_:
+                            va = EVAL_ARG();
+                            res = make_bool(ctx, IS_FALSE(va));
+                            break;
+
+                        case prim_type_t::is:
+                            va  = EVAL_ARG();
+                            res = make_bool(ctx, equal(ctx, va, EVAL_ARG()));
+                            break;
+
+                        case prim_type_t::atom:
+                            res = make_bool(ctx, TYPE(EVAL_ARG()) != obj_type_t::pair);
+                            break;
+
+                        case prim_type_t::print:
+                            while (!IS_NIL(arg)) {
+                                format::print("{}", printable_t{ctx, EVAL_ARG()});
+                                if (!IS_NIL(arg))
+                                    format::print(" ");
+                            }
+                            format::print("\n");
+                            res = ctx->nil;
+                            break;
+
+                        case prim_type_t::gt:
+                            va  = EVAL_ARG();
+                            vb  = EVAL_ARG();
+                            res = make_bool(ctx, to_flonum(va) > to_flonum(vb));
+                            break;
+
+                        case prim_type_t::gte:
+                            va  = EVAL_ARG();
+                            vb  = EVAL_ARG();
+                            res = make_bool(ctx, to_flonum(va) >= to_flonum(vb));
+                            break;
+
+                        case prim_type_t::lt:
+                            va  = EVAL_ARG();
+                            vb  = EVAL_ARG();
+                            res = make_bool(ctx, to_flonum(va) < to_flonum(vb));
+                            break;
+
+                        case prim_type_t::lte:
+                            va  = EVAL_ARG();
+                            vb  = EVAL_ARG();
+                            res = make_bool(ctx, to_flonum(va) <= to_flonum(vb));
+                            break;
+
+                        case prim_type_t::add: {
+                            flonum_t x = to_flonum(EVAL_ARG());
+                            while (!IS_NIL(arg))
+                                x += to_flonum(EVAL_ARG());
+                            res = make_flonum(ctx, x);
+                            break;
+                        }
+
+                        case prim_type_t::sub: {
+                            flonum_t x = to_flonum(EVAL_ARG());
+                            while (!IS_NIL(arg))
+                                x -= to_flonum(EVAL_ARG());
+                            res = make_flonum(ctx, x);
+                            break;
+                        }
+
+                        case prim_type_t::mul: {
+                            flonum_t x = to_flonum(EVAL_ARG());
+                            while (!IS_NIL(arg))
+                                x *= to_flonum(EVAL_ARG());
+                            res = make_flonum(ctx, x);
+                            break;
+                        }
+
+                        case prim_type_t::div: {
+                            flonum_t x = to_flonum(EVAL_ARG());
+                            while (!IS_NIL(arg))
+                                x /= to_flonum(EVAL_ARG());
+                            res = make_flonum(ctx, x);
+                            break;
+                        }
+
+                        case prim_type_t::mod: {
+                            fixnum_t x = to_fixnum(EVAL_ARG());
+                            while (!IS_NIL(arg))
+                                x %= to_fixnum(EVAL_ARG());
+                            res = make_fixnum(ctx, x);
+                            break;
+                        }
+
+                        default:
+                            break;
+                    }
+                    break;
+
+                case obj_type_t::ffi: {
+                    auto proto = (proto_t*) NATIVE_PTR(fn);
+                    auto ol = ffi::proto::match_signature(proto,
+                                                          buf,
+                                                          make_ffi_signature(ctx, arg, env, buf));
+                    if (!ol)
+                        error(ctx, "ffi: no matching overload for function: {}", proto->name);
+                    n = 0;
+                    ffi::reset(ctx->ffi);
+                    while (!IS_NIL(arg)) {
+                        if (n >= ol->params.size)
+                            error(ctx, "ffi: too many arguments: {}@{}", ol->name, proto->name);
+                        auto& param = ol->params[n];
+                        va          = EVAL(CAR(arg));
+                        switch (TYPE(va)) {
+                            case obj_type_t::nil:
+                                ffi::push(ctx->ffi, (u0*) nullptr);
+                                break;
+                            case obj_type_t::ptr:
+                                switch (ffi_type_t(param->value.type.user)) {
+                                    case ffi_type_t::object:
+                                        ffi::push(ctx->ffi, va);
+                                        break;
+                                    case ffi_type_t::context:
+                                        ffi::push(ctx->ffi, ctx);
+                                        break;
+                                    default:
+                                        ffi::push(ctx->ffi, NATIVE_PTR(va));
+                                        break;
+                                }
+                                break;
+                            case obj_type_t::pair:
+                                switch (ffi_type_t(param->value.type.user)) {
+                                    case ffi_type_t::list:
+                                        ffi::push(ctx->ffi, arg);
+                                        break;
+                                    default:
+                                        error(ctx, "ffi: invalid pair argument");
+                                        break;
+                                }
+                                break;
+                            case obj_type_t::fixnum:
+                                switch (param->value.type.cls) {
+                                    case param_cls_t::int_:
+                                        ffi::push(ctx->ffi, FIXNUM(va));
+                                        break;
+                                    case param_cls_t::float_:
+                                        ffi::push(ctx->ffi, flonum_t(FIXNUM(va)));
+                                        break;
+                                    default:
+                                        error(ctx, "ffi: invalid float conversion");
+                                }
+                                break;
+                            case obj_type_t::flonum:
+                                switch (param->value.type.cls) {
+                                    case param_cls_t::int_:
+                                        ffi::push(ctx->ffi, fixnum_t(FLONUM(va)));
+                                        break;
+                                    case param_cls_t::float_:
+                                        ffi::push(ctx->ffi, FLONUM(va));
+                                        break;
+                                    default:
+                                        error(ctx, "ffi: invalid float conversion");
+                                }
+                                break;
+                            case obj_type_t::symbol:
+                            case obj_type_t::string:
+                            case obj_type_t::keyword: {
+                                auto s = string::interned::get_slice(STRING_ID(va));
+                                if (!s)
+                                    error(ctx, "ffi: invalid interned string id: {}", STRING_ID(va));
+                                ffi::push(ctx->ffi, s);
+                                break;
+                            }
+                            case obj_type_t::boolean:
+                                ffi::push(ctx->ffi, va == ctx->true_ ? true : false);
+                                break;
+                            default: {
+                                switch (ffi_type_t(param->value.type.user)) {
+                                    case ffi_type_t::context:
+                                        ffi::push(ctx->ffi, ctx);
+                                        break;
+                                    default:
+                                        break;
+                                }
+                                error(ctx, "ffi: unsupported scm object type");
+                            }
+                        }
+                        arg = CDR(arg);
+                        ++n;
+                    }
+                    param_alias_t ret{};
+                    auto status = ffi::call(ctx->ffi, ol, ret);
+                    if (!OK(status))
+                        error(ctx, "ffi: call failed: {}", ol->name);
+                    switch (ol->ret_type.cls) {
+                        case param_cls_t::ptr:
+                            res = !ret.p ? ctx->nil : (obj_t*) ret.p;
+                            break;
+                        case param_cls_t::int_:
+                            if (ffi_type_t(ol->ret_type.user) == ffi_type_t::boolean) {
+                                res = make_bool(ctx, ret.b);
+                            } else {
+                                res = make_fixnum(ctx, ret.dw);
+                            }
+                            break;
+                        case param_cls_t::void_:
+                            res = ctx->nil;
+                            break;
+                        case param_cls_t::float_:
+                            res = make_flonum(ctx, ret.fdw);
+                            break;
+                        default:
+                            error(ctx, "ffi: unsupported return type");
+                    }
+                    break;
+                }
+
+                case obj_type_t::cfunc:
+                    res = ((native_func_t) NATIVE_PTR(fn))(ctx, eval_list(ctx, arg, env));
+                    break;
+
+                case obj_type_t::func: {
+                    obj_t* fn_env = CDR(fn);
+                    auto e = (env_t*) NATIVE_PTR(CDR(fn_env));
+
+                    arg = eval_list(ctx, arg, env);
+                    args_to_env(ctx, CAR(e->params), arg, fn_env);
+                    arg = CDR(e->params);
+                    u32 save = save_gc(ctx);
+                    for (; !IS_NIL(CDR(arg)); arg = CDR(arg)) {
+                        restore_gc(ctx, save);
+                        push_gc(ctx, arg);
+                        eval(ctx, CAR(arg), fn_env);
+                    }
+                    obj = CAR(arg);
+                    res = eval(ctx, CAR(arg), fn_env);
+                    break;
+                }
+
+                case obj_type_t::macro: {
+                    obj_t* expr{};
+                    obj_t* mac_env = CDR(fn);
+                    auto e = (env_t*) NATIVE_PTR(CDR(mac_env));
+                    args_to_env(ctx, CAR(e->params), arg, mac_env);
+                    arg = CDR(e->params);
+                    u32 save = save_gc(ctx);
+                    while (!IS_NIL(arg)) {
+                        restore_gc(ctx, save);
+                        push_gc(ctx, arg);
+                        expr = eval(ctx, next_arg(ctx, &arg), mac_env);
+                    }
+                    *obj = *expr;
+                    ctx->call_list = CDR(cl);
+                    res = eval(ctx, obj, env);
+                    break;
+                }
+
+                default:
+                    error(ctx, "tried to call non-callable value");
+            }
+
+            restore_gc(ctx, gc);
+        }
+
+        restore_gc(ctx, gc);
+        push_gc(ctx, res);
+        if (cl)
+            ctx->call_list = CDR(cl);
+
+        return res;
+    }
+
     u0 print(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj) {
         format::format_to(buf, "{}\n", printable_t{ctx, obj});
     }
 
     u0 write(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj) {
         format::format_to(buf, "{}", printable_t{ctx, obj});
+    }
+
+    obj_t* make_environment(ctx_t* ctx, obj_t* parent) {
+        if (parent && !IS_NIL(parent))
+            check_type(ctx, parent, obj_type_t::environment);
+        obj_t* obj = make_object(ctx);
+        auto env = &array::append(ctx->environments);
+        env->params     = ctx->nil;
+        env->parent     = parent && !IS_NIL(parent) ? parent : ctx->nil;
+        env->gc_protect = true;
+        hashtab::init(env->bindings, ctx->alloc);
+        SET_TYPE(obj, obj_type_t::environment);
+        SET_CDR(obj, make_user_ptr(ctx, env));
+        return obj;
     }
 
     obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size) {
@@ -742,6 +1235,12 @@ namespace basecode::scm {
             }
         }
         return type;
+    }
+
+    u0 set(ctx_t* ctx, obj_t* sym, obj_t* v, obj_t* env) {
+        check_type(ctx, env, obj_type_t::environment);
+        auto e = (env_t*) NATIVE_PTR(CDR(env));
+        hashtab::set(e->bindings, FIXNUM(sym), v);
     }
 
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn) {
@@ -924,27 +1423,37 @@ namespace basecode::scm {
         return ctx->nil;
     }
 
+    static u0 finalize_environment(ctx_t* ctx, obj_t* env) {
+        check_type(ctx, env, obj_type_t::environment);
+        auto e = (env_t*) NATIVE_PTR(CDR(env));
+        e->gc_protect = false;
+    }
+
     obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len) {
-        u32 id{};
-        obj_t* obj = find_symbol(ctx, name, id, len);
-        if (!IS_NIL(obj))
+        const auto rc = string::interned::fold_for_result(name, len);
+        if (!OK(rc.status))
+            error(ctx, "make_symbol: unable to intern string: {}", name);
+        auto obj = hashtab::find(ctx->symtab, rc.id);
+        if (obj)
             return obj;
         obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::symbol);
-        SET_CDR(obj, cons(ctx, make_string(ctx, name, len, id), ctx->nil));
-        ctx->sym_list = cons(ctx, obj, ctx->sym_list);
+        SET_FIXNUM(obj, rc.id);
+        hashtab::insert(ctx->symtab, rc.id, obj);
         return obj;
     }
 
     obj_t* make_keyword(ctx_t* ctx, const s8* name, s32 len) {
-        u32 id{};
-        obj_t* obj = find_symbol(ctx, name, id, len);
-        if (!IS_NIL(obj))
+        const auto rc = string::interned::fold_for_result(name, len);
+        if (!OK(rc.status))
+            error(ctx, "make_keyword: unable to intern string: {}", name);
+        auto obj = hashtab::find(ctx->symtab, rc.id);
+        if (obj)
             return obj;
         obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::keyword);
-        SET_CDR(obj, cons(ctx, make_string(ctx, name, len, id), ctx->nil));
-        ctx->sym_list = cons(ctx, obj, ctx->sym_list);
+        SET_FIXNUM(obj, rc.id);
+        hashtab::insert(ctx->symtab, rc.id, obj);
         return obj;
     }
 
@@ -985,9 +1494,8 @@ namespace basecode::scm {
         return make_list(ctx, t1, 3);
     }
 
-    u0 fmt_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args) {
+    u0 format_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args) {
         obj_t* cl = ctx->call_list;
-        ctx->call_list = ctx->nil;
         if (ctx->handlers.error)
             ctx->handlers.error(ctx, fmt_msg.data(), cl);
         format::print(stderr, "error: ");
@@ -995,6 +1503,7 @@ namespace basecode::scm {
         format::print(stderr, "\n");
         for (; !IS_NIL(cl); cl = CDR(cl))
             format::print(stderr, "=> {}\n", printable_t{ctx, CAR(cl)});
+        ctx->call_list = ctx->nil;
         exit(EXIT_FAILURE);
     }
 
@@ -1006,46 +1515,17 @@ namespace basecode::scm {
     }
 
     obj_t* make_string(ctx_t* ctx, const s8* str, s32 len, u32 id) {
-        auto obj = find_string(ctx, str, id, len);
-        if (!IS_NIL(obj))
+        const auto rc = string::interned::fold_for_result(str, len);
+        if (!OK(rc.status))
+            error(ctx, "make_string: unable to intern string: {}", str);
+        auto obj = hashtab::find(ctx->strtab, rc.id);
+        if (obj)
             return obj;
         obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::string);
-        SET_FIXNUM(obj, id);
-        ctx->str_list = cons(ctx, obj, ctx->str_list);
+        SET_FIXNUM(obj, rc.id);
+        hashtab::insert(ctx->strtab, rc.id, obj);
         return obj;
-    }
-
-    obj_t* find_string(ctx_t* ctx, const s8* str, u32& id, s32 len) {
-        if (!id) {
-            const auto rc = string::interned::fold_for_result(str, len);
-            if (!OK(rc.status))
-                error(ctx, "find_string unable to intern string: {}", str);
-            id = rc.id;
-        }
-        for (obj_t* obj = ctx->str_list; !IS_NIL(obj); obj = CDR(obj)) {
-            auto kar = CAR(obj);
-            const auto intern_id = FIXNUM(kar);
-            if (intern_id == id)
-                return kar;
-        }
-        return ctx->nil;
-    }
-
-    obj_t* find_symbol(ctx_t* ctx, const s8* name, u32& id, s32 len) {
-        if (!id) {
-            const auto rc = string::interned::fold_for_result(name, len);
-            if (!OK(rc.status))
-                error(ctx, "find_symbol unable to intern string: {}", name);
-            id = rc.id;
-        }
-        for (obj_t* obj = ctx->sym_list; !IS_NIL(obj); obj = CDR(obj)) {
-            auto str = CAR(CDR(CAR(obj)));
-            const auto intern_id = FIXNUM(str);
-            if (intern_id == id)
-                return CAR(obj);
-        }
-        return ctx->nil;
     }
 
     static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type) {
@@ -1058,447 +1538,97 @@ namespace basecode::scm {
         return obj;
     }
 
-    static obj_t* eval(ctx_t* ctx, obj_t* obj, obj_t* env, obj_t** new_env) {
-        obj_t* fn   {};
-        obj_t* kar  {};
-        obj_t* arg  {};
-        obj_t* res  {};
-        obj_t* va   {};
-        obj_t* vb   {};
-        obj_t* cl   {};
-        u8          buf[16]{};
-        u32    n    {};
-        u32    gc   {save_gc(ctx)};
+    u0 format_object(const printable_t& printable, fmt_ctx_t& fmt_ctx) {
+        auto o = fmt_ctx.out();
+        auto ctx = printable.ctx;
+        auto obj = printable.obj;
 
-        while (!res) {
-            if (TYPE(obj) == obj_type_t::symbol) {
-                res = CDR(get(ctx, obj, env));
+        switch (TYPE(obj)) {
+            case obj_type_t::nil:
+                fmt::format_to(o, "nil");
+                break;
+
+            case obj_type_t::pair:
+            case obj_type_t::func:
+            case obj_type_t::macro: {
+                obj_t* p = obj;
+                fmt::format_to(o, "(");
+                for (;;) {
+                    fmt::format_to(o, "{}", printable_t{ctx, CAR(p), true});
+                    p = CDR(p);
+                    if (TYPE(p) != obj_type_t::pair)
+                        break;
+                    fmt::format_to(o, " ");
+                }
+                if (!IS_NIL(p))
+                    fmt::format_to(o, " . {}", printable_t{ctx, p, true});
+                fmt::format_to(o, ")");
                 break;
             }
 
-            if (TYPE(obj) != obj_type_t::pair) {
-                res = obj;
+            case obj_type_t::fixnum:
+                fmt::format_to(o, "{}", to_fixnum(obj));
+                break;
+
+            case obj_type_t::flonum:
+                fmt::format_to(o, "{:.7g}", to_flonum(obj));
+                break;
+
+            case obj_type_t::error: {
+                auto err_args   = error_args(ctx, obj);
+                auto args       = car(ctx, err_args);
+                auto call_stack = car(ctx, CDR(err_args));
+                fmt::format_to(o, "error: ");
+                for (; !IS_NIL(args); args = CDR(args)) {
+                    auto expr = eval(ctx, CAR(args));
+                    fmt::format_to(o, "{} ", printable_t{ctx, expr});
+                }
+                fmt::format_to(o, "\n");
+                for (; !IS_NIL(call_stack); call_stack = CDR(call_stack))
+                    fmt::format_to(o, "=> {}\n", printable_t{ctx, CAR(call_stack)});
                 break;
             }
 
-            cl = cons(ctx, obj, ctx->call_list);
-            ctx->call_list = cl;
+            case obj_type_t::keyword:
+                fmt::format_to(o, "#:");
+            case obj_type_t::symbol:
+                fmt::format_to(o, "{}", to_string(ctx, obj));
+                break;
 
-            kar = CAR(obj);
-            arg = CDR(obj);
-            if (TYPE(kar) == obj_type_t::symbol)
-                fn  = CDR(get(ctx, kar, env));
-            else    fn = kar;
+            case obj_type_t::string:
+                if (printable.quote)
+                    fmt::format_to(o, "\"{}\"", to_string(ctx, obj));
+                else
+                    fmt::format_to(o, "{}", to_string(ctx, obj));
+                break;
 
-            switch (TYPE(fn)) {
-                case obj_type_t::prim:
-                    switch (PRIM(fn)) {
-                        case prim_type_t::eval:
-                            obj = EVAL_ARG();
-                            break;
+            case obj_type_t::boolean:
+                fmt::format_to(o, "{}", to_string(ctx, obj));
+                break;
 
-                        case prim_type_t::let:
-                            va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
-                            if (new_env)
-                                *new_env = cons(ctx, cons(ctx, va, EVAL_ARG()), env);
-                            res = ctx->nil;
-                            break;
+            case obj_type_t::environment:
+                format_environment(ctx, obj, fmt_ctx, printable.indent);
+                break;
 
-                        case prim_type_t::set:
-                            va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
-                            SET_CDR(get(ctx, va, env), EVAL_ARG());
-                            res = ctx->nil;
-                            break;
-
-                        case prim_type_t::if_:
-                            obj = IS_TRUE(EVAL(CAR(arg))) ? CADR(arg) : CADDR(arg);
-                            break;
-
-                        case prim_type_t::fn:
-                        case prim_type_t::mac:
-                            va = cons(ctx, env, arg);
-                            next_arg(ctx, &arg);
-                            res = make_object(ctx);
-                            SET_TYPE(res, PRIM(fn) == prim_type_t::fn ? obj_type_t::func : obj_type_t::macro);
-                            SET_CDR(res, va);
-                            break;
-
-                        case prim_type_t::error:
-                            res = make_error(ctx, arg, cl);
-                            break;
-
-                        case prim_type_t::while_:
-                            va = next_arg(ctx, &arg);
-                            n  = save_gc(ctx);
-                            while (true) {
-                                vb = EVAL(va);
-                                if (IS_NIL(vb) || IS_FALSE(vb))
-                                    break;
-                                vb = arg;
-                                for (; !IS_NIL(vb); vb = CDR(vb)) {
-                                    restore_gc(ctx, n);
-                                    push_gc(ctx, vb);
-                                    push_gc(ctx, env);
-                                    eval(ctx, CAR(vb), env, &env);
-                                }
-                                restore_gc(ctx, n);
-                            }
-                            res = ctx->nil;
-                            break;
-
-                        case prim_type_t::quote:
-                            res = next_arg(ctx, &arg);
-                            break;
-
-                        case prim_type_t::unquote:
-                            error(ctx, "unquote is not valid in this context.");
-                            break;
-
-                        case prim_type_t::quasiquote:
-                            obj = quasiquote(ctx, next_arg(ctx, &arg), env);
-                            break;
-
-                        case prim_type_t::unquote_splicing:
-                            error(ctx, "unquote-splicing is not valid in this context.");
-                            break;
-
-                        case prim_type_t::and_:
-                            obj = ctx->nil;
-                            for (; !IS_NIL(arg) && !IS_NIL(va = EVAL_ARG()); obj = va);
-                            break;
-
-                        case prim_type_t::or_:
-                            while (!IS_NIL(arg) && IS_NIL(obj = EVAL_ARG()));
-                            break;
-
-                        case prim_type_t::do_: {
-                            u32 save = save_gc(ctx);
-                            for (; !IS_NIL(CDR(arg)); arg = CDR(arg)) {
-                                restore_gc(ctx, save);
-                                push_gc(ctx, arg);
-                                push_gc(ctx, env);
-                                eval(ctx, CAR(arg), env, &env);
-                            }
-                            obj = CAR(arg);
-                            break;
-                        }
-
-                        case prim_type_t::cons:
-                            va  = EVAL_ARG();
-                            res = cons(ctx, va, EVAL_ARG());
-                            break;
-
-                        case prim_type_t::car:
-                            res = car(ctx, EVAL_ARG());
-                            break;
-
-                        case prim_type_t::cdr:
-                            res = cdr(ctx, EVAL_ARG());
-                            break;
-
-                        case prim_type_t::setcar:
-                            va = check_type(ctx, EVAL_ARG(), obj_type_t::pair);
-                            SET_CAR(va, EVAL_ARG());
-                            res = ctx->nil;
-                            break;
-
-                        case prim_type_t::setcdr:
-                            va = check_type(ctx, EVAL_ARG(), obj_type_t::pair);
-                            SET_CDR(va, EVAL_ARG());
-                            res = ctx->nil;
-                            break;
-
-                        case prim_type_t::list:
-                            res = eval_list(ctx, arg, env);
-                            break;
-
-                        case prim_type_t::not_:
-                            va = EVAL_ARG();
-                            res = make_bool(ctx, IS_FALSE(va));
-                            break;
-
-                        case prim_type_t::is:
-                            va  = EVAL_ARG();
-                            res = make_bool(ctx, equal(ctx, va, EVAL_ARG()));
-                            break;
-
-                        case prim_type_t::atom:
-                            res = make_bool(ctx, TYPE(EVAL_ARG()) != obj_type_t::pair);
-                            break;
-
-                        case prim_type_t::print:
-                            while (!IS_NIL(arg)) {
-                                format::print("{}", printable_t{ctx, EVAL_ARG()});
-                                if (!IS_NIL(arg))
-                                    format::print(" ");
-                            }
-                            format::print("\n");
-                            res = ctx->nil;
-                            break;
-
-                        case prim_type_t::gt:
-                            va  = EVAL_ARG();
-                            vb  = EVAL_ARG();
-                            res = make_bool(ctx, to_flonum(va) > to_flonum(vb));
-                            break;
-
-                        case prim_type_t::gte:
-                            va  = EVAL_ARG();
-                            vb  = EVAL_ARG();
-                            res = make_bool(ctx, to_flonum(va) >= to_flonum(vb));
-                            break;
-
-                        case prim_type_t::lt:
-                            va  = EVAL_ARG();
-                            vb  = EVAL_ARG();
-                            res = make_bool(ctx, to_flonum(va) < to_flonum(vb));
-                            break;
-
-                        case prim_type_t::lte:
-                            va  = EVAL_ARG();
-                            vb  = EVAL_ARG();
-                            res = make_bool(ctx, to_flonum(va) <= to_flonum(vb));
-                            break;
-
-                        case prim_type_t::add: {
-                            flonum_t x = to_flonum(EVAL_ARG());
-                            while (!IS_NIL(arg))
-                                x += to_flonum(EVAL_ARG());
-                            res = make_flonum(ctx, x);
-                            break;
-                        }
-
-                        case prim_type_t::sub: {
-                            flonum_t x = to_flonum(EVAL_ARG());
-                            while (!IS_NIL(arg))
-                                x -= to_flonum(EVAL_ARG());
-                            res = make_flonum(ctx, x);
-                            break;
-                        }
-
-                        case prim_type_t::mul: {
-                            flonum_t x = to_flonum(EVAL_ARG());
-                            while (!IS_NIL(arg))
-                                x *= to_flonum(EVAL_ARG());
-                            res = make_flonum(ctx, x);
-                            break;
-                        }
-
-                        case prim_type_t::div: {
-                            flonum_t x = to_flonum(EVAL_ARG());
-                            while (!IS_NIL(arg))
-                                x /= to_flonum(EVAL_ARG());
-                            res = make_flonum(ctx, x);
-                            break;
-                        }
-
-                        case prim_type_t::mod: {
-                            fixnum_t x = to_fixnum(EVAL_ARG());
-                            while (!IS_NIL(arg))
-                                x %= to_fixnum(EVAL_ARG());
-                            res = make_fixnum(ctx, x);
-                            break;
-                        }
-
-                        default:
-                            break;
-                    }
-                    break;
-
-                case obj_type_t::ffi: {
-                    auto proto = (proto_t*) NATIVE_PTR(fn);
-                    auto ol = ffi::proto::match_signature(proto,
-                                                          buf,
-                                                          make_ffi_signature(ctx, arg, env, buf));
-                    if (!ol)
-                        error(ctx, "ffi: no matching overload for function: {}", proto->name);
-                    n = 0;
-                    ffi::reset(ctx->ffi);
-                    while (!IS_NIL(arg)) {
-                        if (n >= ol->params.size)
-                            error(ctx, "ffi: too many arguments: {}@{}", ol->name, proto->name);
-                        auto& param = ol->params[n];
-                        va          = EVAL(CAR(arg));
-                        switch (TYPE(va)) {
-                            case obj_type_t::nil:
-                                ffi::push(ctx->ffi, (u0*) nullptr);
-                                break;
-                            case obj_type_t::ptr:
-                                switch (ffi_type_t(param->value.type.user)) {
-                                    case ffi_type_t::object:
-                                        ffi::push(ctx->ffi, va);
-                                        break;
-                                    case ffi_type_t::context:
-                                        ffi::push(ctx->ffi, ctx);
-                                        break;
-                                    default:
-                                        ffi::push(ctx->ffi, NATIVE_PTR(va));
-                                        break;
-                                }
-                                break;
-                            case obj_type_t::pair:
-                                switch (ffi_type_t(param->value.type.user)) {
-                                    case ffi_type_t::list:
-                                        ffi::push(ctx->ffi, arg);
-                                        break;
-                                    default:
-                                        error(ctx, "ffi: invalid pair argument");
-                                        break;
-                                }
-                                break;
-                            case obj_type_t::fixnum:
-                                switch (param->value.type.cls) {
-                                    case param_cls_t::int_:
-                                        ffi::push(ctx->ffi, FIXNUM(va));
-                                        break;
-                                    case param_cls_t::float_:
-                                        ffi::push(ctx->ffi, flonum_t(FIXNUM(va)));
-                                        break;
-                                    default:
-                                        error(ctx, "ffi: invalid float conversion");
-                                }
-                                break;
-                            case obj_type_t::flonum:
-                                switch (param->value.type.cls) {
-                                    case param_cls_t::int_:
-                                        ffi::push(ctx->ffi, fixnum_t(FLONUM(va)));
-                                        break;
-                                    case param_cls_t::float_:
-                                        ffi::push(ctx->ffi, FLONUM(va));
-                                        break;
-                                    default:
-                                        error(ctx, "ffi: invalid float conversion");
-                                }
-                                break;
-                            case obj_type_t::symbol:
-                                va = CADR(va);
-                                // N.B. fallthrough intentional
-                            case obj_type_t::string: {
-                                auto s = string::interned::get_slice(STRING_ID(va));
-                                if (!s)
-                                    error(ctx, "ffi: invalid interned string id: {}", STRING_ID(va));
-                                ffi::push(ctx->ffi, s);
-                                break;
-                            }
-                            case obj_type_t::boolean:
-                                ffi::push(ctx->ffi, va == ctx->true_ ? true : false);
-                                break;
-                            case obj_type_t::keyword: {
-                                va = CADR(va);
-                                auto s = string::interned::get_slice(STRING_ID(va));
-                                if (!s)
-                                    error(ctx, "ffi: invalid interned string id for keyword: {}", STRING_ID(va));
-                                break;
-                            }
-                            default: {
-                                switch (ffi_type_t(param->value.type.user)) {
-                                    case ffi_type_t::context:
-                                        ffi::push(ctx->ffi, ctx);
-                                        break;
-                                    default:
-                                        break;
-                                }
-                                error(ctx, "ffi: unsupported scm object type");
-                            }
-                        }
-                        arg = CDR(arg);
-                        ++n;
-                    }
-                    param_alias_t ret{};
-                    auto status = ffi::call(ctx->ffi, ol, ret);
-                    if (!OK(status))
-                        error(ctx, "ffi: call failed: {}", ol->name);
-                    switch (ol->ret_type.cls) {
-                        case param_cls_t::ptr:
-                            res = !ret.p ? ctx->nil : (obj_t*) ret.p;
-                            break;
-                        case param_cls_t::int_:
-                            if (ffi_type_t(ol->ret_type.user) == ffi_type_t::boolean) {
-                                res = make_bool(ctx, ret.b);
-                            } else {
-                                res = make_fixnum(ctx, ret.dw);
-                            }
-                            break;
-                        case param_cls_t::void_:
-                            res = ctx->nil;
-                            break;
-                        case param_cls_t::float_:
-                            res = make_flonum(ctx, ret.fdw);
-                            break;
-                        default:
-                            error(ctx, "ffi: unsupported return type");
-                    }
-                    break;
-                }
-
-                case obj_type_t::cfunc:
-                    res = ((native_func_t) NATIVE_PTR(fn))(ctx, eval_list(ctx, arg, env));
-                    break;
-
-                case obj_type_t::func: {
-                    arg  = eval_list(ctx, arg, env);
-                    va   = CDR(fn); // (env params ...)
-                    vb   = CDR(va); // (params ...)
-                    env  = args_to_env(ctx, CAR(vb), arg, CAR(va));
-                    arg  = CDR(vb);
-                    u32 save = save_gc(ctx);
-                    for (; !IS_NIL(CDR(arg)); arg = CDR(arg)) {
-                        restore_gc(ctx, save);
-                        push_gc(ctx, arg);
-                        push_gc(ctx, env);
-                        eval(ctx, CAR(arg), env, &env);
-                    }
-                    obj = CAR(arg);
-                    break;
-                }
-
-                case obj_type_t::macro: {
-                    // replace caller object with code generated by macro and re-eval
-                    va = CDR(fn); // (env params ...)
-                    vb = CDR(va); // (params ...)
-                    auto mac_env = args_to_env(ctx, CAR(vb), arg, CAR(va));
-                    arg = CDR(vb);
-                    u32 save = save_gc(ctx);
-                    while (!IS_NIL(arg)) {
-                        restore_gc(ctx, save);
-                        push_gc(ctx, arg);
-                        push_gc(ctx, mac_env);
-                        res = eval(ctx, next_arg(ctx, &arg), mac_env, &mac_env);
-                    }
-                    *obj = *res;
-                    res  = {};
-                    ctx->call_list = CDR(cl);
-                    break;
-                }
-
-                default:
-                    error(ctx, "tried to call non-callable value");
-            }
-
-            restore_gc(ctx, gc);
+            default:
+                fmt::format_to(o, "[{} {}]", type_name(obj), (u0*) obj);
+                break;
         }
-
-        restore_gc(ctx, gc);
-        push_gc(ctx, res);
-        if (cl)
-            ctx->call_list = CDR(cl);
-
-        return res;
     }
 
-    static obj_t* args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg, obj_t* env) {
+    static u0 args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg, obj_t* env) {
         while (!IS_NIL(prm)) {
             if (TYPE(prm) != obj_type_t::pair) {
-                env = cons(ctx, cons(ctx, prm, arg), env);
+                set(ctx, prm, arg, env);
                 break;
             }
-            env = cons(ctx, cons(ctx, CAR(prm), car(ctx, arg)), env);
+            auto k = CAR(prm);
+            auto v = CAR(arg);
+            set(ctx, k, v, env);
             prm = CDR(prm);
-            arg = cdr(ctx, arg);
+            arg = CDR(arg);
         }
-        return env;
     }
-
 
     static u32 make_ffi_signature(ctx_t* ctx, obj_t* args, obj_t* env, u8* buf) {
         u32 len{};
@@ -1514,6 +1644,42 @@ namespace basecode::scm {
             args = CDR(args);
         }
         return len;
+    }
+
+    static u0 format_environment(ctx_t* ctx, obj_t* env, fmt_ctx_t& fmt_ctx, u32 indent) {
+        auto e = (env_t*) NATIVE_PTR(CDR(env));
+        fmt::format_to(fmt_ctx.out(), "{:<{}}(", " ", indent);
+        b8 first = true;
+        for (const auto& pair : e->bindings) {
+            auto s = string::interned::get_slice(pair.key);
+            if (!s)
+                continue;
+            if (first) {
+                fmt::format_to(fmt_ctx.out(),
+                               "({:<16} . {})\n",
+                               *s,
+                               printable_t{ctx, pair.value, true});
+                first = false;
+            } else {
+                fmt::format_to(fmt_ctx.out(),
+                               "{:<{}}({:<16} . {})\n",
+                               " ",
+                               indent,
+                               *s,
+                               printable_t{ctx, pair.value, true});
+            }
+        }
+        if (IS_NIL(e->parent)) {
+            fmt::format_to(fmt_ctx.out(), "{:<{}}(parent . nil)", " ", indent);
+        } else {
+            fmt::format_to(fmt_ctx.out(),
+                           "{:<{}}(parent . [environment {}])",
+                           " ",
+                           indent,
+                           (u0*) e->parent);
+//                           printable_t{ctx, e->parent, false, indent + 5});
+        }
+        fmt::format_to(fmt_ctx.out(), ")\n");
     }
 }
 
