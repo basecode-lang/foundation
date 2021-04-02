@@ -165,9 +165,13 @@ namespace basecode::scm {
 
     obj_t* make_environment(ctx_t* ctx, obj_t* parent);
 
+    obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env);
+
     obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size);
 
     u0 set(ctx_t* ctx, obj_t* sym, obj_t* v, obj_t* env);
+
+    obj_t* quasiquote(ctx_t* ctx, obj_t* obj, obj_t* env);
 
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn);
 

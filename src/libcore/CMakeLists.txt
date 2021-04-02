@@ -75,8 +75,6 @@ set(
 
     buf_pool.cpp ${CORE_INC_DIR}/buf_pool.h
 
-    config.cpp ${CORE_INC_DIR}/config.h
-
     context.cpp ${CORE_INC_DIR}/context.h
 
     cxx/scope.cpp
@@ -179,7 +177,11 @@ set(
 
     ${CORE_INC_DIR}/set.h
 
-    scm.cpp ${CORE_INC_DIR}/scm.h
+    ${CORE_INC_DIR}/scm/types.h
+    scm/vm.cpp ${CORE_INC_DIR}/scm/vm.h
+    scm/scm.cpp ${CORE_INC_DIR}/scm/scm.h
+    scm/bytecode.cpp ${CORE_INC_DIR}/scm/bytecode.h
+    scm/modules/config.cpp ${CORE_INC_DIR}/scm/modules/config.h
 
     ${CORE_INC_DIR}/slice.h
     slice_utils.cpp ${CORE_INC_DIR}/slice_utils.h

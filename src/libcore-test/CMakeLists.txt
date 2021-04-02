@@ -20,6 +20,7 @@ add_executable(
     eav_tests.cpp
     bst_tests.cpp
     rbt_tests.cpp
+    scm_tests.cpp
     path_tests.cpp
     list_tests.cpp
     uuid_tests.cpp

@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include <basecode/core/scm.h>
 #include <basecode/core/path.h>
 #include <basecode/core/types.h>
 #include <basecode/core/context.h>
+#include <basecode/core/scm/scm.h>
 
 namespace basecode {
     enum class cvar_type_t : u8 {

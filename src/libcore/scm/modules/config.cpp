@@ -18,11 +18,11 @@
 
 #include <basecode/core/log.h>
 #include <basecode/core/error.h>
-#include <basecode/core/config.h>
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/log/system/spdlog.h>
 #include <basecode/core/log/system/syslog.h>
+#include <basecode/core/scm/modules/config.h>
 
 namespace basecode::config {
     constexpr u32 max_cvar_size = 256;
@@ -989,12 +989,11 @@ namespace basecode::config {
             return status_t::bad_input;
         buf_crsr_t crsr{};
         buf::cursor::init(crsr, buf);
-        auto gc = scm::save_gc(g_cfg_sys.ctx);
         defer(
-            scm::restore_gc(g_cfg_sys.ctx, gc);
             buf::cursor::free(crsr);
             buf::free(buf);
         );
+        auto gc = scm::save_gc(g_cfg_sys.ctx);
         while (true) {
             scm::obj_t* expr;
 //            TIME_BLOCK(
@@ -1006,10 +1005,11 @@ namespace basecode::config {
 //            fflush(stdout);
 //            TIME_BLOCK(
 //                "eval::scm::eval"_ss,
-                *obj = scm::eval(g_cfg_sys.ctx, expr);
+//                *obj = scm::eval(g_cfg_sys.ctx, expr);
 //                    );
             scm::restore_gc(g_cfg_sys.ctx, gc);
         }
+        scm::restore_gc(g_cfg_sys.ctx, gc);
         return status_t::ok;
     }
 

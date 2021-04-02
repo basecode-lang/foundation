@@ -24,7 +24,6 @@
 #include <basecode/core/term.h>
 #include <basecode/core/error.h>
 #include <basecode/core/locale.h>
-#include <basecode/core/config.h>
 #include <basecode/core/thread.h>
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
@@ -32,6 +31,7 @@
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
 #include <basecode/core/configure.h>
+#include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
 

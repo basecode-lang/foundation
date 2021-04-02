@@ -40,101 +40,9 @@
 //
 // ----------------------------------------------------------------------------
 
-#pragma clang diagnostic push
-#pragma ide diagnostic ignored "altera-struct-pack-align"
-
-#include <bit>
-#include <basecode/core/scm.h>
-#include <basecode/core/string.h>
-#include <basecode/core/hashtab.h>
-
-#define OBJ_AT(idx)             (&ctx->objects[(idx)])
-#define OBJ_IDX(x)              ((x) - ctx->objects)
-#define CAR(x)                  (&ctx->objects[(x)->pair.car_idx])
-#define CDR(x)                  (&ctx->objects[(x)->pair.cdr_idx])
-#define CAAR(x)                 CAR(CAR(x))
-#define CADR(x)                 CAR(CDR(x))
-#define CDDR(x)                 CDR(CDR(x))
-#define CADDR(x)                CAR(CDR(CDR(x)))
-#define SET_CAR(x, o)           ((x)->pair.car_idx = OBJ_IDX(o))
-#define SET_CDR(x, o)           ((x)->pair.cdr_idx = OBJ_IDX(o))
-#define IS_NIL(x)               ((x) == ctx->nil)
-#define TYPE(x)                 (obj_type_t((x)->hdr.type))
-#define IS_TRUE(x)              (!IS_NIL(x) && (x) == ctx->true_)
-#define IS_FALSE(x)             (IS_NIL(x)  || (x) == ctx->false_)
-#define IS_GC_MARKED(x)         ((x)->hdr.gc_mark)
-#define SET_GC_MARK(x, v)       ((x)->hdr.gc_mark = (v))
-#define SET_TYPE(x, t)          ((x)->hdr.type = u8((t)))
-#define FIXNUM(x)               ((x)->number.value)
-#define FLONUM(x)               (std::bit_cast<f32>(u32((x)->number.value)))
-#define STRING_ID(x)            (FIXNUM((x)))
-#define SET_FIXNUM(x, v)        ((x)->number.value = (v))
-#define SET_FLONUM(x, v)        ((x)->number.value = std::bit_cast<u32>(f32(v)))
-#define PRIM(x)                 (prim_type_t((x)->prim.code))
-#define SET_PRIM(x, p)          ((x)->prim.code = fixnum_t((p)))
-#define NATIVE_PTR(x)           (ctx->native_ptrs[FIXNUM((x))])
-#define EVAL(o)                 eval(ctx, (o), env)
-#define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env)
-#define SYM(o)                  make_symbol(ctx, (o))
-#define CONS1(a)                cons(ctx, (a), ctx->nil)
-#define CONS(a, d)              cons(ctx, (a), (d))
-#define PRINT(h, o)             SAFE_SCOPE( \
-    str_t str{};                            \
-    str::init(str, ctx->alloc);             \
-    {                                       \
-        str_buf_t _buf{&str};                \
-        format::format_to(_buf, "{}{}\n", (h), printable_t{ctx, (o), true});\
-    }                                       \
-    format::print(stdout, "{}", str);\
-    fflush(stdout);)
+#include <basecode/core/scm/types.h>
 
 namespace basecode::scm {
-    struct env_t;
-
-    using ptr_array_t           = array_t<u0*>;
-    using env_array_t           = array_t<env_t>;
-    using bind_table_t          = hashtab_t<u32, obj_t*>;
-    using symbol_table_t        = hashtab_t<u32, obj_t*>;
-    using string_table_t        = hashtab_t<u32, obj_t*>;
-
-    enum class prim_type_t : u8 {
-        eval,
-        let,
-        set,
-        if_,
-        fn,
-        mac,
-        while_,
-        error,
-        quote,
-        unquote,
-        quasiquote,
-        unquote_splicing,
-        and_,
-        or_,
-        do_,
-        cons,
-        car,
-        cdr,
-        setcar,
-        setcdr,
-        list,
-        not_,
-        is,
-        atom,
-        print,
-        gt,
-        gte,
-        lt,
-        lte,
-        add,
-        sub,
-        mul,
-        div,
-        mod,
-        max,
-    };
-
     static const s8* s_prim_names[] = {
         "eval",
         "let",
@@ -192,80 +100,7 @@ namespace basecode::scm {
         "environment",
     };
 
-    enum class numtype_t : u8 {
-        none,
-        fixnum,
-        flonum,
-    };
-
     static const s8* s_delims   = " \n\t\r()[];";
-
-    struct env_t final {
-        obj_t*                  params;
-        obj_t*                  parent;
-        bind_table_t            bindings;
-        b8                      gc_protect;
-    };
-
-    struct obj_t final {
-        union {
-            struct {
-                u64             type:       6;
-                u64             gc_mark:    1;
-                u64             pad:        57;
-            }                   hdr;
-            struct {
-                u64             type:       6;
-                u64             gc_mark:    1;
-                u64             code:       32;
-                u64             pad:        25;
-            }                   prim;
-            struct {
-                u64             type:       6;
-                u64             gc_mark:    1;
-                u64             car_idx:    28;
-                u64             cdr_idx:    28;
-                u64             pad:        1;
-            }                   pair;
-            struct {
-                u64             type:       6;
-                u64             gc_mark:    1;
-                u64             value:      32;
-                u64             pad:        25;
-            }                   number;
-            u64                 full;
-        };
-    };
-    static_assert(sizeof(obj_t) == 8, "obj_t is no longer 8 bytes!");
-
-    struct ctx_t final {
-        alloc_t*                alloc;
-        ffi_t                   ffi;
-        handlers_t              handlers;
-        obj_stack_t             gc_stack;
-        obj_stack_t             cl_stack;
-        env_array_t             environments;
-        ptr_array_t             native_ptrs;
-        string_table_t          strtab;
-        symbol_table_t          symtab;
-        obj_t*                  objects;
-        obj_t*                  env;
-        obj_t*                  nil;
-        obj_t*                  dot;
-        obj_t*                  true_;
-        obj_t*                  false_;
-        obj_t*                  rbrac;
-        obj_t*                  rparen;
-        obj_t*                  call_list;
-        obj_t*                  free_list;
-        u32                     object_used;
-        u32                     object_count;
-    };
-
-    struct ffi_type_map_t final {
-        u8                      type;
-        u8                      size;
-    } __attribute__((aligned(2)));
 
     static ffi_type_map_t s_types[] = {
         [u32(obj_type_t::pair)]     = ffi_type_map_t{.type = 'P', .size = 'q'},
@@ -277,23 +112,19 @@ namespace basecode::scm {
         [u32(obj_type_t::boolean)]  = ffi_type_map_t{.type = 'B', .size = 'b'},
     };
 
-    static obj_t* reverse(ctx_t* ctx, obj_t* obj);
-
     static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b);
 
     static numtype_t get_numtype(const s8* buf, s32 len);
 
     static obj_t* read_expr(ctx_t* ctx, buf_crsr_t& crsr);
 
-    static u0 finalize_environment(ctx_t* ctx, obj_t* env);
-
-    static obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env);
-
-    static obj_t* quasiquote(ctx_t* ctx, obj_t* obj, obj_t* env);
+    [[maybe_unused]] static obj_t* reverse(ctx_t* ctx, obj_t* obj);
 
     static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type);
 
     static u0 args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg, obj_t* env);
+
+    [[maybe_unused]] static u0 finalize_environment(ctx_t* ctx, obj_t* env);
 
     static u32 make_ffi_signature(ctx_t* ctx, obj_t* args, obj_t* env, u8* buf);
 
@@ -329,7 +160,6 @@ namespace basecode::scm {
     }
 
     u0 collect_garbage(ctx_t* ctx) {
-        fflush(stdout);
 //        format::print("before: ctx->object_used = {}\n", ctx->object_used);
         for (const auto& pair : ctx->strtab)
             mark(ctx, pair.value);
@@ -1243,6 +1073,24 @@ namespace basecode::scm {
         hashtab::set(e->bindings, FIXNUM(sym), v);
     }
 
+    obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env) {
+        obj_t* head = ctx->nil;
+        obj_t* tail = head;
+        while (!IS_NIL(lst)) {
+            auto r = cons(ctx,
+                          EVAL(next_arg(ctx, &lst)),
+                          ctx->nil);
+            if (IS_NIL(tail)) {
+                head = r;
+                tail = head;
+            } else {
+                SET_CDR(tail, r);
+                tail = r;
+            }
+        }
+        return head;
+    }
+
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn) {
         obj_t* obj = make_object(ctx);
         array::append(ctx->native_ptrs, (u0*) fn);
@@ -1423,6 +1271,25 @@ namespace basecode::scm {
         return ctx->nil;
     }
 
+    obj_t* quasiquote(ctx_t* ctx, obj_t* obj, obj_t* env) {
+        if (TYPE(obj) != obj_type_t::pair)
+            return CONS(SYM("quote"), CONS1(obj));
+        auto a = CAR(obj);
+        if (equal(ctx, a, SYM("unquote-splicing")))
+            error(ctx, "unquote-splicing not valid in this context");
+        if (equal(ctx, a, SYM("unquote")))
+            return CADR(obj);
+        if (TYPE(a) == obj_type_t::pair) {
+            auto aa = CAAR(obj);
+            if (equal(ctx, aa, SYM("unquote-splicing"))) {
+                obj_t* t1[] = {SYM("append"), CADR(a), quasiquote(ctx, CDR(obj), env)};
+                return make_list(ctx, t1, 3);
+            }
+        }
+        obj_t* t1[] = {SYM("cons"), quasiquote(ctx, a, env), quasiquote(ctx, CDR(obj), env)};
+        return make_list(ctx, t1, 3);
+    }
+
     static u0 finalize_environment(ctx_t* ctx, obj_t* env) {
         check_type(ctx, env, obj_type_t::environment);
         auto e = (env_t*) NATIVE_PTR(CDR(env));
@@ -1455,43 +1322,6 @@ namespace basecode::scm {
         SET_FIXNUM(obj, rc.id);
         hashtab::insert(ctx->symtab, rc.id, obj);
         return obj;
-    }
-
-    static obj_t* eval_list(ctx_t* ctx, obj_t* lst, obj_t* env) {
-        obj_t* head = ctx->nil;
-        obj_t* tail = head;
-        while (!IS_NIL(lst)) {
-            auto r = cons(ctx,
-                          EVAL(next_arg(ctx, &lst)),
-                          ctx->nil);
-            if (IS_NIL(tail)) {
-                head = r;
-                tail = head;
-            } else {
-                SET_CDR(tail, r);
-                tail = r;
-            }
-        }
-        return head;
-    }
-
-    static obj_t* quasiquote(ctx_t* ctx, obj_t* obj, obj_t* env) {
-        if (TYPE(obj) != obj_type_t::pair)
-            return CONS(SYM("quote"), CONS1(obj));
-        auto a = CAR(obj);
-        if (equal(ctx, a, SYM("unquote-splicing")))
-            error(ctx, "unquote-splicing not valid in this context");
-        if (equal(ctx, a, SYM("unquote")))
-            return CADR(obj);
-        if (TYPE(a) == obj_type_t::pair) {
-            auto aa = CAAR(obj);
-            if (equal(ctx, aa, SYM("unquote-splicing"))) {
-                obj_t* t1[] = {SYM("append"), CADR(a), quasiquote(ctx, CDR(obj), env)};
-                return make_list(ctx, t1, 3);
-            }
-        }
-        obj_t* t1[] = {SYM("cons"), quasiquote(ctx, a, env), quasiquote(ctx, CDR(obj), env)};
-        return make_list(ctx, t1, 3);
     }
 
     u0 format_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args) {
@@ -1682,5 +1512,3 @@ namespace basecode::scm {
         fmt::format_to(fmt_ctx.out(), ")\n");
     }
 }
-
-#pragma clang diagnostic pop

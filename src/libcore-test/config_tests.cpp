@@ -18,9 +18,9 @@
 
 #include <catch2/catch.hpp>
 #include <basecode/core/buf.h>
-#include <basecode/core/config.h>
 #include <basecode/core/string.h>
 #include <basecode/core/stopwatch.h>
+#include <basecode/core/scm/modules/config.h>
 
 using namespace basecode;
 
