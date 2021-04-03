@@ -180,6 +180,7 @@ set(
     ${CORE_INC_DIR}/scm/types.h
     scm/vm.cpp ${CORE_INC_DIR}/scm/vm.h
     scm/scm.cpp ${CORE_INC_DIR}/scm/scm.h
+    scm/compiler.cpp ${CORE_INC_DIR}/scm/compiler.h
     scm/bytecode.cpp ${CORE_INC_DIR}/scm/bytecode.h
     scm/modules/config.cpp ${CORE_INC_DIR}/scm/modules/config.h
 
