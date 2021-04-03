@@ -18,9 +18,13 @@
 
 #pragma once
 
-#include <basecode/core/scm/types.h>
+#include <basecode/core/hashtab.h>
 
 namespace basecode::scm {
+    struct ctx_t;
+    struct obj_t;
+    struct env_t;
+
     enum class memory_area_t : u8 {
         code,
         heap,

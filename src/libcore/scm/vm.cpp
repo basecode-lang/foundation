@@ -18,6 +18,7 @@
 
 #include <basecode/core/scm/vm.h>
 #include <basecode/core/scm/scm.h>
+#include <basecode/core/scm/types.h>
 #include <basecode/core/scm/bytecode.h>
 
 namespace basecode::scm {
@@ -140,6 +141,8 @@ namespace basecode::scm {
         constexpr u8 op_gc_reg1         = 104;
         constexpr u8 op_gc_reg2         = 105;
         constexpr u8 op_apply_reg2      = 106;
+        constexpr u8 op_const_reg2      = 107;
+        constexpr u8 op_const_imm2      = 108;
         constexpr u8 op_error           = 255;
 
         static u8 s_op_decode[][2][8] = {
@@ -380,6 +383,10 @@ namespace basecode::scm {
                 {op_gc,         op_error,       op_error,       op_apply_reg2,  op_error,       op_error,       op_error,       op_error},
                 {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
             },
+            [instruction::type::const_] = {
+                {op_error,      op_const_imm2,  op_error,       op_const_reg2,  op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+            },
         };
 
         u0 free(vm_t& vm) {
@@ -536,6 +543,8 @@ namespace basecode::scm {
                 [op_gc_reg1]            = &&gc_reg1,
                 [op_gc_reg2]            = &&gc_reg2,
                 [op_apply_reg2]         = &&apply_reg2,
+                [op_const_reg2]         = &&const_reg2,
+                [op_const_imm2]         = &&const_imm2,
                 [op_error]              = &&error,
             };
 
@@ -1310,6 +1319,30 @@ namespace basecode::scm {
             apply_reg2:
             {
                 // XXX:
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            const_imm2:
+            {
+                auto v = OBJ_AT(G(opers->imm.src));
+                flags->c = false;
+                flags->z = !IS_NIL(v);
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->imm.dest) = u64(v);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            const_reg2:
+            {
+                auto v = OBJ_AT(G(opers->reg2.src));
+                flags->c = false;
+                flags->z = !IS_NIL(v);
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->reg2.dest) = u64(v);
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }

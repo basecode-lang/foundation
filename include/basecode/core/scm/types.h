@@ -23,8 +23,7 @@
 
 #include <bit>
 #include <basecode/core/string.h>
-#include <basecode/core/hashtab.h>
-#include <basecode/core/scm/scm.h>
+#include <basecode/core/scm/bytecode.h>
 
 #define OBJ_AT(idx)             (&ctx->objects[(idx)])
 #define OBJ_IDX(x)              ((x) - ctx->objects)
@@ -159,7 +158,9 @@ namespace basecode::scm {
 
     struct ctx_t final {
         alloc_t*                alloc;
+        vm_t                    vm;
         ffi_t                   ffi;
+        emitter_t               emitter;
         handlers_t              handlers;
         obj_stack_t             gc_stack;
         obj_stack_t             cl_stack;

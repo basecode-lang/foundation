@@ -81,6 +81,13 @@ namespace basecode::scm {
                 [qq]        = "QQ"_ss,
                 [gc]        = "GC"_ss,
                 [apply]     = "APPLY"_ss,
+                [const_]    = "CONST"_ss,
+                [ladd]      = "LADD"_ss,
+                [lsub]      = "LSUB"_ss,
+                [lmul]      = "LMUL"_ss,
+                [ldiv]      = "LDIV"_ss,
+                [lmod]      = "LMOD"_ss,
+                [truthy]    = "TRUTHY"_ss,
             };
 
             str::slice_t name(u8 op) {
@@ -145,11 +152,13 @@ namespace basecode::scm {
             }
 
             u0 pred(bb_t& bb, bb_t& pred) {
+                assert((!pred.next && !bb.prev) && (&bb != &pred));
                 pred.next = &bb;
                 bb.prev   = &pred;
             }
 
             u0 succ(bb_t& bb, bb_t& succ) {
+                assert((!succ.prev && !bb.next) && (&bb != &succ));
                 succ.prev = &bb;
                 bb.next   = &succ;
             }
@@ -165,6 +174,11 @@ namespace basecode::scm {
                 operands->reg1.pad  = 0;
                 inst->data          = data;
                 array::append(bb.entries, buf);
+            }
+
+            u0 apply_label(bb_t& bb, label_t label) {
+                bb.label = label;
+                hashtab::insert(bb.emitter->labels, label, &bb);
             }
 
             u0 imm1(bb_t& bb, u8 opcode, imm_t imm) {
@@ -331,14 +345,31 @@ namespace basecode::scm {
                 register_alloc::free(e.gp);
             }
 
+            u0 reset(emitter_t& e) {
+                for (auto bb : e.blocks)
+                    basic_block::free(*bb);
+                stable_array::reset(e.blocks);
+                str_array::reset(e.strings);
+                hashtab::reset(e.labels);
+                register_alloc::reset(e.gp);
+            }
+
             u0 disassemble(emitter_t& e, bb_t& start_block) {
-                auto& vm = *e.vm;
+                for (auto bb : e.blocks) {
+                    format::print("id: {}, prev: {}, next: {}\n",
+                                  bb->id,
+                                  bb->prev ? bb->prev->id : 0,
+                                  bb->next ? bb->next->id : 0);
+                }
                 auto curr = &start_block;
                 u64  addr = curr->addr;
                 while (curr) {
                     for (auto str_id : curr->comments)
                         format::print("${:08X}: ; {}\n", addr, e.strings[str_id - 1]);
                     format::print("${:08X}: bb_{}:\n", addr, curr->id);
+                    if (curr->label) {
+                        format::print("${:08X}: {}:\n", addr, e.strings[curr->label - 1]);
+                    }
                     if (curr->type == bb_type_t::data) {
                         for (auto encoded : curr->entries)
                             format::print("${:08X}:    .word {}\n", addr, encoded);
@@ -544,10 +575,8 @@ namespace basecode::scm {
 
             bb_t& leave(bb_t& bb) {
                 auto& entry_block = emitter::make_basic_block(*bb.emitter, bb_type_t::code);
-                basic_block::succ(bb, entry_block);
-                basic_block::note(entry_block, "--------------------------------------------------------"_ss);
-                basic_block::note(entry_block, "leave"_ss);
-                basic_block::note(entry_block, "--------------------------------------------------------"_ss);
+               basic_block::succ(bb, entry_block);
+                basic_block::note(entry_block, "** epilogue"_ss);
                 basic_block::reg2(entry_block, op::move, rf::fp, rf::sp);
                 basic_block::reg2(entry_block, op::pop, rf::sp, rf::lr);
                 basic_block::reg1(entry_block, op::ret, rf::lr);
@@ -555,13 +584,11 @@ namespace basecode::scm {
             }
 
             bb_t& enter(bb_t& bb, u32 locals) {
-                auto& exit_block  = emitter::make_basic_block(*bb.emitter, bb_type_t::code);
                 auto& entry_block =  emitter::make_basic_block(*bb.emitter, bb_type_t::code);
-
+                basic_block::note(entry_block, "** prologue"_ss);
                 basic_block::succ(bb, entry_block);
-                basic_block::note(entry_block, "--------------------------------------------------------"_ss);
-                basic_block::note(entry_block, "enter"_ss);
-                basic_block::note(entry_block, "--------------------------------------------------------"_ss);
+
+                auto& exit_block  = emitter::make_basic_block(*bb.emitter, bb_type_t::code);
                 basic_block::succ(entry_block, exit_block);
                 basic_block::reg2(exit_block, op::push, rf::lr, rf::sp);
                 basic_block::reg2(exit_block, op::move, rf::sp, rf::fp);
@@ -575,6 +602,12 @@ namespace basecode::scm {
         namespace register_alloc {
             u0 free(register_alloc_t& reg_alloc) {
                 memory::free(reg_alloc.alloc, reg_alloc.slots);
+            }
+
+            u0 reset(register_alloc_t& reg_alloc) {
+                std::memset(reg_alloc.slots,
+                            0,
+                            sizeof(u8) * (reg_alloc.end - reg_alloc.start));
             }
 
             u0 release_all(register_alloc_t& reg_alloc) {

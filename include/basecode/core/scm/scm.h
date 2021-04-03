@@ -123,6 +123,8 @@ namespace basecode::scm {
 
     obj_t* eval(ctx_t* ctx, obj_t* obj);
 
+    obj_t* eval2(ctx_t* ctx, obj_t* obj);
+
     obj_t* make_bool(ctx_t* ctx, b8 value);
 
     u0* to_user_ptr(ctx_t* ctx, obj_t* obj);

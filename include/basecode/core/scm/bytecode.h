@@ -128,6 +128,13 @@ namespace basecode::scm {
             constexpr u8 qq     = 56;
             constexpr u8 gc     = 57;
             constexpr u8 apply  = 58;
+            constexpr u8 const_ = 59;
+            constexpr u8 ladd   = 60;
+            constexpr u8 lsub   = 61;
+            constexpr u8 lmul   = 62;
+            constexpr u8 ldiv   = 63;
+            constexpr u8 lmod   = 64;
+            constexpr u8 truthy = 65;
 
             str::slice_t name(u8 op);
         }
@@ -191,9 +198,9 @@ namespace basecode::scm {
     };
 
     struct instruction_t final {
-        u64                     type:       6;
+        u64                     type:       7;
         u64                     is_signed:  1;
-        u64                     encoding:   4;
+        u64                     encoding:   3;
         u64                     data:       53;
     };
     static_assert(sizeof(instruction_t) <= 8, "instruction_t is now greater than 8 bytes!");
@@ -286,6 +293,8 @@ namespace basecode::scm {
 
             u0 imm1(bb_t& bb, u8 opcode, imm_t imm);
 
+            u0 apply_label(bb_t& bb, label_t label);
+
             bb_t& ubuf(bb_t& bb, u8 addr_reg, u32 size);
 
             u0 init(bb_t& bb, emitter_t* e, bb_type_t type);
@@ -311,6 +320,8 @@ namespace basecode::scm {
         namespace emitter {
             u0 free(emitter_t& e);
 
+            u0 reset(emitter_t& e);
+
             constexpr imm_t imm(bb_t* bb) {
                 return imm_t{
                     .b = bb,
@@ -320,6 +331,12 @@ namespace basecode::scm {
             }
 
             u0 disassemble(emitter_t& e, bb_t& start_block);
+
+            template <String_Concept T>
+            label_t make_label(emitter_t& e, const T& name) {
+                str_array::append(e.strings, name);
+                return e.strings.size;
+            }
 
             status_t assemble(emitter_t& e, bb_t& start_block);
 
@@ -360,6 +377,8 @@ namespace basecode::scm {
 
         namespace register_alloc {
             u0 free(register_alloc_t& reg_alloc);
+
+            u0 reset(register_alloc_t& reg_alloc);
 
             u0 release_all(register_alloc_t& reg_alloc);
 

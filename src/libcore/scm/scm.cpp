@@ -40,7 +40,26 @@
 //
 // ----------------------------------------------------------------------------
 
+//    format::print("Address            Offset             Size    Reg Value              Top\n");
+//    format::print("-----------------------------------------------------------------------------\n");
+//    for (const auto& entry : vm.memory_map.entries) {
+//        if (!entry.valid)
+//            continue;
+//        format::print("0x{:016X} 0x{:016X} 0x{:05X}",
+//                      entry.addr,
+//                      entry.offs,
+//                      entry.size);
+//        format::print(" {:<2}  0x{:016X} {}\n",
+//                      scm::register_file::name(entry.reg),
+//                      G(entry.reg),
+//                      entry.top ? "  X" : "");
+//    }
+//    format::print("\n");
+//
+
+#include <basecode/core/scm/scm.h>
 #include <basecode/core/scm/types.h>
+#include <basecode/core/scm/bytecode.h>
 
 namespace basecode::scm {
     static const s8* s_prim_names[] = {
@@ -112,6 +131,8 @@ namespace basecode::scm {
         [u32(obj_type_t::boolean)]  = ffi_type_map_t{.type = 'B', .size = 'b'},
     };
 
+    static obj_t* make_object(ctx_t* ctx);
+
     static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b);
 
     static numtype_t get_numtype(const s8* buf, s32 len);
@@ -141,6 +162,8 @@ namespace basecode::scm {
             hashtab::free(env.bindings);
         array::free(ctx->environments);
         ffi::free(ctx->ffi);
+        vm::emitter::free(ctx->emitter);
+        vm::free(ctx->vm);
     }
 
     obj_t* nil(ctx_t* ctx) {
@@ -314,6 +337,293 @@ namespace basecode::scm {
         return eval(ctx, obj, ctx->env);
     }
 
+    static bb_t& compile(ctx_t* ctx,
+                         obj_t* obj,
+                         obj_t* env,
+                         bb_t& bb,
+                         u8 target_reg = 0,
+                         u32 label = 0) {
+        namespace op = instruction::type;
+        namespace rf = register_file;
+
+        auto& vm = ctx->vm;
+
+        auto type = TYPE(obj);
+        switch (type) {
+            case obj_type_t::fixnum:
+            case obj_type_t::flonum:
+            case obj_type_t::string:
+            case obj_type_t::boolean:
+                vm::basic_block::imm2(bb,
+                                      op::const_,
+                                      vm::emitter::imm((u32) OBJ_IDX(obj)),
+                                      target_reg);
+                break;
+
+            case obj_type_t::symbol:
+                vm::basic_block::imm2(bb,
+                                      op::get,
+                                      vm::emitter::imm((u32) OBJ_IDX(obj)),
+                                      target_reg);
+                break;
+
+            case obj_type_t::pair: {
+                u8 a_reg, b_reg;
+                vm::register_alloc::reserve_next(ctx->emitter.gp, a_reg);
+                vm::register_alloc::reserve_next(ctx->emitter.gp, b_reg);
+
+                auto form = CAR(obj);
+                if (TYPE(form) == obj_type_t::symbol)
+                    form = get(ctx, form, env);
+                auto args = CDR(obj);
+                switch (PRIM(form)) {
+                    case prim_type_t::eval:
+                        compile(ctx, CAR(args), env, bb, a_reg);
+                        vm::basic_block::reg2(bb, op::eval, a_reg, target_reg);
+                        break;
+
+                    case prim_type_t::add: {
+                        while (!IS_NIL(args)) {
+                            compile(ctx, CAR(args), env, bb, b_reg);
+                            vm::basic_block::reg2(bb, op::ladd, b_reg, a_reg);
+                            args = CDR(args);
+                        }
+                        vm::basic_block::reg2(bb, op::move, a_reg, target_reg);
+                        break;
+                    }
+
+                    case prim_type_t::sub:
+                        break;
+
+                    case prim_type_t::mul:
+                        break;
+
+                    case prim_type_t::div:
+                        break;
+
+                    case prim_type_t::mod:
+                        break;
+
+                    case prim_type_t::let:
+                    case prim_type_t::set: {
+                        u32 idx = OBJ_IDX(CAR(args));
+                        vm::basic_block::imm2(bb,
+                                              op::const_,
+                                              vm::emitter::imm(idx),
+                                              a_reg);
+                        auto label_id = vm::emitter::make_label(
+                            ctx->emitter,
+                            *string::interned::get_slice(STRING_ID(OBJ_AT(idx))));
+                        auto& value_bb = compile(ctx, CADR(args), env, bb, b_reg, label_id);
+                        vm::basic_block::reg2(bb, op::set, a_reg, b_reg);
+                        return value_bb;
+                    }
+
+                    case prim_type_t::fn:
+                    case prim_type_t::mac: {
+                        auto new_env = make_environment(ctx, env);
+                        auto param   = CAR(args);
+                        while (!IS_NIL(param)) {
+                            if (TYPE(param) != obj_type_t::pair) {
+                                set(ctx, param, ctx->false_, new_env);
+                                break;
+                            }
+                            set(ctx, CAR(param), ctx->false_, new_env);
+                            param = CDR(param);
+                        }
+                        auto e = (env_t*) NATIVE_PTR(CDR(new_env));
+                        e->params = args;
+                        next_arg(ctx, &args);
+                        auto res = make_object(ctx);
+                        SET_TYPE(res, PRIM(form) == prim_type_t::fn ?
+                                      obj_type_t::func :
+                                      obj_type_t::macro);
+                        SET_CDR(res, new_env);
+                        u32 idx = OBJ_IDX(res);
+                        vm::basic_block::imm2(bb,
+                                              op::const_,
+                                              vm::emitter::imm(idx),
+                                              target_reg);
+                        auto& proc_bb = vm::emitter::make_basic_block(
+                            ctx->emitter,
+                            bb_type_t::code);
+                        vm::basic_block::succ(bb, proc_bb);
+                        str_t note_str;
+                        if (label) {
+                            vm::basic_block::apply_label(proc_bb, label);
+                            note_str = format::format(
+                                "proc: {} = {}",
+                                ctx->emitter.strings[label - 1],
+                                printable_t{ctx, e->params, true});
+                        } else {
+                            note_str = format::format(
+                                "proc: {}",
+                                printable_t{ctx, e->params, true});
+                        }
+                        vm::basic_block::note(proc_bb, note_str);
+                        bb_t* body_bb = &vm::bytecode::enter(proc_bb, 0);
+                        auto body = CDR(e->params);
+                        while (!IS_NIL(body)) {
+                            body_bb = &compile(ctx, CAR(body), new_env, *body_bb);
+                            body    = CDR(body);
+                        }
+                        return vm::bytecode::leave(*body_bb);
+                    }
+
+                    case prim_type_t::if_: {
+                        auto& exit_bb = vm::emitter::make_basic_block(
+                            ctx->emitter,
+                            bb_type_t::code);
+                        vm::basic_block::none(exit_bb, op::nop);
+
+                        auto& false_bb = vm::emitter::make_basic_block(
+                            ctx->emitter,
+                            bb_type_t::code);
+
+                        compile(ctx, CAR(args), env, bb, a_reg);
+                        vm::basic_block::reg1(bb, op::truthy, a_reg);
+                        vm::basic_block::imm1(bb, op::bne, vm::emitter::imm(&false_bb));
+
+                        auto& true_bb = vm::emitter::make_basic_block(
+                            ctx->emitter,
+                            bb_type_t::code);
+                        vm::basic_block::succ(bb, true_bb);
+                        auto& true2_bb = compile(ctx, CADR(args), env, true_bb, target_reg);
+                        vm::basic_block::imm1(true2_bb, op::bra, vm::emitter::imm(&exit_bb));
+                        vm::basic_block::succ(true2_bb, false_bb);
+
+                        auto& false2_bb = compile(ctx, CADDR(args), env, false_bb, target_reg);
+                        vm::basic_block::succ(false2_bb, exit_bb);
+
+                        return exit_bb;
+                    }
+
+                    case prim_type_t::do_:
+                        break;
+
+                    case prim_type_t::or_:
+                        break;
+
+                    case prim_type_t::and_:
+                        break;
+
+                    case prim_type_t::not_:
+                        compile(ctx, CAR(args), env, bb, a_reg);
+                        vm::basic_block::reg2(bb, op::truthy, a_reg, target_reg);
+                        vm::basic_block::reg1(bb, op::not_, target_reg);
+                        break;
+
+                    case prim_type_t::car:
+                        compile(ctx, CAR(args), env, bb, a_reg);
+                        vm::basic_block::reg2(bb, op::car, a_reg, target_reg);
+                        break;
+
+                    case prim_type_t::cdr:
+                        compile(ctx, CAR(args), env, bb, a_reg);
+                        vm::basic_block::reg2(bb, op::cdr, a_reg, target_reg);
+                        break;
+
+                    case prim_type_t::cons:
+                        compile(ctx, CAR(args), env, bb, a_reg);
+                        compile(ctx, CADR(args), env, bb, target_reg);
+                        vm::basic_block::reg3(bb, op::cdr, a_reg, b_reg, target_reg);
+                        break;
+
+                    case prim_type_t::atom:
+                        // XXX: this is incorrect!  temporary!!!
+                        compile(ctx, CAR(args), env, bb, a_reg);
+                        vm::basic_block::reg2(bb, op::type, a_reg, b_reg);
+                        vm::basic_block::imm2(bb, op::move, vm::emitter::imm(1), target_reg);
+                        break;
+
+                    case prim_type_t::setcar:
+                        compile(ctx, CAR(args), env, bb, a_reg);
+                        compile(ctx, CADR(args), env, bb, target_reg);
+                        vm::basic_block::reg2(bb, op::setcar, a_reg, target_reg);
+                        break;
+
+                    case prim_type_t::setcdr:
+                        compile(ctx, CAR(args), env, bb, a_reg);
+                        compile(ctx, CADR(args), env, bb, target_reg);
+                        vm::basic_block::reg2(bb, op::setcdr, a_reg, target_reg);
+                        break;
+
+                    case prim_type_t::error:
+                        vm::basic_block::imm2(
+                            bb,
+                            op::const_,
+                            vm::emitter::imm((u32) OBJ_IDX(args)),
+                            a_reg);
+                        vm::basic_block::reg2(bb, op::error, a_reg, target_reg);
+                        break;
+
+                    case prim_type_t::quote:
+                        vm::basic_block::imm2(
+                            bb,
+                            op::const_,
+                            vm::emitter::imm((u32) OBJ_IDX(CAR(args))),
+                            a_reg);
+                        vm::basic_block::reg2(bb, op::qt, a_reg, target_reg);
+                        break;
+
+                    case prim_type_t::unquote:
+                        error(ctx, "unquote is not valid in this context.");
+                        break;
+
+                    case prim_type_t::quasiquote:
+                        vm::basic_block::imm2(
+                            bb,
+                            op::const_,
+                            vm::emitter::imm((u32) OBJ_IDX(CAR(args))),
+                            a_reg);
+                        vm::basic_block::reg2(bb, op::qq, a_reg, rf::r1);
+                        break;
+
+                    case prim_type_t::unquote_splicing:
+                        error(ctx, "unquote-splicing is not valid in this context.");
+                        break;
+                }
+
+                vm::register_alloc::release(ctx->emitter.gp, a_reg);
+                vm::register_alloc::release(ctx->emitter.gp, b_reg);
+                break;
+            }
+
+            case obj_type_t::ffi:
+                break;
+
+            case obj_type_t::func:
+                break;
+
+            case obj_type_t::macro:
+                break;
+
+            case obj_type_t::cfunc:
+                break;
+
+            default:
+                break;
+        }
+
+        return bb;
+    }
+
+    obj_t* eval2(ctx_t* ctx, obj_t* obj) {
+        auto& bb = vm::emitter::make_basic_block(ctx->emitter, bb_type_t::code);
+
+        u8 target_reg;
+        vm::register_alloc::reserve_next(ctx->emitter.gp, target_reg);
+        auto& comp_bb = compile(ctx, obj, ctx->env, bb, target_reg);
+        vm::basic_block::imm1(
+            bb,
+            instruction::type::exit,
+            vm::emitter::imm(1, imm_type_t::boolean));
+        format::print("comp_bb->id = {}\n", comp_bb.id);
+        vm::emitter::disassemble(ctx->emitter, bb);
+
+        return ctx->nil;
+    }
+
     static obj_t* make_object(ctx_t* ctx) {
         obj_t* obj;
         if (IS_NIL(ctx->free_list)) {
@@ -431,14 +741,22 @@ namespace basecode::scm {
         ctx->free_list = ctx->nil;
 
         // populate freelist
-        for (u32 i = 0; i < ctx->object_count; i++) {
+        for (s32 i = ctx->object_count - 1; i >= 0; i--) {
             obj_t* obj = &ctx->objects[i];
             SET_TYPE(obj, obj_type_t::free);
             SET_CDR(obj, ctx->free_list);
             ctx->free_list = obj;
         }
 
+        auto& vm = ctx->vm;
         ctx->alloc = alloc;
+        vm::init(vm, ctx->alloc, size);
+        vm::memory_map(vm, scm::memory_area_t::code, scm::register_file::lp, 256 * 1024);
+        vm::memory_map(vm, scm::memory_area_t::heap, scm::register_file::hp, 64 * 1024);
+        vm::memory_map(vm, scm::memory_area_t::env_stack, scm::register_file::ep, 4 * 1024, true);
+        vm::memory_map(vm, scm::memory_area_t::data_stack, scm::register_file::dp, 4 * 1024, true);
+        vm::reset(vm);
+        vm::emitter::init(ctx->emitter, &vm, LP, ctx->alloc);
         array::init(ctx->native_ptrs, ctx->alloc);
         array::reserve(ctx->native_ptrs, 256);
         stack::init(ctx->gc_stack, ctx->alloc);
