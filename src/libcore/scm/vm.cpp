@@ -117,6 +117,7 @@ namespace basecode::scm {
         constexpr u8 op_trap_imm        = 80;
         constexpr u8 op_trap_reg2       = 81;
         constexpr u8 op_lea_imm         = 82;
+        constexpr u8 op_lea_offs        = 109;
         constexpr u8 op_bra_imm         = 83;
         constexpr u8 op_bra_reg1        = 84;
         constexpr u8 op_car_reg2        = 85;
@@ -308,7 +309,7 @@ namespace basecode::scm {
                 {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
             },
             [instruction::type::lea] = {
-                {op_error,      op_lea_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_lea_imm,     op_error,       op_error,       op_error,       op_error,       op_lea_offs,    op_error},
                 {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
             },
             [instruction::type::bra] = {
@@ -519,6 +520,7 @@ namespace basecode::scm {
                 [op_trap_imm]           = &&trap_imm,
                 [op_trap_reg2]          = &&trap_reg2,
                 [op_lea_imm]            = &&lea_imm,
+                [op_lea_offs]           = &&lea_offs,
                 [op_bra_imm]            = &&bra_imm,
                 [op_bra_reg1]           = &&bra_reg1,
                 [op_car_reg2]           = &&car_reg2,
@@ -1181,14 +1183,14 @@ namespace basecode::scm {
             cons_reg3:
             {
                 auto c = cons(ctx,
-                              (obj_t*) G(opers->reg3.src),
-                              (obj_t*) G(opers->reg3.dest2));
+                              (obj_t*) G(opers->reg3.a),
+                              (obj_t*) G(opers->reg3.b));
                 flags->c = false;
                 flags->z = !IS_NIL(c);
                 flags->n = false;
                 flags->i = false;
                 flags->v = false;
-                G(opers->reg3.dest1) = u64(c);
+                G(opers->reg3.c) = u64(c);
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }
@@ -1408,6 +1410,12 @@ namespace basecode::scm {
             lea_imm:
             {
                 G(opers->imm.dest) = PC + s32(opers->imm.src);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            lea_offs:
+            {
+                G(opers->offset.dest) = G(opers->offset.src) + s32(opers->offset.offs);
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }

@@ -33,110 +33,120 @@
 #define LP                      G(basecode::scm::register_file::lp)
 #define SP                      G(basecode::scm::register_file::sp)
 #define LR                      G(basecode::scm::register_file::lr)
-#define R(n)                    G(basecode::scm::register_file:r0 + (n))
+#define R(n)                    G(basecode::scm::register_file::r0 + (n))
 
 namespace basecode::scm {
-    namespace register_file {
-        constexpr u8 pc         = 0;
-        constexpr u8 ep         = 1;
-        constexpr u8 dp         = 2;
-        constexpr u8 hp         = 3;
-        constexpr u8 fp         = 4;
-        constexpr u8 sp         = 6;   // code stack ptr
-        constexpr u8 lp         = 7;   // code load ptr
-        constexpr u8 m          = 8;   // mode
-        constexpr u8 f          = 9;   // flags register
-        constexpr u8 lr         = 10;  // link register
-        constexpr u8 r0         = 11;
-        constexpr u8 r1         = 12;
-        constexpr u8 r2         = 13;
-        constexpr u8 r3         = 14;
-        constexpr u8 r4         = 15;
-        constexpr u8 r5         = 16;
-        constexpr u8 r6         = 17;
-        constexpr u8 r7         = 18;
-        constexpr u8 r8         = 19;
-        constexpr u8 r9         = 20;
-        constexpr u8 r10        = 21;
-        constexpr u8 r11        = 22;
-        constexpr u8 r12        = 23;
-        constexpr u8 r13        = 24;
-        constexpr u8 r14        = 25;
-        constexpr u8 r15        = 26;
+    using reg_t                 = u8;
+    using op_code_t             = u8;
 
-        str::slice_t name(u8 reg);
+    namespace register_file {
+        constexpr reg_t pc      = 0;
+        constexpr reg_t ep      = 1;
+        constexpr reg_t dp      = 2;
+        constexpr reg_t hp      = 3;
+        constexpr reg_t fp      = 4;
+        constexpr reg_t sp      = 5;   // code stack ptr
+        constexpr reg_t lp      = 6;   // code load ptr
+        constexpr reg_t m       = 7;   // mode
+        constexpr reg_t f       = 8;   // flags register
+        constexpr reg_t lr      = 9;   // link register
+        constexpr reg_t r0      = 10;
+        constexpr reg_t r1      = 11;
+        constexpr reg_t r2      = 12;
+        constexpr reg_t r3      = 13;
+        constexpr reg_t r4      = 14;
+        constexpr reg_t r5      = 15;
+        constexpr reg_t r6      = 16;
+        constexpr reg_t r7      = 17;
+        constexpr reg_t r8      = 18;
+        constexpr reg_t r9      = 19;
+        constexpr reg_t r10     = 20;
+        constexpr reg_t r11     = 21;
+        constexpr reg_t r12     = 22;
+        constexpr reg_t r13     = 23;
+        constexpr reg_t r14     = 24;
+        constexpr reg_t r15     = 25;
+
+        str::slice_t name(reg_t reg);
     }
 
     namespace instruction {
         namespace type {
-            constexpr u8 nop    = 0;
-            constexpr u8 add    = 1;
-            constexpr u8 mul    = 2;
-            constexpr u8 sub    = 3;
-            constexpr u8 div    = 4;
-            constexpr u8 pow    = 5;
-            constexpr u8 mod    = 6;
-            constexpr u8 neg    = 7;
-            constexpr u8 not_   = 8;
-            constexpr u8 shl    = 9;
-            constexpr u8 shr    = 10;
-            constexpr u8 or_    = 11;
-            constexpr u8 and_   = 12;
-            constexpr u8 xor_   = 13;
-            constexpr u8 br     = 14;
-            constexpr u8 blr    = 15;
-            constexpr u8 cmp    = 16;
-            constexpr u8 beq    = 17;
-            constexpr u8 bne    = 18;
-            constexpr u8 bl     = 19;
-            constexpr u8 ble    = 20;
-            constexpr u8 bg     = 21;
-            constexpr u8 bge    = 22;
-            constexpr u8 seq    = 23;
-            constexpr u8 sne    = 24;
-            constexpr u8 sl     = 25;
-            constexpr u8 sle    = 26;
-            constexpr u8 sg     = 27;
-            constexpr u8 sge    = 28;
-            constexpr u8 ret    = 29;
-            constexpr u8 mma    = 30;
-            constexpr u8 pop    = 31;
-            constexpr u8 get    = 32;
-            constexpr u8 set    = 33;
-            constexpr u8 push   = 34;
-            constexpr u8 move   = 35;
-            constexpr u8 load   = 36;
-            constexpr u8 store  = 37;
-            constexpr u8 exit   = 38;
-            constexpr u8 trap   = 39;
-            constexpr u8 lea    = 40;
-            constexpr u8 bra    = 41;
-            constexpr u8 car    = 42;
-            constexpr u8 cdr    = 43;
-            constexpr u8 setcar = 44;
-            constexpr u8 setcdr = 45;
-            constexpr u8 fix    = 46;
-            constexpr u8 flo    = 47;
-            constexpr u8 cons   = 48;
-            constexpr u8 env    = 49;
-            constexpr u8 type   = 50;
-            constexpr u8 list   = 51;
-            constexpr u8 eval   = 52;
-            constexpr u8 error  = 53;
-            constexpr u8 write  = 54;
-            constexpr u8 qt     = 55;
-            constexpr u8 qq     = 56;
-            constexpr u8 gc     = 57;
-            constexpr u8 apply  = 58;
-            constexpr u8 const_ = 59;
-            constexpr u8 ladd   = 60;
-            constexpr u8 lsub   = 61;
-            constexpr u8 lmul   = 62;
-            constexpr u8 ldiv   = 63;
-            constexpr u8 lmod   = 64;
-            constexpr u8 truthy = 65;
+            constexpr op_code_t nop     = 0;
+            constexpr op_code_t add     = 1;
+            constexpr op_code_t mul     = 2;
+            constexpr op_code_t sub     = 3;
+            constexpr op_code_t div     = 4;
+            constexpr op_code_t pow     = 5;
+            constexpr op_code_t mod     = 6;
+            constexpr op_code_t neg     = 7;
+            constexpr op_code_t not_    = 8;
+            constexpr op_code_t shl     = 9;
+            constexpr op_code_t shr     = 10;
+            constexpr op_code_t or_     = 11;
+            constexpr op_code_t and_    = 12;
+            constexpr op_code_t xor_    = 13;
+            constexpr op_code_t br      = 14;
+            constexpr op_code_t blr     = 15;
+            constexpr op_code_t cmp     = 16;
+            constexpr op_code_t beq     = 17;
+            constexpr op_code_t bne     = 18;
+            constexpr op_code_t bl      = 19;
+            constexpr op_code_t ble     = 20;
+            constexpr op_code_t bg      = 21;
+            constexpr op_code_t bge     = 22;
+            constexpr op_code_t seq     = 23;
+            constexpr op_code_t sne     = 24;
+            constexpr op_code_t sl      = 25;
+            constexpr op_code_t sle     = 26;
+            constexpr op_code_t sg      = 27;
+            constexpr op_code_t sge     = 28;
+            constexpr op_code_t ret     = 29;
+            constexpr op_code_t mma     = 30;
+            constexpr op_code_t pop     = 31;
+            constexpr op_code_t get     = 32;
+            constexpr op_code_t set     = 33;
+            constexpr op_code_t push    = 34;
+            constexpr op_code_t move    = 35;
+            constexpr op_code_t load    = 36;
+            constexpr op_code_t store   = 37;
+            constexpr op_code_t exit    = 38;
+            constexpr op_code_t trap    = 39;
+            constexpr op_code_t lea     = 40;
+            constexpr op_code_t bra     = 41;
+            constexpr op_code_t car     = 42;
+            constexpr op_code_t cdr     = 43;
+            constexpr op_code_t setcar  = 44;
+            constexpr op_code_t setcdr  = 45;
+            constexpr op_code_t fix     = 46;
+            constexpr op_code_t flo     = 47;
+            constexpr op_code_t cons    = 48;
+            constexpr op_code_t env     = 49;
+            constexpr op_code_t type    = 50;
+            constexpr op_code_t list    = 51;
+            constexpr op_code_t eval    = 52;
+            constexpr op_code_t error   = 53;
+            constexpr op_code_t write   = 54;
+            constexpr op_code_t qt      = 55;
+            constexpr op_code_t qq      = 56;
+            constexpr op_code_t gc      = 57;
+            constexpr op_code_t apply   = 58;
+            constexpr op_code_t const_  = 59;
+            constexpr op_code_t ladd    = 60;
+            constexpr op_code_t lsub    = 61;
+            constexpr op_code_t lmul    = 62;
+            constexpr op_code_t ldiv    = 63;
+            constexpr op_code_t lmod    = 64;
+            constexpr op_code_t lnot    = 65;
+            constexpr op_code_t pairp   = 66;
+            constexpr op_code_t listp   = 67;
+            constexpr op_code_t symp    = 68;
+            constexpr op_code_t atomp   = 69;
+            constexpr op_code_t truep   = 70;
+            constexpr op_code_t falsep  = 71;
+            constexpr op_code_t lcmp    = 72;
 
-            str::slice_t name(u8 op);
+            str::slice_t name(op_code_t op);
         }
 
         namespace encoding {
@@ -170,30 +180,32 @@ namespace basecode::scm {
             u64                 pad:        5;
         }                       reg2;
         struct {
-            u64                 src:        8;
-            u64                 dest1:      8;
-            u64                 dest2:      8;
+            u64                 a:          8;
+            u64                 b:          8;
+            u64                 c:          8;
             u64                 pad:        29;
         }                       reg3;
         struct {
-            u64                 src:        8;
-            u64                 dest1:      8;
-            u64                 dest2:      8;
-            u64                 dest3:      8;
+            u64                 a:          8;
+            u64                 b:          8;
+            u64                 c:          8;
+            u64                 d:          8;
             u64                 pad:        21;
         }                       reg4;
         struct {
             u64                 offs:       32;
             u64                 src:        8;
             u64                 dest:       8;
-            u64                 pad:        5;
+            u64                 mode:       1;
+            u64                 pad:        4;
         }                       offset;
         struct {
             u64                 offs:       24;
             u64                 base:       8;
             u64                 index:      8;
             u64                 dest:       8;
-            u64                 pad:        5;
+            u64                 mode:       1;
+            u64                 pad:        4;
         }                       indexed;
     };
 
@@ -211,8 +223,9 @@ namespace basecode::scm {
     using label_t               = u32;
     using bb_list_t             = stable_array_t<bb_t>;
     using label_map_t           = hashtab_t<u32, bb_t*>;
+    using note_list_t           = array_t<u32>;
     using encoded_list_t        = array_t<u64>;
-    using comment_list_t        = array_t<u32>;
+    using comment_table_t       = hashtab_t<u32, note_list_t>;
 
     enum class imm_size_t : u8 {
         signed_word,
@@ -253,19 +266,21 @@ namespace basecode::scm {
         bb_t*                   prev;
         bb_t*                   next;
         u64                     addr;
+        note_list_t             notes;
         encoded_list_t          entries;
-        comment_list_t          comments;
+        comment_table_t         comments;
         label_t                 label;
         u32                     id;
         bb_type_t               type;
     };
 
-    struct register_alloc_t final {
-        alloc_t*                alloc;
-        u8*                     slots;
-        u32                     start;
-        u32                     end;
+    struct reg_alloc_t final {
+        u64                     slots;
+        reg_t                   start;
+        reg_t                   end;
     };
+
+    struct reg_result_t;
 
     struct emitter_t final {
         alloc_t*                alloc;
@@ -274,7 +289,7 @@ namespace basecode::scm {
         bb_list_t               blocks;
         str_array_t             strings;
         label_map_t             labels;
-        register_alloc_t        gp;
+        reg_alloc_t             gp;
     };
 
     namespace vm {
@@ -283,38 +298,53 @@ namespace basecode::scm {
 
             u0 dw(bb_t& bb, imm_t imm);
 
-            u0 none(bb_t& bb, u8 opcode);
-
             u0 pred(bb_t& bb, bb_t& pred);
 
             u0 succ(bb_t& bb, bb_t& succ);
 
-            u0 reg1(bb_t& bb, u8 opcode, u8 arg);
+            template <String_Concept T>
+            u0 note(bb_t& bb, const T& value) {
+                str_array::append(bb.emitter->strings, value);
+                array::append(bb.notes, bb.emitter->strings.size);
+            }
 
-            u0 imm1(bb_t& bb, u8 opcode, imm_t imm);
+            u0 none(bb_t& bb, op_code_t opcode);
 
             u0 apply_label(bb_t& bb, label_t label);
 
-            bb_t& ubuf(bb_t& bb, u8 addr_reg, u32 size);
+            u0 reg1(bb_t& bb, op_code_t opcode, reg_t arg);
+
+            u0 imm1(bb_t& bb, op_code_t opcode, imm_t imm);
+
+            bb_t& ubuf(bb_t& bb, reg_t addr_reg, u32 size);
 
             u0 init(bb_t& bb, emitter_t* e, bb_type_t type);
 
-            u0 note(bb_t& bb, const String_Concept auto& value) {
+            template <String_Concept T>
+            u0 comment(bb_t& bb, const T& value, s32 line = -1) {
+                line = line == -1 ? bb.entries.size : line;
+                auto notes = hashtab::find(bb.comments, line);
+                if (!notes) {
+                    notes = hashtab::emplace(bb.comments, line);
+                    array::init(*notes, bb.emitter->alloc);
+                }
                 str_array::append(bb.emitter->strings, value);
-                array::append(bb.comments, bb.emitter->strings.size);
+                array::append(*notes, bb.emitter->strings.size);
             }
 
-            u0 reg3(bb_t& bb, u8 opcode, u8 src, u8 dest1, u8 dest2);
-
-            u0 offs(bb_t& bb, u8 opcode, s32 offset, u8 src, u8 dest);
+            bb_t& make_succ(bb_t& bb, bb_type_t type = bb_type_t::code);
 
             bb_t& ibuf(bb_t& bb, u8 addr_reg, const imm_t* data, u32 size);
 
-            u0 indx(bb_t& bb, u8 opcode, s32 offset, u8 base, u8 index, u8 dest);
+            u0 reg3(bb_t& bb, op_code_t opcode, reg_t src, reg_t dest1, reg_t dest2);
 
-            u0 imm2(bb_t& bb, u8 opcode, imm_t src, u8 dest, b8 is_signed = false);
+            u0 imm2(bb_t& bb, op_code_t opcode, imm_t src, reg_t dest, b8 is_signed = false);
 
-            u0 reg2(bb_t& bb, u8 opcode, u8 src, u8 dest, b8 is_signed = false, s32 aux = 0);
+            u0 indx(bb_t& bb, op_code_t opcode, s32 offset, reg_t base, reg_t index, reg_t dest);
+
+            u0 offs(bb_t& bb, op_code_t opcode, s32 offset, reg_t src, reg_t dest, b8 mode = false);
+
+            u0 reg2(bb_t& bb, op_code_t opcode, reg_t src, reg_t dest, b8 is_signed = false, s32 aux = 0);
         }
 
         namespace emitter {
@@ -330,8 +360,6 @@ namespace basecode::scm {
                 };
             }
 
-            u0 disassemble(emitter_t& e, bb_t& start_block);
-
             template <String_Concept T>
             label_t make_label(emitter_t& e, const T& name) {
                 str_array::append(e.strings, name);
@@ -340,7 +368,7 @@ namespace basecode::scm {
 
             status_t assemble(emitter_t& e, bb_t& start_block);
 
-            bb_t& make_basic_block(emitter_t& e, bb_type_t type);
+            u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf);
 
             constexpr imm_t imm(s32 v, imm_type_t type = imm_type_t::value) {
                 return imm_t{
@@ -366,29 +394,82 @@ namespace basecode::scm {
                 };
             }
 
+            bb_t& make_basic_block(emitter_t& e, bb_type_t type = bb_type_t::code);
+
             u0 init(emitter_t& e, vm_t* vm, u64 address, alloc_t* alloc = context::top()->alloc);
         }
 
         namespace bytecode {
-            bb_t& leave(bb_t& e);
+            bb_t& leave(bb_t& bb);
 
-            bb_t& enter(bb_t& e, u32 locals);
+            bb_t& enter(bb_t& bb, u32 locals);
+
+            u0 free_stack(bb_t& bb, u32 words);
+
+            u0 get(bb_t& bb, u32 idx, reg_t reg);
+
+            u0 set(bb_t& bb, u32 idx, reg_t reg);
+
+            u0 set(bb_t& bb, reg_t sym, reg_t val);
+
+            u0 const_(bb_t& bb, u32 idx, reg_t reg);
+
+            u0 qt(bb_t& bb, u32 idx, reg_t target_reg);
+
+            u0 qq(bb_t& bb, u32 idx, reg_t target_reg);
+
+            u0 error(bb_t& bb, u32 idx, reg_t target_reg);
+
+            u0 car(bb_t& bb, reg_t val_reg, reg_t target_reg);
+
+            u0 cdr(bb_t& bb, reg_t val_reg, reg_t target_reg);
+
+            u0 not_(bb_t& bb, reg_t val_reg, reg_t target_reg);
+
+            u0 alloc_stack(bb_t& bb, u32 words, reg_t base_reg);
+
+            u0 setcar(bb_t& bb, reg_t val_reg, reg_t target_reg);
+
+            u0 setcdr(bb_t& bb, reg_t val_reg, reg_t target_reg);
+
+            u0 cons(bb_t& bb, reg_t car, reg_t cdr, reg_t target_reg);
+
+            bb_t& list(bb_t& bb, reg_t lst_reg, reg_t base_reg, u32 size);
+
+            bb_t& arith_op(bb_t& bb, op_code_t op_code, reg_t acc_reg, reg_t base_reg, u32 size);
         }
 
-        namespace register_alloc {
-            u0 free(register_alloc_t& reg_alloc);
+        namespace reg_alloc {
+            u0 reset(reg_alloc_t& alloc);
 
-            u0 reset(register_alloc_t& reg_alloc);
+            u0 init(reg_alloc_t& alloc, reg_t start, reg_t end);
 
-            u0 release_all(register_alloc_t& reg_alloc);
+            reg_result_t reserve(reg_alloc_t& alloc, u32 count = 1);
 
-            b8 release(register_alloc_t& reg_alloc, u8 reg);
-
-            b8 reserve(register_alloc_t& reg_alloc, u8 reg = 0);
-
-            b8 reserve_next(register_alloc_t& reg_alloc, u8& reg);
-
-            u0 init(register_alloc_t& reg_alloc, u32 start, u32 end, alloc_t* alloc = context::top()->alloc);
+            u0 release(reg_alloc_t& alloc, const reg_result_t& result);
         }
     }
+
+    struct reg_result_t final {
+        u32                     count;
+
+        ~reg_result_t() {
+            vm::reg_alloc::release(*alloc, *this);
+        }
+
+        reg_t& operator[](u32 idx) {
+            return regs[idx];
+        };
+
+        const reg_t operator[](u32 idx) const {
+            return regs[idx];
+        };
+
+        reg_result_t(reg_alloc_t& a) : count(0), alloc(&a), regs() {
+        }
+
+    private:
+        reg_alloc_t*            alloc;
+        reg_t                   regs[16];
+    };
 }

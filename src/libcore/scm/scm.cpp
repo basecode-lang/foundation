@@ -58,6 +58,7 @@
 //
 
 #include <basecode/core/scm/scm.h>
+#include <basecode/core/stopwatch.h>
 #include <basecode/core/scm/types.h>
 #include <basecode/core/scm/bytecode.h>
 
@@ -337,268 +338,238 @@ namespace basecode::scm {
         return eval(ctx, obj, ctx->env);
     }
 
-    static bb_t& compile(ctx_t* ctx,
-                         obj_t* obj,
-                         obj_t* env,
-                         bb_t& bb,
-                         u8 target_reg = 0,
-                         u32 label = 0) {
+    static bb_t& compile_proc(ctx_t* ctx, obj_t* params, obj_t* body, obj_t* env, bb_t& bb, u8 target_reg = 0, u32 label = 0);
+
+    static bb_t& compile(ctx_t* ctx, obj_t* obj, obj_t* env, bb_t& bb, u8 target_reg = 0, u32 label = 0, b8 top_level = false);
+
+    static bb_t& compile_proc(ctx_t* ctx, obj_t* params, obj_t* body, obj_t* env, bb_t& bb, u32 label) {
+        auto& proc_bb = vm::basic_block::make_succ(bb);
+        str_t note_str;
+        if (label) {
+            vm::basic_block::apply_label(proc_bb, label);
+            note_str = format::format(
+                "proc: ({} {} {})",
+                ctx->emitter.strings[label - 1],
+                printable_t{ctx, params, true},
+                printable_t{ctx, body, true});
+        } else {
+            note_str = format::format(
+                "proc: (_ {} {}",
+                printable_t{ctx, params, true},
+                printable_t{ctx, body, true});
+        }
+        vm::basic_block::note(proc_bb, note_str);
+        bb_t* body_bb = &vm::bytecode::enter(proc_bb, 0);
+        auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+        while (!IS_NIL(body)) {
+            body_bb = &compile(ctx, CAR(body), env, *body_bb, reg[0]);
+            body    = CDR(body);
+        }
+        return vm::bytecode::leave(*body_bb);
+    }
+
+    static bb_t& compile_prim(ctx_t* ctx, obj_t* form, obj_t* args, obj_t* env, bb_t& bb, u8 target_reg = 0, u32 label = 0, b8 top_level = false) {
         namespace op = instruction::type;
         namespace rf = register_file;
 
         auto& vm = ctx->vm;
 
-        auto type = TYPE(obj);
-        switch (type) {
-            case obj_type_t::fixnum:
-            case obj_type_t::flonum:
-            case obj_type_t::string:
-            case obj_type_t::boolean:
-                vm::basic_block::imm2(bb,
-                                      op::const_,
-                                      vm::emitter::imm((u32) OBJ_IDX(obj)),
-                                      target_reg);
-                break;
-
-            case obj_type_t::symbol:
-                vm::basic_block::imm2(bb,
-                                      op::get,
-                                      vm::emitter::imm((u32) OBJ_IDX(obj)),
-                                      target_reg);
-                break;
-
-            case obj_type_t::pair: {
-                u8 a_reg, b_reg;
-                vm::register_alloc::reserve_next(ctx->emitter.gp, a_reg);
-                vm::register_alloc::reserve_next(ctx->emitter.gp, b_reg);
-
-                auto form = CAR(obj);
-                if (TYPE(form) == obj_type_t::symbol)
-                    form = get(ctx, form, env);
-                auto args = CDR(obj);
-                switch (PRIM(form)) {
-                    case prim_type_t::eval:
-                        compile(ctx, CAR(args), env, bb, a_reg);
-                        vm::basic_block::reg2(bb, op::eval, a_reg, target_reg);
-                        break;
-
-                    case prim_type_t::add: {
-                        while (!IS_NIL(args)) {
-                            compile(ctx, CAR(args), env, bb, b_reg);
-                            vm::basic_block::reg2(bb, op::ladd, b_reg, a_reg);
-                            args = CDR(args);
-                        }
-                        vm::basic_block::reg2(bb, op::move, a_reg, target_reg);
-                        break;
-                    }
-
-                    case prim_type_t::sub:
-                        break;
-
-                    case prim_type_t::mul:
-                        break;
-
-                    case prim_type_t::div:
-                        break;
-
-                    case prim_type_t::mod:
-                        break;
-
-                    case prim_type_t::let:
-                    case prim_type_t::set: {
-                        u32 idx = OBJ_IDX(CAR(args));
-                        vm::basic_block::imm2(bb,
-                                              op::const_,
-                                              vm::emitter::imm(idx),
-                                              a_reg);
-                        auto label_id = vm::emitter::make_label(
-                            ctx->emitter,
-                            *string::interned::get_slice(STRING_ID(OBJ_AT(idx))));
-                        auto& value_bb = compile(ctx, CADR(args), env, bb, b_reg, label_id);
-                        vm::basic_block::reg2(bb, op::set, a_reg, b_reg);
-                        return value_bb;
-                    }
-
-                    case prim_type_t::fn:
-                    case prim_type_t::mac: {
-                        auto new_env = make_environment(ctx, env);
-                        auto param   = CAR(args);
-                        while (!IS_NIL(param)) {
-                            if (TYPE(param) != obj_type_t::pair) {
-                                set(ctx, param, ctx->false_, new_env);
-                                break;
-                            }
-                            set(ctx, CAR(param), ctx->false_, new_env);
-                            param = CDR(param);
-                        }
-                        auto e = (env_t*) NATIVE_PTR(CDR(new_env));
-                        e->params = args;
-                        next_arg(ctx, &args);
-                        auto res = make_object(ctx);
-                        SET_TYPE(res, PRIM(form) == prim_type_t::fn ?
-                                      obj_type_t::func :
-                                      obj_type_t::macro);
-                        SET_CDR(res, new_env);
-                        u32 idx = OBJ_IDX(res);
-                        vm::basic_block::imm2(bb,
-                                              op::const_,
-                                              vm::emitter::imm(idx),
-                                              target_reg);
-                        auto& proc_bb = vm::emitter::make_basic_block(
-                            ctx->emitter,
-                            bb_type_t::code);
-                        vm::basic_block::succ(bb, proc_bb);
-                        str_t note_str;
-                        if (label) {
-                            vm::basic_block::apply_label(proc_bb, label);
-                            note_str = format::format(
-                                "proc: {} = {}",
-                                ctx->emitter.strings[label - 1],
-                                printable_t{ctx, e->params, true});
-                        } else {
-                            note_str = format::format(
-                                "proc: {}",
-                                printable_t{ctx, e->params, true});
-                        }
-                        vm::basic_block::note(proc_bb, note_str);
-                        bb_t* body_bb = &vm::bytecode::enter(proc_bb, 0);
-                        auto body = CDR(e->params);
-                        while (!IS_NIL(body)) {
-                            body_bb = &compile(ctx, CAR(body), new_env, *body_bb);
-                            body    = CDR(body);
-                        }
-                        return vm::bytecode::leave(*body_bb);
-                    }
-
-                    case prim_type_t::if_: {
-                        auto& exit_bb = vm::emitter::make_basic_block(
-                            ctx->emitter,
-                            bb_type_t::code);
-                        vm::basic_block::none(exit_bb, op::nop);
-
-                        auto& false_bb = vm::emitter::make_basic_block(
-                            ctx->emitter,
-                            bb_type_t::code);
-
-                        compile(ctx, CAR(args), env, bb, a_reg);
-                        vm::basic_block::reg1(bb, op::truthy, a_reg);
-                        vm::basic_block::imm1(bb, op::bne, vm::emitter::imm(&false_bb));
-
-                        auto& true_bb = vm::emitter::make_basic_block(
-                            ctx->emitter,
-                            bb_type_t::code);
-                        vm::basic_block::succ(bb, true_bb);
-                        auto& true2_bb = compile(ctx, CADR(args), env, true_bb, target_reg);
-                        vm::basic_block::imm1(true2_bb, op::bra, vm::emitter::imm(&exit_bb));
-                        vm::basic_block::succ(true2_bb, false_bb);
-
-                        auto& false2_bb = compile(ctx, CADDR(args), env, false_bb, target_reg);
-                        vm::basic_block::succ(false2_bb, exit_bb);
-
-                        return exit_bb;
-                    }
-
-                    case prim_type_t::do_:
-                        break;
-
-                    case prim_type_t::or_:
-                        break;
-
-                    case prim_type_t::and_:
-                        break;
-
-                    case prim_type_t::not_:
-                        compile(ctx, CAR(args), env, bb, a_reg);
-                        vm::basic_block::reg2(bb, op::truthy, a_reg, target_reg);
-                        vm::basic_block::reg1(bb, op::not_, target_reg);
-                        break;
-
-                    case prim_type_t::car:
-                        compile(ctx, CAR(args), env, bb, a_reg);
-                        vm::basic_block::reg2(bb, op::car, a_reg, target_reg);
-                        break;
-
-                    case prim_type_t::cdr:
-                        compile(ctx, CAR(args), env, bb, a_reg);
-                        vm::basic_block::reg2(bb, op::cdr, a_reg, target_reg);
-                        break;
-
-                    case prim_type_t::cons:
-                        compile(ctx, CAR(args), env, bb, a_reg);
-                        compile(ctx, CADR(args), env, bb, target_reg);
-                        vm::basic_block::reg3(bb, op::cdr, a_reg, b_reg, target_reg);
-                        break;
-
-                    case prim_type_t::atom:
-                        // XXX: this is incorrect!  temporary!!!
-                        compile(ctx, CAR(args), env, bb, a_reg);
-                        vm::basic_block::reg2(bb, op::type, a_reg, b_reg);
-                        vm::basic_block::imm2(bb, op::move, vm::emitter::imm(1), target_reg);
-                        break;
-
-                    case prim_type_t::setcar:
-                        compile(ctx, CAR(args), env, bb, a_reg);
-                        compile(ctx, CADR(args), env, bb, target_reg);
-                        vm::basic_block::reg2(bb, op::setcar, a_reg, target_reg);
-                        break;
-
-                    case prim_type_t::setcdr:
-                        compile(ctx, CAR(args), env, bb, a_reg);
-                        compile(ctx, CADR(args), env, bb, target_reg);
-                        vm::basic_block::reg2(bb, op::setcdr, a_reg, target_reg);
-                        break;
-
-                    case prim_type_t::error:
-                        vm::basic_block::imm2(
-                            bb,
-                            op::const_,
-                            vm::emitter::imm((u32) OBJ_IDX(args)),
-                            a_reg);
-                        vm::basic_block::reg2(bb, op::error, a_reg, target_reg);
-                        break;
-
-                    case prim_type_t::quote:
-                        vm::basic_block::imm2(
-                            bb,
-                            op::const_,
-                            vm::emitter::imm((u32) OBJ_IDX(CAR(args))),
-                            a_reg);
-                        vm::basic_block::reg2(bb, op::qt, a_reg, target_reg);
-                        break;
-
-                    case prim_type_t::unquote:
-                        error(ctx, "unquote is not valid in this context.");
-                        break;
-
-                    case prim_type_t::quasiquote:
-                        vm::basic_block::imm2(
-                            bb,
-                            op::const_,
-                            vm::emitter::imm((u32) OBJ_IDX(CAR(args))),
-                            a_reg);
-                        vm::basic_block::reg2(bb, op::qq, a_reg, rf::r1);
-                        break;
-
-                    case prim_type_t::unquote_splicing:
-                        error(ctx, "unquote-splicing is not valid in this context.");
-                        break;
-                }
-
-                vm::register_alloc::release(ctx->emitter.gp, a_reg);
-                vm::register_alloc::release(ctx->emitter.gp, b_reg);
+        switch (PRIM(form)) {
+            case prim_type_t::is:
+            case prim_type_t::gt:
+            case prim_type_t::lt:
+            case prim_type_t::lte:
+            case prim_type_t::gte: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
+                compile(ctx, CAR(args), env, bb, reg[0]);
+                compile(ctx, CADR(args), env, bb, reg[1]);
+                vm::basic_block::reg2(bb, op::lcmp, reg[0], reg[1]);
                 break;
             }
 
-            case obj_type_t::ffi:
+            case prim_type_t::add:
+            case prim_type_t::sub:
+            case prim_type_t::mul:
+            case prim_type_t::div:
+            case prim_type_t::mod: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
+                u32 size = length(ctx, args);
+                vm::bytecode::alloc_stack(bb, size, reg[0]);
+                s32 offs = 0;
+                while (!IS_NIL(args)) {
+                    compile(ctx, CAR(args), env, bb, reg[1]);
+                    vm::basic_block::offs(bb, op::store, offs, reg[1], reg[0], true);
+                    args = CDR(args);
+                    offs += 8;
+                }
+                return vm::bytecode::arith_op(bb, op::ladd, target_reg, reg[0], size);
+            }
+
+            case prim_type_t::let:
+            case prim_type_t::set: {
+                auto reg      = vm::reg_alloc::reserve(ctx->emitter.gp);
+                u32  idx      = OBJ_IDX(CAR(args));
+                auto label_id = vm::emitter::make_label(
+                    ctx->emitter,
+                    *string::interned::get_slice(STRING_ID(OBJ_AT(idx))));
+                auto& value_bb = compile(ctx, CADR(args), env, bb, target_reg, label_id);
+                if (top_level) {
+                    auto value = OBJ_AT(G(target_reg));
+                    set(ctx, (obj_t*) OBJ_AT(idx), value, env);
+                    if (TYPE(value) == obj_type_t::func
+                    ||  TYPE(value) == obj_type_t::macro) {
+                        auto new_env = CDR(value);
+                        auto e = (env_t*) NATIVE_PTR(CDR(new_env));
+                        return compile_proc(ctx, CAR(e->params), CDR(e->params), new_env, bb, label_id);
+                    }
+                } else {
+                    vm::bytecode::const_(bb, idx, reg[0]);
+                    vm::bytecode::set(bb, reg[0], target_reg);
+                }
+                return value_bb;
+            }
+
+            case prim_type_t::fn:
+            case prim_type_t::mac: {
+                b8   is_mac = PRIM(form) == prim_type_t::mac;
+                auto proc   = make_proc(ctx, args, CDR(args), env, is_mac);
+                auto idx    = OBJ_IDX(proc);
+                G(target_reg) = idx;
+                vm::bytecode::const_(bb, idx, target_reg);
+                break;
+            }
+
+            case prim_type_t::if_: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+
+                auto& exit_bb = vm::emitter::make_basic_block(ctx->emitter);
+                vm::basic_block::none(exit_bb, op::nop);
+
+                auto& false_bb = vm::emitter::make_basic_block(ctx->emitter);
+
+                compile(ctx, CAR(args), env, bb, reg[0]);
+                vm::basic_block::reg1(bb, op::truep, reg[0]);
+                vm::basic_block::imm1(bb, op::bne, vm::emitter::imm(&false_bb));
+
+                auto& true_bb = vm::emitter::make_basic_block(ctx->emitter);
+                vm::basic_block::succ(bb, true_bb);
+                auto& true2_bb = compile(ctx, CADR(args), env, true_bb, target_reg);
+                vm::basic_block::imm1(true2_bb, op::bra, vm::emitter::imm(&exit_bb));
+                vm::basic_block::succ(true2_bb, false_bb);
+
+                auto& false2_bb = compile(ctx, CADDR(args), env, false_bb, target_reg);
+                vm::basic_block::succ(false2_bb, exit_bb);
+
+                return exit_bb;
+            }
+
+            case prim_type_t::do_:
                 break;
 
-            case obj_type_t::func:
+            case prim_type_t::or_:
                 break;
 
-            case obj_type_t::macro:
+            case prim_type_t::and_:
                 break;
 
-            case obj_type_t::cfunc:
+            case prim_type_t::not_: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+                compile(ctx, CAR(args), env, bb, reg[0]);
+                vm::bytecode::not_(bb, reg[0], target_reg);
+                break;
+            }
+
+            case prim_type_t::car: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+                compile(ctx, CAR(args), env, bb, reg[0]);
+                vm::bytecode::car(bb, reg[0], target_reg);
+                break;
+            }
+
+            case prim_type_t::cdr: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+                compile(ctx, CAR(args), env, bb, reg[0]);
+                vm::bytecode::cdr(bb, reg[0], target_reg);
+                break;
+            }
+
+            case prim_type_t::cons: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
+                compile(ctx, CAR(args), env, bb, reg[0]);
+                compile(ctx, CADR(args), env, bb, reg[1]);
+                vm::bytecode::cons(bb, reg[0], reg[1], target_reg);
+                break;
+            }
+
+            case prim_type_t::atom: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
+                compile(ctx, CAR(args), env, bb, reg[0]);
+                vm::basic_block::reg2(bb, op::atomp, reg[0], reg[1]);
+                break;
+            }
+
+            case prim_type_t::eval: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+                compile(ctx, CAR(args), env, bb, reg[0]);
+                vm::basic_block::reg2(bb, op::eval, reg[0], target_reg);
+                break;
+            }
+
+            case prim_type_t::list: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
+                u32 size = length(ctx, args);
+                vm::bytecode::alloc_stack(bb, size, reg[0]);
+                s32 offs = 0;
+                while (!IS_NIL(args)) {
+                    compile(ctx, CAR(args), env, bb, reg[1]);
+                    vm::basic_block::offs(bb, op::store, offs, reg[1], reg[0], true);
+                    args = CDR(args);
+                    offs += 8;
+                }
+                return vm::bytecode::list(bb, target_reg, reg[0], size);
+            }
+
+            case prim_type_t::while_: {
+                break;
+            }
+
+            case prim_type_t::setcar: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+                compile(ctx, CAR(args), env, bb, reg[0]);
+                compile(ctx, CADR(args), env, bb, target_reg);
+                vm::bytecode::setcar(bb, reg[0], target_reg);
+                break;
+            }
+
+            case prim_type_t::setcdr: {
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+                compile(ctx, CAR(args), env, bb, reg[0]);
+                compile(ctx, CADR(args), env, bb, target_reg);
+                vm::bytecode::setcdr(bb, reg[0], target_reg);
+                break;
+            }
+
+            case prim_type_t::error:
+                vm::bytecode::error(bb, OBJ_IDX(args), target_reg);
+                break;
+
+            case prim_type_t::print:
+                break;
+
+            case prim_type_t::quote:
+                vm::bytecode::qt(bb, OBJ_IDX(CAR(args)), target_reg);
+                break;
+
+            case prim_type_t::unquote:
+                error(ctx, "unquote is not valid in this context.");
+                break;
+
+            case prim_type_t::quasiquote:
+                vm::bytecode::qq(bb, OBJ_IDX(CAR(args)), target_reg);
+                break;
+
+            case prim_type_t::unquote_splicing:
+                error(ctx, "unquote-splicing is not valid in this context.");
                 break;
 
             default:
@@ -608,19 +579,97 @@ namespace basecode::scm {
         return bb;
     }
 
+    static bb_t& compile(ctx_t* ctx, obj_t* obj, obj_t* env, bb_t& bb, u8 target_reg, u32 label, b8 top_level) {
+        namespace op = instruction::type;
+        namespace rf = register_file;
+
+        auto type = TYPE(obj);
+        switch (type) {
+            case obj_type_t::nil:
+            case obj_type_t::fixnum:
+            case obj_type_t::flonum:
+            case obj_type_t::string:
+            case obj_type_t::boolean:
+                vm::bytecode::const_(bb, OBJ_IDX(obj), target_reg);
+                break;
+
+            case obj_type_t::symbol:
+                vm::bytecode::get(bb, OBJ_IDX(obj), target_reg);
+                break;
+
+            case obj_type_t::pair: {
+                obj_t* sym  = CAR(obj);
+                obj_t* args = CDR(obj);
+                obj_t* form = TYPE(sym) == obj_type_t::symbol ? get(ctx, sym, env) : sym;
+
+                bb_t* new_bb{};
+                auto cl = cons(ctx, obj, ctx->call_list);
+                ctx->call_list = cl;
+
+                switch (TYPE(form)) {
+                    case obj_type_t::ffi: {
+                        vm::basic_block::none(bb, op::nop);
+                        vm::basic_block::comment(bb, "XXX: ffi call"_ss);
+                        break;
+                    }
+
+                    case obj_type_t::func: {
+                        vm::basic_block::none(bb, op::nop);
+                        vm::basic_block::comment(bb, "XXX: proc call"_ss);
+                        break;
+                    }
+
+                    case obj_type_t::prim: {
+                        new_bb = &compile_prim(ctx, form, args, env, bb, target_reg, label, top_level);
+                        break;
+                    }
+
+                    case obj_type_t::macro: {
+                        vm::basic_block::none(bb, op::nop);
+                        vm::basic_block::comment(bb, "XXX: macro call"_ss);
+                        break;
+                    }
+
+                    case obj_type_t::cfunc: {
+                        vm::basic_block::none(bb, op::nop);
+                        vm::basic_block::comment(bb, "XXX: cfunc call"_ss);
+                        break;
+                    }
+
+                    default:
+                        error(ctx, "tried to call non-callable value");
+                }
+
+                ctx->call_list = CDR(cl);
+                return *new_bb;
+            }
+
+            default:
+                break;
+        }
+
+        return bb;
+    }
+
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
-        auto& bb = vm::emitter::make_basic_block(ctx->emitter, bb_type_t::code);
-
-        u8 target_reg;
-        vm::register_alloc::reserve_next(ctx->emitter.gp, target_reg);
-        auto& comp_bb = compile(ctx, obj, ctx->env, bb, target_reg);
-        vm::basic_block::imm1(
-            bb,
-            instruction::type::exit,
-            vm::emitter::imm(1, imm_type_t::boolean));
-        format::print("comp_bb->id = {}\n", comp_bb.id);
-        vm::emitter::disassemble(ctx->emitter, bb);
-
+        auto& bb = vm::emitter::make_basic_block(ctx->emitter);
+        auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+        TIME_BLOCK(
+            "compile expr"_ss,
+            auto& comp_bb = compile(ctx, obj, ctx->env, bb, reg[0], 0, true);
+            UNUSED(comp_bb);
+            vm::basic_block::imm1(
+                bb,
+                instruction::type::exit,
+                vm::emitter::imm(1, imm_type_t::boolean));
+            );
+        str_t str{};
+        str::init(str, ctx->alloc);
+        {
+            str_buf_t buf{&str};
+            vm::emitter::disassemble(ctx->emitter, bb, buf);
+        }
+        format::print("{}\n", str);
         return ctx->nil;
     }
 
@@ -736,18 +785,6 @@ namespace basecode::scm {
         if ((ctx->object_count % 2) != 0)
             --ctx->object_count;
 
-        // init lists
-        ctx->call_list = ctx->nil;
-        ctx->free_list = ctx->nil;
-
-        // populate freelist
-        for (s32 i = ctx->object_count - 1; i >= 0; i--) {
-            obj_t* obj = &ctx->objects[i];
-            SET_TYPE(obj, obj_type_t::free);
-            SET_CDR(obj, ctx->free_list);
-            ctx->free_list = obj;
-        }
-
         auto& vm = ctx->vm;
         ctx->alloc = alloc;
         vm::init(vm, ctx->alloc, size);
@@ -768,9 +805,21 @@ namespace basecode::scm {
         array::init(ctx->environments, ctx->alloc);
 
         // init objects
-        ctx->nil       = make_object(ctx);
+        ctx->nil       = &ctx->objects[ctx->object_used++];
         ctx->nil->full = 0;
         SET_TYPE(ctx->nil, obj_type_t::nil);
+
+        // init lists
+        ctx->call_list = ctx->nil;
+        ctx->free_list = ctx->nil;
+
+        // populate freelist
+        for (s32 i = ctx->object_count - 1; i >= ctx->object_used; i--) {
+            obj_t* obj = &ctx->objects[i];
+            SET_TYPE(obj, obj_type_t::free);
+            SET_CDR(obj, ctx->free_list);
+            ctx->free_list = obj;
+        }
 
         ctx->env       = make_environment(ctx, ctx->nil);
 
@@ -1642,13 +1691,15 @@ namespace basecode::scm {
 
     u0 format_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args) {
         obj_t* cl = ctx->call_list;
-        if (ctx->handlers.error)
+        if (cl && ctx->handlers.error)
             ctx->handlers.error(ctx, fmt_msg.data(), cl);
         format::print(stderr, "error: ");
         format::vprint(ctx->alloc, stderr, fmt_msg, args);
-        format::print(stderr, "\n");
-        for (; !IS_NIL(cl); cl = CDR(cl))
-            format::print(stderr, "=> {}\n", printable_t{ctx, CAR(cl)});
+        if (cl) {
+            format::print(stderr, "\n");
+            for (; !IS_NIL(cl); cl = CDR(cl))
+                format::print(stderr, "=> {}\n", printable_t{ctx, CAR(cl)});
+        }
         ctx->call_list = ctx->nil;
         exit(EXIT_FAILURE);
     }
@@ -1790,6 +1841,25 @@ namespace basecode::scm {
             args = CDR(args);
         }
         return len;
+    }
+
+    obj_t* make_proc(ctx_t* ctx, obj_t* params, obj_t* body, obj_t* env, b8 macro) {
+        auto new_env = make_environment(ctx, env);
+        auto param   = params;
+        while (!IS_NIL(param)) {
+            if (TYPE(param) != obj_type_t::pair) {
+                set(ctx, param, ctx->false_, new_env);
+                break;
+            }
+            set(ctx, CAR(param), ctx->false_, new_env);
+            param = CDR(param);
+        }
+        auto e = (env_t*) NATIVE_PTR(CDR(new_env));
+        e->params = params;
+        auto obj = make_object(ctx);
+        SET_TYPE(obj, macro ? obj_type_t::macro : obj_type_t::func);
+        SET_CDR(obj, new_env);
+        return obj;
     }
 
     static u0 format_environment(ctx_t* ctx, obj_t* env, fmt_ctx_t& fmt_ctx, u32 indent) {

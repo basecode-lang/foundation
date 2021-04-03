@@ -199,6 +199,8 @@ namespace basecode::scm {
     ctx_t* init(u0* ptr, u32 size, alloc_t* alloc = context::top()->alloc);
 
     obj_t* make_string(ctx_t* ctx, const s8* str, s32 len = -1, u32 id = {});
+
+    obj_t* make_proc(ctx_t* ctx, obj_t* params, obj_t* body, obj_t* env, b8 macro = false);
 }
 
 FORMAT_TYPE(basecode::scm::printable_t, basecode::scm::format_object(data, ctx));
