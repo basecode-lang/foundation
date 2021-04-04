@@ -19,7 +19,6 @@
 #include <basecode/core/scm/vm.h>
 #include <basecode/core/scm/scm.h>
 #include <basecode/core/scm/types.h>
-#include <basecode/core/scm/bytecode.h>
 
 namespace basecode::scm {
     namespace trap {
@@ -131,7 +130,7 @@ namespace basecode::scm {
         constexpr u8 op_cons_reg3       = 93;
         constexpr u8 op_env_reg2        = 94;
         constexpr u8 op_type_reg2       = 95;
-        constexpr u8 op_list_reg2       = 96;
+        constexpr u8 op_list_reg2_imm   = 96;
         constexpr u8 op_eval_reg2       = 97;
         constexpr u8 op_error_reg2      = 98;
         constexpr u8 op_write_imm2      = 99;
@@ -144,249 +143,314 @@ namespace basecode::scm {
         constexpr u8 op_apply_reg2      = 106;
         constexpr u8 op_const_reg2      = 107;
         constexpr u8 op_const_imm2      = 108;
+        constexpr u8 op_ladd_reg2_imm   = 110;
+        constexpr u8 op_lsub_reg2_imm   = 111;
+        constexpr u8 op_lmul_reg2_imm   = 112;
+        constexpr u8 op_ldiv_reg2_imm   = 113;
+        constexpr u8 op_lmod_reg2_imm   = 114;
+        constexpr u8 op_lnot_reg2       = 115;
+        constexpr u8 op_pairp_reg2      = 116;
+        constexpr u8 op_listp_reg2      = 117;
+        constexpr u8 op_symp_reg2       = 118;
+        constexpr u8 op_atomp_reg2      = 119;
+        constexpr u8 op_truep_reg1      = 120;
+        constexpr u8 op_falsep_reg1     = 121;
+        constexpr u8 op_lcmp_reg2       = 122;
         constexpr u8 op_error           = 255;
 
-        static u8 s_op_decode[][2][8] = {
-            //  none            imm             reg1            reg2            reg3            reg4            offset          indexed
+        static u8 s_op_decode[][2][9] = {
+            //  none            imm             reg1            reg2            reg3            reg4            offset          indexed             reg2_imm
             [instruction::type::nop] = {
-                {op_nop,        op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_nop,        op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_nop,        op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_nop,        op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::add] = {
-                {op_error,      op_add_imm,     op_error,       op_add_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_adds_imm,    op_error,       op_adds_reg2,   op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_add_imm,     op_error,       op_add_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_adds_imm,    op_error,       op_adds_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::mul] = {
-                {op_error,      op_mul_imm,     op_error,       op_mul_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_muls_imm,    op_error,       op_muls_reg2,   op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_mul_imm,     op_error,       op_mul_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_muls_imm,    op_error,       op_muls_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::sub] = {
-                {op_error,      op_sub_imm,     op_error,       op_sub_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_subs_imm,    op_error,       op_subs_reg2,   op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_sub_imm,     op_error,       op_sub_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_subs_imm,    op_error,       op_subs_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::div] = {
-                {op_error,      op_div_imm,     op_error,       op_div_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_div_imm,     op_error,       op_div_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::pow] = {
-                {op_error,      op_pow_imm,     op_error,       op_pow_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_pow_imm,     op_error,       op_pow_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::mod] = {
-                {op_error,      op_mod_imm,     op_error,       op_mod_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_mod_imm,     op_error,       op_mod_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::neg] = {
-                {op_error,      op_error,       op_neg_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_neg_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_neg_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_neg_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::not_] = {
-                {op_error,      op_error,       op_not_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_not_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_not_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_not_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::shl] = {
-                {op_error,      op_shl_imm,     op_error,       op_shl_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_shl_imm,     op_error,       op_shl_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::shr] = {
-                {op_error,      op_shr_imm,     op_error,       op_shr_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_shr_imm,     op_error,       op_shr_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::or_] = {
-                {op_error,      op_or_imm,      op_error,       op_or_reg2,     op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_or_imm,      op_error,       op_or_reg2,     op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::and_] = {
-                {op_error,      op_and_imm,     op_error,       op_and_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_and_imm,     op_error,       op_and_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::xor_] = {
-                {op_error,      op_xor_imm,     op_error,       op_xor_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_xor_imm,     op_error,       op_xor_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::br] = {
-                {op_error,      op_br_imm,      op_br_reg1,     op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_br_imm,      op_br_reg1,     op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::blr] = {
-                {op_error,      op_blr_imm,     op_blr_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_blr_imm,     op_blr_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::cmp] = {
-                {op_error,      op_cmp_imm,     op_error,       op_cmp_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_cmps_imm,    op_error,       op_cmps_reg2,   op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_cmp_imm,     op_error,       op_cmp_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_cmps_imm,    op_error,       op_cmps_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::beq] = {
-                {op_error,      op_beq_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_beqs_imm,    op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_beq_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_beqs_imm,    op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::bne] = {
-                {op_error,      op_bne_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_bnes_imm,    op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_bne_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_bnes_imm,    op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::bl] = {
-                {op_error,      op_bl_imm,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_bls_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_bl_imm,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_bls_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::ble] = {
-                {op_error,      op_ble_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_bles_imm,    op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_ble_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_bles_imm,    op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::bg] = {
-                {op_error,      op_bg_imm,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_bgs_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_bg_imm,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_bgs_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::bge] = {
-                {op_error,      op_bge_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_bges_imm,    op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_bge_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_bges_imm,    op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::seq] = {
-                {op_error,      op_error,       op_seq_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_seqs_reg1,   op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_seq_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_seqs_reg1,   op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::sne] = {
-                {op_error,      op_error,       op_sne_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_snes_reg1,   op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_sne_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_snes_reg1,   op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::sl] = {
-                {op_error,      op_error,       op_sl_reg1,     op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_sls_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_sl_reg1,     op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_sls_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::sle] = {
-                {op_error,      op_error,       op_sle_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_sles_reg1,   op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_sle_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_sles_reg1,   op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::sg] = {
-                {op_error,      op_error,       op_sg_reg1,     op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_sgs_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_sg_reg1,     op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_sgs_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::sge] = {
-                {op_error,      op_error,       op_sge_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_sges_reg1,   op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_sge_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_sges_reg1,   op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::ret] = {
-                {op_error,      op_error,       op_ret_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_ret_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::mma] = {
-                {op_error,      op_mma_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_mma_imm,     op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::pop] = {
-                {op_error,      op_error,       op_error,       op_pop_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_pop_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::get] = {
-                {op_error,      op_error,       op_error,       op_get_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_get_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::set] = {
-                {op_error,      op_error,       op_set_reg2,    op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_set_reg2,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::push] = {
-                {op_error,      op_push_imm,    op_error,       op_push_reg2,   op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_push_imm,    op_error,       op_push_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::move] = {
-                {op_error,      op_move_imm,    op_error,       op_move_reg2,   op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_move_imm,    op_error,       op_move_reg2,   op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_move_imm,    op_error,       op_move_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_move_imm,    op_error,       op_move_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::load] = {
-                {op_error,      op_error,       op_error,       op_load_reg2,   op_error,       op_error,       op_load_offs,   op_load_idx},
-                {op_error,      op_error,       op_error,       op_load_reg2,   op_error,       op_error,       op_load_offs,   op_load_idx},
+                {op_error,      op_error,       op_error,       op_load_reg2,   op_error,       op_error,       op_load_offs,   op_load_idx,        op_error},
+                {op_error,      op_error,       op_error,       op_load_reg2,   op_error,       op_error,       op_load_offs,   op_load_idx,        op_error},
             },
             [instruction::type::store] = {
-                {op_error,      op_error,       op_error,       op_store_reg2,  op_error,       op_error,       op_store_offs,  op_store_idx},
-                {op_error,      op_error,       op_error,       op_store_reg2,  op_error,       op_error,       op_store_offs,  op_store_idx},
+                {op_error,      op_error,       op_error,       op_store_reg2,  op_error,       op_error,       op_store_offs,  op_store_idx,       op_error},
+                {op_error,      op_error,       op_error,       op_store_reg2,  op_error,       op_error,       op_store_offs,  op_store_idx,       op_error},
             },
             [instruction::type::exit] = {
-                {op_error,      op_exit_imm,    op_exit_reg1,   op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_exit_imm,    op_exit_reg1,   op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::trap] = {
-                {op_error,      op_trap_imm,    op_error,       op_trap_reg2,   op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_trap_imm,    op_error,       op_trap_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::lea] = {
-                {op_error,      op_lea_imm,     op_error,       op_error,       op_error,       op_error,       op_lea_offs,    op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_lea_imm,     op_error,       op_error,       op_error,       op_error,       op_lea_offs,    op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::bra] = {
-                {op_error,      op_bra_imm,     op_bra_reg1,    op_error,       op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_bra_imm,     op_bra_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::car] = {
-                {op_error,      op_error,       op_error,       op_car_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_car_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::cdr] = {
-                {op_error,      op_error,       op_error,       op_cdr_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_cdr_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::setcar] = {
-                {op_error,      op_error,       op_error,       op_setcar_reg2, op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_setcar_reg2, op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::setcdr] = {
-                {op_error,      op_error,       op_error,       op_setcdr_reg2, op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_setcdr_reg2, op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::fix] = {
-                {op_error,      op_fix_imm2,    op_error,       op_fix_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_fix_imm2,    op_error,       op_fix_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::flo] = {
-                {op_error,      op_flo_imm2,    op_error,       op_flo_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_flo_imm2,    op_error,       op_flo_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::cons] = {
-                {op_error,      op_error,       op_error,       op_error,       op_cons_reg3,   op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_cons_reg3,   op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::env] = {
-                {op_error,      op_error,       op_error,       op_env_reg2,    op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_env_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::type] = {
-                {op_error,      op_error,       op_error,       op_type_reg2,   op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_type_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::list] = {
-                {op_error,      op_error,       op_error,       op_list_reg2,   op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_list_reg2_imm},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::eval] = {
-                {op_error,      op_error,       op_error,       op_eval_reg2,   op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_eval_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::error] = {
-                {op_error,      op_error,       op_error,       op_error_reg2,  op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_error_reg2,  op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::write] = {
-                {op_error,      op_write_imm2,  op_error,       op_write_reg2,  op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_write_imm2,  op_error,       op_write_reg2,  op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::qt] = {
-                {op_error,      op_error,       op_error,       op_qt_reg2,     op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_qt_reg2,     op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::qq] = {
-                {op_error,      op_error,       op_error,       op_qq_reg2,     op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_error,       op_error,       op_qq_reg2,     op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::gc] = {
-                {op_gc,         op_error,       op_gc_reg1,     op_gc_reg2,     op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_gc,         op_error,       op_gc_reg1,     op_gc_reg2,     op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::apply] = {
-                {op_gc,         op_error,       op_error,       op_apply_reg2,  op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_gc,         op_error,       op_error,       op_apply_reg2,  op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::const_] = {
-                {op_error,      op_const_imm2,  op_error,       op_const_reg2,  op_error,       op_error,       op_error,       op_error},
-                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error},
+                {op_error,      op_const_imm2,  op_error,       op_const_reg2,  op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::ladd] = {
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_ladd_reg2_imm},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::lsub] = {
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_lsub_reg2_imm},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::lmul] = {
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_lmul_reg2_imm},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::ldiv] = {
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_ldiv_reg2_imm},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::lmod] = {
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_lmod_reg2_imm},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::lnot] = {
+                {op_error,      op_error,       op_error,       op_lnot_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::pairp] = {
+                {op_error,      op_error,       op_error,       op_pairp_reg2,  op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::listp] = {
+                {op_error,      op_error,       op_error,       op_listp_reg2,  op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::symp] = {
+                {op_error,      op_error,       op_error,       op_symp_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::atomp] = {
+                {op_error,      op_error,       op_error,       op_atomp_reg2,  op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::truep] = {
+                {op_error,      op_error,       op_truep_reg1,  op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::falsep] = {
+                {op_error,      op_error,       op_falsep_reg1, op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            },
+            [instruction::type::lcmp] = {
+                {op_error,      op_error,       op_error,       op_lcmp_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
         };
 
@@ -534,7 +598,7 @@ namespace basecode::scm {
                 [op_cons_reg3]          = &&cons_reg3,
                 [op_env_reg2]           = &&env_reg2,
                 [op_type_reg2]          = &&type_reg2,
-                [op_list_reg2]          = &&list_reg2,
+                [op_list_reg2_imm]      = &&list_reg2_imm,
                 [op_eval_reg2]          = &&eval_reg2,
                 [op_error_reg2]         = &&error_reg2,
                 [op_write_imm2]         = &&write_imm2,
@@ -547,6 +611,19 @@ namespace basecode::scm {
                 [op_apply_reg2]         = &&apply_reg2,
                 [op_const_reg2]         = &&const_reg2,
                 [op_const_imm2]         = &&const_imm2,
+                [op_ladd_reg2_imm]      = &&ladd_reg2_imm,
+                [op_lsub_reg2_imm]      = &&lsub_reg2_imm,
+                [op_lmul_reg2_imm]      = &&lmul_reg2_imm,
+                [op_ldiv_reg2_imm]      = &&ldiv_reg2_imm,
+                [op_lmod_reg2_imm]      = &&lmod_reg2_imm,
+                [op_lnot_reg2]          = &&lnot_reg2,
+                [op_pairp_reg2]         = &&pairp_reg2,
+                [op_listp_reg2]         = &&listp_reg2,
+                [op_symp_reg2]          = &&symp_reg2,
+                [op_atomp_reg2]         = &&atomp_reg2,
+                [op_truep_reg1]         = &&truep_reg1,
+                [op_falsep_reg1]        = &&falsep_reg1,
+                [op_lcmp_reg2]          = &&lcmp_reg2,
                 [op_error]              = &&error,
             };
 
@@ -1213,16 +1290,20 @@ namespace basecode::scm {
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }
-            list_reg2:
+            list_reg2_imm:
             {
-                // XXX: this isn't correct
-                auto v = eval_list(ctx, (obj_t*) G(opers->reg2.src), env);
-                flags->c = false;
-                flags->z = !IS_NIL(v);
-                flags->n = false;
-                flags->i = false;
-                flags->v = false;
-                G(opers->reg2.dest) = u64(v);
+                auto base = G(opers->reg2_imm.a);
+                auto size = s32(opers->reg2_imm.imm) / sizeof(u64);
+                auto offs = 0;
+                auto lst  = ctx->nil;
+                auto gc = save_gc(ctx);
+                for (u32 i = 0; i < size; ++i) {
+                    lst = cons(ctx, (obj_t*) H(base + offs), lst);
+                    offs += sizeof(u64);
+                }
+                restore_gc(ctx, gc);
+                push_gc(ctx, lst);
+                G(opers->reg2_imm.b) = u64(lst);
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }
@@ -1390,6 +1471,199 @@ namespace basecode::scm {
                     (obj_t*) G(opers->reg2.dest),
                     (obj_t*) G(opers->reg2.src),
                     env);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            lnot_reg2:
+            {
+                auto v = (obj_t*) G(opers->reg2.src);
+                flags->c = false;
+                flags->z = !IS_TRUE(v);
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->reg2.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            truep_reg1:
+            {
+                auto v = (obj_t*) G(opers->reg1.dest);
+                flags->c = false;
+                flags->z = IS_TRUE(v);
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->reg1.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            falsep_reg1:
+            {
+                auto v = (obj_t*) G(opers->reg1.dest);
+                flags->c = false;
+                flags->z = IS_FALSE(v);
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->reg1.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            pairp_reg2:
+            {
+                auto v = (obj_t*) G(opers->reg2.src);
+                flags->c = false;
+                flags->z = TYPE(v) == obj_type_t::pair;
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->reg2.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            listp_reg2:
+            {
+                // FIXME
+                auto v = (obj_t*) G(opers->reg2.src);
+                flags->c = false;
+                flags->z = TYPE(v) == obj_type_t::pair; // XXX: NOT CORRECT, fix!
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->reg2.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            symp_reg2:
+            {
+                auto v = (obj_t*) G(opers->reg2.src);
+                flags->c = false;
+                flags->z = TYPE(v) == obj_type_t::symbol;
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->reg2.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            atomp_reg2:
+            {
+                auto v = (obj_t*) G(opers->reg2.src);
+                flags->c = false;
+                flags->z = TYPE(v) != obj_type_t::pair;
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->reg2.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            ladd_reg2_imm:
+            {
+                auto     base = G(opers->reg2_imm.a);
+                auto     size = s32(opers->reg2_imm.imm) / sizeof(u64);
+                auto     offs = 0;
+                flonum_t acc  = to_flonum((obj_t*) H(base + offs));
+                auto gc = save_gc(ctx);
+                base += sizeof(u64);
+                for (u32 i = 0; i < size - 1; ++i) {
+                    acc += to_flonum((obj_t*) H(base + offs));
+                    offs += sizeof(u64);
+                }
+                restore_gc(ctx, gc);
+                auto res = make_flonum(ctx, acc);
+                push_gc(ctx, res);
+                G(opers->reg2_imm.b) = u64(res);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            lsub_reg2_imm:
+            {
+                auto     base = G(opers->reg2_imm.a);
+                auto     size = s32(opers->reg2_imm.imm) / sizeof(u64);
+                auto     offs = 0;
+                flonum_t acc  = to_flonum((obj_t*) H(base + offs));
+                auto gc = save_gc(ctx);
+                base += sizeof(u64);
+                for (u32 i = 0; i < size - 1; ++i) {
+                    acc -= to_flonum((obj_t*) H(base + offs));
+                    offs += sizeof(u64);
+                }
+                restore_gc(ctx, gc);
+                auto res = make_flonum(ctx, acc);
+                push_gc(ctx, res);
+                G(opers->reg2_imm.b) = u64(res);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            lmul_reg2_imm:
+            {
+                auto     base = G(opers->reg2_imm.a);
+                auto     size = s32(opers->reg2_imm.imm) / sizeof(u64);
+                auto     offs = 0;
+                flonum_t acc  = to_flonum((obj_t*) H(base + offs));
+                auto gc = save_gc(ctx);
+                base += sizeof(u64);
+                for (u32 i = 0; i < size - 1; ++i) {
+                    acc *= to_flonum((obj_t*) H(base + offs));
+                    offs += sizeof(u64);
+                }
+                restore_gc(ctx, gc);
+                auto res = make_flonum(ctx, acc);
+                push_gc(ctx, res);
+                G(opers->reg2_imm.b) = u64(res);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            ldiv_reg2_imm:
+            {
+                auto     base = G(opers->reg2_imm.a);
+                auto     size = s32(opers->reg2_imm.imm) / sizeof(u64);
+                auto     offs = 0;
+                flonum_t acc  = to_flonum((obj_t*) H(base + offs));
+                auto gc = save_gc(ctx);
+                base += sizeof(u64);
+                for (u32 i = 0; i < size - 1; ++i) {
+                    acc /= to_flonum((obj_t*) H(base + offs));
+                    offs += sizeof(u64);
+                }
+                restore_gc(ctx, gc);
+                auto res = make_flonum(ctx, acc);
+                push_gc(ctx, res);
+                G(opers->reg2_imm.b) = u64(res);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            lmod_reg2_imm:
+            {
+                auto     base = G(opers->reg2_imm.a);
+                auto     size = s32(opers->reg2_imm.imm) / sizeof(u64);
+                auto     offs = 0;
+                fixnum_t acc  = to_fixnum((obj_t*) H(base + offs));
+                auto gc = save_gc(ctx);
+                base += sizeof(u64);
+                for (u32 i = 0; i < size - 1; ++i) {
+                    acc %= to_fixnum((obj_t*) H(base + offs));
+                    offs += sizeof(u64);
+                }
+                restore_gc(ctx, gc);
+                auto res = make_fixnum(ctx, acc);
+                push_gc(ctx, res);
+                G(opers->reg2_imm.b) = u64(res);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            lcmp_reg2:
+            {
+                auto cmp = scm::compare(ctx,
+                                        (obj_t*) G(opers->reg2.src),
+                                        (obj_t*) G(opers->reg2.src));
+                flags->c = cmp > 0;
+                flags->z = cmp == 0;
+                flags->n = cmp < 0;
+                flags->i = false;
+                flags->v = false;
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }

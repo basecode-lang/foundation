@@ -335,6 +335,34 @@ namespace basecode::scm {
                 array::append(bb.entries, buf);
             }
 
+            u0 reg2_imm(bb_t& bb, op_code_t opcode, reg_t a, reg_t b, imm_t imm, b8 is_signed) {
+                u64 buf{};
+                u64  data{};
+                auto inst = (instruction_t*) &buf;
+                auto operands = (operand_encoding_t*) &data;
+                inst->type           = opcode;
+                inst->is_signed      = is_signed;
+                inst->encoding       = instruction::encoding::reg2_imm;
+                operands->reg2_imm.a = a;
+                operands->reg2_imm.b = b;
+                switch (imm.type) {
+                    case imm_type_t::block:
+                        operands->reg2_imm.imm = imm.b->id;
+                        break;
+                    case imm_type_t::obj:
+                    case imm_type_t::trap:
+                    case imm_type_t::value:
+                    case imm_type_t::label:
+                    case imm_type_t::boolean:
+                        operands->reg2_imm.imm = imm.s;
+                        break;
+                }
+                operands->reg2_imm.type = u8(imm.type);
+                operands->reg2_imm.size = u8(imm.size);
+                inst->data = data;
+                array::append(bb.entries, buf);
+            }
+
             u0 indx(bb_t& bb, op_code_t opcode, s32 offset, reg_t base, reg_t index, reg_t dest) {
                 u64 buf{};
                 u64  data{};
@@ -395,22 +423,40 @@ namespace basecode::scm {
                 }
             }
 
+            static u0 format_imm_oper(str_buf_t& buf, imm_type_t type, s32 value) {
+                switch (type) {
+                    case imm_type_t::obj:
+                        // XXX: format the scheme object
+                        format::format_to(buf, "{}", value);
+                        break;
+                    case imm_type_t::trap:
+                        format::format_to(buf, "{}", trap::name(value));
+                        break;
+                    case imm_type_t::value:
+                    case imm_type_t::boolean:
+                        format::format_to(buf, "{}", value);
+                        break;
+                    case imm_type_t::label:
+                        break;
+                    case imm_type_t::block:
+                        format::format_to(buf, "bb_{}", value);
+                        break;
+                }
+            }
+
             u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf) {
-//                for (auto bb : e.blocks) {
-//                    format::print("id: {}, prev: {}, next: {}\n",
-//                                  bb->id,
-//                                  bb->prev ? bb->prev->id : 0,
-//                                  bb->next ? bb->next->id : 0);
-//                }
                 auto curr = &start_block;
                 u64  addr = curr->addr;
                 while (curr) {
                     for (auto str_id : curr->notes)
                         format::format_to(buf, "${:08X}: ; {}\n", addr, e.strings[str_id - 1]);
                     format::format_to(buf, "${:08X}: bb_{}:\n", addr, curr->id);
-                    if (curr->label) {
+                    if (curr->label)
                         format::format_to(buf, "${:08X}: {}:\n", addr, e.strings[curr->label - 1]);
-                    }
+                    if (curr->prev)
+                        format::format_to(buf, "${:08X}:    .pred bb_{}\n", addr, curr->prev->id);
+                    if (curr->next)
+                        format::format_to(buf, "${:08X}:    .succ bb_{}\n", addr, curr->next->id);
                     if (curr->type == bb_type_t::data) {
                         auto start_pos = buf.size();
                         for (s32 i = 0; i < curr->entries.size; ++i) {
@@ -425,92 +471,83 @@ namespace basecode::scm {
                         for (s32 i = 0; i < curr->entries.size; ++i) {
                             auto& encoded = curr->entries[i];
                             auto inst     = (instruction_t*) &encoded;
-                            u64  data     = inst->data;
-                            auto operands = (operand_encoding_t*) &data;
+                            u64  data      = inst->data;
+                            auto opers     = (operand_encoding_t*) &data;
                             auto start_pos = buf.size();
                             format::format_to(buf, "${:08X}:    {:<12}",
                                           addr,
                                           instruction::type::name(inst->type));
                             switch (inst->encoding) {
                                 case instruction::encoding::imm: {
-                                    switch (imm_type_t(operands->imm.type)) {
-                                        case imm_type_t::obj:
-                                            // XXX: format the scheme object
-                                            format::format_to(buf, "{}", operands->imm.src);
-                                            break;
-                                        case imm_type_t::trap:
-                                            format::format_to(buf, "{}", trap::name(operands->imm.src));
-                                            break;
-                                        case imm_type_t::value:
-                                        case imm_type_t::boolean:
-                                            format::format_to(buf, "{}", s32(operands->imm.src));
-                                            break;
-                                        case imm_type_t::label:
-                                            break;
-                                        case imm_type_t::block:
-                                            format::format_to(buf, "bb_{}", operands->imm.src);
-                                            break;
-                                    }
-                                    if (operands->imm.dest > 0) {
+                                    format_imm_oper(buf, imm_type_t(opers->imm.type), opers->imm.src);
+                                    if (opers->imm.dest > 0) {
                                         format::format_to(buf,
                                                           ", {}",
-                                                          register_file::name(operands->imm.dest));
+                                                          register_file::name(opers->imm.dest));
                                     }
                                     break;
                                 }
                                 case instruction::encoding::reg1: {
                                     format::format_to(buf,
                                                       "{}",
-                                                      register_file::name(operands->reg1.dest));
+                                                      register_file::name(opers->reg1.dest));
                                     break;
                                 }
                                 case instruction::encoding::reg2: {
                                     format::format_to(buf,
                                                       "{}, {}",
-                                                      register_file::name(operands->reg2.src),
-                                                      register_file::name(operands->reg2.dest));
+                                                      register_file::name(opers->reg2.src),
+                                                      register_file::name(opers->reg2.dest));
+                                    break;
+                                }
+                                case instruction::encoding::reg2_imm: {
+                                    format::format_to(buf,
+                                                      "{}, {}, ",
+                                                      register_file::name(opers->reg2_imm.a),
+                                                      register_file::name(opers->reg2_imm.b));
+                                    format_imm_oper(buf, imm_type_t(opers->reg2_imm.type), opers->reg2_imm.imm);
                                     break;
                                 }
                                 case instruction::encoding::reg3: {
                                     format::format_to(buf,
                                                       "{}, {}, {}",
-                                                      register_file::name(operands->reg3.a),
-                                                      register_file::name(operands->reg3.b),
-                                                      register_file::name(operands->reg3.c));
+                                                      register_file::name(opers->reg3.a),
+                                                      register_file::name(opers->reg3.b),
+                                                      register_file::name(opers->reg3.c));
                                     break;
                                 }
                                 case instruction::encoding::reg4: {
                                     format::format_to(buf,
                                                       "{}, {}, {}",
-                                                      register_file::name(operands->reg4.a),
-                                                      register_file::name(operands->reg4.b),
-                                                      register_file::name(operands->reg4.c),
-                                                      register_file::name(operands->reg4.d));
+                                                      register_file::name(opers->reg4.a),
+                                                      register_file::name(opers->reg4.b),
+                                                      register_file::name(opers->reg4.c),
+                                                      register_file::name(opers->reg4.d));
                                     break;
                                 }
                                 case instruction::encoding::offset: {
-                                    if (operands->offset.mode) {
+                                    if (opers->offset.mode) {
                                         format::format_to(buf,
                                                           "{}, {}({})",
-                                                          register_file::name(operands->offset.src),
-                                                          s32(operands->offset.offs),
-                                                          register_file::name(operands->offset.dest));
+                                                          register_file::name(opers->offset.src),
+                                                          s32(opers->offset.offs),
+                                                          register_file::name(opers->offset.dest));
                                     } else {
                                         format::format_to(buf,
                                                           "{}({}), {}",
-                                                          s32(operands->offset.offs),
-                                                          register_file::name(operands->offset.src),
-                                                          register_file::name(operands->offset.dest));
+                                                          s32(opers->offset.offs),
+                                                          register_file::name(opers->offset.src),
+                                                          register_file::name(opers->offset.dest));
                                     }
                                     break;
                                 }
                                 case instruction::encoding::indexed: {
                                     format::format_to(buf,
                                                       "{}({}, {}), {}",
-                                                      s32(operands->indexed.offs),
-                                                      register_file::name(operands->indexed.base),
-                                                      register_file::name(operands->indexed.index),
-                                                      register_file::name(operands->indexed.dest));
+                                                      s32(opers->indexed.offs),
+                                                      register_file::name(opers->indexed.base),
+                                                      register_file::name(opers->indexed.index),
+                                                      register_file::name(opers->indexed.dest));
                                     break;
                                 }
                                 default: {
@@ -717,17 +754,33 @@ namespace basecode::scm {
                 basic_block::reg2(bb, op::setcdr, val_reg, target_reg);
             }
 
-            u0 cons(bb_t& bb, reg_t car, reg_t cdr, reg_t target_reg) {
-                vm::basic_block::reg3(bb, op::cons, car, cdr, target_reg);
+            u0 gt(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
+                vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
+                vm::basic_block::reg1(bb, op::sg, target_reg);
             }
 
-            bb_t& list(bb_t& bb, reg_t lst_reg, reg_t base_reg, u32 size) {
-                auto reg = reg_alloc::reserve(bb.emitter->gp);
-                auto& list_bb = basic_block::make_succ(bb);
-                basic_block::imm2(list_bb, op::list, emitter::imm(size * 8), base_reg);
-                basic_block::offs(list_bb, op::load, 0, base_reg, lst_reg);
-                free_stack(list_bb, size);
-                return list_bb;
+            u0 lt(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
+                vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
+                vm::basic_block::reg1(bb, op::sl, target_reg);
+            }
+
+            u0 is(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
+                vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
+                vm::basic_block::reg1(bb, op::seq, target_reg);
+            }
+
+            u0 lte(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
+                vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
+                vm::basic_block::reg1(bb, op::sle, target_reg);
+            }
+
+            u0 gte(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
+                vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
+                vm::basic_block::reg1(bb, op::sge, target_reg);
+            }
+
+            u0 cons(bb_t& bb, reg_t car, reg_t cdr, reg_t target_reg) {
+                vm::basic_block::reg3(bb, op::cons, car, cdr, target_reg);
             }
 
             bb_t& if_(bb_t& bb, bb_t& pred_block, bb_t& true_bb, bb_t& false_bb) {
@@ -735,11 +788,19 @@ namespace basecode::scm {
                 return exit_bb;
             }
 
-            bb_t& arith_op(bb_t& bb, op_code_t op_code, reg_t acc_reg, reg_t base_reg, u32 size) {
+            bb_t& list(bb_t& bb, reg_t lst_reg, reg_t base_reg, reg_t target_reg, u32 size) {
+                auto reg = reg_alloc::reserve(bb.emitter->gp);
+                auto& list_bb = basic_block::make_succ(bb);
+                basic_block::reg2_imm(list_bb, op::list, target_reg, base_reg, emitter::imm(size * 8));
+                basic_block::offs(list_bb, op::load, 0, base_reg, lst_reg);
+                free_stack(list_bb, size);
+                return list_bb;
+            }
+
+            bb_t& arith_op(bb_t& bb, op_code_t op_code, reg_t base_reg, reg_t target_reg, u32 size) {
                 auto reg = reg_alloc::reserve(bb.emitter->gp);
                 auto& arith_bb = basic_block::make_succ(bb);
-                basic_block::imm2(arith_bb, op_code, emitter::imm(size * 8), base_reg);
-                basic_block::offs(arith_bb, op::load, 0, base_reg, acc_reg);
+                basic_block::reg2_imm(arith_bb, op_code, base_reg, target_reg, emitter::imm(size * 8));
                 free_stack(arith_bb, size);
                 return arith_bb;
             }

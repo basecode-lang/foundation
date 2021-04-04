@@ -155,6 +155,8 @@ namespace basecode::scm {
 
     obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env);
 
+    s32 compare(ctx_t* ctx, obj_t* lhs, obj_t* rhs);
+
     obj_t* next_arg_no_chk(ctx_t* ctx, obj_t** arg);
 
     obj_t* cons(ctx_t* ctx, obj_t* car, obj_t* cdr);

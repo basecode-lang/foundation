@@ -21,10 +21,63 @@
 #include <basecode/core/scm/compiler.h>
 
 namespace basecode::scm {
-    bb_t& compile(const context_t& c) {
-        namespace op = instruction::type;
-        namespace rf = register_file;
+    namespace op = instruction::type;
+    namespace rf = register_file;
 
+    static bb_t& compile_cmp_op(const context_t& c, prim_type_t type) {
+        auto ctx = c.ctx;
+        auto kind = &c.kind.prim;
+        auto reg  = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
+        scm::compile(make_context(*c.bb, ctx,  CAR(kind->args), c.env, reg[0]));
+        scm::compile(make_context(*c.bb, ctx, CADR(kind->args), c.env, reg[1]));
+
+        switch (type) {
+            case prim_type_t::is:
+                vm::bytecode::is(*c.bb, reg[0], reg[1], c.target);
+                break;
+
+            case prim_type_t::lt:
+                vm::bytecode::lt(*c.bb, reg[0], reg[1], c.target);
+                break;
+
+            case prim_type_t::gt:
+                vm::bytecode::gt(*c.bb, reg[0], reg[1], c.target);
+                break;
+
+            case prim_type_t::lte:
+                vm::bytecode::lte(*c.bb, reg[0], reg[1], c.target);
+                break;
+
+            case prim_type_t::gte:
+                vm::bytecode::gte(*c.bb, reg[0], reg[1], c.target);
+                break;
+
+            default:
+                error(ctx, "unknown compare prim");
+        }
+
+        return *c.bb;
+    }
+
+    static bb_t& compile_arith_op(const context_t& c, op_code_t op_code) {
+        auto ctx = c.ctx;
+        auto kind = &c.kind.prim;
+
+        auto args = kind->args;
+        auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
+        u32 size = length(ctx, args);
+        vm::bytecode::alloc_stack(*c.bb, size, reg[0]);
+        s32 offs = 0;
+        while (!IS_NIL(args)) {
+            scm::compile(make_context(*c.bb, ctx, CAR(args), c.env, reg[1]));
+            vm::basic_block::offs(*c.bb, op::store, offs, reg[1], reg[0], true);
+            args = CDR(args);
+            offs += 8;
+        }
+        return vm::bytecode::arith_op(*c.bb, op_code, reg[0], c.target, size);
+    }
+
+    bb_t& compile(const context_t& c) {
         auto ctx = c.ctx;
 
         auto type = TYPE(c.obj);
@@ -147,44 +200,22 @@ namespace basecode::scm {
     }
 
     bb_t& prim::compile(const context_t& c) {
-        namespace op = instruction::type;
-        namespace rf = register_file;
-
         auto ctx = c.ctx;
         auto& vm = ctx->vm;
         auto kind = &c.kind.prim;
+        auto type = PRIM(c.kind.prim.form);
 
-        switch (PRIM(c.kind.prim.form)) {
+        switch (type) {
             case prim_type_t::is:
             case prim_type_t::gt:
             case prim_type_t::lt:
             case prim_type_t::lte:
-            case prim_type_t::gte: {
-                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
-                scm::compile(make_context(*c.bb, ctx,  CAR(kind->args), c.env, reg[0]));
-                scm::compile(make_context(*c.bb, ctx, CADR(kind->args), c.env, reg[1]));
-                vm::basic_block::reg2(*c.bb, op::lcmp, reg[0], reg[1]);
-                break;
-            }
-
-            case prim_type_t::add:
-            case prim_type_t::sub:
-            case prim_type_t::mul:
-            case prim_type_t::div:
-            case prim_type_t::mod: {
-                auto args = kind->args;
-                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
-                u32 size = length(ctx, args);
-                vm::bytecode::alloc_stack(*c.bb, size, reg[0]);
-                s32 offs = 0;
-                while (!IS_NIL(args)) {
-                    scm::compile(make_context(*c.bb, ctx, CAR(args), c.env, reg[1]));
-                    vm::basic_block::offs(*c.bb, op::store, offs, reg[1], reg[0], true);
-                    args = CDR(args);
-                    offs += 8;
-                }
-                return vm::bytecode::arith_op(*c.bb, op::ladd, c.target, reg[0], size);
-            }
+            case prim_type_t::gte:  return compile_cmp_op(c, type);
+            case prim_type_t::add:  return compile_arith_op(c, op::ladd);
+            case prim_type_t::sub:  return compile_arith_op(c, op::lsub);
+            case prim_type_t::mul:  return compile_arith_op(c, op::lmul);
+            case prim_type_t::div:  return compile_arith_op(c, op::ldiv);
+            case prim_type_t::mod:  return compile_arith_op(c, op::lmod);
 
             case prim_type_t::let:
             case prim_type_t::set: {
@@ -250,8 +281,19 @@ namespace basecode::scm {
                 return exit_bb;
             }
 
-            case prim_type_t::do_:
-                break;
+            case prim_type_t::do_: {
+                auto args = kind->args;
+                if (IS_NIL(args))
+                    break;
+                auto dc = make_context(*c.bb, ctx, ctx->nil, c.env, c.target);
+                while (!IS_NIL(args)) {
+                    dc.obj = CAR(args);
+                    auto& next_bb = scm::compile(dc);
+                    dc.bb = &next_bb;
+                    args = CDR(args);
+                }
+                return *dc.bb;
+            }
 
             case prim_type_t::or_:
                 break;
@@ -314,7 +356,7 @@ namespace basecode::scm {
                     args = CDR(args);
                     offs += 8;
                 }
-                return vm::bytecode::list(*c.bb, c.target, reg[0], size);
+                return vm::bytecode::list(*c.bb, c.target, reg[0], c.target, size);
             }
 
             case prim_type_t::while_: {

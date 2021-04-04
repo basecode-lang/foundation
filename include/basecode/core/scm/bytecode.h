@@ -150,14 +150,15 @@ namespace basecode::scm {
         }
 
         namespace encoding {
-            constexpr u8 none   = 0;
-            constexpr u8 imm    = 1;
-            constexpr u8 reg1   = 2;
-            constexpr u8 reg2   = 3;
-            constexpr u8 reg3   = 4;
-            constexpr u8 reg4   = 5;
-            constexpr u8 offset = 6;
-            constexpr u8 indexed= 7;
+            constexpr u8 none           = 0;
+            constexpr u8 imm            = 1;
+            constexpr u8 reg1           = 2;
+            constexpr u8 reg2           = 3;
+            constexpr u8 reg3           = 4;
+            constexpr u8 reg4           = 5;
+            constexpr u8 offset         = 6;
+            constexpr u8 indexed        = 7;
+            constexpr u8 reg2_imm       = 8;
         }
     }
 
@@ -167,37 +168,44 @@ namespace basecode::scm {
             u64                 dest:       8;
             u64                 type:       4;
             u64                 size:       3;
-            u64                 aux:        6;
+            u64                 aux:        4;
         }                       imm;
         struct {
             u64                 dest:       8;
-            u64                 pad:        45;
+            u64                 pad:        43;
         }                       reg1;
         struct {
             u64                 src:        8;
             u64                 dest:       8;
             u64                 aux:        32;
-            u64                 pad:        5;
+            u64                 pad:        3;
         }                       reg2;
         struct {
             u64                 a:          8;
             u64                 b:          8;
+            u64                 imm:        28;
+            u64                 size:       3;
+            u64                 type:       4;
+        }                       reg2_imm;
+        struct {
+            u64                 a:          8;
+            u64                 b:          8;
             u64                 c:          8;
-            u64                 pad:        29;
+            u64                 pad:        27;
         }                       reg3;
         struct {
             u64                 a:          8;
             u64                 b:          8;
             u64                 c:          8;
             u64                 d:          8;
-            u64                 pad:        21;
+            u64                 pad:        19;
         }                       reg4;
         struct {
             u64                 offs:       32;
             u64                 src:        8;
             u64                 dest:       8;
             u64                 mode:       1;
-            u64                 pad:        4;
+            u64                 pad:        2;
         }                       offset;
         struct {
             u64                 offs:       24;
@@ -205,15 +213,15 @@ namespace basecode::scm {
             u64                 index:      8;
             u64                 dest:       8;
             u64                 mode:       1;
-            u64                 pad:        4;
+            u64                 pad:        2;
         }                       indexed;
     };
 
     struct instruction_t final {
-        u64                     type:       7;
+        u64                     type:       8;
         u64                     is_signed:  1;
-        u64                     encoding:   3;
-        u64                     data:       53;
+        u64                     encoding:   4;
+        u64                     data:       51;
     };
     static_assert(sizeof(instruction_t) <= 8, "instruction_t is now greater than 8 bytes!");
 
@@ -344,6 +352,8 @@ namespace basecode::scm {
 
             u0 offs(bb_t& bb, op_code_t opcode, s32 offset, reg_t src, reg_t dest, b8 mode = false);
 
+            u0 reg2_imm(bb_t& bb, op_code_t opcode, reg_t a, reg_t b, imm_t imm, b8 is_signed = false);
+
             u0 reg2(bb_t& bb, op_code_t opcode, reg_t src, reg_t dest, b8 is_signed = false, s32 aux = 0);
         }
 
@@ -432,11 +442,21 @@ namespace basecode::scm {
 
             u0 setcdr(bb_t& bb, reg_t val_reg, reg_t target_reg);
 
+            u0 is(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg);
+
+            u0 lt(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg);
+
+            u0 gt(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg);
+
+            u0 lte(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg);
+
+            u0 gte(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg);
+
             u0 cons(bb_t& bb, reg_t car, reg_t cdr, reg_t target_reg);
 
-            bb_t& list(bb_t& bb, reg_t lst_reg, reg_t base_reg, u32 size);
+            bb_t& list(bb_t& bb, reg_t lst_reg, reg_t base_reg, reg_t target_reg, u32 size);
 
-            bb_t& arith_op(bb_t& bb, op_code_t op_code, reg_t acc_reg, reg_t base_reg, u32 size);
+            bb_t& arith_op(bb_t& bb, op_code_t op_code, reg_t base_reg, reg_t target_reg, u32 size);
         }
 
         namespace reg_alloc {

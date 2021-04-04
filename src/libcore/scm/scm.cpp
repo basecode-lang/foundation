@@ -643,6 +643,13 @@ namespace basecode::scm {
         return obj;
     }
 
+    s32 compare(ctx_t* ctx, obj_t* lhs, obj_t* rhs) {
+        if (equal(ctx, lhs, rhs))
+            return 0;
+
+        return -1;
+    }
+
     obj_t* eval(ctx_t* ctx, obj_t* obj, obj_t* env) {
         obj_t* fn   {};
         obj_t* kar  {};
