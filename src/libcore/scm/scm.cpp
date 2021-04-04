@@ -325,17 +325,19 @@ namespace basecode::scm {
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
         vm::emitter::reset(ctx->emitter);
         auto& bb = vm::emitter::make_basic_block(ctx->emitter);
-        auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
-        vm::reg_alloc::protect(ctx->emitter.gp, reg[0], true);
+        auto ret_reg = vm::reg_alloc::reserve_one(ctx->emitter.gp);
+        vm::reg_alloc::protect(ctx->emitter.gp, ret_reg, true);
         TIME_BLOCK(
             "compile expr"_ss,
-            auto tc = make_context(bb, ctx, obj, ctx->env, reg[0], true);
-            auto& comp_bb = scm::compile(tc);
+            auto tc = make_context(bb, ctx, obj, ctx->env, true);
+            auto comp_result = scm::compile(tc);
             vm::basic_block::imm1(
-                comp_bb,
+                *comp_result.bb,
                 instruction::type::exit,
                 vm::emitter::imm(1, imm_type_t::boolean));
+            release_result(bb.emitter->gp, comp_result);
             );
+        vm::reg_alloc::release_one(ctx->emitter.gp, ret_reg);
         str_t str{};
         str::init(str, ctx->alloc);
         {

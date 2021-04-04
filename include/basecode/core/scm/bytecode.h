@@ -233,6 +233,7 @@ namespace basecode::scm {
     using bb_list_t             = stable_array_t<bb_t>;
     using label_map_t           = hashtab_t<u32, bb_t*>;
     using note_list_t           = array_t<u32>;
+    using reg_table_t           = hashtab_t<u64, reg_t>;
     using encoded_list_t        = array_t<u64>;
     using comment_table_t       = hashtab_t<u32, note_list_t>;
 
@@ -295,10 +296,11 @@ namespace basecode::scm {
     struct emitter_t final {
         alloc_t*                alloc;
         vm_t*                   vm;
-        u64                     address;
+        u64                     addr;
         bb_list_t               blocks;
-        str_array_t             strings;
-        label_map_t             labels;
+        reg_table_t             regtab;
+        str_array_t             strtab;
+        label_map_t             labtab;
         reg_alloc_t             gp;
     };
 
@@ -319,7 +321,7 @@ namespace basecode::scm {
                     reg_t dest,
                     b8 mode = false);
 
-            u0 indx(bb_t& bb,
+            [[maybe_unused]] u0 indx(bb_t& bb,
                     op_code_t opcode,
                     s32 offset,
                     reg_t base,
@@ -355,13 +357,17 @@ namespace basecode::scm {
 
             template <String_Concept T>
             u0 note(bb_t& bb, const T& value) {
-                str_array::append(bb.emitter->strings, value);
-                array::append(bb.notes, bb.emitter->strings.size);
+                str_array::append(bb.emitter->strtab, value);
+                array::append(bb.notes, bb.emitter->strtab.size);
             }
 
             u0 none(bb_t& bb, op_code_t opcode);
 
             u0 apply_label(bb_t& bb, label_t label);
+
+            reg_t* find_bind(bb_t& bb, obj_t* obj);
+
+            u0 set_bind(bb_t& bb, reg_t reg, obj_t* obj);
 
             u0 reg1(bb_t& bb, op_code_t opcode, reg_t arg);
 
@@ -379,8 +385,8 @@ namespace basecode::scm {
                     notes = hashtab::emplace(bb.comments, line);
                     array::init(*notes, bb.emitter->alloc);
                 }
-                str_array::append(bb.emitter->strings, value);
-                array::append(*notes, bb.emitter->strings.size);
+                str_array::append(bb.emitter->strtab, value);
+                array::append(*notes, bb.emitter->strtab.size);
             }
 
             bb_t& make_succ(bb_t& bb, bb_type_t type = bb_type_t::code);
@@ -389,6 +395,11 @@ namespace basecode::scm {
         }
 
         namespace emitter {
+            u0 init(emitter_t& e,
+                    vm_t* vm,
+                    u64 addr,
+                    alloc_t* alloc = context::top()->alloc);
+
             u0 free(emitter_t& e);
 
             u0 reset(emitter_t& e);
@@ -403,11 +414,15 @@ namespace basecode::scm {
 
             template <String_Concept T>
             label_t make_label(emitter_t& e, const T& name) {
-                str_array::append(e.strings, name);
-                return e.strings.size;
+                str_array::append(e.strtab, name);
+                return e.strtab.size;
             }
 
             status_t assemble(emitter_t& e, bb_t& start_block);
+
+            inline str::slice_t get_string(emitter_t& e, label_t label) {
+                return e.strtab[label - 1];
+            }
 
             u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf);
 
@@ -436,8 +451,6 @@ namespace basecode::scm {
             }
 
             bb_t& make_basic_block(emitter_t& e, bb_type_t type = bb_type_t::code);
-
-            u0 init(emitter_t& e, vm_t* vm, u64 address, alloc_t* alloc = context::top()->alloc);
         }
 
         namespace bytecode {
@@ -503,17 +516,7 @@ namespace basecode::scm {
         }
 
         namespace reg_alloc {
-            u0 reset(reg_alloc_t& alloc);
-
-            b8 is_protected(reg_alloc_t& alloc, reg_t reg);
-
-            u0 protect(reg_alloc_t& alloc, reg_t reg, b8 flag);
-
-            u0 init(reg_alloc_t& alloc, reg_t start, reg_t end);
-
-            reg_result_t reserve(reg_alloc_t& alloc, u32 count = 1);
-
-            u0 release(reg_alloc_t& alloc, const reg_result_t& result);
+            inline u0 release(reg_alloc_t& alloc, const reg_result_t& result);
         }
     }
 
@@ -539,4 +542,60 @@ namespace basecode::scm {
         reg_alloc_t*            alloc;
         reg_t                   regs[16];
     };
+
+    namespace vm::reg_alloc {
+        inline u0 reset(reg_alloc_t& alloc) {
+            alloc.slots = {};
+            alloc.prots = {};
+        }
+
+        inline reg_t reserve_one(reg_alloc_t& alloc) {
+            u32 msb_zeros = alloc.slots != 0 ? __builtin_clzll(alloc.slots) : 64;
+            if (!msb_zeros)
+                return 0;
+            u32 idx = 64 - msb_zeros;
+            alloc.slots |= (1UL << idx);
+            return alloc.start + idx;
+        }
+
+        inline u0 release_one(reg_alloc_t& alloc, reg_t reg) {
+            const u32 idx = reg - alloc.start;
+            if (!(alloc.slots & (1UL << idx)))
+                return;
+            const auto mask = ~(1UL << idx);
+            alloc.slots &= mask;
+            alloc.prots &= mask;
+        }
+
+        inline b8 is_protected(reg_alloc_t& alloc, reg_t reg) {
+            const auto mask = 1UL << reg;
+            return (alloc.prots & mask) == mask;
+        }
+
+        inline u0 protect(reg_alloc_t& alloc, reg_t reg, b8 flag) {
+            if (flag) {
+                alloc.prots |= (1UL << reg);
+            } else {
+                alloc.prots &= ~(1UL << reg);
+            }
+        }
+
+        inline u0 init(reg_alloc_t& alloc, reg_t start, reg_t end) {
+            alloc.end   = end;
+            alloc.start = start;
+            alloc.slots = alloc.prots = {};
+        }
+
+        inline reg_result_t reserve(reg_alloc_t& alloc, u32 count = 1) {
+            reg_result_t r(alloc);
+            for (u32 i = 0; i < count; ++i)
+                r[r.count++] = reserve_one(alloc);
+            return r;
+        }
+
+        inline u0 release(reg_alloc_t& alloc, const reg_result_t& result) {
+            for (u32 i = 0; i < result.count; ++i)
+                release_one(alloc, result[i]);
+        }
+    }
 }

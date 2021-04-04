@@ -1304,7 +1304,7 @@ namespace basecode::scm {
                 auto gc    = save_gc(ctx);
                 for (u32 i = count - 1; i >= 0; --i) {
                     lst = cons(ctx, (obj_t*) H(base + offs), lst);
-                    offs += sizeof(u64);
+                    offs -= sizeof(u64);
                 }
                 restore_gc(ctx, gc);
                 push_gc(ctx, lst);

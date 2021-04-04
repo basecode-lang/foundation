@@ -46,28 +46,38 @@ namespace basecode {
                 }               prim;
             }                   kind;
             label_t             label;
-            reg_t               target;
             context_kind_t      type;
             b8                  top_level;
+        };
+
+        struct compile_result_t final {
+            bb_t*               bb;
+            reg_t               reg;
+            b8                  should_release;
         };
 
         context_t make_context(bb_t& bb,
                                ctx_t* ctx,
                                obj_t* obj,
                                obj_t* env,
-                               reg_t target = 0,
                                b8 top_level = false);
 
-        bb_t& compile(const context_t& c);
+        compile_result_t compile(const context_t& c);
+
+        inline u0 release_result(reg_alloc_t& alloc,
+                                 const compile_result_t& r) {
+            if (r.should_release && r.reg != 0)
+                vm::reg_alloc::release_one(alloc, r.reg);
+        }
 
         namespace proc {
-            bb_t& apply(const context_t& c);
+            compile_result_t apply(const context_t& c);
 
-            bb_t& compile(const context_t& c);
+            compile_result_t compile(const context_t& c);
         }
 
         namespace prim {
-            bb_t& compile(const context_t& c);
+            compile_result_t compile(const context_t& c);
         }
     }
 }

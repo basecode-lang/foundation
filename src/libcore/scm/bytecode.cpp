@@ -233,7 +233,7 @@ namespace basecode::scm {
                 array::append(bb.entries, buf);
             }
 
-            u0 indx(bb_t& bb,
+            [[maybe_unused]] u0 indx(bb_t& bb,
                     op_code_t opcode,
                     s32 offset,
                     reg_t base,
@@ -331,15 +331,23 @@ namespace basecode::scm {
                 array::append(bb.entries, buf);
             }
 
+            reg_t* find_bind(bb_t& bb, obj_t* obj) {
+                return hashtab::find(bb.emitter->regtab, u64(obj));
+            }
+
             u0 apply_label(bb_t& bb, label_t label) {
                 bb.label = label;
-                hashtab::insert(bb.emitter->labels, label, &bb);
+                hashtab::insert(bb.emitter->labtab, label, &bb);
             }
 
             bb_t& make_succ(bb_t& bb, bb_type_t type) {
                 auto& new_bb = emitter::make_basic_block(*bb.emitter, type);
                 succ(bb, new_bb);
                 return new_bb;
+            }
+
+            u0 set_bind(bb_t& bb, reg_t reg, obj_t* obj) {
+                hashtab::insert(bb.emitter->regtab, u64(obj), reg);
             }
 
             u0 reg1(bb_t& bb, op_code_t opcode, reg_t arg) {
@@ -420,16 +428,18 @@ namespace basecode::scm {
                 for (auto bb : e.blocks)
                     basic_block::free(*bb);
                 stable_array::free(e.blocks);
-                str_array::free(e.strings);
-                hashtab::free(e.labels);
+                hashtab::free(e.regtab);
+                hashtab::free(e.labtab);
+                str_array::free(e.strtab);
             }
 
             u0 reset(emitter_t& e) {
                 for (auto bb : e.blocks)
                     basic_block::free(*bb);
                 stable_array::reset(e.blocks);
-                str_array::reset(e.strings);
-                hashtab::reset(e.labels);
+                hashtab::reset(e.regtab);
+                hashtab::reset(e.labtab);
+                str_array::reset(e.strtab);
                 reg_alloc::reset(e.gp);
             }
 
@@ -489,7 +499,7 @@ namespace basecode::scm {
                         format::format_to(buf,
                                           "${:08X}: ; {}\n",
                                           addr,
-                                          e.strings[str_id - 1]);
+                                          e.strtab[str_id - 1]);
                     }
                     format::format_to(buf,
                                       "${:08X}: bb_{}:\n",
@@ -499,7 +509,7 @@ namespace basecode::scm {
                         format::format_to(buf,
                                           "${:08X}: {}:\n",
                                           addr,
-                                          e.strings[curr->label - 1]);
+                                          e.strtab[curr->label - 1]);
                     }
                     if (curr->prev) {
                         format::format_to(buf,
@@ -523,7 +533,7 @@ namespace basecode::scm {
                             format_comments(buf,
                                             buf.size() - start_pos,
                                             hashtab::find(curr->comments, i + 1),
-                                            e.strings,
+                                            e.strtab,
                                             addr);
                         }
                     } else {
@@ -630,7 +640,7 @@ namespace basecode::scm {
                             format_comments(buf,
                                             buf.size() - start_pos,
                                             hashtab::find(curr->comments, i + 1),
-                                            e.strings,
+                                            e.strtab,
                                             addr);
                             addr += sizeof(instruction_t);
                         }
@@ -682,7 +692,7 @@ namespace basecode::scm {
                                                     break;
                                                 }
                                                 case imm_type_t::label: {
-                                                    auto target_block = hashtab::find(e.labels, operands->imm.src);
+                                                    auto target_block = hashtab::find(e.labtab, operands->imm.src);
                                                     if (!target_block)
                                                         return status_t::unresolved_label;
                                                     operands->imm.src = s32(target_block->addr - addr);
@@ -720,13 +730,14 @@ namespace basecode::scm {
                 return bb;
             }
 
-            u0 init(emitter_t& e, vm_t* vm, u64 address, alloc_t* alloc) {
-                e.alloc   = alloc;
-                e.vm      = vm;
-                e.address = address;
+            u0 init(emitter_t& e, vm_t* vm, u64 addr, alloc_t* alloc) {
+                e.vm    = vm;
+                e.addr  = addr;
+                e.alloc = alloc;
+                hashtab::init(e.labtab, e.alloc);
+                hashtab::init(e.regtab, e.alloc);
+                str_array::init(e.strtab, e.alloc);
                 stable_array::init(e.blocks, e.alloc);
-                str_array::init(e.strings, e.alloc);
-                hashtab::init(e.labels, e.alloc);
                 reg_alloc::init(e.gp, register_file::r0, register_file::r15);
             }
         }
@@ -936,56 +947,6 @@ namespace basecode::scm {
                                       emitter::imm(size * 8));
                 free_stack(list_bb, size);
                 return list_bb;
-            }
-        }
-
-        namespace reg_alloc {
-            u0 reset(reg_alloc_t& alloc) {
-                alloc.slots = {};
-                alloc.prots = {};
-            }
-
-            reg_result_t reserve(reg_alloc_t& alloc, u32 count) {
-                reg_result_t r(alloc);
-                for (u32 i = 0; i < count; ++i) {
-                    u32 msb_zeros = alloc.slots != 0 ? __builtin_clzll(alloc.slots) : 64;
-                    if (!msb_zeros)
-                        return r;
-                    u32 idx = 64 - msb_zeros;
-                    alloc.slots |= (1UL << idx);
-                    r[r.count++] = alloc.start + idx;
-                }
-                return r;
-            }
-
-            b8 is_protected(reg_alloc_t& alloc, reg_t reg) {
-                const auto mask = 1UL << reg;
-                return (alloc.prots & mask) == mask;
-            }
-
-            u0 protect(reg_alloc_t& alloc, reg_t reg, b8 flag) {
-                if (flag) {
-                    alloc.prots |= (1UL << reg);
-                } else {
-                    alloc.prots &= ~(1UL << reg);
-                }
-            }
-
-            u0 init(reg_alloc_t& alloc, reg_t start, reg_t end) {
-                alloc.end   = end;
-                alloc.start = start;
-                alloc.slots = alloc.prots = {};
-            }
-
-            u0 release(reg_alloc_t& alloc, const reg_result_t& result) {
-                for (u32 i = 0; i < result.count; ++i) {
-                    const u32 idx = result[i] - alloc.start;
-                    if (!(alloc.slots & (1UL << idx)))
-                        continue;
-                    const auto mask = ~(1UL << idx);
-                    alloc.slots &= mask;
-                    alloc.prots &= mask;
-                }
             }
         }
     }
