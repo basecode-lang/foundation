@@ -413,13 +413,21 @@ namespace basecode::scm {
         namespace bytecode {
             bb_t& leave(bb_t& bb);
 
+            u0 save_protected(bb_t& bb);
+
+            u0 restore_protected(bb_t& bb);
+
             bb_t& enter(bb_t& bb, u32 locals);
 
             u0 free_stack(bb_t& bb, u32 words);
 
+            u0 lnot(bb_t& bb, reg_t target_reg);
+
             u0 get(bb_t& bb, u32 idx, reg_t reg);
 
             u0 set(bb_t& bb, u32 idx, reg_t reg);
+
+            u0 get(bb_t& bb, reg_t sym, reg_t reg);
 
             u0 set(bb_t& bb, reg_t sym, reg_t val);
 
@@ -435,7 +443,7 @@ namespace basecode::scm {
 
             u0 cdr(bb_t& bb, reg_t val_reg, reg_t target_reg);
 
-            u0 not_(bb_t& bb, reg_t val_reg, reg_t target_reg);
+            u0 lnot(bb_t& bb, reg_t val_reg, reg_t target_reg);
 
             u0 alloc_stack(bb_t& bb, u32 words, reg_t base_reg);
 

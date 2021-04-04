@@ -25,8 +25,15 @@ namespace basecode {
         struct ctx_t;
         struct obj_t;
 
+        enum class context_kind_t : u8 {
+            none,
+            proc,
+            prim,
+        };
+
         struct context_t final {
             bb_t*               bb;
+            bb_t*               entry_point;
             ctx_t*              ctx;
             obj_t*              obj;
             obj_t*              env;
@@ -34,7 +41,6 @@ namespace basecode {
                 struct {
                     obj_t*      body;
                     obj_t*      params;
-                    obj_t*      new_env;
                 }               proc;
                 struct {
                     obj_t*      form;
@@ -43,6 +49,7 @@ namespace basecode {
             }                   kind;
             label_t             label;
             reg_t               target;
+            context_kind_t      type;
             b8                  top_level;
         };
 
@@ -55,12 +62,14 @@ namespace basecode {
 
         bb_t& compile(const context_t& c);
 
-        namespace prim {
+        namespace proc {
+            bb_t& apply(const context_t& c);
+
             bb_t& compile(const context_t& c);
         }
 
-        namespace proc {
-            bb_t& compile(const context_t& c, u32& bb_id);
+        namespace prim {
+            bb_t& compile(const context_t& c);
         }
     }
 }

@@ -156,6 +156,7 @@ namespace basecode::scm {
         constexpr u8 op_truep_reg1      = 120;
         constexpr u8 op_falsep_reg1     = 121;
         constexpr u8 op_lcmp_reg2       = 122;
+        constexpr u8 op_lnot_reg1       = 123;
         constexpr u8 op_error           = 255;
 
         static u8 s_op_decode[][2][9] = {
@@ -421,7 +422,7 @@ namespace basecode::scm {
                 {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::lnot] = {
-                {op_error,      op_error,       op_error,       op_lnot_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_error,       op_lnot_reg1,   op_lnot_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
                 {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::pairp] = {
@@ -492,7 +493,7 @@ namespace basecode::scm {
 #define EXEC_NEXT()             SAFE_SCOPE(                                         \
     if (cycles > 0)     --cycles;                                                   \
     if (cycles == 0)    return status;                                              \
-    env   = (obj_t*) G(register_file::ep);                                          \
+    env   = (obj_t*) H(G(register_file::ep));                                       \
     inst  = (instruction_t*) &H(PC);                                                \
     data  = inst->data;                                                             \
     flags = (flag_register_t*) &F;                                                  \
@@ -616,6 +617,7 @@ namespace basecode::scm {
                 [op_lmul_reg2_imm]      = &&lmul_reg2_imm,
                 [op_ldiv_reg2_imm]      = &&ldiv_reg2_imm,
                 [op_lmod_reg2_imm]      = &&lmod_reg2_imm,
+                [op_lnot_reg1]          = &&lnot_reg1,
                 [op_lnot_reg2]          = &&lnot_reg2,
                 [op_pairp_reg2]         = &&pairp_reg2,
                 [op_listp_reg2]         = &&listp_reg2,
@@ -1273,8 +1275,8 @@ namespace basecode::scm {
             }
             env_reg2:
             {
-                G(opers->reg2.dest) = u64(make_environment(ctx,
-                                                     (obj_t*) G(opers->reg2.src)));
+                auto curr_env = (obj_t*) H(G(opers->reg2.src));
+                G(opers->reg2.dest) = u64(make_environment(ctx, curr_env));
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }
@@ -1471,6 +1473,18 @@ namespace basecode::scm {
                     (obj_t*) G(opers->reg2.dest),
                     (obj_t*) G(opers->reg2.src),
                     env);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            lnot_reg1:
+            {
+                auto v = (obj_t*) G(opers->reg1.dest);
+                flags->c = false;
+                flags->z = !IS_TRUE(v);
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->reg1.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }

@@ -1027,35 +1027,37 @@ namespace basecode::scm {
                     break;
 
                 case obj_type_t::func: {
-                    auto proc = (proc_t*) NATIVE_PTR(CDR(fn));
                     arg = eval_list(ctx, arg, env);
-                    args_to_env(ctx, proc->params, arg, proc->env_obj);
+                    auto proc = (proc_t*) NATIVE_PTR(CDR(fn));
+                    auto apply_env = make_environment(ctx, env);
+                    args_to_env(ctx, proc->params, arg, apply_env);
                     arg = proc->params;
                     u32 save = save_gc(ctx);
                     for (; !IS_NIL(CDR(arg)); arg = CDR(arg)) {
                         restore_gc(ctx, save);
                         push_gc(ctx, arg);
-                        eval(ctx, CAR(arg), proc->env_obj);
+                        eval(ctx, CAR(arg), apply_env);
                     }
                     obj = CAR(arg);
-                    res = eval(ctx, CAR(arg), proc->env_obj);
+                    res = eval(ctx, CAR(arg), apply_env);
                     break;
                 }
 
                 case obj_type_t::macro: {
                     auto proc = (proc_t*) NATIVE_PTR(CDR(fn));
+                    auto apply_env = make_environment(ctx, env);
                     obj_t* expr{};
-                    args_to_env(ctx, proc->params, arg, proc->env_obj);
+                    args_to_env(ctx, proc->params, arg, apply_env);
                     arg = proc->params;
                     u32 save = save_gc(ctx);
                     while (!IS_NIL(arg)) {
                         restore_gc(ctx, save);
                         push_gc(ctx, arg);
-                        expr = eval(ctx, next_arg(ctx, &arg), proc->env_obj);
+                        expr = eval(ctx, next_arg(ctx, &arg), apply_env);
                     }
                     *obj = *expr;
                     ctx->call_list = CDR(cl);
-                    res = eval(ctx, obj, env);
+                    res = eval(ctx, obj, apply_env);
                     break;
                 }
 
@@ -1534,24 +1536,13 @@ namespace basecode::scm {
     }
 
     obj_t* make_proc(ctx_t* ctx, obj_t* params, obj_t* body, obj_t* env, b8 macro) {
-        auto new_env = make_environment(ctx, env);
-        auto lst     = params;
-        while (!IS_NIL(lst)) {
-            if (TYPE(lst) != obj_type_t::pair) {
-                set(ctx, lst, ctx->false_, new_env);
-                break;
-            }
-            set(ctx, CAR(lst), ctx->false_, new_env);
-            lst = CDR(lst);
-        }
-        auto e = (env_t*) NATIVE_PTR(CDR(new_env));
         auto proc = &array::append(ctx->procedures);
-        proc->env          = e;
+        proc->e            = (env_t*) NATIVE_PTR(CDR(env));
+        proc->env          = env;
         proc->addr         = {};
         proc->body         = body;
         proc->params       = params;
         proc->is_tco       = false;
-        proc->env_obj      = new_env;
         proc->is_macro     = macro;
         proc->is_assembled = false;
         auto obj = make_object(ctx);

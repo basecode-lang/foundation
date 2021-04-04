@@ -25,11 +25,16 @@ namespace basecode::scm {
     namespace rf = register_file;
 
     static bb_t& compile_cmp_op(const context_t& c, prim_type_t type) {
-        auto ctx = c.ctx;
+        auto ctx  = c.ctx;
         auto kind = &c.kind.prim;
         auto reg  = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
-        scm::compile(make_context(*c.bb, ctx,  CAR(kind->args), c.env, reg[0]));
-        scm::compile(make_context(*c.bb, ctx, CADR(kind->args), c.env, reg[1]));
+        auto oc   = c;
+        oc.obj    = CAR(kind->args);
+        oc.target = reg[0];
+        scm::compile(oc);
+        oc.obj    = CADR(kind->args);
+        oc.target = reg[1];
+        scm::compile(oc);
 
         switch (type) {
             case prim_type_t::is:
@@ -68,14 +73,26 @@ namespace basecode::scm {
         vm::reg_alloc::protect(ctx->emitter.gp, reg[0], true);
         u32 size = length(ctx, args);
         vm::bytecode::alloc_stack(*c.bb, size, reg[0]);
-        s32 offs = 0;
+        s32  offs = 0;
+        auto ac   = c;
+        ac.target = reg[1];
         while (!IS_NIL(args)) {
-            scm::compile(make_context(*c.bb, ctx, CAR(args), c.env, reg[1]));
-            vm::basic_block::offs(*c.bb, op::store, offs, reg[1], reg[0], true);
+            ac.obj = CAR(args);
+            scm::compile(ac);
+            vm::basic_block::offs(*c.bb,
+                                  op::store,
+                                  offs,
+                                  reg[1],
+                                  reg[0],
+                                  true);
             args = CDR(args);
             offs += 8;
         }
-        return vm::bytecode::arith_op(*c.bb, op_code, reg[0], c.target, size);
+        return vm::bytecode::arith_op(*c.bb,
+                                      op_code,
+                                      reg[0],
+                                      c.target,
+                                      size);
     }
 
     bb_t& compile(const context_t& c) {
@@ -95,72 +112,14 @@ namespace basecode::scm {
                 break;
 
             case obj_type_t::symbol:
-                vm::bytecode::get(*c.bb, OBJ_IDX(c.obj), c.target);
+                vm::bytecode::get(*c.bb, (u32) OBJ_IDX(c.obj), c.target);
                 vm::basic_block::comment(*c.bb,
                                          format::format("symbol: {}",
                                                         to_string(c.ctx, c.obj)));
                 break;
 
-            case obj_type_t::pair: {
-                obj_t* sym  = CAR(c.obj);
-                obj_t* args = CDR(c.obj);
-                obj_t* form = TYPE(sym) == obj_type_t::symbol ? get(ctx, sym, c.env) : sym;
-
-                bb_t* new_bb{};
-                auto cl = cons(ctx, c.obj, ctx->call_list);
-                ctx->call_list = cl;
-
-                switch (TYPE(form)) {
-                    case obj_type_t::ffi: {
-                        vm::basic_block::none(*c.bb, op::nop);
-                        vm::basic_block::comment(*c.bb, "XXX: ffi call"_ss);
-                        break;
-                    }
-
-                    case obj_type_t::func: {
-                        for (reg_t r = rf::r0; r < rf::r15; ++r) {
-                            if (vm::reg_alloc::is_protected(c.bb->emitter->gp, r))
-                                vm::basic_block::reg1(*c.bb, op::push, r);
-                        }
-                        vm::basic_block::none(*c.bb, op::nop);
-                        vm::basic_block::comment(*c.bb,
-                                                 format::format("call: {}",
-                                                                printable_t{c.ctx, sym, true}));
-                        for (reg_t r = rf::r15; r >= rf::r0; --r) {
-                            if (vm::reg_alloc::is_protected(c.bb->emitter->gp, r))
-                                vm::basic_block::reg1(*c.bb, op::pop, r);
-                        }
-                        break;
-                    }
-
-                    case obj_type_t::prim: {
-                        auto pc = make_context(*c.bb, c.ctx, c.obj, c.env, c.target, c.top_level);
-                        pc.label          = c.label;
-                        pc.kind.prim.form = form;
-                        pc.kind.prim.args = args;
-                        new_bb = &prim::compile(pc);
-                        break;
-                    }
-
-                    case obj_type_t::macro: {
-                        vm::basic_block::none(*c.bb, op::nop);
-                        vm::basic_block::comment(*c.bb, "XXX: macro call"_ss);
-                        break;
-                    }
-
-                    case obj_type_t::cfunc: {
-                        vm::basic_block::none(*c.bb, op::nop);
-                        vm::basic_block::comment(*c.bb, "XXX: cfunc call"_ss);
-                        break;
-                    }
-
-                    default:
-                        error(ctx, "tried to call non-callable value");
-                }
-
-                ctx->call_list = CDR(cl);
-                return *new_bb;
-            }
+            case obj_type_t::pair:
+                return proc::apply(c);
 
             default:
                 break;
@@ -180,15 +139,101 @@ namespace basecode::scm {
         c.ctx       = ctx;
         c.obj       = obj;
         c.env       = env;
+        c.type      = context_kind_t::none;
         c.target    = target;
         c.top_level = top_level;
         return c;
     }
 
-    bb_t& proc::compile(const context_t& c, u32& bb_id) {
+    bb_t& proc::apply(const context_t& c) {
+        auto ctx = c.ctx;
+
+        obj_t* sym  = CAR(c.obj);
+        obj_t* args = CDR(c.obj);
+        obj_t* form = TYPE(sym) == obj_type_t::symbol ? get(ctx, sym, c.env) : sym;
+
+        bb_t* new_bb{};
+        auto cl = cons(ctx, c.obj, ctx->call_list);
+        ctx->call_list = cl;
+
+        switch (TYPE(form)) {
+            case obj_type_t::ffi: {
+                vm::basic_block::none(*c.bb, op::nop);
+                vm::basic_block::comment(*c.bb, "XXX: ffi call"_ss);
+                break;
+            }
+
+            case obj_type_t::func: {
+                auto proc = (proc_t*) NATIVE_PTR(CDR(form));
+                vm::bytecode::save_protected(*c.bb);
+                vm::basic_block::reg2(*c.bb, op::env, rf::ep, c.target);
+                vm::basic_block::reg2(*c.bb, op::push, c.target, rf::ep);
+                {
+                    auto reg = vm::reg_alloc::reserve(c.ctx->emitter.gp, 2);
+                    auto keys = proc->params;
+                    auto vals = args;
+                    auto vc   = c;
+                    vc.target = reg[1];
+                    while (!IS_NIL(keys)) {
+                        if (TYPE(keys) != obj_type_t::pair) {
+                            vm::bytecode::const_(*c.bb, OBJ_IDX(keys), reg[0]);
+                            vc.obj = vals;
+                            scm::compile(vc);
+                            vm::bytecode::set(*c.bb, reg[0], reg[1]);
+                            break;
+                        } else {
+                            vm::bytecode::const_(*c.bb, OBJ_IDX(CAR(keys)), reg[0]);
+                            vc.obj = CAR(vals);
+                            scm::compile(vc);
+                            vm::bytecode::set(*c.bb, reg[0], reg[1]);
+                            keys = CDR(keys);
+                            vals = CDR(vals);
+                        }
+                    }
+                }
+                vm::basic_block::imm1(*c.bb,
+                                      op::blr,
+                                      vm::emitter::imm(c.entry_point));
+                vm::basic_block::comment(*c.bb,
+                                         format::format("call: {}",
+                                                        printable_t{c.ctx, sym, true}));
+                vm::basic_block::reg2(*c.bb, op::pop, rf::ep, c.target);
+                vm::basic_block::comment(*c.bb, "drop apply env"_ss);
+                vm::bytecode::restore_protected(*c.bb);
+                break;
+            }
+
+            case obj_type_t::prim: {
+                auto pc = c;
+                pc.kind.prim.form = form;
+                pc.kind.prim.args = args;
+                new_bb = &prim::compile(pc);
+                break;
+            }
+
+            case obj_type_t::macro: {
+                vm::basic_block::none(*c.bb, op::nop);
+                vm::basic_block::comment(*c.bb, "XXX: macro call"_ss);
+                break;
+            }
+
+            case obj_type_t::cfunc: {
+                vm::basic_block::none(*c.bb, op::nop);
+                vm::basic_block::comment(*c.bb, "XXX: cfunc call"_ss);
+                break;
+            }
+
+            default:
+                error(ctx, "tried to call non-callable value");
+        }
+
+        ctx->call_list = CDR(cl);
+        return *new_bb;
+    }
+
+    bb_t& proc::compile(const context_t& c) {
         auto ctx = c.ctx;
         auto& proc_bb = vm::basic_block::make_succ(*c.bb);
-        bb_id = proc_bb.id;
         str_t note_str;
         if (c.label) {
             vm::basic_block::apply_label(proc_bb, c.label);
@@ -206,19 +251,18 @@ namespace basecode::scm {
         vm::basic_block::note(proc_bb, note_str);
         auto reg  = vm::reg_alloc::reserve(c.ctx->emitter.gp);
         auto body = c.kind.proc.body;
-        auto& body_bb = vm::bytecode::enter(proc_bb, 0);
-        auto body_ctx = make_context(body_bb,
-                                     c.ctx,
-                                     ctx->nil,
-                                     c.kind.proc.new_env,
-                                     reg[0]);
+        auto bc   = c;
+        bc.bb          = &vm::bytecode::enter(proc_bb, 0);
+        bc.type        = context_kind_t::none;
+        bc.kind        = {};
+        bc.target      = reg[0];
+        bc.entry_point = &proc_bb;
         while (!IS_NIL(body)) {
-            body_ctx.obj = CAR(body);
-            auto& next_bb = scm::compile(body_ctx);
-            body_ctx.bb = &next_bb;
+            bc.obj = CAR(body);
+            bc.bb  = &scm::compile(bc);
             body = CDR(body);
         }
-        return vm::bytecode::leave(*body_ctx.bb);
+        return vm::bytecode::leave(*bc.bb);
     }
 
     bb_t& prim::compile(const context_t& c) {
@@ -241,11 +285,12 @@ namespace basecode::scm {
 
             case prim_type_t::let:
             case prim_type_t::set: {
-                auto reg      = vm::reg_alloc::reserve(ctx->emitter.gp);
-                auto key      = CAR(kind->args);
-                u32  idx      = OBJ_IDX(key);
-                auto vc = make_context(*c.bb, ctx, CADR(kind->args), c.env, c.target);
-                vc.label = vm::emitter::make_label(
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+                auto key = CAR(kind->args);
+                u32  idx = OBJ_IDX(key);
+                auto vc  = c;
+                vc.obj       = CADR(kind->args);
+                vc.label     = vm::emitter::make_label(
                     ctx->emitter,
                     *string::interned::get_slice(STRING_ID(OBJ_AT(idx))));
                 auto& value_bb = scm::compile(vc);
@@ -255,15 +300,13 @@ namespace basecode::scm {
                     if (TYPE(value) == obj_type_t::func
                     ||  TYPE(value) == obj_type_t::macro) {
                         auto proc = (proc_t*) NATIVE_PTR(CDR(value));
-                        auto pc = make_context(*c.bb, c.ctx, c.obj, c.env);
-                        pc.label             = vc.label;
-                        pc.kind.proc.body    = proc->body;
-                        pc.kind.proc.params  = proc->params;
-                        pc.kind.proc.new_env = proc->env_obj;
-                        u32 bb_id;
-                        auto& next_bb = proc::compile(pc, bb_id);
-                        proc->addr = bb_id;
-                        return next_bb;
+                        auto pc   = c;
+                        pc.type             = context_kind_t::proc;
+                        pc.label            = vc.label;
+                        pc.top_level        = false;
+                        pc.kind.proc.body   = proc->body;
+                        pc.kind.proc.params = proc->params;
+                        return proc::compile(pc);
                     }
                 } else {
                     vm::bytecode::const_(*c.bb, idx, reg[0]);
@@ -285,11 +328,13 @@ namespace basecode::scm {
                                         is_mac);
                 auto idx    = OBJ_IDX(proc);
                 G(c.target) = idx;
-                vm::bytecode::const_(*c.bb, idx, c.target);
+                if (!c.top_level)
+                    vm::bytecode::const_(*c.bb, idx, c.target);
                 break;
             }
 
             case prim_type_t::if_: {
+                auto ic  = c;
                 auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
 
                 auto& exit_bb = vm::emitter::make_basic_block(ctx->emitter);
@@ -297,17 +342,25 @@ namespace basecode::scm {
 
                 auto& false_bb = vm::emitter::make_basic_block(ctx->emitter);
 
-                scm::compile(make_context(*c.bb, ctx, CAR(kind->args), c.env, reg[0]));
+                ic.obj    = CAR(kind->args);
+                ic.target = reg[0];
+                scm::compile(ic);
                 vm::basic_block::reg1(*c.bb, op::truep, reg[0]);
                 vm::basic_block::imm1(*c.bb, op::bne, vm::emitter::imm(&false_bb));
 
                 auto& true_bb = vm::emitter::make_basic_block(ctx->emitter);
                 vm::basic_block::succ(*c.bb, true_bb);
-                auto& true2_bb = scm::compile(make_context(true_bb, ctx, CADR(kind->args), c.env, c.target));
+                ic.bb     = &true_bb;
+                ic.obj    = CADR(kind->args);
+                ic.target = c.target;
+                auto& true2_bb = scm::compile(ic);
                 vm::basic_block::imm1(true2_bb, op::bra, vm::emitter::imm(&exit_bb));
                 vm::basic_block::succ(true2_bb, false_bb);
 
-                auto& false2_bb = scm::compile(make_context(false_bb, ctx, CADDR(kind->args), c.env, c.target));
+                ic.bb     = &false_bb;
+                ic.obj    = CADDR(kind->args);
+                ic.target = c.target;
+                auto& false2_bb = scm::compile(ic);
                 vm::basic_block::succ(false2_bb, exit_bb);
 
                 return exit_bb;
@@ -317,11 +370,10 @@ namespace basecode::scm {
                 auto args = kind->args;
                 if (IS_NIL(args))
                     break;
-                auto dc = make_context(*c.bb, ctx, ctx->nil, c.env, c.target);
+                auto dc = c;
                 while (!IS_NIL(args)) {
                     dc.obj = CAR(args);
-                    auto& next_bb = scm::compile(dc);
-                    dc.bb = &next_bb;
+                    dc.bb  = &scm::compile(dc);
                     args = CDR(args);
                 }
                 return *dc.bb;
@@ -335,43 +387,62 @@ namespace basecode::scm {
 
             case prim_type_t::not_: {
                 auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
-                scm::compile(make_context(*c.bb, ctx, CAR(kind->args), c.env, reg[0]));
-                vm::bytecode::not_(*c.bb, reg[0], c.target);
+                auto nc  = c;
+                nc.obj = CAR(kind->args);
+                scm::compile(nc);
+                vm::bytecode::lnot(*c.bb, c.target);
                 break;
             }
 
             case prim_type_t::car: {
                 auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
-                scm::compile(make_context(*c.bb, ctx, CAR(kind->args), c.env, reg[0]));
+                auto cc  = c;
+                cc.obj    = CAR(kind->args);
+                cc.target = reg[0];
+                scm::compile(cc);
                 vm::bytecode::car(*c.bb, reg[0], c.target);
                 break;
             }
 
             case prim_type_t::cdr: {
                 auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
-                scm::compile(make_context(*c.bb, ctx, CAR(kind->args), c.env, reg[0]));
+                auto cc  = c;
+                cc.obj    = CAR(kind->args);
+                cc.target = reg[0];
+                scm::compile(cc);
                 vm::bytecode::cdr(*c.bb, reg[0], c.target);
                 break;
             }
 
             case prim_type_t::cons: {
                 auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
-                scm::compile(make_context(*c.bb, ctx, CAR(kind->args), c.env, reg[0]));
-                scm::compile(make_context(*c.bb, ctx, CADR(kind->args),c.env, reg[1]));
+                auto cc  = c;
+                cc.obj    = CAR(kind->args);
+                cc.target = reg[0];
+                scm::compile(cc);
+                cc.obj    = CADR(kind->args);
+                cc.target = reg[1];
+                scm::compile(cc);
                 vm::bytecode::cons(*c.bb, reg[0], reg[1], c.target);
                 break;
             }
 
             case prim_type_t::atom: {
-                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
-                scm::compile(make_context(*c.bb, ctx, CAR(kind->args), c.env, reg[0]));
-                vm::basic_block::reg2(*c.bb, op::atomp, reg[0], reg[1]);
+                auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+                auto ac  = c;
+                ac.obj    = CAR(kind->args);
+                ac.target = reg[0];
+                scm::compile(ac);
+                vm::basic_block::reg2(*c.bb, op::atomp, reg[0], c.target);
                 break;
             }
 
             case prim_type_t::eval: {
                 auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
-                scm::compile(make_context(*c.bb, ctx, CAR(kind->args), c.env, reg[0]));
+                auto ec  = c;
+                ec.obj    = CAR(kind->args);
+                ec.target = reg[0];
+                scm::compile(ec);
                 vm::basic_block::reg2(*c.bb, op::eval, reg[0], c.target);
                 break;
             }
@@ -381,14 +452,26 @@ namespace basecode::scm {
                 auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
                 u32 size = length(ctx, args);
                 vm::bytecode::alloc_stack(*c.bb, size, reg[0]);
-                s32 offs = 0;
+                s32  offs = 0;
+                auto lc   = c;
+                lc.target = reg[1];
                 while (!IS_NIL(args)) {
-                    scm::compile(make_context(*c.bb, ctx, CAR(args), c.env, reg[1]));
-                    vm::basic_block::offs(*c.bb, op::store, offs, reg[1], reg[0], true);
+                    lc.obj = CAR(args);
+                    lc.bb  = &scm::compile(lc);
+                    vm::basic_block::offs(*c.bb,
+                                          op::store,
+                                          offs,
+                                          reg[1],
+                                          reg[0],
+                                          true);
                     args = CDR(args);
                     offs += 8;
                 }
-                return vm::bytecode::list(*c.bb, c.target, reg[0], c.target, size);
+                return vm::bytecode::list(*lc.bb,
+                                          c.target,
+                                          reg[0],
+                                          c.target,
+                                          size);
             }
 
             case prim_type_t::while_: {
@@ -397,22 +480,36 @@ namespace basecode::scm {
 
             case prim_type_t::setcar: {
                 auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
-                scm::compile(make_context(*c.bb, ctx, CAR(kind->args), c.env, reg[0]));
-                scm::compile(make_context(*c.bb, ctx, CADR(kind->args), c.env, c.target));
+                auto sc  = c;
+                sc.obj    = CADR(kind->args);
+                sc.target = reg[0];
+                scm::compile(sc);
+                sc.obj    = CAR(kind->args);
+                sc.target = c.target;
+                scm::compile(sc);
                 vm::bytecode::setcar(*c.bb, reg[0], c.target);
                 break;
             }
 
             case prim_type_t::setcdr: {
                 auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
-                scm::compile(make_context(*c.bb, ctx,  CAR(kind->args), c.env,reg[0]));
-                scm::compile(make_context(*c.bb, ctx, CADR(kind->args), c.env, c.target));
+                auto sc  = c;
+                sc.obj    = CADR(kind->args);
+                sc.target = reg[0];
+                scm::compile(sc);
+                sc.obj    = CAR(kind->args);
+                sc.target = c.target;
+                scm::compile(sc);
                 vm::bytecode::setcdr(*c.bb, reg[0], c.target);
                 break;
             }
 
             case prim_type_t::error:
                 vm::bytecode::error(*c.bb, OBJ_IDX(kind->args), c.target);
+                vm::basic_block::comment(*c.bb,
+                                         format::format("literal: {}",
+                                                        to_string(c.ctx, kind->args)),
+                                         c.bb->entries.size - 1);
                 break;
 
             case prim_type_t::print:

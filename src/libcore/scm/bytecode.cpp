@@ -674,6 +674,20 @@ namespace basecode::scm {
                 return entry_block;
             }
 
+            u0 save_protected(bb_t& bb) {
+                for (reg_t r = rf::r0; r < rf::r15; ++r) {
+                    if (vm::reg_alloc::is_protected(bb.emitter->gp, r))
+                        vm::basic_block::reg2(bb, op::push, r, rf::sp);
+                }
+            }
+
+            u0 restore_protected(bb_t& bb) {
+                for (reg_t r = rf::r15; r >= rf::r0; --r) {
+                    if (vm::reg_alloc::is_protected(bb.emitter->gp, r))
+                        vm::basic_block::reg2(bb, op::pop, rf::sp, r);
+                }
+            }
+
             bb_t& enter(bb_t& bb, u32 locals) {
                 auto& entry_block =  emitter::make_basic_block(*bb.emitter);
                 basic_block::succ(bb, entry_block);
@@ -695,6 +709,10 @@ namespace basecode::scm {
                 basic_block::imm2(bb, op::add, vm::emitter::imm(words * 8), rf::sp);
             }
 
+            u0 lnot(bb_t& bb, reg_t target_reg) {
+                basic_block::reg1(bb, op::lnot, target_reg);
+            }
+
             u0 set(bb_t& bb, u32 idx, reg_t reg) {
                 basic_block::imm2(bb, op::set, vm::emitter::imm(idx), reg);
             }
@@ -703,8 +721,12 @@ namespace basecode::scm {
                 basic_block::imm2(bb, op::get, vm::emitter::imm(idx), reg);
             }
 
+            u0 get(bb_t& bb, reg_t sym, reg_t reg) {
+                basic_block::reg2(bb, op::get, sym, reg);
+            }
+
             u0 set(bb_t& bb, reg_t sym, reg_t val) {
-                basic_block::reg2(bb, op::set, sym, val);
+                basic_block::reg2(bb, op::set, val, sym);
             }
 
             u0 const_(bb_t& bb, u32 idx, reg_t reg) {
@@ -737,7 +759,7 @@ namespace basecode::scm {
                 basic_block::reg2(bb, op::cdr, val_reg, target_reg);
             }
 
-            u0 not_(bb_t& bb, reg_t val_reg, reg_t target_reg) {
+            u0 lnot(bb_t& bb, reg_t val_reg, reg_t target_reg) {
                 basic_block::reg2(bb, op::lnot, val_reg, target_reg);
             }
 

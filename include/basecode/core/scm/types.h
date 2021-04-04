@@ -127,10 +127,10 @@ namespace basecode::scm {
     };
 
     struct proc_t final {
-        env_t*                  env;
+        env_t*                  e;
+        obj_t*                  env;
         obj_t*                  body;
         obj_t*                  params;
-        obj_t*                  env_obj;
         u64                     addr;
         u8                      is_tco:         1;
         u8                      is_macro:       1;
