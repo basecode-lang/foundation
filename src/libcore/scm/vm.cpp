@@ -461,8 +461,8 @@ namespace basecode::scm {
         }
 
         u0 reset(vm_t& vm) {
-            u64 top = heap_top(vm);
-            u64 addr     = 0;
+            std::memset(vm.memory_map.reg_to_entry, -1, sizeof(s32) * 32);
+            u64 addr = 0;
             for (u32 i = 0; i < max_memory_areas; ++i) {
                 auto& area = vm.memory_map.entries[i];
                 if (!area.valid)
@@ -474,16 +474,14 @@ namespace basecode::scm {
                 } else {
                     area.addr = addr > 0 ? addr - 1 : addr;
                 }
-                vm.heap[top - area.reg] = area.addr;
+                G(area.reg) = area.addr;
+                vm.memory_map.reg_to_entry[area.reg] = i;
                 addr = end_addr;
             }
 
             M  = 0;
             LR = 0;
             PC = LP;
-
-            auto code_area = &vm.memory_map.entries[u32(memory_area_t::code)];
-            SP             = (code_area->addr + code_area->size) - vm.memory_map.code_stack_size;
         }
 
         u32 heap_top(vm_t& vm) {
@@ -1821,6 +1819,15 @@ namespace basecode::scm {
             }
         }
 
+        status_t init(vm_t& vm, alloc_t* alloc, u32 heap_size) {
+            vm.alloc                = alloc;
+            vm.heap                 = (u64*) memory::alloc(vm.alloc, heap_size, alignof(u64));
+            vm.memory_map           = {};
+            vm.memory_map.heap_size = heap_size / sizeof(u64);
+            hashtab::init(vm.traps, vm.alloc);
+            return status_t::ok;
+        }
+
         u0 memory_map(vm_t& vm, memory_area_t area, u8 reg, u32 size, b8 top) {
             auto entry = &vm.memory_map.entries[u32(area)];
             entry->offs  = 0;
@@ -1831,24 +1838,10 @@ namespace basecode::scm {
         }
 
         const memory_map_entry_t* find_memory_map_entry(const vm_t& vm, u8 reg) {
-            for (u32 i = 0; i < max_memory_areas; ++i) {
-                const auto& entry = vm.memory_map.entries[i];
-                if (!entry.valid)
-                    continue;
-                if (entry.reg == reg)
-                    return &entry;
-            }
-            return nullptr;
-        }
-
-        status_t init(vm_t& vm, alloc_t* alloc, u32 heap_size, u32 code_stack_size) {
-            vm.alloc      = alloc;
-            vm.heap       = (u64*) memory::alloc(vm.alloc, heap_size, alignof(u64));
-            vm.memory_map = {};
-            vm.memory_map.heap_size       = heap_size / sizeof(u64);
-            vm.memory_map.code_stack_size = code_stack_size / sizeof(u64);
-            hashtab::init(vm.traps, vm.alloc);
-            return status_t::ok;
+            s32 idx = vm.memory_map.reg_to_entry[reg];
+            if (idx == -1)
+                return nullptr;
+            return &vm.memory_map.entries[idx];
         }
     }
 }

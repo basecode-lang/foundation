@@ -24,6 +24,8 @@ namespace basecode {
     namespace scm {
         struct ctx_t;
         struct obj_t;
+        struct env_t;
+        struct proc_t;
 
         enum class context_kind_t : u8 {
             none,
@@ -33,15 +35,11 @@ namespace basecode {
 
         struct context_t final {
             bb_t*               bb;
-            bb_t*               entry_point;
             ctx_t*              ctx;
             obj_t*              obj;
             obj_t*              env;
             union {
-                struct {
-                    obj_t*      body;
-                    obj_t*      params;
-                }               proc;
+                proc_t*         proc;
                 struct {
                     obj_t*      form;
                     obj_t*      args;

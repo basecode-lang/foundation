@@ -463,7 +463,7 @@ namespace basecode::scm {
 
             u0 cons(bb_t& bb, reg_t car, reg_t cdr, reg_t target_reg);
 
-            bb_t& list(bb_t& bb, reg_t lst_reg, reg_t base_reg, reg_t target_reg, u32 size);
+            bb_t& list(bb_t& bb, reg_t base_reg, reg_t target_reg, u32 size);
 
             bb_t& arith_op(bb_t& bb, op_code_t op_code, reg_t base_reg, reg_t target_reg, u32 size);
         }

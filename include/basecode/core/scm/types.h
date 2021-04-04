@@ -131,9 +131,13 @@ namespace basecode::scm {
         obj_t*                  env;
         obj_t*                  body;
         obj_t*                  params;
-        u64                     addr;
+        union {
+            bb_t*               bb;
+            u64                 absolute;
+        }                       addr;
         u8                      is_tco:         1;
         u8                      is_macro:       1;
+        u8                      is_compiled:    1;
         u8                      is_assembled:   1;
         u8                      pad:            5;
     };

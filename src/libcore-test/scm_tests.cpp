@@ -20,7 +20,7 @@
 #include <basecode/core/buf.h>
 #include <basecode/core/string.h>
 #include <basecode/core/scm/scm.h>
-#include <basecode/core/stopwatch.h>
+#include <basecode/core/scm/types.h>
 
 using namespace basecode;
 
@@ -29,9 +29,24 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
     auto alloc = memory::system::default_alloc();
 
     auto ctx = (scm::ctx_t*) memory::alloc(alloc, heap_size);
-    scm::init(ctx, heap_size, alloc);
+    auto& vm = ctx->vm;
 
-    scm::obj_t* obj{};
+    scm::init(ctx, heap_size, alloc);
+    format::print("Address            Offset             Size    Reg Value              Top\n");
+    format::print("-----------------------------------------------------------------------------\n");
+    for (const auto& entry : vm.memory_map.entries) {
+        if (!entry.valid)
+            continue;
+        format::print("0x{:016X} 0x{:016X} 0x{:05X}",
+                      entry.addr,
+                      entry.offs,
+                      entry.size);
+        format::print(" {:<2}  0x{:016X} {}\n",
+                      scm::register_file::name(entry.reg),
+                      G(entry.reg),
+                      entry.top ? "  X" : "");
+    }
+    format::print("\n");
 
     const auto source = R"(
 (= length (fn (ls)
@@ -40,6 +55,10 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
         (if (not (atom ls))
             (+ 1 (length (cdr ls)))
             (error "invalid argument to length")))))
+
+(do
+    (let nums (list 1 2 3 4 5 6))
+    (length nums))
 )"_ss;
 
     buf_t buf{};
@@ -54,12 +73,11 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
         buf::free(buf);
         scm::free(ctx);
         memory::free(alloc, ctx));
-    auto expr = scm::read(ctx, crsr);
-    if (!expr) {
-        obj = scm::nil(ctx);
-    } else {
-        format::print("expr: {}\n", scm::printable_t{ctx, expr, true});
-        obj = scm::eval2(ctx, expr);
+    while (true) {
+        auto expr = scm::read(ctx, crsr);
+        if (!expr)
+            break;
+        auto obj = scm::eval2(ctx, expr);
         format::print("obj:  {}\n", scm::printable_t{ctx, obj, true});
     }
 }

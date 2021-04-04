@@ -29,6 +29,7 @@ namespace basecode::scm {
         code,
         heap,
         env_stack,
+        code_stack,
         data_stack,
     };
 
@@ -45,7 +46,7 @@ namespace basecode::scm {
 
     struct memory_map_t final {
         u32                     heap_size;
-        u32                     code_stack_size;
+        s32                     reg_to_entry[32];
         memory_map_entry_t      entries[max_memory_areas];
     };
 
@@ -94,8 +95,7 @@ namespace basecode::scm {
 
         status_t init(vm_t& vm,
                       alloc_t* alloc = context::top()->alloc,
-                      u32 heap_size = 8 * 1024 * 1024,
-                      u32 code_stack_size = 2048);
+                      u32 heap_size = 8 * 1024 * 1024);
 
         status_t step(vm_t& vm, ctx_t* ctx, s32 cycles = -1);
 

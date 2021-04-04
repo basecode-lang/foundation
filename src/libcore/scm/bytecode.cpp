@@ -810,18 +810,17 @@ namespace basecode::scm {
                 vm::basic_block::reg3(bb, op::cons, car, cdr, target_reg);
             }
 
+            bb_t& list(bb_t& bb, reg_t base_reg, reg_t target_reg, u32 size) {
+                auto reg = reg_alloc::reserve(bb.emitter->gp);
+                auto& list_bb = basic_block::make_succ(bb);
+                basic_block::reg2_imm(list_bb, op::list, base_reg, target_reg, emitter::imm(size * 8));
+                free_stack(list_bb, size);
+                return list_bb;
+            }
+
             bb_t& if_(bb_t& bb, bb_t& pred_block, bb_t& true_bb, bb_t& false_bb) {
                 auto& exit_bb = emitter::make_basic_block(*bb.emitter);
                 return exit_bb;
-            }
-
-            bb_t& list(bb_t& bb, reg_t lst_reg, reg_t base_reg, reg_t target_reg, u32 size) {
-                auto reg = reg_alloc::reserve(bb.emitter->gp);
-                auto& list_bb = basic_block::make_succ(bb);
-                basic_block::reg2_imm(list_bb, op::list, target_reg, base_reg, emitter::imm(size * 8));
-                basic_block::offs(list_bb, op::load, 0, base_reg, lst_reg);
-                free_stack(list_bb, size);
-                return list_bb;
             }
 
             bb_t& arith_op(bb_t& bb, op_code_t op_code, reg_t base_reg, reg_t target_reg, u32 size) {

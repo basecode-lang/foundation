@@ -40,23 +40,6 @@
 //
 // ----------------------------------------------------------------------------
 
-//    format::print("Address            Offset             Size    Reg Value              Top\n");
-//    format::print("-----------------------------------------------------------------------------\n");
-//    for (const auto& entry : vm.memory_map.entries) {
-//        if (!entry.valid)
-//            continue;
-//        format::print("0x{:016X} 0x{:016X} 0x{:05X}",
-//                      entry.addr,
-//                      entry.offs,
-//                      entry.size);
-//        format::print(" {:<2}  0x{:016X} {}\n",
-//                      scm::register_file::name(entry.reg),
-//                      G(entry.reg),
-//                      entry.top ? "  X" : "");
-//    }
-//    format::print("\n");
-//
-
 #include <basecode/core/scm/scm.h>
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/scm/types.h>
@@ -340,15 +323,16 @@ namespace basecode::scm {
     }
 
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
+        vm::emitter::reset(ctx->emitter);
         auto& bb = vm::emitter::make_basic_block(ctx->emitter);
         auto reg = vm::reg_alloc::reserve(ctx->emitter.gp);
+        vm::reg_alloc::protect(ctx->emitter.gp, reg[0], true);
         TIME_BLOCK(
             "compile expr"_ss,
             auto tc = make_context(bb, ctx, obj, ctx->env, reg[0], true);
             auto& comp_bb = scm::compile(tc);
-            UNUSED(comp_bb);
             vm::basic_block::imm1(
-                bb,
+                comp_bb,
                 instruction::type::exit,
                 vm::emitter::imm(1, imm_type_t::boolean));
             );
@@ -505,10 +489,12 @@ namespace basecode::scm {
         auto& vm = ctx->vm;
         ctx->alloc = alloc;
         vm::init(vm, ctx->alloc, size);
-        vm::memory_map(vm, scm::memory_area_t::code, scm::register_file::lp, 256 * 1024);
-        vm::memory_map(vm, scm::memory_area_t::heap, scm::register_file::hp, 64 * 1024);
-        vm::memory_map(vm, scm::memory_area_t::env_stack, scm::register_file::ep, 4 * 1024, true);
-        vm::memory_map(vm, scm::memory_area_t::data_stack, scm::register_file::dp, 4 * 1024, true);
+        const auto half_heap = size / 2;
+        vm::memory_map(vm, scm::memory_area_t::code, scm::register_file::lp, half_heap / 2);
+        vm::memory_map(vm, scm::memory_area_t::code_stack, scm::register_file::sp,half_heap / 3, true);
+        vm::memory_map(vm, scm::memory_area_t::heap, scm::register_file::hp, half_heap / 2);
+        vm::memory_map(vm, scm::memory_area_t::data_stack, scm::register_file::dp, half_heap / 3, true);
+        vm::memory_map(vm, scm::memory_area_t::env_stack, scm::register_file::ep, half_heap / 3, true);
         vm::reset(vm);
         vm::emitter::init(ctx->emitter, &vm, LP, ctx->alloc);
         array::init(ctx->native_ptrs, ctx->alloc);
@@ -1544,6 +1530,7 @@ namespace basecode::scm {
         proc->params       = params;
         proc->is_tco       = false;
         proc->is_macro     = macro;
+        proc->is_compiled  = false;
         proc->is_assembled = false;
         auto obj = make_object(ctx);
         SET_TYPE(obj, macro ? obj_type_t::macro : obj_type_t::func);
