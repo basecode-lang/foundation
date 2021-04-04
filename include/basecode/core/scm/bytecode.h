@@ -22,8 +22,8 @@
 #include <basecode/core/str_array.h>
 #include <basecode/core/stable_array.h>
 
-#define H(a)                    (vm.heap[(a / 8)])
-#define G(n)                    (vm.heap[(vm.memory_map.heap_size - 1) - (n)])
+#define H(a)                    (vm[(a)])
+#define G(n)                    (vm[(vm.memory_map.heap_size - 1) - (n)])
 #define M                       G(basecode::scm::register_file::m)
 #define F                       G(basecode::scm::register_file::f)
 #define PC                      G(basecode::scm::register_file::pc)
@@ -168,7 +168,8 @@ namespace basecode::scm {
             u64                 dest:       8;
             u64                 type:       4;
             u64                 size:       3;
-            u64                 aux:        4;
+            u64                 mode:       1;
+            u64                 aux:        3;
         }                       imm;
         struct {
             u64                 dest:       8;
@@ -305,6 +306,47 @@ namespace basecode::scm {
         namespace basic_block {
             u0 free(bb_t& bb);
 
+            u0 reg3(bb_t& bb,
+                    op_code_t opcode,
+                    reg_t src,
+                    reg_t dest1,
+                    reg_t dest2);
+
+            u0 offs(bb_t& bb,
+                    op_code_t opcode,
+                    s32 offset,
+                    reg_t src,
+                    reg_t dest,
+                    b8 mode = false);
+
+            u0 indx(bb_t& bb,
+                    op_code_t opcode,
+                    s32 offset,
+                    reg_t base,
+                    reg_t index,
+                    reg_t dest);
+
+            u0 reg2(bb_t& bb,
+                    op_code_t opcode,
+                    reg_t src,
+                    reg_t dest,
+                    b8 is_signed = false,
+                    s32 aux = 0);
+
+            u0 imm2(bb_t& bb,
+                    op_code_t opcode,
+                    imm_t src,
+                    reg_t dest,
+                    b8 is_signed = false,
+                    b8 mode = false);
+
+            u0 reg2_imm(bb_t& bb,
+                        op_code_t opcode,
+                        reg_t a,
+                        reg_t b,
+                        imm_t imm,
+                        b8 is_signed = false);
+
             u0 dw(bb_t& bb, imm_t imm);
 
             u0 pred(bb_t& bb, bb_t& pred);
@@ -344,18 +386,6 @@ namespace basecode::scm {
             bb_t& make_succ(bb_t& bb, bb_type_t type = bb_type_t::code);
 
             bb_t& ibuf(bb_t& bb, u8 addr_reg, const imm_t* data, u32 size);
-
-            u0 reg3(bb_t& bb, op_code_t opcode, reg_t src, reg_t dest1, reg_t dest2);
-
-            u0 imm2(bb_t& bb, op_code_t opcode, imm_t src, reg_t dest, b8 is_signed = false);
-
-            u0 indx(bb_t& bb, op_code_t opcode, s32 offset, reg_t base, reg_t index, reg_t dest);
-
-            u0 offs(bb_t& bb, op_code_t opcode, s32 offset, reg_t src, reg_t dest, b8 mode = false);
-
-            u0 reg2_imm(bb_t& bb, op_code_t opcode, reg_t a, reg_t b, imm_t imm, b8 is_signed = false);
-
-            u0 reg2(bb_t& bb, op_code_t opcode, reg_t src, reg_t dest, b8 is_signed = false, s32 aux = 0);
         }
 
         namespace emitter {
@@ -413,6 +443,12 @@ namespace basecode::scm {
         namespace bytecode {
             bb_t& leave(bb_t& bb);
 
+            bb_t& arith_op(bb_t& bb,
+                           op_code_t op_code,
+                           reg_t base_reg,
+                           reg_t target_reg,
+                           u32 size);
+
             u0 save_protected(bb_t& bb);
 
             u0 restore_protected(bb_t& bb);
@@ -464,8 +500,6 @@ namespace basecode::scm {
             u0 cons(bb_t& bb, reg_t car, reg_t cdr, reg_t target_reg);
 
             bb_t& list(bb_t& bb, reg_t base_reg, reg_t target_reg, u32 size);
-
-            bb_t& arith_op(bb_t& bb, op_code_t op_code, reg_t base_reg, reg_t target_reg, u32 size);
         }
 
         namespace reg_alloc {

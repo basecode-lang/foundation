@@ -20,6 +20,16 @@
 #include <basecode/core/scm/scm.h>
 #include <basecode/core/scm/types.h>
 
+#define EXEC_NEXT()             SAFE_SCOPE(                                         \
+    if (cycles > 0)     --cycles;                                                   \
+    if (cycles == 0)    return status;                                              \
+    env   = (obj_t*) H(G(register_file::ep));                                       \
+    inst  = (instruction_t*) &H(PC);                                                \
+    data  = inst->data;                                                             \
+    flags = (flag_register_t*) &F;                                                  \
+    opers = (operand_encoding_t*) &data;                                            \
+    goto *s_microcode[s_op_decode[inst->type][inst->is_signed][inst->encoding]];)
+
 namespace basecode::scm {
     namespace trap {
         static str::slice_t s_names[] = {
@@ -157,6 +167,8 @@ namespace basecode::scm {
         constexpr u8 op_falsep_reg1     = 121;
         constexpr u8 op_lcmp_reg2       = 122;
         constexpr u8 op_lnot_reg1       = 123;
+        constexpr u8 op_get_imm         = 124;
+        constexpr u8 op_set_imm         = 125;
         constexpr u8 op_error           = 255;
 
         static u8 s_op_decode[][2][9] = {
@@ -290,11 +302,11 @@ namespace basecode::scm {
                 {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::get] = {
-                {op_error,      op_error,       op_error,       op_get_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_get_imm,     op_error,       op_get_reg2,    op_error,       op_error,       op_error,       op_error,           op_error},
                 {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::set] = {
-                {op_error,      op_error,       op_set_reg2,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+                {op_error,      op_set_imm,     op_set_reg2,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
                 {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             },
             [instruction::type::push] = {
@@ -488,16 +500,6 @@ namespace basecode::scm {
             return vm.memory_map.heap_size - 1;
         }
 
-#define EXEC_NEXT()             SAFE_SCOPE(                                         \
-    if (cycles > 0)     --cycles;                                                   \
-    if (cycles == 0)    return status;                                              \
-    env   = (obj_t*) H(G(register_file::ep));                                       \
-    inst  = (instruction_t*) &H(PC);                                                \
-    data  = inst->data;                                                             \
-    flags = (flag_register_t*) &F;                                                  \
-    opers = (operand_encoding_t*) &data;                                            \
-    goto *s_microcode[s_op_decode[inst->type][inst->is_signed][inst->encoding]];)
-
         status_t step(vm_t& vm, ctx_t* ctx, s32 cycles) {
             static u0* s_microcode[] = {
                 [op_nop]                = &&nop,
@@ -624,6 +626,8 @@ namespace basecode::scm {
                 [op_truep_reg1]         = &&truep_reg1,
                 [op_falsep_reg1]        = &&falsep_reg1,
                 [op_lcmp_reg2]          = &&lcmp_reg2,
+                [op_get_imm]            = &&get_imm,
+                [op_set_imm]            = &&set_imm,
                 [op_error]              = &&error,
             };
 
@@ -1292,12 +1296,13 @@ namespace basecode::scm {
             }
             list_reg2_imm:
             {
-                auto base = G(opers->reg2_imm.a);
-                auto size = s32(opers->reg2_imm.imm) / sizeof(u64);
-                auto offs = 0;
-                auto lst  = ctx->nil;
-                auto gc = save_gc(ctx);
-                for (u32 i = 0; i < size; ++i) {
+                auto base  = G(opers->reg2_imm.a);
+                auto size  = s32(opers->reg2_imm.imm);
+                auto count = size / sizeof(u64);
+                auto offs  = size - sizeof(u64);
+                auto lst   = ctx->nil;
+                auto gc    = save_gc(ctx);
+                for (u32 i = count - 1; i >= 0; --i) {
                     lst = cons(ctx, (obj_t*) H(base + offs), lst);
                     offs += sizeof(u64);
                 }
@@ -1453,6 +1458,19 @@ namespace basecode::scm {
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }
+            get_imm:
+            {
+                auto key = (obj_t*) OBJ_AT(G(opers->imm.src));
+                auto v   = get(ctx, key, env);
+                flags->c = false;
+                flags->z = !IS_NIL(v);
+                flags->n = false;
+                flags->i = false;
+                flags->v = false;
+                G(opers->imm.dest) = u64(v);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
             get_reg2:
             {
                 auto v = get(ctx, (obj_t*) G(opers->reg2.src), env);
@@ -1462,6 +1480,15 @@ namespace basecode::scm {
                 flags->i = false;
                 flags->v = false;
                 G(opers->reg2.dest) = u64(v);
+                PC += sizeof(instruction_t);
+                EXEC_NEXT();
+            }
+            set_imm:
+            {
+                set(ctx,
+                    (obj_t*) G(opers->imm.dest),
+                    OBJ_AT(G(opers->imm.src)),
+                    env);
                 PC += sizeof(instruction_t);
                 EXEC_NEXT();
             }

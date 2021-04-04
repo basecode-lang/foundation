@@ -77,6 +77,9 @@ namespace basecode::scm {
         trap_map_t              traps;
         memory_map_t            memory_map;
         b8                      exited;
+
+        u64& operator[](u32 addr)       { return heap[addr >> 3]; }
+        u64 operator[](u32 addr) const  { return heap[addr >> 3]; }
     };
 
     namespace vm {
