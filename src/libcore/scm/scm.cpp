@@ -162,6 +162,7 @@ namespace basecode::scm {
         for (auto& env : ctx->environments)
             hashtab::free(env.bindings);
         array::free(ctx->environments);
+        array::free(ctx->procedures);
         ffi::free(ctx->ffi);
         vm::emitter::free(ctx->emitter);
         vm::free(ctx->vm);
@@ -383,6 +384,34 @@ namespace basecode::scm {
         return ctx->native_ptrs[FIXNUM(check_type(ctx, obj, obj_type_t::ptr))];
     }
 
+    str_t to_string(ctx_t* ctx, obj_t* obj) {
+        switch (TYPE(obj)) {
+            case obj_type_t::nil:
+                return str_t("nil"_ss);
+            case obj_type_t::pair:
+                return format::format("{}",
+                                      printable_t{ctx, obj, true});
+            case obj_type_t::prim: {
+                auto name = s_prim_names[u32(PRIM(obj))];
+                return str_t(name);
+            }
+            case obj_type_t::fixnum:
+                return format::format("{}", FIXNUM(obj));
+            case obj_type_t::flonum:
+                return format::format("{.7g}", FLONUM(obj));
+            case obj_type_t::symbol:
+            case obj_type_t::string:
+            case obj_type_t::keyword:
+                return str_t(*string::interned::get_slice(STRING_ID(obj)));
+            case obj_type_t::boolean:
+                return str_t(IS_TRUE(obj) ? "#t"_ss : "#f"_ss);
+            default: {
+                auto name = s_type_names[u32(TYPE(obj))];
+                return str_t(name);
+            }
+        }
+    }
+
     obj_t* make_bool(ctx_t* ctx, obj_t* obj) {
         return IS_TRUE(obj) ? ctx->true_ : ctx->false_;
     }
@@ -491,6 +520,7 @@ namespace basecode::scm {
         hashtab::init(ctx->strtab, ctx->alloc);
         hashtab::init(ctx->symtab, ctx->alloc);
         array::init(ctx->environments, ctx->alloc);
+        array::init(ctx->procedures, ctx->alloc);
 
         // init objects
         ctx->nil       = &ctx->objects[ctx->object_used++];
@@ -551,21 +581,6 @@ namespace basecode::scm {
         for (res = ctx->nil; !IS_NIL(obj); obj = CDR(obj))
             res = cons(ctx, CAR(obj), res);
         return res;
-    }
-
-    str::slice_t to_string(ctx_t* ctx, obj_t* obj) {
-        switch (TYPE(obj)) {
-            case obj_type_t::nil:
-                return "nil"_ss;
-            case obj_type_t::symbol:
-            case obj_type_t::string:
-            case obj_type_t::keyword:
-                return *string::interned::get_slice(STRING_ID(obj));
-            case obj_type_t::boolean:
-                return IS_TRUE(obj) ? "#t"_ss : "#f"_ss;
-            default:
-                return str::slice_t{};
-        }
     }
 
     obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env) {
@@ -701,25 +716,9 @@ namespace basecode::scm {
                             break;
 
                         case prim_type_t::fn:
-                        case prim_type_t::mac: {
-                            auto new_env = make_environment(ctx, env);
-                            auto param   = CAR(arg);
-                            while (!IS_NIL(param)) {
-                                if (TYPE(param) != obj_type_t::pair) {
-                                    set(ctx, param, ctx->false_, new_env);
-                                    break;
-                                }
-                                set(ctx, CAR(param), ctx->false_, new_env);
-                                param = CDR(param);
-                            }
-                            auto e = (env_t*) NATIVE_PTR(CDR(new_env));
-                            e->params = arg;
-                            next_arg(ctx, &arg);
-                            res = make_object(ctx);
-                            SET_TYPE(res, PRIM(fn) == prim_type_t::fn ? obj_type_t::func : obj_type_t::macro);
-                            SET_CDR(res, new_env);
+                        case prim_type_t::mac:
+                            res = make_proc(ctx, CAR(arg), CADR(arg), env, PRIM(fn) == prim_type_t::mac);
                             break;
-                        }
 
                         case prim_type_t::error:
                             res = make_error(ctx, arg, cl);
@@ -1028,34 +1027,31 @@ namespace basecode::scm {
                     break;
 
                 case obj_type_t::func: {
-                    obj_t* fn_env = CDR(fn);
-                    auto e = (env_t*) NATIVE_PTR(CDR(fn_env));
-
+                    auto proc = (proc_t*) NATIVE_PTR(CDR(fn));
                     arg = eval_list(ctx, arg, env);
-                    args_to_env(ctx, CAR(e->params), arg, fn_env);
-                    arg = CDR(e->params);
+                    args_to_env(ctx, proc->params, arg, proc->env_obj);
+                    arg = proc->params;
                     u32 save = save_gc(ctx);
                     for (; !IS_NIL(CDR(arg)); arg = CDR(arg)) {
                         restore_gc(ctx, save);
                         push_gc(ctx, arg);
-                        eval(ctx, CAR(arg), fn_env);
+                        eval(ctx, CAR(arg), proc->env_obj);
                     }
                     obj = CAR(arg);
-                    res = eval(ctx, CAR(arg), fn_env);
+                    res = eval(ctx, CAR(arg), proc->env_obj);
                     break;
                 }
 
                 case obj_type_t::macro: {
+                    auto proc = (proc_t*) NATIVE_PTR(CDR(fn));
                     obj_t* expr{};
-                    obj_t* mac_env = CDR(fn);
-                    auto e = (env_t*) NATIVE_PTR(CDR(mac_env));
-                    args_to_env(ctx, CAR(e->params), arg, mac_env);
-                    arg = CDR(e->params);
+                    args_to_env(ctx, proc->params, arg, proc->env_obj);
+                    arg = proc->params;
                     u32 save = save_gc(ctx);
                     while (!IS_NIL(arg)) {
                         restore_gc(ctx, save);
                         push_gc(ctx, arg);
-                        expr = eval(ctx, next_arg(ctx, &arg), mac_env);
+                        expr = eval(ctx, next_arg(ctx, &arg), proc->env_obj);
                     }
                     *obj = *expr;
                     ctx->call_list = CDR(cl);
@@ -1091,7 +1087,6 @@ namespace basecode::scm {
             check_type(ctx, parent, obj_type_t::environment);
         obj_t* obj = make_object(ctx);
         auto env = &array::append(ctx->environments);
-        env->params     = ctx->nil;
         env->parent     = parent && !IS_NIL(parent) ? parent : ctx->nil;
         env->gc_protect = true;
         hashtab::init(env->bindings, ctx->alloc);
@@ -1540,20 +1535,28 @@ namespace basecode::scm {
 
     obj_t* make_proc(ctx_t* ctx, obj_t* params, obj_t* body, obj_t* env, b8 macro) {
         auto new_env = make_environment(ctx, env);
-        auto param   = params;
-        while (!IS_NIL(param)) {
-            if (TYPE(param) != obj_type_t::pair) {
-                set(ctx, param, ctx->false_, new_env);
+        auto lst     = params;
+        while (!IS_NIL(lst)) {
+            if (TYPE(lst) != obj_type_t::pair) {
+                set(ctx, lst, ctx->false_, new_env);
                 break;
             }
-            set(ctx, CAR(param), ctx->false_, new_env);
-            param = CDR(param);
+            set(ctx, CAR(lst), ctx->false_, new_env);
+            lst = CDR(lst);
         }
         auto e = (env_t*) NATIVE_PTR(CDR(new_env));
-        e->params = params;
+        auto proc = &array::append(ctx->procedures);
+        proc->env          = e;
+        proc->addr         = {};
+        proc->body         = body;
+        proc->params       = params;
+        proc->is_tco       = false;
+        proc->env_obj      = new_env;
+        proc->is_macro     = macro;
+        proc->is_assembled = false;
         auto obj = make_object(ctx);
         SET_TYPE(obj, macro ? obj_type_t::macro : obj_type_t::func);
-        SET_CDR(obj, new_env);
+        SET_CDR(obj, make_user_ptr(ctx, proc));
         return obj;
     }
 

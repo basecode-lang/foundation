@@ -65,6 +65,7 @@ namespace basecode::scm {
 
         auto args = kind->args;
         auto reg = vm::reg_alloc::reserve(ctx->emitter.gp, 2);
+        vm::reg_alloc::protect(ctx->emitter.gp, reg[0], true);
         u32 size = length(ctx, args);
         vm::bytecode::alloc_stack(*c.bb, size, reg[0]);
         s32 offs = 0;
@@ -88,10 +89,16 @@ namespace basecode::scm {
             case obj_type_t::string:
             case obj_type_t::boolean:
                 vm::bytecode::const_(*c.bb, OBJ_IDX(c.obj), c.target);
+                vm::basic_block::comment(*c.bb,
+                                         format::format("literal: {}",
+                                                        to_string(c.ctx, c.obj)));
                 break;
 
             case obj_type_t::symbol:
                 vm::bytecode::get(*c.bb, OBJ_IDX(c.obj), c.target);
+                vm::basic_block::comment(*c.bb,
+                                         format::format("symbol: {}",
+                                                        to_string(c.ctx, c.obj)));
                 break;
 
             case obj_type_t::pair: {
@@ -111,8 +118,18 @@ namespace basecode::scm {
                     }
 
                     case obj_type_t::func: {
+                        for (reg_t r = rf::r0; r < rf::r15; ++r) {
+                            if (vm::reg_alloc::is_protected(c.bb->emitter->gp, r))
+                                vm::basic_block::reg1(*c.bb, op::push, r);
+                        }
                         vm::basic_block::none(*c.bb, op::nop);
-                        vm::basic_block::comment(*c.bb, "XXX: proc call"_ss);
+                        vm::basic_block::comment(*c.bb,
+                                                 format::format("call: {}",
+                                                                printable_t{c.ctx, sym, true}));
+                        for (reg_t r = rf::r15; r >= rf::r0; --r) {
+                            if (vm::reg_alloc::is_protected(c.bb->emitter->gp, r))
+                                vm::basic_block::reg1(*c.bb, op::pop, r);
+                        }
                         break;
                     }
 
@@ -168,20 +185,21 @@ namespace basecode::scm {
         return c;
     }
 
-    bb_t& proc::compile(const context_t& c) {
+    bb_t& proc::compile(const context_t& c, u32& bb_id) {
         auto ctx = c.ctx;
         auto& proc_bb = vm::basic_block::make_succ(*c.bb);
+        bb_id = proc_bb.id;
         str_t note_str;
         if (c.label) {
             vm::basic_block::apply_label(proc_bb, c.label);
             note_str = format::format(
-                "proc: ({} {} {})",
+                "proc: ({} (fn {} {}))",
                 c.ctx->emitter.strings[c.label - 1],
                 printable_t{c.ctx, c.kind.proc.params, true},
                 printable_t{c.ctx, c.kind.proc.body, true});
         } else {
             note_str = format::format(
-                "proc: (_ {} {}",
+                "proc: (_ (fn {} {}))",
                 printable_t{c.ctx, c.kind.proc.params, true},
                 printable_t{c.ctx, c.kind.proc.body, true});
         }
@@ -189,7 +207,11 @@ namespace basecode::scm {
         auto reg  = vm::reg_alloc::reserve(c.ctx->emitter.gp);
         auto body = c.kind.proc.body;
         auto& body_bb = vm::bytecode::enter(proc_bb, 0);
-        auto body_ctx = make_context(body_bb, c.ctx, ctx->nil, c.kind.proc.new_env, reg[0]);
+        auto body_ctx = make_context(body_bb,
+                                     c.ctx,
+                                     ctx->nil,
+                                     c.kind.proc.new_env,
+                                     reg[0]);
         while (!IS_NIL(body)) {
             body_ctx.obj = CAR(body);
             auto& next_bb = scm::compile(body_ctx);
@@ -220,7 +242,8 @@ namespace basecode::scm {
             case prim_type_t::let:
             case prim_type_t::set: {
                 auto reg      = vm::reg_alloc::reserve(ctx->emitter.gp);
-                u32  idx      = OBJ_IDX(CAR(kind->args));
+                auto key      = CAR(kind->args);
+                u32  idx      = OBJ_IDX(key);
                 auto vc = make_context(*c.bb, ctx, CADR(kind->args), c.env, c.target);
                 vc.label = vm::emitter::make_label(
                     ctx->emitter,
@@ -231,18 +254,23 @@ namespace basecode::scm {
                     set(ctx, (obj_t*) OBJ_AT(idx), value, c.env);
                     if (TYPE(value) == obj_type_t::func
                     ||  TYPE(value) == obj_type_t::macro) {
-                        auto new_env = CDR(value);
-                        auto e = (env_t*) NATIVE_PTR(CDR(new_env));
+                        auto proc = (proc_t*) NATIVE_PTR(CDR(value));
                         auto pc = make_context(*c.bb, c.ctx, c.obj, c.env);
                         pc.label             = vc.label;
-                        pc.kind.proc.body    = CDR(e->params);
-                        pc.kind.proc.params  = CAR(e->params);
-                        pc.kind.proc.new_env = new_env;
-                        return proc::compile(pc);
+                        pc.kind.proc.body    = proc->body;
+                        pc.kind.proc.params  = proc->params;
+                        pc.kind.proc.new_env = proc->env_obj;
+                        u32 bb_id;
+                        auto& next_bb = proc::compile(pc, bb_id);
+                        proc->addr = bb_id;
+                        return next_bb;
                     }
                 } else {
                     vm::bytecode::const_(*c.bb, idx, reg[0]);
                     vm::bytecode::set(*c.bb, reg[0], c.target);
+                    vm::basic_block::comment(*c.bb,
+                                             format::format("symbol: {}",
+                                                            printable_t{c.ctx, key, true}));
                 }
                 return value_bb;
             }
@@ -250,7 +278,11 @@ namespace basecode::scm {
             case prim_type_t::fn:
             case prim_type_t::mac: {
                 b8   is_mac = PRIM(kind->form) == prim_type_t::mac;
-                auto proc   = make_proc(ctx, kind->args, CDR(kind->args), c.env, is_mac);
+                auto proc   = make_proc(ctx,
+                                        CAR(kind->args),
+                                        CDR(kind->args),
+                                        c.env,
+                                        is_mac);
                 auto idx    = OBJ_IDX(proc);
                 G(c.target) = idx;
                 vm::bytecode::const_(*c.bb, idx, c.target);

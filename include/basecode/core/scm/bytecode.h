@@ -284,6 +284,7 @@ namespace basecode::scm {
 
     struct reg_alloc_t final {
         u64                     slots;
+        u64                     prots;
         reg_t                   start;
         reg_t                   end;
     };
@@ -461,6 +462,10 @@ namespace basecode::scm {
 
         namespace reg_alloc {
             u0 reset(reg_alloc_t& alloc);
+
+            b8 is_protected(reg_alloc_t& alloc, reg_t reg);
+
+            u0 protect(reg_alloc_t& alloc, reg_t reg, b8 flag);
 
             u0 init(reg_alloc_t& alloc, reg_t start, reg_t end);
 

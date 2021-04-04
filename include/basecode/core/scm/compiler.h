@@ -55,12 +55,12 @@ namespace basecode {
 
         bb_t& compile(const context_t& c);
 
-        namespace proc {
+        namespace prim {
             bb_t& compile(const context_t& c);
         }
 
-        namespace prim {
-            bb_t& compile(const context_t& c);
+        namespace proc {
+            bb_t& compile(const context_t& c, u32& bb_id);
         }
     }
 }

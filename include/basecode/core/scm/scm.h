@@ -127,6 +127,8 @@ namespace basecode::scm {
 
     obj_t* make_bool(ctx_t* ctx, b8 value);
 
+    str_t to_string(ctx_t* ctx, obj_t* obj);
+
     u0* to_user_ptr(ctx_t* ctx, obj_t* obj);
 
     obj_t* make_bool(ctx_t* ctx, obj_t* obj);
@@ -150,8 +152,6 @@ namespace basecode::scm {
     u0 write(FILE* file, ctx_t* ctx, obj_t* obj);
 
     u0 print(FILE* file, ctx_t* ctx, obj_t* obj);
-
-    str::slice_t to_string(ctx_t* ctx, obj_t* obj);
 
     obj_t* get(ctx_t* ctx, obj_t* sym, obj_t* env);
 

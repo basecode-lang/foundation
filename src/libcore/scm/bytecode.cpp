@@ -756,26 +756,31 @@ namespace basecode::scm {
 
             u0 gt(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
                 vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
+                vm::basic_block::comment(bb, "prim: gt"_ss);
                 vm::basic_block::reg1(bb, op::sg, target_reg);
             }
 
             u0 lt(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
                 vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
+                vm::basic_block::comment(bb, "prim: lt"_ss);
                 vm::basic_block::reg1(bb, op::sl, target_reg);
             }
 
             u0 is(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
                 vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
+                vm::basic_block::comment(bb, "prim: gte"_ss);
                 vm::basic_block::reg1(bb, op::seq, target_reg);
             }
 
             u0 lte(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
                 vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
+                vm::basic_block::comment(bb, "prim: lte"_ss);
                 vm::basic_block::reg1(bb, op::sle, target_reg);
             }
 
             u0 gte(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
                 vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
+                vm::basic_block::comment(bb, "prim: gte"_ss);
                 vm::basic_block::reg1(bb, op::sge, target_reg);
             }
 
@@ -809,6 +814,7 @@ namespace basecode::scm {
         namespace reg_alloc {
             u0 reset(reg_alloc_t& alloc) {
                 alloc.slots = {};
+                alloc.prots = {};
             }
 
             reg_result_t reserve(reg_alloc_t& alloc, u32 count) {
@@ -824,10 +830,23 @@ namespace basecode::scm {
                 return r;
             }
 
+            b8 is_protected(reg_alloc_t& alloc, reg_t reg) {
+                const auto mask = 1UL << reg;
+                return (alloc.prots & mask) == mask;
+            }
+
+            u0 protect(reg_alloc_t& alloc, reg_t reg, b8 flag) {
+                if (flag) {
+                    alloc.prots |= (1UL << reg);
+                } else {
+                    alloc.prots &= ~(1UL << reg);
+                }
+            }
+
             u0 init(reg_alloc_t& alloc, reg_t start, reg_t end) {
                 alloc.end   = end;
-                alloc.slots = {};
                 alloc.start = start;
+                alloc.slots = alloc.prots = {};
             }
 
             u0 release(reg_alloc_t& alloc, const reg_result_t& result) {
@@ -835,7 +854,9 @@ namespace basecode::scm {
                     const u32 idx = result[i] - alloc.start;
                     if (!(alloc.slots & (1UL << idx)))
                         continue;
-                    alloc.slots &= ~(1UL << idx);
+                    const auto mask = ~(1UL << idx);
+                    alloc.slots &= mask;
+                    alloc.prots &= mask;
                 }
             }
         }

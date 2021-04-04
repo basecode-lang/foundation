@@ -67,9 +67,11 @@
 
 namespace basecode::scm {
     struct env_t;
+    struct proc_t;
 
     using ptr_array_t           = array_t<u0*>;
     using env_array_t           = array_t<env_t>;
+    using proc_array_t          = array_t<proc_t>;
     using bind_table_t          = hashtab_t<u32, obj_t*>;
     using symbol_table_t        = hashtab_t<u32, obj_t*>;
     using string_table_t        = hashtab_t<u32, obj_t*>;
@@ -119,10 +121,21 @@ namespace basecode::scm {
     };
 
     struct env_t final {
-        obj_t*                  params;
         obj_t*                  parent;
         bind_table_t            bindings;
         b8                      gc_protect;
+    };
+
+    struct proc_t final {
+        env_t*                  env;
+        obj_t*                  body;
+        obj_t*                  params;
+        obj_t*                  env_obj;
+        u64                     addr;
+        u8                      is_tco:         1;
+        u8                      is_macro:       1;
+        u8                      is_assembled:   1;
+        u8                      pad:            5;
     };
 
     struct obj_t final {
@@ -164,6 +177,7 @@ namespace basecode::scm {
         handlers_t              handlers;
         obj_stack_t             gc_stack;
         obj_stack_t             cl_stack;
+        proc_array_t            procedures;
         env_array_t             environments;
         ptr_array_t             native_ptrs;
         string_table_t          strtab;
