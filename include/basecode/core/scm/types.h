@@ -105,26 +105,17 @@ namespace basecode::scm {
         empty
     };
 
-    enum class numtype_t : u8 {
+    enum class num_type_t : u8 {
         none,
         fixnum,
         flonum,
     };
 
-    enum class imm_size_t : u8 {
-        signed_word,
-        unsigned_word,
-        signed_half_word,
-        unsigned_half_word,
-    };
-
     enum class imm_type_t : u8 {
-        obj,
         trap,
         value,
         label,
         block,
-        boolean
     };
 
     enum class prim_type_t : u8 {
@@ -188,7 +179,7 @@ namespace basecode::scm {
         obj_t*                  params;
         union {
             bb_t*               bb;
-            u64                 absolute;
+            u32                 abs;
         }                       addr;
         u8                      is_tco:         1;
         u8                      is_macro:       1;
@@ -231,56 +222,74 @@ namespace basecode::scm {
     union operand_encoding_t final {
         struct {
             u64                 src:        32;
-            u64                 dest:       8;
-            u64                 type:       4;
-            u64                 size:       3;
+            u64                 dst:        6;
+            u64                 dst_type:   1;
+            u64                 type:       3;
             u64                 mode:       1;
             u64                 aux:        3;
+            u64                 pad:        5;
         }                       imm;
         struct {
-            u64                 dest:       8;
-            u64                 pad:        43;
+            u64                 dst:        6;
+            u64                 dst_type:   1;
+            u64                 pad:        44;
         }                       reg1;
         struct {
-            u64                 src:        8;
-            u64                 dest:       8;
+            u64                 src:        6;
+            u64                 src_type:   1;
+            u64                 dst:        6;
+            u64                 dst_type:   1;
             u64                 aux:        32;
-            u64                 pad:        3;
+            u64                 pad:        5;
         }                       reg2;
         struct {
-            u64                 a:          8;
-            u64                 b:          8;
-            u64                 imm:        28;
-            u64                 size:       3;
-            u64                 type:       4;
+            u64                 a:          6;
+            u64                 a_type:     1;
+            u64                 b:          6;
+            u64                 b_type:     1;
+            u64                 imm:        31;
+            u64                 type:       3;
+            u64                 pad:        3;
         }                       reg2_imm;
         struct {
-            u64                 a:          8;
-            u64                 b:          8;
-            u64                 c:          8;
-            u64                 pad:        27;
+            u64                 a:          6;
+            u64                 a_type:     1;
+            u64                 b:          6;
+            u64                 b_type:     1;
+            u64                 c:          6;
+            u64                 c_type:     1;
+            u64                 pad:        30;
         }                       reg3;
         struct {
-            u64                 a:          8;
-            u64                 b:          8;
-            u64                 c:          8;
-            u64                 d:          8;
-            u64                 pad:        19;
+            u64                 a:          6;
+            u64                 a_type:     1;
+            u64                 b:          6;
+            u64                 b_type:     1;
+            u64                 c:          6;
+            u64                 c_type:     1;
+            u64                 d:          6;
+            u64                 d_type:     1;
+            u64                 pad:        23;
         }                       reg4;
         struct {
             u64                 offs:       32;
-            u64                 src:        8;
-            u64                 dest:       8;
+            u64                 src:        6;
+            u64                 src_type:   1;
+            u64                 dst:        6;
+            u64                 dst_type:   1;
             u64                 mode:       1;
-            u64                 pad:        2;
+            u64                 pad:        4;
         }                       offset;
         struct {
             u64                 offs:       24;
-            u64                 base:       8;
-            u64                 index:      8;
-            u64                 dest:       8;
+            u64                 base:       6;
+            u64                 base_type:  1;
+            u64                 ndx:        6;
+            u64                 ndx_type:   1;
+            u64                 dst:        6;
+            u64                 dst_type:   1;
             u64                 mode:       1;
-            u64                 pad:        2;
+            u64                 pad:        5;
         }                       indexed;
     };
 
@@ -296,12 +305,9 @@ namespace basecode::scm {
         union {
             s32                 s;
             u32                 u;
-            s64                 ls;
-            u64                 lu;
             bb_t*               b;
         };
         imm_type_t              type;
-        imm_size_t              size;
     };
 
     struct var_t final {

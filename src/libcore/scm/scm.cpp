@@ -119,7 +119,7 @@ namespace basecode::scm {
 
     static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b);
 
-    static numtype_t get_numtype(const s8* buf, s32 len);
+    static num_type_t get_numtype(const s8* buf, s32 len);
 
     static obj_t* read_expr(ctx_t* ctx, buf_crsr_t& crsr);
 
@@ -337,7 +337,7 @@ namespace basecode::scm {
             vm::basic_block::imm1(
                 *comp_result.bb,
                 instruction::type::exit,
-                vm::emitter::imm(1, imm_type_t::boolean));
+                vm::emitter::imm(1));
             compiler::release_result(ctx->compiler, comp_result);
             );
 
@@ -1099,20 +1099,20 @@ namespace basecode::scm {
         return res;
     }
 
-    static numtype_t get_numtype(const s8* buf, s32 len) {
+    static num_type_t get_numtype(const s8* buf, s32 len) {
         const s8* p = buf;
-        s8 ch = *p;
-        numtype_t type = ((ch == '+' && len > 1)
-                          || (ch == '-' && len > 1)
-                          || isdigit(ch)) ? numtype_t::fixnum : numtype_t::none;
-        if (type == numtype_t::none)
+        s8         ch   = *p;
+        num_type_t type = ((ch == '+' && len > 1)
+                           || (ch == '-' && len > 1)
+                           || isdigit(ch)) ? num_type_t::fixnum : num_type_t::none;
+        if (type == num_type_t::none)
             return type;
         while (--len > 0) {
             ch = *(++p);
             if (ch == '.' || ch == 'e' || ch == 'E' || ch == '-') {
-                type = numtype_t::flonum;
+                type = num_type_t::flonum;
             } else if (ch < 48 || ch > 57) {
-                type = numtype_t::none;
+                type = num_type_t::none;
                 break;
             }
         }
@@ -1303,15 +1303,15 @@ namespace basecode::scm {
                 s8* end = (s8*) (start + len);
                 if (p != s) {
                     switch (get_numtype(start, len)) {
-                        case numtype_t::none:
+                        case num_type_t::none:
                             if (strncmp(start, "#:", 2) == 0) {
                                 return make_keyword(ctx, start + 2, len - 2);
                             } else {
                                 return make_symbol(ctx, start, len);
                             }
-                        case numtype_t::fixnum:
+                        case num_type_t::fixnum:
                             return make_fixnum(ctx, strtol(start, &end, 10));
-                        case numtype_t::flonum:
+                        case num_type_t::flonum:
                             return make_flonum(ctx, strtod(start, &end));
                     }
                 } else {

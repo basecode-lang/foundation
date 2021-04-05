@@ -645,350 +645,350 @@ namespace basecode::scm::vm {
         }
         add_imm:
         {
-            auto sum = __builtin_addcll(G(opers->imm.dest),
+            auto sum = __builtin_addcll(G(opers->imm.dst),
                                         opers->imm.src,
                                         0,
                                         &carry_out);
             flags->z = sum == 0;
             flags->c = carry_out > 0;
-            G(opers->imm.dest) = sum;
+            G(opers->imm.dst) = sum;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         add_reg2:
         {
-            auto sum = __builtin_addcll(G(opers->reg2.dest),
+            auto sum = __builtin_addcll(G(opers->reg2.dst),
                                         G(opers->reg2.src),
                                         0,
                                         &carry_out);
             flags->z = sum == 0;
             flags->c = carry_out > 0;
-            G(opers->reg2.dest) = sum;
+            G(opers->reg2.dst) = sum;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         adds_imm:
         {
             s64 sum{};
-            flags->v = __builtin_saddll_overflow(G(opers->imm.dest),
+            flags->v = __builtin_saddll_overflow(G(opers->imm.dst),
                                                  opers->imm.src,
                                                  &sum);
             flags->z = sum == 0;
             flags->c = false;
-            G(opers->imm.dest) = sum;
+            G(opers->imm.dst) = sum;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         adds_reg2:
         {
             s64 sum{};
-            flags->v = __builtin_saddll_overflow(G(opers->reg2.dest),
+            flags->v = __builtin_saddll_overflow(G(opers->reg2.dst),
                                                  G(opers->reg2.src),
                                                  &sum);
             flags->z = sum == 0;
             flags->c = false;
-            G(opers->reg2.dest) = sum;
+            G(opers->reg2.dst) = sum;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         mul_imm:
         {
             u64 prod{};
-            flags->c = __builtin_umulll_overflow(G(opers->imm.dest),
+            flags->c = __builtin_umulll_overflow(G(opers->imm.dst),
                                                  opers->imm.src,
                                                  &prod);
             flags->z = prod == 0;
             flags->v = false;
-            G(opers->imm.dest) = prod;
+            G(opers->imm.dst) = prod;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         mul_reg2:
         {
             u64 prod{};
-            flags->c = __builtin_umulll_overflow(G(opers->reg2.dest),
+            flags->c = __builtin_umulll_overflow(G(opers->reg2.dst),
                                                  G(opers->reg2.src),
                                                  &prod);
             flags->z = prod == 0;
             flags->v = false;
-            G(opers->reg2.dest) = prod;
+            G(opers->reg2.dst) = prod;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         muls_imm:
         {
             s64 prod{};
-            flags->v = __builtin_smulll_overflow(G(opers->imm.dest),
+            flags->v = __builtin_smulll_overflow(G(opers->imm.dst),
                                                  opers->imm.src,
                                                  &prod);
             flags->z = prod == 0;
             flags->c = false;
-            G(opers->imm.dest) = prod;
+            G(opers->imm.dst) = prod;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         muls_reg2:
         {
             s64 prod{};
-            flags->v = __builtin_smulll_overflow(G(opers->reg2.dest),
+            flags->v = __builtin_smulll_overflow(G(opers->reg2.dst),
                                                  G(opers->reg2.src),
                                                  &prod);
             flags->z = prod == 0;
             flags->c = false;
-            G(opers->reg2.dest) = prod;
+            G(opers->reg2.dst) = prod;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sub_imm:
         {
-            auto diff = __builtin_subcll(G(opers->imm.dest),
+            auto diff = __builtin_subcll(G(opers->imm.dst),
                                          opers->imm.src,
                                          0,
                                          &carry_out);
             flags->z  = diff == 0;
             flags->c  = carry_out > 0;
-            G(opers->imm.dest) = diff;
+            G(opers->imm.dst) = diff;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sub_reg2:
         {
-            auto diff = __builtin_subcll(G(opers->reg2.dest),
+            auto diff = __builtin_subcll(G(opers->reg2.dst),
                                          G(opers->reg2.src),
                                          0,
                                          &carry_out);
             flags->z  = diff == 0;
             flags->c  = carry_out > 0;
-            G(opers->reg2.dest) = diff;
+            G(opers->reg2.dst) = diff;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         subs_imm:
         {
             s64 diff{};
-            flags->v = __builtin_ssubll_overflow(G(opers->imm.dest),
+            flags->v = __builtin_ssubll_overflow(G(opers->imm.dst),
                                                  opers->imm.src,
                                                  &diff);
             flags->z = diff == 0;
             flags->c = false;
-            G(opers->imm.dest) = diff;
+            G(opers->imm.dst) = diff;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         subs_reg2:
         {
             s64 diff{};
-            flags->v = __builtin_ssubll_overflow(G(opers->reg2.dest),
+            flags->v = __builtin_ssubll_overflow(G(opers->reg2.dst),
                                                  G(opers->reg2.src),
                                                  &diff);
             flags->z = diff == 0;
             flags->c = false;
-            G(opers->reg2.dest) = diff;
+            G(opers->reg2.dst) = diff;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         div_imm:
         {
-            auto quotient = opers->imm.src == 0 ? 0 : G(opers->imm.dest) / opers->imm.src;
+            auto quotient = opers->imm.src == 0 ? 0 : G(opers->imm.dst) / opers->imm.src;
             flags->v = false;
             flags->c = false;
             flags->z = quotient == 0;
-            G(opers->imm.dest) = quotient;
+            G(opers->imm.dst) = quotient;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         div_reg2:
         {
             auto src = G(opers->reg2.src);
-            auto quotient = src == 0 ? 0 : G(opers->reg2.dest) / src;
+            auto quotient = src == 0 ? 0 : G(opers->reg2.dst) / src;
             flags->v = false;
             flags->c = false;
             flags->z = quotient == 0;
-            G(opers->reg2.dest) = quotient;
+            G(opers->reg2.dst) = quotient;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         pow_imm:
         {
-            u64 e = pow(G(opers->imm.dest), opers->imm.src);
+            u64 e = pow(G(opers->imm.dst), opers->imm.src);
             flags->v = false;
             flags->c = false;
             flags->z = e == 0;
             flags->n = s64(e) < 0;
-            G(opers->imm.dest) = e;
+            G(opers->imm.dst) = e;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         pow_reg2:
         {
-            u64 e = pow(G(opers->reg2.dest), G(opers->reg2.src));
+            u64 e = pow(G(opers->reg2.dst), G(opers->reg2.src));
             flags->v = false;
             flags->c = false;
             flags->z = e == 0;
             flags->n = s64(e) < 0;
-            G(opers->reg2.dest) = e;
+            G(opers->reg2.dst) = e;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         mod_imm:
         {
-            u64 e = G(opers->imm.dest) % opers->imm.src;
+            u64 e = G(opers->imm.dst) % opers->imm.src;
             flags->v = false;
             flags->c = false;
             flags->z = e == 0;
             flags->n = s64(e) < 0;
-            G(opers->imm.dest) = e;
+            G(opers->imm.dst) = e;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         mod_reg2:
         {
-            u64 e = G(opers->reg2.dest) % G(opers->reg2.src);
+            u64 e = G(opers->reg2.dst) % G(opers->reg2.src);
             flags->v = false;
             flags->c = false;
             flags->z = e == 0;
             flags->n = s64(e) < 0;
-            G(opers->reg2.dest) = e;
+            G(opers->reg2.dst) = e;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         neg_reg1:
         {
-            s64 negated = -G(opers->reg1.dest);
+            s64 negated = -G(opers->reg1.dst);
             flags->v = false;
             flags->c = false;
             flags->z = negated == 0;
             flags->n = negated < 0;
-            G(opers->reg1.dest) = negated;
+            G(opers->reg1.dst) = negated;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         not_reg1:
         {
-            u64 bin_not = ~G(opers->reg1.dest);
+            u64 bin_not = ~G(opers->reg1.dst);
             flags->v = false;
             flags->c = false;
             flags->z = bin_not == 0;
             flags->n = s64(bin_not) < 0;
-            G(opers->reg1.dest) = bin_not;
+            G(opers->reg1.dst) = bin_not;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         shl_imm:
         {
             auto count = opers->imm.src;
-            auto shifted = G(opers->imm.dest) << count;
+            auto shifted = G(opers->imm.dst) << count;
             auto msb = shifted & (1ULL << 63U);
             flags->v = msb ^ (count & 0x1fU);
             flags->c = msb;
             flags->z = shifted == 0;
             flags->n = s64(shifted) < 0;
-            G(opers->imm.dest) = shifted;
+            G(opers->imm.dst) = shifted;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         shl_reg2:
         {
             auto count = G(opers->reg2.src);
-            auto shifted = G(opers->reg2.dest) << count;
+            auto shifted = G(opers->reg2.dst) << count;
             auto msb = shifted & (1ULL << 63U);
             flags->v = msb ^ (count & 0x1fU);
             flags->c = msb;
             flags->z = shifted == 0;
             flags->n = s64(shifted) < 0;
-            G(opers->reg2.dest) = shifted;
+            G(opers->reg2.dst) = shifted;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         shr_imm:
         {
             auto count = opers->imm.src;
-            auto dv = G(opers->imm.dest);
+            auto dv = G(opers->imm.dst);
             auto shifted = dv >> count;
             flags->v = dv & (1ULL << 63U);
             flags->c = shifted & 0x01U;
             flags->z = shifted == 0;
             flags->n = s64(shifted) < 0;
-            G(opers->imm.dest) = shifted;
+            G(opers->imm.dst) = shifted;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         shr_reg2:
         {
             auto count = G(opers->reg2.src);
-            auto dv = G(opers->reg2.dest);
+            auto dv = G(opers->reg2.dst);
             auto shifted = dv >> count;
             flags->v = dv & (1ULL << 63U);
             flags->c = shifted & 0x01U;
             flags->z = shifted == 0;
             flags->n = s64(shifted) < 0;
-            G(opers->reg2.dest) = shifted;
+            G(opers->reg2.dst) = shifted;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         or_imm:
         {
-            auto e = G(opers->imm.dest) | opers->imm.src;
+            auto e = G(opers->imm.dst) | opers->imm.src;
             flags->v = false;
             flags->c = false;
             flags->z = e == 0;
             flags->n = s64(e) < 0;
-            G(opers->imm.dest) = e;
+            G(opers->imm.dst) = e;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         or_reg2:
         {
-            auto e = G(opers->reg2.dest) | G(opers->reg2.src);
+            auto e = G(opers->reg2.dst) | G(opers->reg2.src);
             flags->v = false;
             flags->c = false;
             flags->z = e == 0;
             flags->n = s64(e) < 0;
-            G(opers->reg2.dest) = e;
+            G(opers->reg2.dst) = e;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         and_imm:
         {
-            auto e = G(opers->imm.dest) & opers->imm.src;
+            auto e = G(opers->imm.dst) & opers->imm.src;
             flags->v = false;
             flags->c = false;
             flags->z = e == 0;
             flags->n = s64(e) < 0;
-            G(opers->imm.dest) = e;
+            G(opers->imm.dst) = e;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         and_reg2:
         {
-            auto e = G(opers->reg2.dest) & G(opers->reg2.src);
+            auto e = G(opers->reg2.dst) & G(opers->reg2.src);
             flags->v = false;
             flags->c = false;
             flags->z = e == 0;
             flags->n = s64(e) < 0;
-            G(opers->reg2.dest) = e;
+            G(opers->reg2.dst) = e;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         xor_imm:
         {
-            auto e = G(opers->imm.dest) ^ opers->imm.src;
+            auto e = G(opers->imm.dst) ^ opers->imm.src;
             flags->v = false;
             flags->c = false;
             flags->z = e == 0;
             flags->n = s64(e) < 0;
-            G(opers->imm.dest) = e;
+            G(opers->imm.dst) = e;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         xor_reg2:
         {
-            auto e = G(opers->reg2.dest) ^ G(opers->reg2.src);
+            auto e = G(opers->reg2.dst) ^ G(opers->reg2.src);
             flags->v = false;
             flags->c = false;
             flags->z = e == 0;
             flags->n = s64(e) < 0;
-            G(opers->reg2.dest) = e;
+            G(opers->reg2.dst) = e;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -999,7 +999,7 @@ namespace basecode::scm::vm {
         }
         br_reg1:
         {
-            PC += s64(G(opers->reg1.dest));
+            PC += s64(G(opers->reg1.dst));
             EXEC_NEXT();
         }
         bra_imm:
@@ -1009,7 +1009,7 @@ namespace basecode::scm::vm {
         }
         bra_reg1:
         {
-            PC = G(opers->reg1.dest);
+            PC = G(opers->reg1.dst);
             EXEC_NEXT();
         }
         blr_imm:
@@ -1021,12 +1021,12 @@ namespace basecode::scm::vm {
         blr_reg1:
         {
             LR = PC + sizeof(instruction_t);
-            PC += s64(G(opers->reg1.dest));
+            PC += s64(G(opers->reg1.dst));
             EXEC_NEXT();
         }
         cmp_imm:
         {
-            auto diff = __builtin_subcll(G(opers->imm.dest),
+            auto diff = __builtin_subcll(G(opers->imm.dst),
                                          opers->imm.src,
                                          0,
                                          &carry_out);
@@ -1039,7 +1039,7 @@ namespace basecode::scm::vm {
         }
         cmp_reg2:
         {
-            auto diff = __builtin_subcll(G(opers->reg2.dest),
+            auto diff = __builtin_subcll(G(opers->reg2.dst),
                                          G(opers->reg2.src),
                                          0,
                                          &carry_out);
@@ -1053,7 +1053,7 @@ namespace basecode::scm::vm {
         cmps_imm:
         {
             s64 diff{};
-            flags->v = __builtin_ssubll_overflow(G(opers->imm.dest),
+            flags->v = __builtin_ssubll_overflow(G(opers->imm.dst),
                                                  opers->imm.src,
                                                  &diff);
             flags->c  = false;
@@ -1065,7 +1065,7 @@ namespace basecode::scm::vm {
         cmps_reg2:
         {
             s64 diff{};
-            flags->v = __builtin_ssubll_overflow(G(opers->reg2.dest),
+            flags->v = __builtin_ssubll_overflow(G(opers->reg2.dst),
                                                  G(opers->reg2.src),
                                                  &diff);
             flags->c  = false;
@@ -1136,116 +1136,116 @@ namespace basecode::scm::vm {
         }
         seq_reg1:
         {
-            G(opers->reg1.dest) = flags->z;
+            G(opers->reg1.dst) = flags->z;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         seqs_reg1:
         {
-            G(opers->reg1.dest) = flags->z;
+            G(opers->reg1.dst) = flags->z;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sne_reg1:
         {
-            G(opers->reg1.dest) = !flags->z;
+            G(opers->reg1.dst) = !flags->z;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         snes_reg1:
         {
-            G(opers->reg1.dest) = !flags->z;
+            G(opers->reg1.dst) = !flags->z;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sl_reg1:
         {
-            G(opers->reg1.dest) = !flags->c;
+            G(opers->reg1.dst) = !flags->c;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sls_reg1:
         {
-            G(opers->reg1.dest) = flags->n != flags->v;
+            G(opers->reg1.dst) = flags->n != flags->v;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sle_reg1:
         {
-            G(opers->reg1.dest) = !flags->c || flags->z;
+            G(opers->reg1.dst) = !flags->c || flags->z;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sles_reg1:
         {
-            G(opers->reg1.dest) = flags->z || flags->n != flags->v;
+            G(opers->reg1.dst) = flags->z || flags->n != flags->v;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sg_reg1:
         {
-            G(opers->reg1.dest) = flags->c && !flags->z;
+            G(opers->reg1.dst) = flags->c && !flags->z;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sgs_reg1:
         {
-            G(opers->reg1.dest) = !flags->z || flags->n == flags->v;
+            G(opers->reg1.dst) = !flags->z || flags->n == flags->v;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sge_reg1:
         {
-            G(opers->reg1.dest) = flags->c;
+            G(opers->reg1.dst) = flags->c;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         sges_reg1:
         {
-            G(opers->reg1.dest) = flags->n == flags->v;
+            G(opers->reg1.dst) = flags->n == flags->v;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         ret_reg1:
         {
-            PC = G(opers->reg1.dest);
+            PC = G(opers->reg1.dst);
             EXEC_NEXT();
         }
         mma_imm:
         {
             auto area = &vm.memory_map.entries[opers->imm.src];
-            G(opers->imm.dest) = area->valid ? area->addr : 0;
+            G(opers->imm.dst) = area->valid ? area->addr : 0;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         pop_reg2:
         {
-            G(opers->reg2.dest) = H(G(opers->reg2.src));
+            G(opers->reg2.dst) = H(G(opers->reg2.src));
             G(opers->reg2.src) += s32(opers->reg2.aux);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         fix_imm2:
         {
-            G(opers->imm.dest) = u64(make_fixnum(ctx, G(opers->imm.src)));
+            G(opers->imm.dst) = u64(make_fixnum(ctx, G(opers->imm.src)));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         fix_reg2:
         {
-            G(opers->reg2.dest) = u64(make_fixnum(ctx, G(opers->reg2.src)));
+            G(opers->reg2.dst) = u64(make_fixnum(ctx, G(opers->reg2.src)));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         flo_imm2:
         {
-            G(opers->imm.dest) = u64(make_flonum(ctx, f32(G(opers->imm.src))));
+            G(opers->imm.dst) = u64(make_flonum(ctx, f32(G(opers->imm.src))));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         flo_reg2:
         {
-            G(opers->reg2.dest) = u64(make_flonum(ctx, f32(G(opers->reg2.src))));
+            G(opers->reg2.dst) = u64(make_flonum(ctx, f32(G(opers->reg2.src))));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1266,7 +1266,7 @@ namespace basecode::scm::vm {
         env_reg2:
         {
             auto curr_env = (obj_t*) H(G(opers->reg2.src));
-            G(opers->reg2.dest) = u64(make_environment(ctx, curr_env));
+            G(opers->reg2.dst) = u64(make_environment(ctx, curr_env));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1278,7 +1278,7 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg2.dest) = u64(t);
+            G(opers->reg2.dst) = u64(t);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1302,9 +1302,9 @@ namespace basecode::scm::vm {
         }
         error_reg2:
         {
-            G(opers->reg2.dest) = u64(make_error(ctx,
-                                                 (obj_t*) G(opers->reg2.src),
-                                                 ctx->call_list));
+            G(opers->reg2.dst) = u64(make_error(ctx,
+                                                (obj_t*) G(opers->reg2.src),
+                                                ctx->call_list));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1313,10 +1313,10 @@ namespace basecode::scm::vm {
             auto m = G(opers->imm.src);
             switch (m) {
                 case 0:
-                    write(stdout, ctx, (obj_t*) G(opers->imm.dest));
+                    write(stdout, ctx, (obj_t*) G(opers->imm.dst));
                     break;
                 case 1:
-                    print(stdout, ctx, (obj_t*) G(opers->imm.dest));
+                    print(stdout, ctx, (obj_t*) G(opers->imm.dst));
                     break;
                 case 2:
                     break;
@@ -1331,10 +1331,10 @@ namespace basecode::scm::vm {
             auto m = G(opers->reg2.src);
             switch (m) {
                 case 0:
-                    write(stdout, ctx, (obj_t*) G(opers->reg2.dest));
+                    write(stdout, ctx, (obj_t*) G(opers->reg2.dst));
                     break;
                 case 1:
-                    print(stdout, ctx, (obj_t*) G(opers->reg2.dest));
+                    print(stdout, ctx, (obj_t*) G(opers->reg2.dst));
                     break;
                 case 2:
                     break;
@@ -1352,7 +1352,7 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg2.dest) = u64(CDR(v));
+            G(opers->reg2.dst) = u64(CDR(v));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1364,7 +1364,7 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg2.dest) = u64(v);
+            G(opers->reg2.dst) = u64(v);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1376,13 +1376,13 @@ namespace basecode::scm::vm {
         }
         gc_reg1:
         {
-            push_gc(ctx, (obj_t*) G(opers->reg1.dest));
+            push_gc(ctx, (obj_t*) G(opers->reg1.dst));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         gc_reg2:
         {
-            G(opers->reg2.dest) = u64(pop_gc(ctx));
+            G(opers->reg2.dst) = u64(pop_gc(ctx));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1406,7 +1406,7 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->imm.dest) = u64(v);
+            G(opers->imm.dst) = u64(v);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1418,31 +1418,31 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg2.dest) = u64(v);
+            G(opers->reg2.dst) = u64(v);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         car_reg2:
         {
-            G(opers->reg2.dest) = u64(CAR((obj_t*) G(opers->reg2.src)));
+            G(opers->reg2.dst) = u64(CAR((obj_t*) G(opers->reg2.src)));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         cdr_reg2:
         {
-            G(opers->reg2.dest) = u64(CDR((obj_t*) G(opers->reg2.src)));
+            G(opers->reg2.dst) = u64(CDR((obj_t*) G(opers->reg2.src)));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         setcar_reg2:
         {
-            SET_CAR((obj_t*) G(opers->reg2.dest), (obj_t*) G(opers->reg2.src));
+            SET_CAR((obj_t*) G(opers->reg2.dst), (obj_t*) G(opers->reg2.src));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         setcdr_reg2:
         {
-            SET_CDR((obj_t*) G(opers->reg2.dest), (obj_t*) G(opers->reg2.src));
+            SET_CDR((obj_t*) G(opers->reg2.dst), (obj_t*) G(opers->reg2.src));
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1455,7 +1455,7 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->imm.dest) = u64(v);
+            G(opers->imm.dst) = u64(v);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1467,14 +1467,14 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg2.dest) = u64(v);
+            G(opers->reg2.dst) = u64(v);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         set_imm:
         {
             set(ctx,
-                (obj_t*) G(opers->imm.dest),
+                (obj_t*) G(opers->imm.dst),
                 OBJ_AT(G(opers->imm.src)),
                 env);
             PC += sizeof(instruction_t);
@@ -1483,7 +1483,7 @@ namespace basecode::scm::vm {
         set_reg2:
         {
             set(ctx,
-                (obj_t*) G(opers->reg2.dest),
+                (obj_t*) G(opers->reg2.dst),
                 (obj_t*) G(opers->reg2.src),
                 env);
             PC += sizeof(instruction_t);
@@ -1491,13 +1491,13 @@ namespace basecode::scm::vm {
         }
         lnot_reg1:
         {
-            auto v = (obj_t*) G(opers->reg1.dest);
+            auto v = (obj_t*) G(opers->reg1.dst);
             flags->c = false;
             flags->z = !IS_TRUE(v);
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg1.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+            G(opers->reg1.dst) = u64(flags->z ? ctx->true_ : ctx->false_);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1509,33 +1509,33 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg2.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+            G(opers->reg2.dst) = u64(flags->z ? ctx->true_ : ctx->false_);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         truep_reg1:
         {
-            auto r = G(opers->reg1.dest);
+            auto r = G(opers->reg1.dst);
             auto v = r == 1 ? ctx->true_ : (obj_t*) r;
             flags->c = false;
             flags->z = IS_TRUE(v);
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg1.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+            G(opers->reg1.dst) = u64(flags->z ? ctx->true_ : ctx->false_);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         falsep_reg1:
         {
-            auto r = G(opers->reg1.dest);
+            auto r = G(opers->reg1.dst);
             auto v = r == 0 ? ctx->false_ : (obj_t*) r;
             flags->c = false;
             flags->z = IS_FALSE(v);
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg1.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+            G(opers->reg1.dst) = u64(flags->z ? ctx->true_ : ctx->false_);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1547,7 +1547,7 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg2.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+            G(opers->reg2.dst) = u64(flags->z ? ctx->true_ : ctx->false_);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1560,7 +1560,7 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg2.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+            G(opers->reg2.dst) = u64(flags->z ? ctx->true_ : ctx->false_);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1572,7 +1572,7 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg2.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+            G(opers->reg2.dst) = u64(flags->z ? ctx->true_ : ctx->false_);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1584,7 +1584,7 @@ namespace basecode::scm::vm {
             flags->n = false;
             flags->i = false;
             flags->v = false;
-            G(opers->reg2.dest) = u64(flags->z ? ctx->true_ : ctx->false_);
+            G(opers->reg2.dst) = u64(flags->z ? ctx->true_ : ctx->false_);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
@@ -1698,46 +1698,46 @@ namespace basecode::scm::vm {
         }
         push_imm:
         {
-            G(opers->imm.dest) += s8(opers->imm.aux);
-            H(G(opers->imm.dest)) = opers->imm.src;
+            G(opers->imm.dst) += s8(opers->imm.aux);
+            H(G(opers->imm.dst)) = opers->imm.src;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         push_reg2:
         {
-            G(opers->reg2.dest) += s32(opers->reg2.aux);
-            H(G(opers->reg2.dest)) = G(opers->reg2.src);
+            G(opers->reg2.dst) += s32(opers->reg2.aux);
+            H(G(opers->reg2.dst)) = G(opers->reg2.src);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         lea_imm:
         {
-            G(opers->imm.dest) = PC + s32(opers->imm.src);
+            G(opers->imm.dst) = PC + s32(opers->imm.src);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         lea_offs:
         {
-            G(opers->offset.dest) = G(opers->offset.src) + s32(opers->offset.offs);
+            G(opers->offset.dst) = G(opers->offset.src) + s32(opers->offset.offs);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         move_imm:
         {
-            G(opers->imm.dest) = opers->imm.src;
+            G(opers->imm.dst) = opers->imm.src;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         move_reg2:
         {
-            G(opers->reg2.dest) = G(opers->reg2.src);
+            G(opers->reg2.dst) = G(opers->reg2.src);
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         load_reg2:
         {
             auto src = H(G(opers->reg2.src));
-            G(opers->reg2.dest) = src;
+            G(opers->reg2.dst) = src;
             flags->v = false;
             flags->c = false;
             flags->z = src == 0;
@@ -1748,7 +1748,7 @@ namespace basecode::scm::vm {
         load_offset:
         {
             auto src = H(G(opers->offset.src) + opers->offset.offs);
-            G(opers->offset.dest) = src;
+            G(opers->offset.dst) = src;
             flags->v = false;
             flags->c = false;
             flags->z = src == 0;
@@ -1758,8 +1758,8 @@ namespace basecode::scm::vm {
         }
         load_indexed:
         {
-            auto src = H(G(opers->indexed.base) + G(opers->indexed.index) + opers->offset.offs);
-            G(opers->indexed.dest) = src;
+            auto src = H(G(opers->indexed.base) + G(opers->indexed.ndx) + opers->offset.offs);
+            G(opers->indexed.dst) = src;
             flags->v = false;
             flags->c = false;
             flags->z = src == 0;
@@ -1770,7 +1770,7 @@ namespace basecode::scm::vm {
         store_reg2:
         {
             auto src = G(opers->reg2.src);
-            H(G(opers->reg2.dest)) = src;
+            H(G(opers->reg2.dst)) = src;
             flags->v = false;
             flags->c = false;
             flags->z = src == 0;
@@ -1781,14 +1781,14 @@ namespace basecode::scm::vm {
         store_offset:
         {
             auto src = G(opers->offset.src);
-            H(G(opers->offset.dest) + opers->offset.offs) = src;
+            H(G(opers->offset.dst) + opers->offset.offs) = src;
             PC += sizeof(instruction_t);
             EXEC_NEXT();
         }
         store_indexed:
         {
-            auto src = G(opers->indexed.dest);
-            H(G(opers->indexed.base) + G(opers->indexed.index) + opers->indexed.offs) = src;
+            auto src = G(opers->indexed.dst);
+            H(G(opers->indexed.base) + G(opers->indexed.ndx) + opers->indexed.offs) = src;
             flags->v = false;
             flags->c = false;
             flags->z = src == 0;
@@ -1806,7 +1806,7 @@ namespace basecode::scm::vm {
         }
         exit_reg1:
         {
-            auto success = b8(G(opers->reg1.dest));
+            auto success = b8(G(opers->reg1.dst));
             if (!success)
                 status = status_t::fail;
             vm.exited = true;
@@ -1815,7 +1815,7 @@ namespace basecode::scm::vm {
         trap_imm:
         {
             auto id       = opers->imm.src;
-            auto arg      = G(opers->imm.dest);
+            auto arg      = G(opers->imm.dst);
             auto callback = hashtab::find(vm.traptab, u32(id));
             status = callback && callback(vm, arg) ? status_t::ok : status_t::fail;
             PC += sizeof(instruction_t);
@@ -1824,7 +1824,7 @@ namespace basecode::scm::vm {
         trap_reg2:
         {
             auto id       = G(opers->reg2.src);
-            auto arg      = G(opers->reg2.dest);
+            auto arg      = G(opers->reg2.dst);
             auto callback = hashtab::find(vm.traptab, u32(id));
             status = callback && callback(vm, arg) ? status_t::ok : status_t::fail;
             PC += sizeof(instruction_t);

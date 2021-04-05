@@ -181,27 +181,27 @@ namespace basecode::scm {
                     op_code_t opcode,
                     s32 offset,
                     reg_t src,
-                    reg_t dest,
+                    reg_t dst,
                     b8 mode = false);
 
             [[maybe_unused]] u0 indx(bb_t& bb,
                     op_code_t opcode,
                     s32 offset,
                     reg_t base,
-                    reg_t index,
-                    reg_t dest);
+                    reg_t ndx,
+                    reg_t dst);
 
             u0 reg2(bb_t& bb,
                     op_code_t opcode,
                     reg_t src,
-                    reg_t dest,
+                    reg_t dst,
                     b8 is_signed = false,
                     s32 aux = 0);
 
             u0 imm2(bb_t& bb,
                     op_code_t opcode,
                     imm_t src,
-                    reg_t dest,
+                    reg_t dst,
                     b8 is_signed = false,
                     b8 mode = false);
 
@@ -212,7 +212,7 @@ namespace basecode::scm {
                         imm_t imm,
                         b8 is_signed = false);
 
-            u0 dw(bb_t& bb, imm_t imm);
+            u0 dw(bb_t& bb, u64 data);
 
             u0 pred(bb_t& bb, bb_t& pred);
 
@@ -254,7 +254,7 @@ namespace basecode::scm {
 
             bb_t& make_succ(bb_t& bb, bb_type_t type = bb_type_t::code);
 
-            bb_t& ibuf(bb_t& bb, u8 addr_reg, const imm_t* data, u32 size);
+            bb_t& ibuf(bb_t& bb, u8 addr_reg, const u64* data, u32 size);
         }
 
         namespace emitter {
@@ -271,7 +271,6 @@ namespace basecode::scm {
                 return imm_t{
                     .b = bb,
                     .type = imm_type_t::block,
-                    .size = imm_size_t::unsigned_half_word
                 };
             }
 
@@ -327,7 +326,6 @@ namespace basecode::scm {
                 return imm_t{
                     .s = v,
                     .type = type,
-                    .size = imm_size_t::signed_half_word
                 };
             }
 
@@ -335,15 +333,6 @@ namespace basecode::scm {
                 return imm_t{
                     .u = v,
                     .type = type,
-                    .size = imm_size_t::unsigned_half_word
-                };
-            }
-
-            constexpr imm_t imm(u64 v, imm_type_t type = imm_type_t::value) {
-                return imm_t{
-                    .lu = v,
-                    .type = type,
-                    .size = imm_size_t::unsigned_half_word
                 };
             }
 
