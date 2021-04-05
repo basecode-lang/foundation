@@ -151,42 +151,6 @@ namespace basecode::scm {
 
     namespace vm {
         namespace basic_block {
-            u0 imm2(bb_t& bb,
-                    op_code_t opcode,
-                    imm_t imm,
-                    reg_t dst,
-                    b8 is_signed,
-                    b8 mode) {
-                u64 buf{};
-                u64  data{};
-                auto inst       = (instruction_t*) &buf;
-                auto opers      = (operand_encoding_t*) &data;
-                inst->type      = opcode;
-                inst->encoding  = instruction::encoding::imm;
-                inst->is_signed = is_signed;
-                switch (imm.type) {
-                    case imm_type_t::block:
-                        opers->imm.src = imm.b->id;
-                        break;
-                    case imm_type_t::trap:
-                    case imm_type_t::label:
-                    case imm_type_t::value:
-                        opers->imm.src = imm.s;
-                        break;
-                }
-                opers->imm.dst  = dst;
-                opers->imm.mode = mode;
-                opers->imm.type = u8(imm.type);
-                auto area = find_memory_map_entry(*bb.emitter->vm, dst);
-                if (area) {
-                    opers->imm.aux = area->top ? -1 : 1;
-                } else {
-                    opers->imm.aux = 0;
-                }
-                inst->data = data;
-                array::append(bb.entries, buf);
-            }
-
             u0 free(bb_t& bb) {
                 for (const auto& pair : bb.comments)
                     array::free(const_cast<note_list_t&>(pair.value));
@@ -213,53 +177,6 @@ namespace basecode::scm {
                 opers->offset.offs = offset;
                 opers->offset.mode = mode;
                 inst->data         = data;
-                array::append(bb.entries, buf);
-            }
-
-            u0 reg2(bb_t& bb,
-                    op_code_t opcode,
-                    reg_t src,
-                    reg_t dst,
-                    b8 is_signed,
-                    s32 aux) {
-                u64 buf{};
-                u64  data{};
-                auto inst        = (instruction_t*) &buf;
-                auto opers       = (operand_encoding_t*) &data;
-                inst->type       = opcode;
-                inst->is_signed  = is_signed;
-                inst->encoding   = instruction::encoding::reg2;
-                opers->reg2.dst  = dst;
-                opers->reg2.src  = src;
-                opers->reg2.pad  = 0;
-                auto area = find_memory_map_entry(*bb.emitter->vm, src);
-                if (area && !aux) {
-                    opers->reg2.aux = area->top ? -1 : 1;
-                } else {
-                    opers->reg2.aux = aux;
-                }
-                inst->data = data;
-                array::append(bb.entries, buf);
-            }
-
-            [[maybe_unused]] u0 indx(bb_t& bb,
-                    op_code_t opcode,
-                    s32 offset,
-                    reg_t base,
-                    reg_t ndx,
-                    reg_t dst) {
-                u64 buf{};
-                u64  data{};
-                auto inst  = (instruction_t*) &buf;
-                auto opers = (operand_encoding_t*) &data;
-                inst->type          = opcode;
-                inst->encoding      = instruction::encoding::indexed;
-                opers->indexed.ndx  = ndx;
-                opers->indexed.dst  = dst;
-                opers->indexed.pad  = 0;
-                opers->indexed.offs = offset;
-                opers->indexed.base = base;
-                inst->data          = data;
                 array::append(bb.entries, buf);
             }
 
@@ -328,13 +245,12 @@ namespace basecode::scm {
                 bb.next   = &succ;
             }
 
-            u0 none(bb_t& bb, op_code_t opcode) {
-                u64 buf{};
-                auto inst = (instruction_t*) &buf;
-                inst->data     = 0;
-                inst->type     = opcode;
-                inst->encoding = instruction::encoding::none;
-                array::append(bb.entries, buf);
+            bb_builder_t encode(bb_t* bb) {
+                return bb_builder_t(bb);
+            }
+
+            bb_builder_t encode(bb_t& bb) {
+                return bb_builder_t(bb);
             }
 
             reg_t* find_bind(bb_t& bb, obj_t* obj) {
@@ -354,29 +270,6 @@ namespace basecode::scm {
 
             u0 set_bind(bb_t& bb, reg_t reg, obj_t* obj) {
                 hashtab::insert(bb.emitter->regtab, u64(obj), reg);
-            }
-
-            u0 reg1(bb_t& bb, op_code_t opcode, reg_t arg) {
-                u64 buf{};
-                u64 data{};
-                auto inst  = (instruction_t*) &buf;
-                auto opers = (operand_encoding_t*) &data;
-                inst->type      = opcode;
-                inst->encoding  = instruction::encoding::reg1;
-                opers->reg1.dst = arg;
-                opers->reg1.pad = 0;
-                inst->data      = data;
-                array::append(bb.entries, buf);
-            }
-
-            bb_t& ubuf(bb_t& bb, reg_t addr_reg, u32 size) {
-                for (u32 i = 0; i < size; ++i)
-                    array::append(bb.entries, 0);
-                auto& load_block = emitter::make_basic_block(*bb.emitter);
-                imm2(load_block,
-                     instruction::type::lea, emitter::imm(&bb),
-                     addr_reg);
-                return load_block;
             }
 
             u0 imm1(bb_t& bb, op_code_t opcode, imm_t imm) {
@@ -414,15 +307,387 @@ namespace basecode::scm {
                 hashtab::init(bb.comments, e->alloc);
             }
 
-            bb_t& ibuf(bb_t& bb, reg_t addr_reg, const u64* data, u32 size) {
-                for (u32 i = 0; i < size; ++i)
-                    array::append(bb.entries, data[i]);
-                auto& load_block = emitter::make_basic_block(*bb.emitter);
-                imm2(load_block,
-                     instruction::type::lea,
-                     emitter::imm(&bb),
-                     addr_reg);
-                return load_block;
+            bb_builder_t::bb_builder_t(bb_t* bb) : _bb(bb),
+                                                   _str(),
+                                                   _imm(),
+                                                   _reg(),
+                                                   _imm1(this),
+                                                   _imm2(this),
+                                                   _reg1(this),
+                                                   _reg2(this),
+                                                   _none(this),
+                                                   _offset(),
+                                                   _aux(),
+                                                   _op_code(),
+                                                   _encoding(),
+                                                   _mode(),
+                                                   _is_signed() {
+            }
+
+            bb_builder_t::bb_builder_t(bb_t& bb) : _bb(&bb),
+                                                   _str(),
+                                                   _imm(),
+                                                   _reg(),
+                                                   _imm1(this),
+                                                   _imm2(this),
+                                                   _reg1(this),
+                                                   _reg2(this),
+                                                   _none(this),
+                                                   _offset(),
+                                                   _aux(),
+                                                   _op_code(),
+                                                   _encoding(),
+                                                   _mode(),
+                                                   _is_signed() {
+            }
+
+            status_t bb_builder_t::build() {
+                u64 buf     {};
+                u64 data    {};
+                auto inst  = (instruction_t*) &buf;
+                auto opers = (operand_encoding_t*) &data;
+                inst->type      = _op_code;
+                inst->is_signed = _is_signed;
+                switch (_encoding) {
+                    case instruction::encoding::none:
+                        inst->data     = 0;
+                        inst->encoding = instruction::encoding::none;
+                        break;
+                    case instruction::encoding::imm:
+                        inst->encoding  = instruction::encoding::imm;
+                        switch (_imm.type) {
+                            case imm_type_t::block:
+                                opers->imm.src = _imm.b->id;
+                                break;
+                            case imm_type_t::trap:
+                            case imm_type_t::label:
+                            case imm_type_t::value:
+                                opers->imm.src = _imm.s;
+                                break;
+                        }
+                        if (_reg[1].type == reg_oper_type_t::reg) {
+                            opers->imm.dst = _reg[1].kind.r;
+                            auto area = find_memory_map_entry(*_bb->emitter->vm, opers->imm.dst);
+                            if (area) {
+                                opers->imm.aux = area->top ? -1 : 1;
+                            } else {
+                                opers->imm.aux = 0;
+                            }
+                        } else {
+                        }
+                        opers->imm.mode = _mode;
+                        opers->imm.type = u8(_imm.type);
+                        break;
+                    case instruction::encoding::offset:
+                        inst->encoding = instruction::encoding::offset;
+                        if (_reg[1].type == reg_oper_type_t::reg) {
+                            opers->offset.dst = _reg[1].kind.r;
+                        } else {
+                        }
+                        if (_reg[0].type == reg_oper_type_t::reg) {
+                            opers->offset.src = _reg[0].kind.r;
+                        } else {
+                        }
+                        opers->offset.pad  = 0;
+                        opers->offset.offs = _offset;
+                        opers->offset.mode = _mode;
+                        break;
+                    case instruction::encoding::indexed:
+                        inst->encoding      = instruction::encoding::indexed;
+                        opers->indexed.pad  = 0;
+                        if (_reg[0].type == reg_oper_type_t::reg) {
+                            opers->indexed.ndx = _reg[0].kind.r;
+                        } else {
+                        }
+                        if (_reg[1].type == reg_oper_type_t::reg) {
+                            opers->indexed.dst = _reg[1].kind.r;
+                        } else {
+                        }
+                        if (_reg[2].type == reg_oper_type_t::reg) {
+                            opers->indexed.base = _reg[2].kind.r;
+                        } else {
+                        }
+                        opers->indexed.offs = _offset;
+                        break;
+                    case instruction::encoding::reg1:
+                        inst->encoding  = instruction::encoding::reg1;
+                        if (_reg[1].type == reg_oper_type_t::reg) {
+                            opers->reg1.dst = _reg[1].kind.r;
+                        } else {
+                        }
+                        opers->reg1.pad = 0;
+                        break;
+                    case instruction::encoding::reg2:
+                        inst->encoding   = instruction::encoding::reg2;
+                        if (_reg[1].type == reg_oper_type_t::reg) {
+                            opers->reg2.dst = _reg[1].kind.r;
+                        } else {
+                        }
+                        if (_reg[0].type == reg_oper_type_t::reg) {
+                            opers->reg2.src = _reg[0].kind.r;
+                            auto area = find_memory_map_entry(*_bb->emitter->vm, opers->reg2.src);
+                            if (area && !_aux) {
+                                opers->reg2.aux = area->top ? -1 : 1;
+                            } else {
+                                opers->reg2.aux = _aux;
+                            }
+                        } else {
+                        }
+                        opers->reg2.pad  = 0;
+                        break;
+                    case instruction::encoding::reg2_imm:
+                        inst->encoding    = instruction::encoding::reg2_imm;
+                        if (_reg[0].type == reg_oper_type_t::reg) {
+                            opers->reg2_imm.a = _reg[0].kind.r;
+                        } else {
+                        }
+                        if (_reg[1].type == reg_oper_type_t::reg) {
+                            opers->reg2_imm.b = _reg[1].kind.r;
+                        } else {
+                        }
+                        switch (_imm.type) {
+                            case imm_type_t::block:
+                                opers->reg2_imm.imm = _imm.b->id;
+                                break;
+                            case imm_type_t::trap:
+                            case imm_type_t::label:
+                            case imm_type_t::value:
+                                opers->reg2_imm.imm = _imm.s;
+                                break;
+                        }
+                        opers->reg2_imm.type = u8(_imm.type);
+                        break;
+                    case instruction::encoding::reg3:
+                        inst->encoding  = instruction::encoding::reg3;
+                        if (_reg[0].type == reg_oper_type_t::reg) {
+                            opers->reg3.a = _reg[1].kind.r;
+                        } else {
+                        }
+                        if (_reg[1].type == reg_oper_type_t::reg) {
+                            opers->reg3.b = _reg[1].kind.r;
+                        } else {
+                        }
+                        if (_reg[2].type == reg_oper_type_t::reg) {
+                            opers->reg3.c = _reg[1].kind.r;
+                        } else {
+                        }
+                        opers->reg3.pad = 0;
+                        break;
+                    default:
+                        return status_t::fail;
+                }
+                inst->data = data;
+                array::append(_bb->entries, buf);
+                return status_t::ok;
+            }
+
+            imm1_builder_t& bb_builder_t::imm1() {
+                _encoding = instruction::encoding::imm;
+                return _imm1;
+            }
+
+            imm2_builder_t& bb_builder_t::imm2() {
+                _encoding = instruction::encoding::imm;
+                return _imm2;
+            }
+
+            reg1_builder_t& bb_builder_t::reg1() {
+                _encoding = instruction::encoding::reg1;
+                return _reg1;
+            }
+
+            reg2_builder_t& bb_builder_t::reg2() {
+                _encoding = instruction::encoding::reg2;
+                return _reg2;
+            }
+
+            none_builder_t& bb_builder_t::none() {
+                _encoding = instruction::encoding::none;
+                return _none;
+            }
+
+            bb_builder_t& none_builder_t::next() {
+                return *_builder;
+            }
+
+            none_builder_t& none_builder_t::op(op_code_t op_code) {
+                _builder->_op_code = op_code;
+                return *this;
+            }
+
+            bb_builder_t& imm1_builder_t::next() {
+                return *_builder;
+            }
+
+            imm1_builder_t& imm1_builder_t::value(s32 value) {
+                _builder->_imm = emitter::imm(value);
+                _builder->_is_signed = true;
+                return *this;
+            }
+
+            imm1_builder_t& imm1_builder_t::value(u32 value) {
+                _builder->_imm = emitter::imm(value);
+                return *this;
+            }
+
+            imm1_builder_t& imm1_builder_t::value(bb_t* value) {
+                _builder->_imm = emitter::imm(value);
+                return *this;
+            }
+
+            bb_builder_t& imm2_builder_t::next() {
+                return *_builder;
+            }
+
+            imm2_builder_t& imm2_builder_t::mode(b8 flag) {
+                _builder->_mode = true;
+                return *this;
+            }
+
+            imm2_builder_t& imm2_builder_t::src(reg_t reg) {
+                _builder->_reg[1] = reg_oper_t{
+                    .kind.r = reg,
+                    .type = reg_oper_type_t::reg
+                };
+                _builder->_mode = true;
+                return *this;
+            }
+
+            imm2_builder_t& imm2_builder_t::dst(reg_t reg) {
+                _builder->_reg[1] = reg_oper_t{
+                    .kind.r = reg,
+                    .type = reg_oper_type_t::reg
+                };
+                return *this;
+            }
+
+            imm2_builder_t& imm2_builder_t::dst(var_t* var) {
+                _builder->_reg[1] = reg_oper_t{
+                    .kind.v = var,
+                    .type = reg_oper_type_t::var
+                };
+                return *this;
+            }
+
+            imm2_builder_t& imm2_builder_t::src(var_t* var) {
+                _builder->_reg[1] = reg_oper_t{
+                    .kind.v = var,
+                    .type = reg_oper_type_t::var
+                };
+                _builder->_mode = true;
+                return *this;
+            }
+
+            imm1_builder_t& imm1_builder_t::op(op_code_t op) {
+                _builder->_op_code = op;
+                return *this;
+            }
+
+            imm2_builder_t& imm2_builder_t::value(s32 value) {
+                _builder->_imm = emitter::imm(value);
+                _builder->_is_signed = true;
+                return *this;
+            }
+
+            imm2_builder_t& imm2_builder_t::value(u32 value) {
+                _builder->_imm = emitter::imm(value);
+                return *this;
+            }
+
+            imm2_builder_t& imm2_builder_t::op(op_code_t op) {
+                _builder->_op_code = op;
+                return *this;
+            }
+
+            imm1_builder_t& imm1_builder_t::is_signed(b8 flag) {
+                _builder->_is_signed = flag;
+                return *this;
+            }
+
+            imm2_builder_t& imm2_builder_t::value(bb_t* value) {
+                _builder->_imm = emitter::imm(value);
+                return *this;
+            }
+
+            imm2_builder_t& imm2_builder_t::is_signed(b8 flag) {
+                _builder->_is_signed = flag;
+                return *this;
+            }
+
+            bb_builder_t& reg1_builder_t::next() {
+                return *_builder;
+            }
+
+            reg1_builder_t& reg1_builder_t::dst(reg_t reg) {
+                _builder->_reg[1] = reg_oper_t{
+                    .kind.r = reg,
+                    .type = reg_oper_type_t::reg
+                };
+                return *this;
+            }
+
+            reg1_builder_t& reg1_builder_t::dst(var_t* var) {
+                _builder->_reg[1] = reg_oper_t{
+                    .kind.v = var,
+                    .type = reg_oper_type_t::var
+                };
+                return *this;
+            }
+
+            reg1_builder_t& reg1_builder_t::op(op_code_t op_code) {
+                _builder->_op_code = op_code;
+                return *this;
+            }
+
+            bb_builder_t& reg2_builder_t::next() {
+                return *_builder;
+            }
+
+            reg2_builder_t& reg2_builder_t::aux(s8 value) {
+                _builder->_aux = value;
+                return *this;
+            }
+
+            reg2_builder_t& reg2_builder_t::dst(reg_t reg) {
+                _builder->_reg[1] = reg_oper_t{
+                    .kind.r = reg,
+                    .type = reg_oper_type_t::reg
+                };
+                return *this;
+            }
+
+            reg2_builder_t& reg2_builder_t::dst(var_t* var) {
+                _builder->_reg[1] = reg_oper_t{
+                    .kind.v = var,
+                    .type = reg_oper_type_t::var
+                };
+                return *this;
+            }
+
+            reg2_builder_t& reg2_builder_t::src(reg_t reg) {
+                _builder->_reg[0] = reg_oper_t{
+                    .kind.r = reg,
+                    .type = reg_oper_type_t::reg
+                };
+                return *this;
+            }
+
+            reg2_builder_t& reg2_builder_t::src(var_t* var) {
+                _builder->_reg[0] = reg_oper_t{
+                    .kind.v = var,
+                    .type = reg_oper_type_t::var
+                };
+                return *this;
+            }
+
+            reg2_builder_t& reg2_builder_t::is_signed(b8 flag) {
+                _builder->_is_signed = flag;
+                return *this;
+            }
+
+            reg2_builder_t& reg2_builder_t::op(op_code_t op_code) {
+                _builder->_op_code = op_code;
+                return *this;
             }
         }
 
@@ -534,7 +799,7 @@ namespace basecode::scm {
                                               curr->entries[i]);
                             format_comments(buf,
                                             buf.size() - start_pos,
-                                            hashtab::find(curr->comments, i + 1),
+                                            hashtab::find(curr->comments, i),
                                             e.strtab,
                                             addr);
                         }
@@ -641,7 +906,7 @@ namespace basecode::scm {
                             }
                             format_comments(buf,
                                             buf.size() - start_pos,
-                                            hashtab::find(curr->comments, i + 1),
+                                            hashtab::find(curr->comments, i),
                                             e.strtab,
                                             addr);
                             addr += sizeof(instruction_t);
@@ -751,13 +1016,30 @@ namespace basecode::scm {
 
             bb_t& leave(bb_t& bb) {
                 auto& entry_block = emitter::make_basic_block(*bb.emitter);
-                basic_block::succ(bb, entry_block);
-                basic_block::reg2(entry_block, op::move, rf::fp, rf::sp);
-                basic_block::comment(entry_block, "*** proc epilogue"_ss);
-                basic_block::comment(entry_block, "**"_ss);
-                basic_block::comment(entry_block, "*"_ss);
-                basic_block::reg2(entry_block, op::pop, rf::sp, rf::lr);
-                basic_block::reg1(entry_block, op::ret, rf::lr);
+                basic_block::encode(entry_block)
+                    .comment("*** proc epilogue"_ss)
+                    .comment("**"_ss)
+                    .comment("*"_ss)
+                    .pred(bb)
+                    .reg2()
+                    .op(op::move)
+                    .src(rf::fp)
+                    .dst(rf::sp)
+                    .next()
+                    .build();
+                basic_block::encode(entry_block)
+                    .reg2()
+                    .op(op::pop)
+                    .src(rf::sp)
+                    .dst(rf::lr)
+                    .next()
+                    .build();
+                basic_block::encode(entry_block)
+                    .reg1()
+                    .op(op::ret)
+                    .dst(rf::lr)
+                    .next()
+                    .build();
                 return entry_block;
             }
 
@@ -798,49 +1080,78 @@ namespace basecode::scm {
             }
 
             bb_t& enter(bb_t& bb, u32 locals) {
-                auto& entry_block =  emitter::make_basic_block(*bb.emitter);
-                basic_block::succ(bb, entry_block);
-
-                auto& exit_block  = emitter::make_basic_block(*bb.emitter);
-                basic_block::succ(entry_block, exit_block);
-                basic_block::reg2(exit_block, op::push, rf::lr, rf::sp);
-                basic_block::comment(exit_block, "*** proc prologue"_ss);
-                basic_block::comment(exit_block, "**"_ss);
-                basic_block::comment(exit_block, "*"_ss);
-                basic_block::reg2(exit_block, op::move, rf::sp, rf::fp);
+                auto& entry_block = emitter::make_basic_block(*bb.emitter);
+                basic_block::encode(entry_block)
+                    .pred(bb)
+                    .comment("*** proc prologue"_ss)
+                    .comment("**"_ss)
+                    .comment("*"_ss)
+                    .reg2()
+                    .op(op::push)
+                    .src(rf::lr)
+                    .dst(rf::sp)
+                    .next()
+                    .build();
+                basic_block::encode(entry_block)
+                    .reg2()
+                    .op(op::move)
+                    .src(rf::sp)
+                    .dst(rf::fp)
+                    .next()
+                    .build();
+                auto& exit_block = emitter::make_basic_block(*bb.emitter);
+                auto exit_encoder = basic_block::encode(exit_block);
+                exit_encoder.pred(entry_block);
                 if (locals > 0) {
-                    basic_block::imm2(exit_block,
-                                      op::sub,
-                                      emitter::imm(locals),
-                                      rf::sp);
+                    exit_encoder
+                        .imm2()
+                        .value(locals)
+                        .dst(rf::sp)
+                        .op(op::sub)
+                        .next()
+                        .build();
                 }
-
                 return exit_block;
             }
 
             u0 free_stack(bb_t& bb, u32 words) {
-                basic_block::imm2(bb,
-                                  op::add,
-                                  emitter::imm(words * 8),
-                                  rf::sp);
+                basic_block::encode(bb)
+                    .imm2()
+                    .op(op::add)
+                    .value(words * 8)
+                    .dst(rf::sp)
+                    .next()
+                    .build();
             }
 
             u0 todo(bb_t& bb, str::slice_t msg) {
-                basic_block::none(bb, op::nop);
-                basic_block::comment(bb, msg);
+                basic_block::encode(bb)
+                    .comment(msg)
+                    .none()
+                    .op(op::nop)
+                    .next()
+                    .build();
             }
 
             u0 set(bb_t& bb, u32 idx, reg_t reg) {
-                basic_block::imm2(bb,
-                                  op::set,
-                                  emitter::imm(idx),
-                                  reg,
-                                  false,
-                                  true);
+                basic_block::encode(bb)
+                    .imm2()
+                    .value(idx)
+                    .op(op::set)
+                    .dst(reg)
+                    .mode(true)
+                    .next()
+                    .build();
             }
 
             u0 get(bb_t& bb, u32 idx, reg_t reg) {
-                basic_block::imm2(bb, op::get, emitter::imm(idx), reg);
+                basic_block::encode(bb)
+                    .imm2()
+                    .value(idx)
+                    .op(op::get)
+                    .dst(reg)
+                    .next()
+                    .build();
             }
 
             compile_result_t inline_(compiler_t& comp,
@@ -853,28 +1164,64 @@ namespace basecode::scm {
             }
 
             u0 set(bb_t& bb, reg_t sym, reg_t val) {
-                basic_block::reg2(bb, op::set, val, sym);
+                basic_block::encode(bb)
+                    .reg2()
+                    .src(val)
+                    .dst(sym)
+                    .op(op::set)
+                    .next()
+                    .build();
             }
 
             u0 get(bb_t& bb, reg_t sym, reg_t reg) {
-                basic_block::reg2(bb, op::get, sym, reg);
+                basic_block::encode(bb)
+                    .reg2()
+                    .src(sym)
+                    .dst(reg)
+                    .op(op::get)
+                    .next()
+                    .build();
             }
 
             u0 pop_env(compiler_t& comp, bb_t& bb) {
                 auto reg = reg_alloc::reserve(bb.emitter->gp);
-                basic_block::reg2(bb, op::pop, rf::ep, reg[0]);
-                basic_block::comment(bb, "drop apply env"_ss);
+                basic_block::encode(bb)
+                    .comment("drop apply env"_ss)
+                    .reg2()
+                    .op(op::pop)
+                    .src(rf::ep)
+                    .dst(reg[0])
+                    .next()
+                    .build();
             }
 
             u0 push_env(compiler_t& comp, bb_t& bb) {
                 auto reg = reg_alloc::reserve(bb.emitter->gp);
                 save_protected(bb, comp);
-                basic_block::reg2(bb, op::env, rf::ep, reg[0]);
-                basic_block::reg2(bb, op::push, reg[0], rf::ep);
+                basic_block::encode(bb)
+                    .reg2()
+                    .op(op::env)
+                    .src(rf::ep)
+                    .dst(reg[0])
+                    .next()
+                    .build();
+                basic_block::encode(bb)
+                    .reg2()
+                    .op(op::push)
+                    .src(reg[0])
+                    .dst(rf::ep)
+                    .next()
+                    .build();
             }
 
             u0 const_(bb_t& bb, u32 idx, reg_t reg) {
-                basic_block::imm2(bb, op::const_, emitter::imm(idx), reg);
+                basic_block::encode(bb)
+                    .imm2()
+                    .op(op::const_)
+                    .value(idx)
+                    .dst(reg)
+                    .next()
+                    .build();
             }
 
             compile_result_t prim(compiler_t& comp,
@@ -936,33 +1283,88 @@ namespace basecode::scm {
 
                 switch (type) {
                     case prim_type_t::is:
-                        basic_block::reg2(*rhs_res.bb, op::lcmp, lhs_res.reg, rhs_res.reg);
-                        basic_block::comment(*rhs_res.bb, "prim: is"_ss);
-                        basic_block::reg1(*rhs_res.bb, op::seq, target_reg);
+                        basic_block::encode(rhs_res.bb)
+                            .comment("prim: is"_ss)
+                            .reg2()
+                            .op(op::lcmp)
+                            .src(lhs_res.reg)
+                            .dst(rhs_res.reg)
+                            .next()
+                            .build();
+                        basic_block::encode(rhs_res.bb)
+                            .reg1()
+                            .op(op::seq)
+                            .dst(target_reg)
+                            .next()
+                            .build();
                         break;
 
                     case prim_type_t::lt:
-                        basic_block::reg2(*rhs_res.bb, op::lcmp, lhs_res.reg, rhs_res.reg);
-                        basic_block::comment(*rhs_res.bb, "prim: lt"_ss);
-                        basic_block::reg1(*rhs_res.bb, op::sl, target_reg);
+                        basic_block::encode(rhs_res.bb)
+                            .comment("prim: lt"_ss)
+                            .reg2()
+                            .op(op::lcmp)
+                            .src(lhs_res.reg)
+                            .dst(rhs_res.reg)
+                            .next()
+                            .build();
+                        basic_block::encode(rhs_res.bb)
+                            .reg1()
+                            .op(op::sl)
+                            .dst(target_reg)
+                            .next()
+                            .build();
                         break;
 
                     case prim_type_t::gt:
-                        basic_block::reg2(*rhs_res.bb, op::lcmp, lhs_res.reg, rhs_res.reg);
-                        basic_block::comment(*rhs_res.bb, "prim: gt"_ss);
-                        basic_block::reg1(*rhs_res.bb, op::sg, target_reg);
+                        basic_block::encode(rhs_res.bb)
+                            .comment("prim: gt"_ss)
+                            .reg2()
+                            .op(op::lcmp)
+                            .src(lhs_res.reg)
+                            .dst(rhs_res.reg)
+                            .next()
+                            .build();
+                        basic_block::encode(rhs_res.bb)
+                            .reg1()
+                            .op(op::sg)
+                            .dst(target_reg)
+                            .next()
+                            .build();
                         break;
 
                     case prim_type_t::lte:
-                        basic_block::reg2(*rhs_res.bb, op::lcmp, lhs_res.reg, rhs_res.reg);
-                        basic_block::comment(*rhs_res.bb, "prim: lte"_ss);
-                        basic_block::reg1(*rhs_res.bb, op::sle, target_reg);
+                        basic_block::encode(rhs_res.bb)
+                            .comment("prim: lte"_ss)
+                            .reg2()
+                            .op(op::lcmp)
+                            .src(lhs_res.reg)
+                            .dst(rhs_res.reg)
+                            .next()
+                            .build();
+                        basic_block::encode(rhs_res.bb)
+                            .reg1()
+                            .op(op::sle)
+                            .dst(target_reg)
+                            .next()
+                            .build();
                         break;
 
                     case prim_type_t::gte:
-                        basic_block::reg2(*rhs_res.bb, op::lcmp, lhs_res.reg, rhs_res.reg);
-                        basic_block::comment(*rhs_res.bb, "prim: gte"_ss);
-                        basic_block::reg1(*rhs_res.bb, op::sge, target_reg);
+                        basic_block::encode(rhs_res.bb)
+                            .comment("prim: gte"_ss)
+                            .reg2()
+                            .op(op::lcmp)
+                            .src(lhs_res.reg)
+                            .dst(rhs_res.reg)
+                            .next()
+                            .build();
+                        basic_block::encode(rhs_res.bb)
+                            .reg1()
+                            .op(op::sge)
+                            .dst(target_reg)
+                            .next()
+                            .build();
                         break;
 
                     default:
@@ -1023,13 +1425,25 @@ namespace basecode::scm {
             u0 error(bb_t& bb, u32 idx, reg_t target_reg) {
                 auto reg = reg_alloc::reserve(bb.emitter->gp);
                 const_(bb, idx, reg[0]);
-                basic_block::reg2(bb, op::error, reg[0], target_reg);
+                basic_block::encode(bb)
+                    .reg2()
+                    .op(op::error)
+                    .src(reg[0])
+                    .dst(target_reg)
+                    .next()
+                    .build();
             }
 
             u0 save_protected(bb_t& bb, compiler_t& comp) {
                 for (reg_t r = rf::r0; r < rf::r15; ++r) {
                     if (reg_alloc::is_protected(comp.emitter.gp, r)) {
-                        basic_block::reg2(bb, op::push, r, rf::sp);
+                        basic_block::encode(bb)
+                            .reg2()
+                            .op(op::push)
+                            .src(r)
+                            .dst(rf::sp)
+                            .next()
+                            .build();
                         comp.prot[comp.prot_count++] = r;
                         reg_alloc::release_one(comp.emitter.gp, r);
                     }
@@ -1040,17 +1454,26 @@ namespace basecode::scm {
                 for (s32 i = comp.prot_count - 1; i >= 0; --i) {
                     reg_t r = comp.prot[i];
                     reg_alloc::reserve_and_protect_reg(comp.emitter.gp, r);
-                    basic_block::reg2(bb, op::pop, rf::sp, r);
+                    basic_block::encode(bb)
+                        .reg2()
+                        .op(op::pop)
+                        .src(rf::sp)
+                        .dst(r)
+                        .next()
+                        .build();
                     comp.prot[i] = 0;
                 }
                 comp.prot_count = 0;
             }
 
             u0 alloc_stack(bb_t& bb, u32 words, reg_t base_reg) {
-                basic_block::imm2(bb,
-                                  op::sub,
-                                  emitter::imm(words * 8),
-                                  rf::sp);
+                basic_block::encode(bb)
+                    .imm2()
+                    .op(op::sub)
+                    .value(words * 8)
+                    .dst(rf::sp)
+                    .next()
+                    .build();
                 basic_block::offs(bb,
                                   op::lea,
                                   -(words * 8),
@@ -1064,9 +1487,8 @@ namespace basecode::scm {
                 if (!target_reg) {
                     auto reg = compiler::reserve_reg(comp, c);
                     get(*c.bb, (u32) OBJ_IDX(c.obj), reg);
-                    basic_block::comment(
-                        *c.bb,
-                        format::format("symbol: {}", scm::to_string(c.ctx, c.obj)));
+                    basic_block::encode(c.bb)
+                        .comment(format::format("symbol: {}", scm::to_string(c.ctx, c.obj)));
                     basic_block::set_bind(*c.bb, reg, c.obj);
                     return {c.bb, reg, false};
                 }
@@ -1079,9 +1501,8 @@ namespace basecode::scm {
                 if (!target_reg) {
                     auto reg = compiler::reserve_reg(comp, c);
                     const_(*c.bb, OBJ_IDX(c.obj), reg);
-                    basic_block::comment(
-                        *c.bb,
-                        format::format("literal: {}", scm::to_string(c.ctx, c.obj)));
+                    basic_block::encode(c.bb)
+                        .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)));
                     basic_block::set_bind(*c.bb, reg, c.obj);
                     return {c.bb, reg, false};
                 }
@@ -1093,7 +1514,13 @@ namespace basecode::scm {
                 auto target_reg = compiler::reserve_reg(comp, c);
                 auto reg = reg_alloc::reserve(comp.emitter.gp);
                 const_(*c.bb, OBJ_IDX(CAR(args)), reg[0]);
-                basic_block::reg2(*c.bb, op::qt, reg[0], target_reg);
+                basic_block::encode(c.bb)
+                    .reg2()
+                    .op(op::qt)
+                    .src(reg[0])
+                    .dst(target_reg)
+                    .next()
+                    .build();
                 return {c.bb, target_reg, true};
             }
 
@@ -1102,7 +1529,13 @@ namespace basecode::scm {
                 auto target_reg = compiler::reserve_reg(comp, c);
                 auto reg = reg_alloc::reserve(comp.emitter.gp);
                 const_(*c.bb, OBJ_IDX(CAR(args)), reg[0]);
-                basic_block::reg2(*c.bb, op::qq, reg[0], target_reg);
+                basic_block::encode(c.bb)
+                    .reg2()
+                    .op(op::qq)
+                    .src(reg[0])
+                    .dst(target_reg)
+                    .next()
+                    .build();
                 return {c.bb, target_reg, true};
             }
 
@@ -1118,7 +1551,13 @@ namespace basecode::scm {
                 auto cc = c;
                 cc.obj = CAR(args);
                 auto res = compiler::compile(comp, cc);
-                basic_block::reg2(*res.bb, op::car, res.reg, target_reg);
+                basic_block::encode(res.bb)
+                    .reg2()
+                    .op(op::car)
+                    .src(res.reg)
+                    .dst(target_reg)
+                    .next()
+                    .build();
                 compiler::release_result(comp, res);
                 return {res.bb, target_reg, true};
             }
@@ -1129,7 +1568,13 @@ namespace basecode::scm {
                 auto cc = c;
                 cc.obj = CAR(args);
                 auto res = compiler::compile(comp, cc);
-                basic_block::reg2(*res.bb, op::cdr, res.reg, target_reg);
+                basic_block::encode(res.bb)
+                    .reg2()
+                    .op(op::cdr)
+                    .src(res.reg)
+                    .dst(target_reg)
+                    .next()
+                    .build();
                 compiler::release_result(comp, res);
                 return {res.bb, target_reg, true};
             }
@@ -1145,12 +1590,23 @@ namespace basecode::scm {
                         oc.target = &comp.ret_reg;
                     auto res = compiler::compile(comp, oc);
                     oc.bb = res.bb;
-                    basic_block::reg1(*oc.bb, op::truep, res.reg);
-                    basic_block::imm1(*oc.bb, op::beq, emitter::imm(&exit_bb));
+                    basic_block::encode(oc.bb)
+                        .reg1()
+                        .op(op::truep)
+                        .dst(res.reg)
+                        .next()
+                        .build();
+                    basic_block::encode(oc.bb)
+                        .imm1()
+                        .op(op::beq)
+                        .value(&exit_bb)
+                        .next()
+                        .build();
                     compiler::release_result(comp, res);
                     args = CDR(args);
                 }
-                basic_block::succ(*oc.bb, exit_bb);
+                basic_block::encode(oc.bb)
+                    .succ(exit_bb);
                 return {&exit_bb, target_reg};
             }
 
@@ -1185,23 +1641,39 @@ namespace basecode::scm {
 
                 ic.obj = CAR(args);
                 auto pred_res = compiler::compile(comp, ic);
-                basic_block::reg1(*c.bb, op::truep, pred_res.reg);
-                basic_block::imm1(*c.bb, op::bne, emitter::imm(&false_bb));
+                basic_block::encode(c.bb)
+                    .reg1()
+                    .op(op::truep)
+                    .dst(pred_res.reg)
+                    .next()
+                    .build();
+                basic_block::encode(c.bb)
+                    .imm1()
+                    .value(&false_bb)
+                    .op(op::bne)
+                    .next()
+                    .build();
                 compiler::release_result(comp, pred_res);
 
                 ic.bb     = &true_bb;
                 ic.obj    = CADR(args);
                 ic.target = &comp.ret_reg;
                 auto true_res = compiler::compile(comp, ic);
-                basic_block::imm1(*true_res.bb, op::br, emitter::imm(&exit_bb));
-                basic_block::succ(*true_res.bb, false_bb);
+                basic_block::encode(true_res.bb)
+                    .succ(false_bb)
+                    .imm1()
+                    .op(op::br)
+                    .value(&exit_bb)
+                    .next()
+                    .build();
                 compiler::release_result(comp, true_res);
 
                 ic.bb     = &false_bb;
                 ic.obj    = CADDR(args);
                 ic.target = &comp.ret_reg;
                 auto false_res = compiler::compile(comp, ic);
-                basic_block::succ(*false_res.bb, exit_bb);
+                basic_block::encode(false_res.bb)
+                    .succ(exit_bb);
                 compiler::release_result(comp, false_res);
 
                 return {&exit_bb, 0};
@@ -1228,7 +1700,13 @@ namespace basecode::scm {
                 auto ac = c;
                 ac.obj = CAR(args);
                 auto res = compiler::compile(comp, ac);
-                basic_block::reg2(*res.bb, op::atomp, res.reg, target_reg);
+                basic_block::encode(res.bb)
+                    .reg2()
+                    .op(op::atomp)
+                    .src(res.reg)
+                    .dst(target_reg)
+                    .next()
+                    .build();
                 compiler::release_result(comp, res);
                 return {res.bb, target_reg, true};
             }
@@ -1239,7 +1717,13 @@ namespace basecode::scm {
                 auto ec = c;
                 ec.obj = CAR(args);
                 auto res = compiler::compile(comp, ec);
-                basic_block::reg2(*res.bb, op::eval, res.reg, target_reg);
+                basic_block::encode(res.bb)
+                    .reg2()
+                    .op(op::eval)
+                    .src(res.reg)
+                    .dst(target_reg)
+                    .next()
+                    .build();
                 compiler::release_result(comp, res);
                 return {res.bb, target_reg, true};
             }
@@ -1287,12 +1771,23 @@ namespace basecode::scm {
                         oc.target = &comp.ret_reg;
                     auto res = compiler::compile(comp, oc);
                     oc.bb = res.bb;
-                    basic_block::reg1(*oc.bb, op::truep, res.reg);
-                    basic_block::imm1(*oc.bb, op::bne, emitter::imm(&exit_bb));
+                    basic_block::encode(oc.bb)
+                        .reg1()
+                        .op(op::truep)
+                        .dst(res.reg)
+                        .next()
+                        .build();
+                    basic_block::encode(oc.bb)
+                        .imm1()
+                        .op(op::bne)
+                        .value(&exit_bb)
+                        .next()
+                        .build();
                     compiler::release_result(comp, res);
                     args = CDR(args);
                 }
-                basic_block::succ(*oc.bb, exit_bb);
+                basic_block::encode(oc.bb)
+                    .succ(exit_bb);
                 return {&exit_bb, target_reg};
             }
 
@@ -1301,7 +1796,12 @@ namespace basecode::scm {
                 auto nc = c;
                 nc.obj = CAR(args);
                 auto res = compiler::compile(comp, nc);
-                basic_block::reg1(*res.bb, op::lnot, res.reg);
+                basic_block::encode(res.bb)
+                    .reg1()
+                    .op(op::lnot)
+                    .dst(res.reg)
+                    .next()
+                    .build();
                 compiler::release_result(comp, res);
                 return res;
             }
@@ -1310,11 +1810,10 @@ namespace basecode::scm {
                 auto ctx = c.ctx;
                 auto target_reg = compiler::reserve_reg(comp, c);
                 error(*c.bb, OBJ_IDX(args), target_reg);
-                basic_block::comment(
-                    *c.bb,
-                    format::format("literal: {}",
-                                   to_string(c.ctx, args)),
-                    c.bb->entries.size - 1);
+                basic_block::encode(c.bb)
+                    .comment(format::format("literal: {}",
+                                            to_string(c.ctx, args)),
+                             c.bb->entries.size - 1);
                 return {c.bb, target_reg, true};
             }
 
@@ -1345,7 +1844,7 @@ namespace basecode::scm {
                     set(ctx, (obj_t*) OBJ_AT(idx), value, c.env);
                     compiler::release_result(comp, res);
                     if (TYPE(value) == obj_type_t::func
-                        ||  TYPE(value) == obj_type_t::macro) {
+                    ||  TYPE(value) == obj_type_t::macro) {
                         auto proc = (proc_t*) NATIVE_PTR(CDR(value));
                         if (!proc->is_compiled) {
                             auto pc = c;
@@ -1356,10 +1855,9 @@ namespace basecode::scm {
                     }
                 } else {
                     set(*res.bb, idx, res.reg);
-                    basic_block::comment(
-                        *res.bb,
-                        format::format("symbol: {}",
-                                       printable_t{c.ctx, key, true}));
+                    basic_block::encode(res.bb)
+                        .comment(format::format("symbol: {}",
+                                                printable_t{c.ctx, key, true}));
                     compiler::release_result(comp, res);
                 }
                 return res;
@@ -1373,7 +1871,13 @@ namespace basecode::scm {
                 sc.bb  = rhs_res.bb;
                 sc.obj = CAR(args);
                 auto lhs_res = compiler::compile(comp, sc);
-                basic_block::reg2(*lhs_res.bb, op::setcdr, lhs_res.reg, rhs_res.reg);
+                basic_block::encode(lhs_res.bb)
+                    .reg2()
+                    .op(op::setcdr)
+                    .src(lhs_res.reg)
+                    .dst(rhs_res.reg)
+                    .next()
+                    .build();
                 compiler::release_result(comp, lhs_res);
                 compiler::release_result(comp, rhs_res);
                 return {lhs_res.bb, 0};
@@ -1387,7 +1891,13 @@ namespace basecode::scm {
                 sc.bb  = rhs_res.bb;
                 sc.obj = CAR(args);
                 auto lhs_res = compiler::compile(comp, sc);
-                basic_block::reg2(*lhs_res.bb, op::setcar, lhs_res.reg, rhs_res.reg);
+                basic_block::encode(lhs_res.bb)
+                    .reg2()
+                    .op(op::setcar)
+                    .src(lhs_res.reg)
+                    .dst(rhs_res.reg)
+                    .next()
+                    .build();
                 compiler::release_result(comp, lhs_res);
                 compiler::release_result(comp, rhs_res);
                 return {lhs_res.bb, 0};

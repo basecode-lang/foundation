@@ -169,6 +169,8 @@ namespace basecode::scm {
 
     namespace vm {
         namespace basic_block {
+            class bb_builder_t;
+
             u0 free(bb_t& bb);
 
             u0 reg3(bb_t& bb,
@@ -184,27 +186,6 @@ namespace basecode::scm {
                     reg_t dst,
                     b8 mode = false);
 
-            [[maybe_unused]] u0 indx(bb_t& bb,
-                    op_code_t opcode,
-                    s32 offset,
-                    reg_t base,
-                    reg_t ndx,
-                    reg_t dst);
-
-            u0 reg2(bb_t& bb,
-                    op_code_t opcode,
-                    reg_t src,
-                    reg_t dst,
-                    b8 is_signed = false,
-                    s32 aux = 0);
-
-            u0 imm2(bb_t& bb,
-                    op_code_t opcode,
-                    imm_t src,
-                    reg_t dst,
-                    b8 is_signed = false,
-                    b8 mode = false);
-
             u0 reg2_imm(bb_t& bb,
                         op_code_t opcode,
                         reg_t a,
@@ -213,6 +194,10 @@ namespace basecode::scm {
                         b8 is_signed = false);
 
             u0 dw(bb_t& bb, u64 data);
+
+            bb_builder_t encode(bb_t* bb);
+
+            bb_builder_t encode(bb_t& bb);
 
             u0 pred(bb_t& bb, bb_t& pred);
 
@@ -224,19 +209,13 @@ namespace basecode::scm {
                 array::append(bb.notes, bb.emitter->strtab.size);
             }
 
-            u0 none(bb_t& bb, op_code_t opcode);
-
             u0 apply_label(bb_t& bb, label_t label);
 
             reg_t* find_bind(bb_t& bb, obj_t* obj);
 
             u0 set_bind(bb_t& bb, reg_t reg, obj_t* obj);
 
-            u0 reg1(bb_t& bb, op_code_t opcode, reg_t arg);
-
             u0 imm1(bb_t& bb, op_code_t opcode, imm_t imm);
-
-            bb_t& ubuf(bb_t& bb, reg_t addr_reg, u32 size);
 
             u0 init(bb_t& bb, emitter_t* e, bb_type_t type);
 
@@ -253,8 +232,6 @@ namespace basecode::scm {
             }
 
             bb_t& make_succ(bb_t& bb, bb_type_t type = bb_type_t::code);
-
-            bb_t& ibuf(bb_t& bb, u8 addr_reg, const u64* data, u32 size);
         }
 
         namespace emitter {
@@ -534,5 +511,182 @@ namespace basecode::scm {
             for (u32 i = 0; i < result.count; ++i)
                 release_one(alloc, result[i]);
         }
+    }
+
+    namespace vm::basic_block {
+        class reg1_builder_t final {
+            bb_builder_t*   _builder;
+        public:
+            reg1_builder_t(bb_builder_t* builder) : _builder(builder) {};
+
+            bb_builder_t& next();
+
+            reg1_builder_t& dst(reg_t reg);
+
+            reg1_builder_t& dst(var_t* var);
+
+            reg1_builder_t& op(op_code_t op_code);
+        };
+
+        class reg2_builder_t final {
+            bb_builder_t*   _builder;
+        public:
+            reg2_builder_t(bb_builder_t* builder) : _builder(builder) {};
+
+            bb_builder_t& next();
+
+            reg2_builder_t& aux(s8 value);
+
+            reg2_builder_t& dst(reg_t reg);
+
+            reg2_builder_t& dst(var_t* var);
+
+            reg2_builder_t& src(reg_t reg);
+
+            reg2_builder_t& src(var_t* var);
+
+            reg2_builder_t& is_signed(b8 flag);
+
+            reg2_builder_t& op(op_code_t op_code);
+        };
+
+        class none_builder_t final {
+            bb_builder_t*   _builder;
+        public:
+            none_builder_t(bb_builder_t* builder) : _builder(builder) {};
+
+            bb_builder_t& next();
+
+            none_builder_t& op(op_code_t op_code);
+        };
+
+        class imm1_builder_t final {
+            bb_builder_t*   _builder;
+        public:
+            imm1_builder_t(bb_builder_t* builder) : _builder(builder) {};
+
+            bb_builder_t& next();
+
+            imm1_builder_t& value(s32 value);
+
+            imm1_builder_t& value(u32 value);
+
+            imm1_builder_t& value(bb_t* value);
+
+            imm1_builder_t& is_signed(b8 flag);
+
+            imm1_builder_t& op(op_code_t op_code);
+        };
+
+        class imm2_builder_t final {
+            bb_builder_t*   _builder;
+        public:
+            imm2_builder_t(bb_builder_t* builder) : _builder(builder) {};
+
+            bb_builder_t& next();
+
+            imm2_builder_t& mode(b8 flag);
+
+            imm2_builder_t& src(reg_t reg);
+
+            imm2_builder_t& src(var_t* var);
+
+            imm2_builder_t& dst(reg_t reg);
+
+            imm2_builder_t& dst(var_t* var);
+
+            imm2_builder_t& value(s32 value);
+
+            imm2_builder_t& value(u32 value);
+
+            imm2_builder_t& op(op_code_t op);
+
+            imm2_builder_t& value(bb_t* value);
+
+            imm2_builder_t& is_signed(b8 flag);
+        };
+
+        class bb_builder_t final {
+            bb_t*           _bb;
+            str::slice_t    _str;
+            imm_t           _imm;
+            reg_oper_t      _reg[4];
+            imm1_builder_t  _imm1;
+            imm2_builder_t  _imm2;
+            reg1_builder_t  _reg1;
+            reg2_builder_t  _reg2;
+            none_builder_t  _none;
+            s32             _offset;
+            s8              _aux;
+            op_code_t       _op_code;
+            u8              _encoding;
+            b8              _mode;
+            b8              _is_signed;
+
+            friend class imm1_builder_t;
+            friend class imm2_builder_t;
+            friend class reg1_builder_t;
+            friend class reg2_builder_t;
+            friend class none_builder_t;
+
+        public:
+            bb_builder_t(bb_t* bb);
+
+            bb_builder_t(bb_t& bb);
+
+            status_t build();
+
+            bb_builder_t& label(label_t label) {
+                _bb->label = label;
+                hashtab::insert(_bb->emitter->labtab, label, _bb);
+                return *this;
+            }
+
+            bb_builder_t& pred(bb_t& prev) {
+                assert((!prev.next && !_bb->prev) && (_bb != &prev));
+                prev.next = _bb;
+                _bb->prev = &prev;
+                return *this;
+            }
+
+            bb_builder_t& succ(bb_t& next) {
+                assert((!next.prev && !_bb->next) && (_bb != &next));
+                next.prev = _bb;
+                _bb->next = &next;
+                return *this;
+            }
+
+            template <String_Concept T>
+            bb_builder_t& note(const T& value) {
+                auto& strtab = _bb->emitter->strtab;
+                str_array::append(strtab, value);
+                array::append(_bb->notes, strtab.size);
+                return *this;
+            }
+
+            template <String_Concept T>
+            bb_builder_t& comment(const T& value, s32 line = -1) {
+                auto& strtab = _bb->emitter->strtab;
+                line = (line == -1 ? _bb->entries.size : line);
+                auto notes = hashtab::find(_bb->comments, line);
+                if (!notes) {
+                    notes = hashtab::emplace(_bb->comments, line);
+                    array::init(*notes, _bb->emitter->alloc);
+                }
+                str_array::append(strtab, value);
+                array::append(*notes, strtab.size);
+                return *this;
+            }
+
+            imm1_builder_t& imm1();
+
+            imm2_builder_t& imm2();
+
+            reg1_builder_t& reg1();
+
+            reg2_builder_t& reg2();
+
+            none_builder_t& none();
+        };
     }
 }

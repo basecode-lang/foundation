@@ -164,6 +164,11 @@ namespace basecode::scm {
         data_stack,
     };
 
+    enum class reg_oper_type_t : u8 {
+        reg,
+        var,
+    };
+
     [[maybe_unused]] constexpr u32 max_memory_areas = 6;
 
     struct env_t final {
@@ -315,6 +320,14 @@ namespace basecode::scm {
         const var_t*            pred;
         intern_id               symbol;
         u32                     version;
+    };
+
+    struct reg_oper_t final {
+        union {
+            reg_t               r;
+            var_t*              v;
+        }                       kind;
+        reg_oper_type_t         type;
     };
 
     struct bb_t final {
