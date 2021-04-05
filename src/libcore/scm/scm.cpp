@@ -147,7 +147,7 @@ namespace basecode::scm {
         array::free(ctx->environments);
         array::free(ctx->procedures);
         ffi::free(ctx->ffi);
-        vm::emitter::free(ctx->emitter);
+        compiler::free(ctx->compiler);
         vm::free(ctx->vm);
     }
 
@@ -323,28 +323,35 @@ namespace basecode::scm {
     }
 
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
-        vm::emitter::reset(ctx->emitter);
-        auto& bb = vm::emitter::make_basic_block(ctx->emitter);
-        auto ret_reg = vm::reg_alloc::reserve_one(ctx->emitter.gp);
-        vm::reg_alloc::protect(ctx->emitter.gp, ret_reg, true);
+        compiler::reset(ctx->compiler);
+        ctx->compiler.ret_reg = vm::reg_alloc::reserve_one(ctx->compiler.emitter.gp);
+//        vm::reg_alloc::protect(ctx->compiler.emitter.gp,
+//                               ctx->compiler.ret_reg,
+//                               true);
+
+        auto& bb = vm::emitter::make_basic_block(ctx->compiler.emitter);
         TIME_BLOCK(
             "compile expr"_ss,
-            auto tc = make_context(bb, ctx, obj, ctx->env, true);
-            auto comp_result = scm::compile(tc);
+            auto tc = compiler::make_context(bb, ctx, obj, ctx->env, true);
+            auto comp_result = compiler::compile(ctx->compiler, tc);
             vm::basic_block::imm1(
                 *comp_result.bb,
                 instruction::type::exit,
                 vm::emitter::imm(1, imm_type_t::boolean));
-            release_result(bb.emitter->gp, comp_result);
+            compiler::release_result(ctx->compiler, comp_result);
             );
-        vm::reg_alloc::release_one(ctx->emitter.gp, ret_reg);
+
+        vm::reg_alloc::release_one(ctx->compiler.emitter.gp,
+                                   ctx->compiler.ret_reg);
+
         str_t str{};
         str::init(str, ctx->alloc);
         {
             str_buf_t buf{&str};
-            vm::emitter::disassemble(ctx->emitter, bb, buf);
+            vm::emitter::disassemble(ctx->compiler.emitter, bb, buf);
         }
         format::print("{}\n", str);
+
         return ctx->nil;
     }
 
@@ -498,7 +505,7 @@ namespace basecode::scm {
         vm::memory_map(vm, scm::memory_area_t::data_stack, scm::register_file::dp, half_heap / 3, true);
         vm::memory_map(vm, scm::memory_area_t::env_stack, scm::register_file::ep, half_heap / 3, true);
         vm::reset(vm);
-        vm::emitter::init(ctx->emitter, &vm, LP, ctx->alloc);
+        compiler::init(ctx->compiler, &vm, LP, ctx->alloc);
         array::init(ctx->native_ptrs, ctx->alloc);
         array::reserve(ctx->native_ptrs, 256);
         stack::init(ctx->gc_stack, ctx->alloc);

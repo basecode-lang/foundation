@@ -19,10 +19,11 @@
 #pragma once
 
 #include <basecode/core/scm/vm.h>
+#include <basecode/core/scm/types.h>
 #include <basecode/core/str_array.h>
 #include <basecode/core/stable_array.h>
 
-#define H(a)                    (vm[(a)])
+#define H(a)                    (vm[((a) / 8)])
 #define G(n)                    (vm[(vm.memory_map.heap_size - 1) - (n)])
 #define M                       G(basecode::scm::register_file::m)
 #define F                       G(basecode::scm::register_file::f)
@@ -36,36 +37,40 @@
 #define R(n)                    G(basecode::scm::register_file::r0 + (n))
 
 namespace basecode::scm {
-    using reg_t                 = u8;
-    using op_code_t             = u8;
+    namespace trap {
+        constexpr u8 hash       = 1;
+        constexpr u8 functor    = 2;
+
+        str::slice_t name(u8 type);
+    }
 
     namespace register_file {
-        constexpr reg_t pc      = 0;
-        constexpr reg_t ep      = 1;
-        constexpr reg_t dp      = 2;
-        constexpr reg_t hp      = 3;
-        constexpr reg_t fp      = 4;
-        constexpr reg_t sp      = 5;   // code stack ptr
-        constexpr reg_t lp      = 6;   // code load ptr
-        constexpr reg_t m       = 7;   // mode
-        constexpr reg_t f       = 8;   // flags register
-        constexpr reg_t lr      = 9;   // link register
-        constexpr reg_t r0      = 10;
-        constexpr reg_t r1      = 11;
-        constexpr reg_t r2      = 12;
-        constexpr reg_t r3      = 13;
-        constexpr reg_t r4      = 14;
-        constexpr reg_t r5      = 15;
-        constexpr reg_t r6      = 16;
-        constexpr reg_t r7      = 17;
-        constexpr reg_t r8      = 18;
-        constexpr reg_t r9      = 19;
-        constexpr reg_t r10     = 20;
-        constexpr reg_t r11     = 21;
-        constexpr reg_t r12     = 22;
-        constexpr reg_t r13     = 23;
-        constexpr reg_t r14     = 24;
-        constexpr reg_t r15     = 25;
+        constexpr reg_t pc              = 0;
+        constexpr reg_t ep              = 1;
+        constexpr reg_t dp              = 2;
+        constexpr reg_t hp              = 3;
+        constexpr reg_t fp              = 4;
+        constexpr reg_t sp              = 5;   // code stack ptr
+        constexpr reg_t lp              = 6;   // code load ptr
+        constexpr reg_t m               = 7;   // mode
+        constexpr reg_t f               = 8;   // flags register
+        constexpr reg_t lr              = 9;   // link register
+        constexpr reg_t r0              = 10;
+        constexpr reg_t r1              = 11;
+        constexpr reg_t r2              = 12;
+        constexpr reg_t r3              = 13;
+        constexpr reg_t r4              = 14;
+        constexpr reg_t r5              = 15;
+        constexpr reg_t r6              = 16;
+        constexpr reg_t r7              = 17;
+        constexpr reg_t r8              = 18;
+        constexpr reg_t r9              = 19;
+        constexpr reg_t r10             = 20;
+        constexpr reg_t r11             = 21;
+        constexpr reg_t r12             = 22;
+        constexpr reg_t r13             = 23;
+        constexpr reg_t r14             = 24;
+        constexpr reg_t r15             = 25;
 
         str::slice_t name(reg_t reg);
     }
@@ -161,148 +166,6 @@ namespace basecode::scm {
             constexpr u8 reg2_imm       = 8;
         }
     }
-
-    union operand_encoding_t final {
-        struct {
-            u64                 src:        32;
-            u64                 dest:       8;
-            u64                 type:       4;
-            u64                 size:       3;
-            u64                 mode:       1;
-            u64                 aux:        3;
-        }                       imm;
-        struct {
-            u64                 dest:       8;
-            u64                 pad:        43;
-        }                       reg1;
-        struct {
-            u64                 src:        8;
-            u64                 dest:       8;
-            u64                 aux:        32;
-            u64                 pad:        3;
-        }                       reg2;
-        struct {
-            u64                 a:          8;
-            u64                 b:          8;
-            u64                 imm:        28;
-            u64                 size:       3;
-            u64                 type:       4;
-        }                       reg2_imm;
-        struct {
-            u64                 a:          8;
-            u64                 b:          8;
-            u64                 c:          8;
-            u64                 pad:        27;
-        }                       reg3;
-        struct {
-            u64                 a:          8;
-            u64                 b:          8;
-            u64                 c:          8;
-            u64                 d:          8;
-            u64                 pad:        19;
-        }                       reg4;
-        struct {
-            u64                 offs:       32;
-            u64                 src:        8;
-            u64                 dest:       8;
-            u64                 mode:       1;
-            u64                 pad:        2;
-        }                       offset;
-        struct {
-            u64                 offs:       24;
-            u64                 base:       8;
-            u64                 index:      8;
-            u64                 dest:       8;
-            u64                 mode:       1;
-            u64                 pad:        2;
-        }                       indexed;
-    };
-
-    struct instruction_t final {
-        u64                     type:       8;
-        u64                     is_signed:  1;
-        u64                     encoding:   4;
-        u64                     data:       51;
-    };
-    static_assert(sizeof(instruction_t) <= 8, "instruction_t is now greater than 8 bytes!");
-
-    struct bb_t;
-    struct emitter_t;
-
-    using label_t               = u32;
-    using bb_list_t             = stable_array_t<bb_t>;
-    using label_map_t           = hashtab_t<u32, bb_t*>;
-    using note_list_t           = array_t<u32>;
-    using reg_table_t           = hashtab_t<u64, reg_t>;
-    using encoded_list_t        = array_t<u64>;
-    using comment_table_t       = hashtab_t<u32, note_list_t>;
-
-    enum class imm_size_t : u8 {
-        signed_word,
-        unsigned_word,
-        signed_half_word,
-        unsigned_half_word,
-    };
-
-    enum class imm_type_t : u8 {
-        obj,
-        trap,
-        value,
-        label,
-        block,
-        boolean
-    };
-
-    struct imm_t final {
-        union {
-            s32                 s;
-            u32                 u;
-            s64                 ls;
-            u64                 lu;
-            bb_t*               b;
-        };
-        imm_type_t              type;
-        imm_size_t              size;
-    };
-
-    enum class bb_type_t : u8 {
-        code,
-        data,
-        empty
-    };
-
-    struct bb_t final {
-        emitter_t*              emitter;
-        bb_t*                   prev;
-        bb_t*                   next;
-        u64                     addr;
-        note_list_t             notes;
-        encoded_list_t          entries;
-        comment_table_t         comments;
-        label_t                 label;
-        u32                     id;
-        bb_type_t               type;
-    };
-
-    struct reg_alloc_t final {
-        u64                     slots;
-        u64                     prots;
-        reg_t                   start;
-        reg_t                   end;
-    };
-
-    struct reg_result_t;
-
-    struct emitter_t final {
-        alloc_t*                alloc;
-        vm_t*                   vm;
-        u64                     addr;
-        bb_list_t               blocks;
-        reg_table_t             regtab;
-        str_array_t             strtab;
-        label_map_t             labtab;
-        reg_alloc_t             gp;
-    };
 
     namespace vm {
         namespace basic_block {
@@ -462,10 +325,6 @@ namespace basecode::scm {
                            reg_t target_reg,
                            u32 size);
 
-            u0 save_protected(bb_t& bb);
-
-            u0 restore_protected(bb_t& bb);
-
             bb_t& enter(bb_t& bb, u32 locals);
 
             u0 free_stack(bb_t& bb, u32 words);
@@ -487,6 +346,10 @@ namespace basecode::scm {
             u0 qq(bb_t& bb, u32 idx, reg_t target_reg);
 
             u0 error(bb_t& bb, u32 idx, reg_t target_reg);
+
+            u0 save_protected(bb_t& bb, compiler_t& comp);
+
+            u0 restore_protected(bb_t& bb, compiler_t& comp);
 
             u0 car(bb_t& bb, reg_t val_reg, reg_t target_reg);
 
@@ -591,6 +454,13 @@ namespace basecode::scm {
             for (u32 i = 0; i < count; ++i)
                 r[r.count++] = reserve_one(alloc);
             return r;
+        }
+
+        inline u0 reserve_and_protect_reg(reg_alloc_t& alloc, reg_t reg) {
+            const u32 idx = reg - alloc.start;
+            const auto mask = (1UL << idx);
+            alloc.slots |= mask;
+            alloc.prots |= mask;
         }
 
         inline u0 release(reg_alloc_t& alloc, const reg_result_t& result) {

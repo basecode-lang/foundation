@@ -18,66 +18,41 @@
 
 #pragma once
 
-namespace basecode {
-    struct bb_t;
+#include <basecode/core/scm/vm.h>
+#include <basecode/core/scm/bytecode.h>
 
-    namespace scm {
-        struct ctx_t;
-        struct obj_t;
-        struct env_t;
-        struct proc_t;
+namespace basecode::scm::compiler {
+    namespace proc {
+        compile_result_t apply(compiler_t& comp, const context_t& c);
 
-        enum class context_kind_t : u8 {
-            none,
-            proc,
-            prim,
-        };
-
-        struct context_t final {
-            bb_t*               bb;
-            ctx_t*              ctx;
-            obj_t*              obj;
-            obj_t*              env;
-            union {
-                proc_t*         proc;
-                struct {
-                    obj_t*      form;
-                    obj_t*      args;
-                }               prim;
-            }                   kind;
-            label_t             label;
-            context_kind_t      type;
-            b8                  top_level;
-        };
-
-        struct compile_result_t final {
-            bb_t*               bb;
-            reg_t               reg;
-            b8                  should_release;
-        };
-
-        context_t make_context(bb_t& bb,
-                               ctx_t* ctx,
-                               obj_t* obj,
-                               obj_t* env,
-                               b8 top_level = false);
-
-        compile_result_t compile(const context_t& c);
-
-        inline u0 release_result(reg_alloc_t& alloc,
-                                 const compile_result_t& r) {
-            if (r.should_release && r.reg != 0)
-                vm::reg_alloc::release_one(alloc, r.reg);
-        }
-
-        namespace proc {
-            compile_result_t apply(const context_t& c);
-
-            compile_result_t compile(const context_t& c);
-        }
-
-        namespace prim {
-            compile_result_t compile(const context_t& c);
-        }
+        compile_result_t compile(compiler_t& comp, const context_t& c);
     }
+
+    namespace prim {
+        compile_result_t compile(compiler_t& comp, const context_t& c);
+    }
+
+    u0 free(compiler_t& comp);
+
+    u0 reset(compiler_t& comp);
+
+    context_t make_context(bb_t& bb,
+                           ctx_t* ctx,
+                           obj_t* obj,
+                           obj_t* env,
+                           b8 top_level = false);
+
+    u0 release_reg(compiler_t& comp, reg_t reg);
+
+    inline u0 release_result(compiler_t& comp,
+                             const compile_result_t& r) {
+        if (r.should_release && r.reg != 0)
+            vm::reg_alloc::release_one(comp.emitter.gp, r.reg);
+    }
+
+    reg_t reserve_reg(compiler_t& comp, const context_t& c);
+
+    u0 init(compiler_t& comp, vm_t* vm, u64 addr, alloc_t* alloc);
+
+    compile_result_t compile(compiler_t& comp, const context_t& c);
 }

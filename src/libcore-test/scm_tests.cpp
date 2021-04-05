@@ -19,8 +19,8 @@
 #include <catch2/catch.hpp>
 #include <basecode/core/buf.h>
 #include <basecode/core/string.h>
-#include <basecode/core/scm/scm.h>
 #include <basecode/core/scm/types.h>
+#include <basecode/core/scm/bytecode.h>
 
 using namespace basecode;
 
@@ -32,7 +32,7 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
     auto& vm = ctx->vm;
 
     scm::init(ctx, heap_size, alloc);
-    format::print("Address            Offset             Size    Reg Value                Top\n");
+    format::print("Address            Offset             Size    Reg Value               Top\n");
     format::print("-----------------------------------------------------------------------------\n");
     for (const auto& entry : vm.memory_map.entries) {
         if (!entry.valid)
@@ -59,7 +59,12 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
 (do
     (let nums (list 1 2 3 4 5 6))
     (length nums))
-)"_ss;
+
+(do
+    (let build-type "RelWithDebInfo")
+    (or (is "Debug"             build-type)
+        (is "RelWithDebInfo"    build-type)
+        (is "Release"           build-type))))"_ss;
 
     buf_t buf{};
     buf::init(buf);

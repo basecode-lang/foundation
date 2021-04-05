@@ -16,9 +16,21 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/scm/compiler.h>
 #include <basecode/core/scm/bytecode.h>
 
 namespace basecode::scm {
+    namespace trap {
+        static str::slice_t s_names[] = {
+            [hash]       = "HASH"_ss,
+            [functor]    = "FUNCTOR"_ss,
+        };
+
+        str::slice_t name(u8 type) {
+            return s_names[u32(type)];
+        }
+    }
+
     namespace instruction {
         namespace type {
             static str::slice_t s_names[] = {
@@ -782,20 +794,6 @@ namespace basecode::scm {
                 return exit_bb;
             }
 
-            u0 save_protected(bb_t& bb) {
-                for (reg_t r = rf::r0; r < rf::r15; ++r) {
-                    if (vm::reg_alloc::is_protected(bb.emitter->gp, r))
-                        vm::basic_block::reg2(bb, op::push, r, rf::sp);
-                }
-            }
-
-            u0 restore_protected(bb_t& bb) {
-                for (reg_t r = rf::r15; r >= rf::r0; --r) {
-                    if (vm::reg_alloc::is_protected(bb.emitter->gp, r))
-                        vm::basic_block::reg2(bb, op::pop, rf::sp, r);
-                }
-            }
-
             bb_t& enter(bb_t& bb, u32 locals) {
                 auto& entry_block =  emitter::make_basic_block(*bb.emitter);
                 basic_block::succ(bb, entry_block);
@@ -871,6 +869,26 @@ namespace basecode::scm {
                 basic_block::reg2(bb, op::error, reg[0], target_reg);
             }
 
+            u0 save_protected(bb_t& bb, compiler_t& comp) {
+                for (reg_t r = rf::r0; r < rf::r15; ++r) {
+                    if (vm::reg_alloc::is_protected(comp.emitter.gp, r)) {
+                        vm::basic_block::reg2(bb, op::push, r, rf::sp);
+                        comp.prot[comp.prot_count++] = r;
+                        reg_alloc::release_one(comp.emitter.gp, r);
+                    }
+                }
+            }
+
+            u0 restore_protected(bb_t& bb, compiler_t& comp) {
+                for (s32 i = comp.prot_count - 1; i >= 0; --i) {
+                    reg_t r = comp.prot[i];
+                    vm::reg_alloc::reserve_and_protect_reg(comp.emitter.gp, r);
+                    vm::basic_block::reg2(bb, op::pop, rf::sp, r);
+                    comp.prot[i] = 0;
+                }
+                comp.prot_count = 0;
+            }
+
             u0 car(bb_t& bb, reg_t val_reg, reg_t target_reg) {
                 basic_block::reg2(bb, op::car, val_reg, target_reg);
             }
@@ -917,7 +935,7 @@ namespace basecode::scm {
 
             u0 is(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
                 vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
-                vm::basic_block::comment(bb, "prim: gte"_ss);
+                vm::basic_block::comment(bb, "prim: is"_ss);
                 vm::basic_block::reg1(bb, op::seq, target_reg);
             }
 
