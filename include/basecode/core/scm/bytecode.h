@@ -276,12 +276,46 @@ namespace basecode::scm {
             }
 
             template <String_Concept T>
+            var_t* make_var(emitter_t& e, const T& name) {
+                assoc_array_t<var_t*> pairs{};
+                assoc_array::init(pairs, e.alloc);
+                defer(assoc_array::free(pairs));
+                symtab::find_prefix(e.vartab, pairs, name);
+                if (pairs.size > 0)
+                    return nullptr;
+                auto rc = string::interned::fold_for_result(name);
+                if (!OK(rc.status))
+                    return nullptr;
+                auto var = &stable_array::append(e.vars);
+                var->pred    = var->succ = {};
+                var->symbol  = rc.id;
+                var->version = 1;
+                symtab::insert(e.vartab,
+                               format::format("{}", *var),
+                               var);
+                return var;
+            }
+
+            template <String_Concept T>
             label_t make_label(emitter_t& e, const T& name) {
                 str_array::append(e.strtab, name);
                 return e.strtab.size;
             }
 
             status_t assemble(emitter_t& e, bb_t& start_block);
+
+            inline var_t* make_var(emitter_t& e, var_t* pred) {
+                auto var = &stable_array::append(e.vars);
+                var->succ    = {};
+                var->pred    = pred;
+                var->symbol  = pred->symbol;
+                var->version = pred->version + 1;
+                symtab::insert(e.vartab,
+                               format::format("{}", *var),
+                               var);
+                pred->succ = var;
+                return var;
+            }
 
             inline str::slice_t get_string(emitter_t& e, label_t label) {
                 return e.strtab[label - 1];

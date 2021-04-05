@@ -74,6 +74,7 @@ namespace basecode::scm {
     struct ctx_t;
     struct obj_t;
     struct env_t;
+    struct var_t;
     struct proc_t;
     struct emitter_t;
     struct reg_result_t;
@@ -82,12 +83,14 @@ namespace basecode::scm {
     using trap_t                = b8 (*)(vm_t& vm, u64 arg);
     using label_t               = u32;
     using op_code_t             = u8;
-    using bb_list_t             = stable_array_t<bb_t>;
+    using bb_array_t            = stable_array_t<bb_t>;
     using ptr_array_t           = array_t<u0*>;
     using env_array_t           = array_t<env_t>;
     using label_map_t           = hashtab_t<u32, bb_t*>;
     using note_list_t           = array_t<u32>;
     using reg_table_t           = hashtab_t<u64, reg_t>;
+    using var_table_t           = symtab_t<var_t*>;
+    using var_array_t           = stable_array_t<var_t>;
     using proc_array_t          = array_t<proc_t>;
     using bind_table_t          = hashtab_t<u32, obj_t*>;
     using trap_table_t          = hashtab_t<u32, trap_t>;
@@ -307,6 +310,13 @@ namespace basecode::scm {
         imm_size_t              size;
     };
 
+    struct var_t final {
+        const var_t*            succ;
+        const var_t*            pred;
+        intern_id               symbol;
+        u32                     version;
+    };
+
     struct bb_t final {
         emitter_t*              emitter;
         bb_t*                   prev;
@@ -366,7 +376,9 @@ namespace basecode::scm {
         alloc_t*                alloc;
         vm_t*                   vm;
         u64                     addr;
-        bb_list_t               blocks;
+        bb_array_t              blocks;
+        var_array_t             vars;
+        var_table_t             vartab;
         reg_table_t             regtab;
         str_array_t             strtab;
         label_map_t             labtab;
@@ -437,5 +449,11 @@ namespace basecode::scm {
         u8                      size;
     } __attribute__((aligned(2)));
 }
+
+FORMAT_TYPE(basecode::scm::var_t,
+            format_to(ctx.out(),
+                      "{}@{}",
+                      *basecode::string::interned::get_slice(data.symbol),
+                      data.version));
 
 #pragma clang diagnostic pop

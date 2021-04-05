@@ -439,20 +439,24 @@ namespace basecode::scm {
             u0 free(emitter_t& e) {
                 for (auto bb : e.blocks)
                     basic_block::free(*bb);
-                stable_array::free(e.blocks);
+                symtab::free(e.vartab);
                 hashtab::free(e.regtab);
                 hashtab::free(e.labtab);
                 str_array::free(e.strtab);
+                stable_array::free(e.vars);
+                stable_array::free(e.blocks);
             }
 
             u0 reset(emitter_t& e) {
                 for (auto bb : e.blocks)
                     basic_block::free(*bb);
-                stable_array::reset(e.blocks);
+                reg_alloc::reset(e.gp);
+                symtab::reset(e.vartab);
                 hashtab::reset(e.regtab);
                 hashtab::reset(e.labtab);
                 str_array::reset(e.strtab);
-                reg_alloc::reset(e.gp);
+                stable_array::reset(e.vars);
+                stable_array::reset(e.blocks);
             }
 
             static u0 format_comments(str_buf_t& buf,
@@ -749,6 +753,7 @@ namespace basecode::scm {
                 hashtab::init(e.labtab, e.alloc);
                 hashtab::init(e.regtab, e.alloc);
                 str_array::init(e.strtab, e.alloc);
+                stable_array::init(e.vars, e.alloc);
                 stable_array::init(e.blocks, e.alloc);
                 reg_alloc::init(e.gp, register_file::r0, register_file::r15);
             }
