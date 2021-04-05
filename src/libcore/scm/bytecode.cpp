@@ -206,16 +206,16 @@ namespace basecode::scm {
                     b8 mode) {
                 u64 buf{};
                 u64  data{};
-                auto inst = (instruction_t*) &buf;
-                auto operands = (operand_encoding_t*) &data;
+                auto inst          = (instruction_t*) &buf;
+                auto opers         = (operand_encoding_t*) &data;
                 inst->type            = opcode;
-                inst->encoding        = instruction::encoding::offset;
-                operands->offset.offs = offset;
-                operands->offset.src  = src;
-                operands->offset.dest = dest;
-                operands->offset.mode = mode;
-                operands->offset.pad  = 0;
-                inst->data            = data;
+                inst->encoding     = instruction::encoding::offset;
+                opers->offset.offs = offset;
+                opers->offset.src  = src;
+                opers->offset.dest = dest;
+                opers->offset.mode = mode;
+                opers->offset.pad  = 0;
+                inst->data         = data;
                 array::append(bb.entries, buf);
             }
 
@@ -227,19 +227,19 @@ namespace basecode::scm {
                     s32 aux) {
                 u64 buf{};
                 u64  data{};
-                auto inst = (instruction_t*) &buf;
-                auto operands = (operand_encoding_t*) &data;
+                auto inst        = (instruction_t*) &buf;
+                auto opers       = (operand_encoding_t*) &data;
                 inst->type          = opcode;
                 inst->is_signed     = is_signed;
-                inst->encoding      = instruction::encoding::reg2;
-                operands->reg2.src  = src;
-                operands->reg2.dest = dest;
-                operands->reg2.pad  = 0;
+                inst->encoding   = instruction::encoding::reg2;
+                opers->reg2.src  = src;
+                opers->reg2.dest = dest;
+                opers->reg2.pad  = 0;
                 auto area = find_memory_map_entry(*bb.emitter->vm, src);
                 if (area && !aux) {
-                    operands->reg2.aux = area->top ? -1 : 1;
+                    opers->reg2.aux = area->top ? -1 : 1;
                 } else {
-                    operands->reg2.aux = aux;
+                    opers->reg2.aux = aux;
                 }
                 inst->data = data;
                 array::append(bb.entries, buf);
@@ -253,16 +253,16 @@ namespace basecode::scm {
                     reg_t dest) {
                 u64 buf{};
                 u64  data{};
-                auto inst = (instruction_t*) &buf;
-                auto operands = (operand_encoding_t*) &data;
+                auto inst            = (instruction_t*) &buf;
+                auto opers           = (operand_encoding_t*) &data;
                 inst->type              = opcode;
-                inst->encoding          = instruction::encoding::indexed;
-                operands->indexed.offs  = offset;
-                operands->indexed.base  = base;
-                operands->indexed.index = index;
-                operands->indexed.dest  = dest;
-                operands->indexed.pad   = 0;
-                inst->data              = data;
+                inst->encoding       = instruction::encoding::indexed;
+                opers->indexed.offs  = offset;
+                opers->indexed.base  = base;
+                opers->indexed.index = index;
+                opers->indexed.dest  = dest;
+                opers->indexed.pad   = 0;
+                inst->data           = data;
                 array::append(bb.entries, buf);
             }
 
@@ -273,15 +273,15 @@ namespace basecode::scm {
                     reg_t dest2) {
                 u64 buf{};
                 u64  data{};
-                auto inst = (instruction_t*) &buf;
-                auto operands = (operand_encoding_t*) &data;
+                auto inst       = (instruction_t*) &buf;
+                auto opers      = (operand_encoding_t*) &data;
                 inst->type         = opcode;
-                inst->encoding     = instruction::encoding::reg3;
-                operands->reg3.a   = src;
-                operands->reg3.b   = dest1;
-                operands->reg3.c   = dest2;
-                operands->reg3.pad = 0;
-                inst->data         = data;
+                inst->encoding  = instruction::encoding::reg3;
+                opers->reg3.a   = src;
+                opers->reg3.b   = dest1;
+                opers->reg3.c   = dest2;
+                opers->reg3.pad = 0;
+                inst->data      = data;
                 array::append(bb.entries, buf);
             }
 
@@ -293,28 +293,28 @@ namespace basecode::scm {
                         b8 is_signed) {
                 u64 buf{};
                 u64  data{};
-                auto inst = (instruction_t*) &buf;
-                auto operands = (operand_encoding_t*) &data;
+                auto inst            = (instruction_t*) &buf;
+                auto opers           = (operand_encoding_t*) &data;
                 inst->type           = opcode;
                 inst->is_signed      = is_signed;
                 inst->encoding       = instruction::encoding::reg2_imm;
-                operands->reg2_imm.a = a;
-                operands->reg2_imm.b = b;
+                opers->reg2_imm.a    = a;
+                opers->reg2_imm.b    = b;
                 switch (imm.type) {
                     case imm_type_t::block:
-                        operands->reg2_imm.imm = imm.b->id;
+                        opers->reg2_imm.imm = imm.b->id;
                         break;
                     case imm_type_t::obj:
                     case imm_type_t::trap:
                     case imm_type_t::value:
                     case imm_type_t::label:
                     case imm_type_t::boolean:
-                        operands->reg2_imm.imm = imm.s;
+                        opers->reg2_imm.imm = imm.s;
                         break;
                 }
-                operands->reg2_imm.type = u8(imm.type);
-                operands->reg2_imm.size = u8(imm.size);
-                inst->data = data;
+                opers->reg2_imm.type = u8(imm.type);
+                opers->reg2_imm.size = u8(imm.size);
+                inst->data           = data;
                 array::append(bb.entries, buf);
             }
 
@@ -365,13 +365,13 @@ namespace basecode::scm {
             u0 reg1(bb_t& bb, op_code_t opcode, reg_t arg) {
                 u64 buf{};
                 u64 data{};
-                auto inst     = (instruction_t*) &buf;
-                auto operands = (operand_encoding_t*) &data;
-                inst->type          = opcode;
-                inst->encoding      = instruction::encoding::reg1;
-                operands->reg1.dest = arg;
-                operands->reg1.pad  = 0;
-                inst->data          = data;
+                auto inst        = (instruction_t*) &buf;
+                auto opers       = (operand_encoding_t*) &data;
+                inst->type       = opcode;
+                inst->encoding   = instruction::encoding::reg1;
+                opers->reg1.dest = arg;
+                opers->reg1.pad  = 0;
+                inst->data       = data;
                 array::append(bb.entries, buf);
             }
 
@@ -388,27 +388,27 @@ namespace basecode::scm {
             u0 imm1(bb_t& bb, op_code_t opcode, imm_t imm) {
                 u64 buf{};
                 u64 data{};
-                auto inst = (instruction_t*) &buf;
-                auto operands = (operand_encoding_t*) &data;
+                auto inst      = (instruction_t*) &buf;
+                auto opers     = (operand_encoding_t*) &data;
                 inst->type     = opcode;
                 inst->encoding = instruction::encoding::imm;
                 switch (imm.type) {
                     case imm_type_t::block:
-                        operands->imm.src = imm.b->id;
+                        opers->imm.src = imm.b->id;
                         break;
                     case imm_type_t::obj:
                     case imm_type_t::trap:
                     case imm_type_t::value:
                     case imm_type_t::label:
                     case imm_type_t::boolean:
-                        operands->imm.src = imm.s;
+                        opers->imm.src = imm.s;
                         break;
                 }
-                operands->imm.dest = 0;
-                operands->imm.type = u8(imm.type);
-                operands->imm.size = u8(imm.size);
-                operands->imm.aux  = 0;
-                inst->data         = data;
+                opers->imm.dest = 0;
+                opers->imm.type = u8(imm.type);
+                opers->imm.size = u8(imm.size);
+                opers->imm.aux  = 0;
+                inst->data      = data;
                 array::append(bb.entries, buf);
             }
 
@@ -807,7 +807,7 @@ namespace basecode::scm {
                 auto target_reg = compiler::reserve_reg(comp, c);
                 G(target_reg) = idx;
                 if (!c.top_level)
-                    bytecode::const_(*c.bb, idx, target_reg);
+                    const_(*c.bb, idx, target_reg);
                 return {c.bb, target_reg, true};
             }
 
@@ -882,7 +882,7 @@ namespace basecode::scm {
 
             u0 push_env(compiler_t& comp, bb_t& bb) {
                 auto reg = reg_alloc::reserve(bb.emitter->gp);
-                bytecode::save_protected(bb, comp);
+                save_protected(bb, comp);
                 basic_block::reg2(bb, op::env, rf::ep, reg[0]);
                 basic_block::reg2(bb, op::push, reg[0], rf::ep);
             }
@@ -1077,7 +1077,7 @@ namespace basecode::scm {
                 auto target_reg = basic_block::find_bind(*c.bb, c.obj);
                 if (!target_reg) {
                     auto reg = compiler::reserve_reg(comp, c);
-                    bytecode::get(*c.bb, (u32) OBJ_IDX(c.obj), reg);
+                    get(*c.bb, (u32) OBJ_IDX(c.obj), reg);
                     basic_block::comment(
                         *c.bb,
                         format::format("symbol: {}", scm::to_string(c.ctx, c.obj)));
@@ -1092,7 +1092,7 @@ namespace basecode::scm {
                 auto target_reg = basic_block::find_bind(*c.bb, c.obj);
                 if (!target_reg) {
                     auto reg = compiler::reserve_reg(comp, c);
-                    bytecode::const_(*c.bb, OBJ_IDX(c.obj), reg);
+                    const_(*c.bb, OBJ_IDX(c.obj), reg);
                     basic_block::comment(
                         *c.bb,
                         format::format("literal: {}", scm::to_string(c.ctx, c.obj)));
@@ -1323,7 +1323,7 @@ namespace basecode::scm {
             compile_result_t error(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
                 auto target_reg = compiler::reserve_reg(comp, c);
-                bytecode::error(*c.bb, OBJ_IDX(args), target_reg);
+                error(*c.bb, OBJ_IDX(args), target_reg);
                 basic_block::comment(
                     *c.bb,
                     format::format("literal: {}",
@@ -1369,7 +1369,7 @@ namespace basecode::scm {
                         }
                     }
                 } else {
-                    bytecode::set(*res.bb, idx, res.reg);
+                    set(*res.bb, idx, res.reg);
                     basic_block::comment(
                         *res.bb,
                         format::format("symbol: {}",
@@ -1426,18 +1426,18 @@ namespace basecode::scm {
                             vc.obj = vals;
                             auto res = compiler::compile(comp, vc);
                             vc.bb  = res.bb;
-                            bytecode::set(*vc.bb,
-                                          (u32) OBJ_IDX(keys),
-                                          res.reg);
+                            set(*vc.bb,
+                                (u32) OBJ_IDX(keys),
+                                res.reg);
                             compiler::release_result(comp, res);
                             break;
                         } else {
                             vc.obj = CAR(vals);
                             auto res = compiler::compile(comp, vc);
                             vc.bb  = res.bb;
-                            bytecode::set(*vc.bb,
-                                          (u32) OBJ_IDX(CAR(keys)),
-                                          res.reg);
+                            set(*vc.bb,
+                                (u32) OBJ_IDX(CAR(keys)),
+                                res.reg);
                             keys = CDR(keys);
                             vals = CDR(vals);
                             compiler::release_result(comp, res);
