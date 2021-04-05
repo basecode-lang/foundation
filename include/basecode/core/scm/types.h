@@ -76,8 +76,12 @@ namespace basecode::scm {
     struct env_t;
     struct var_t;
     struct proc_t;
+    struct inst_t;
+    struct operand_t;
     struct emitter_t;
     struct reg_result_t;
+    struct encoded_inst_t;
+    union  encoded_operand_t;
 
     using reg_t                 = u8;
     using trap_t                = b8 (*)(vm_t& vm, u64 arg);
@@ -87,17 +91,16 @@ namespace basecode::scm {
     using ptr_array_t           = array_t<u0*>;
     using env_array_t           = array_t<env_t>;
     using label_map_t           = hashtab_t<u32, bb_t*>;
-    using note_list_t           = array_t<u32>;
-    using reg_table_t           = hashtab_t<u64, reg_t>;
     using var_table_t           = symtab_t<var_t*>;
     using var_array_t           = stable_array_t<var_t>;
+    using note_array_t          = array_t<u32>;
+    using inst_array_t          = array_t<inst_t>;
     using proc_array_t          = array_t<proc_t>;
     using bind_table_t          = hashtab_t<u32, obj_t*>;
     using trap_table_t          = hashtab_t<u32, trap_t>;
     using symbol_table_t        = hashtab_t<u32, obj_t*>;
     using string_table_t        = hashtab_t<u32, obj_t*>;
-    using encoded_list_t        = array_t<u64>;
-    using comment_table_t       = hashtab_t<u32, note_list_t>;
+    using comment_table_t       = hashtab_t<u32, note_array_t>;
 
     enum class bb_type_t : u8 {
         code,
@@ -109,13 +112,6 @@ namespace basecode::scm {
         none,
         fixnum,
         flonum,
-    };
-
-    enum class imm_type_t : u8 {
-        trap,
-        value,
-        label,
-        block,
     };
 
     enum class prim_type_t : u8 {
@@ -164,9 +160,14 @@ namespace basecode::scm {
         data_stack,
     };
 
-    enum class reg_oper_type_t : u8 {
+    enum class operand_type_t : u8 {
+        none,
         reg,
         var,
+        trap,
+        value,
+        label,
+        block,
     };
 
     [[maybe_unused]] constexpr u32 max_memory_areas = 6;
@@ -224,96 +225,64 @@ namespace basecode::scm {
     };
     static_assert(sizeof(obj_t) == 8, "obj_t is no longer 8 bytes!");
 
-    union operand_encoding_t final {
+    union encoded_operand_t final {
         struct {
             u64                 src:        32;
             u64                 dst:        6;
-            u64                 dst_type:   1;
-            u64                 type:       3;
-            u64                 mode:       1;
-            u64                 aux:        3;
+            u64                 aux:        8;
             u64                 pad:        5;
         }                       imm;
         struct {
             u64                 dst:        6;
-            u64                 dst_type:   1;
-            u64                 pad:        44;
+            u64                 pad:        45;
         }                       reg1;
         struct {
             u64                 src:        6;
-            u64                 src_type:   1;
             u64                 dst:        6;
-            u64                 dst_type:   1;
             u64                 aux:        32;
-            u64                 pad:        5;
+            u64                 pad:        7;
         }                       reg2;
         struct {
             u64                 a:          6;
-            u64                 a_type:     1;
             u64                 b:          6;
-            u64                 b_type:     1;
-            u64                 imm:        31;
-            u64                 type:       3;
-            u64                 pad:        3;
+            u64                 imm:        32;
+            u64                 pad:        7;
         }                       reg2_imm;
         struct {
             u64                 a:          6;
-            u64                 a_type:     1;
             u64                 b:          6;
-            u64                 b_type:     1;
             u64                 c:          6;
-            u64                 c_type:     1;
-            u64                 pad:        30;
+            u64                 pad:        33;
         }                       reg3;
         struct {
             u64                 a:          6;
-            u64                 a_type:     1;
             u64                 b:          6;
-            u64                 b_type:     1;
             u64                 c:          6;
-            u64                 c_type:     1;
             u64                 d:          6;
-            u64                 d_type:     1;
-            u64                 pad:        23;
+            u64                 pad:        27;
         }                       reg4;
         struct {
             u64                 offs:       32;
             u64                 src:        6;
-            u64                 src_type:   1;
             u64                 dst:        6;
-            u64                 dst_type:   1;
-            u64                 mode:       1;
-            u64                 pad:        4;
+            u64                 pad:        7;
         }                       offset;
         struct {
-            u64                 offs:       24;
+            u64                 offs:       32;
             u64                 base:       6;
-            u64                 base_type:  1;
             u64                 ndx:        6;
-            u64                 ndx_type:   1;
             u64                 dst:        6;
-            u64                 dst_type:   1;
-            u64                 mode:       1;
-            u64                 pad:        5;
+            u64                 pad:        1;
         }                       indexed;
     };
 
-    struct instruction_t final {
+    struct encoded_inst_t final {
         u64                     type:       8;
         u64                     is_signed:  1;
         u64                     encoding:   4;
         u64                     data:       51;
     };
-    static_assert(sizeof(instruction_t) <= 8, "instruction_t is now greater than 8 bytes!");
-
-    struct imm_t final {
-        union {
-            s32                 s;
-            u32                 u;
-            bb_t*               b;
-        };
-        imm_type_t              type;
-    };
+    static_assert(sizeof(encoded_inst_t) <= 8, "encoded_inst_t is now greater than 8 bytes!");
 
     struct var_t final {
         const var_t*            succ;
@@ -322,12 +291,27 @@ namespace basecode::scm {
         u32                     version;
     };
 
-    struct reg_oper_t final {
+    struct operand_t final {
         union {
-            reg_t               r;
-            var_t*              v;
+            reg_t               reg;
+            var_t*              var;
+            s32                 s;
+            u32                 u;
+            bb_t*               bb;
+            label_t             label;
         }                       kind;
-        reg_oper_type_t         type;
+        operand_type_t          type;
+    };
+
+    struct inst_t final {
+        alloc_t*                alloc;
+        operand_t               operands[4];
+        s32                     aux;
+        op_code_t               type;
+        u8                      mode:       1;
+        u8                      encoding:   4;
+        u8                      is_signed:  1;
+        u8                      pad:        2;
     };
 
     struct bb_t final {
@@ -335,8 +319,8 @@ namespace basecode::scm {
         bb_t*                   prev;
         bb_t*                   next;
         u64                     addr;
-        note_list_t             notes;
-        encoded_list_t          entries;
+        note_array_t            notes;
+        inst_array_t            insts;
         comment_table_t         comments;
         label_t                 label;
         u32                     id;
@@ -392,7 +376,6 @@ namespace basecode::scm {
         bb_array_t              blocks;
         var_array_t             vars;
         var_table_t             vartab;
-        reg_table_t             regtab;
         str_array_t             strtab;
         label_map_t             labtab;
         reg_alloc_t             gp;

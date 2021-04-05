@@ -325,19 +325,17 @@ namespace basecode::scm {
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
         compiler::reset(ctx->compiler);
         ctx->compiler.ret_reg = vm::reg_alloc::reserve_one(ctx->compiler.emitter.gp);
-//        vm::reg_alloc::protect(ctx->compiler.emitter.gp,
-//                               ctx->compiler.ret_reg,
-//                               true);
 
         auto& bb = vm::emitter::make_basic_block(ctx->compiler.emitter);
         TIME_BLOCK(
             "compile expr"_ss,
             auto tc = compiler::make_context(bb, ctx, obj, ctx->env, true);
             auto comp_result = compiler::compile(ctx->compiler, tc);
-            vm::basic_block::imm1(
-                *comp_result.bb,
-                instruction::type::exit,
-                vm::emitter::imm(1));
+            vm::basic_block::encode(comp_result.bb)
+                .imm1()
+                    .op(instruction::type::exit)
+                    .value(1)
+                    .build();
             compiler::release_result(ctx->compiler, comp_result);
             );
 
@@ -392,8 +390,10 @@ namespace basecode::scm {
                 return format::format("{}", FIXNUM(obj));
             case obj_type_t::flonum:
                 return format::format("{.7g}", FLONUM(obj));
-            case obj_type_t::symbol:
             case obj_type_t::string:
+                return format::format("\"{}\"",
+                                      *string::interned::get_slice(STRING_ID(obj)));
+            case obj_type_t::symbol:
             case obj_type_t::keyword:
                 return str_t(*string::interned::get_slice(STRING_ID(obj)));
             case obj_type_t::boolean:

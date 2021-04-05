@@ -173,65 +173,11 @@ namespace basecode::scm {
 
             u0 free(bb_t& bb);
 
-            u0 reg3(bb_t& bb,
-                    op_code_t opcode,
-                    reg_t src,
-                    reg_t dest1,
-                    reg_t dest2);
-
-            u0 offs(bb_t& bb,
-                    op_code_t opcode,
-                    s32 offset,
-                    reg_t src,
-                    reg_t dst,
-                    b8 mode = false);
-
-            u0 reg2_imm(bb_t& bb,
-                        op_code_t opcode,
-                        reg_t a,
-                        reg_t b,
-                        imm_t imm,
-                        b8 is_signed = false);
-
-            u0 dw(bb_t& bb, u64 data);
-
             bb_builder_t encode(bb_t* bb);
 
             bb_builder_t encode(bb_t& bb);
 
-            u0 pred(bb_t& bb, bb_t& pred);
-
-            u0 succ(bb_t& bb, bb_t& succ);
-
-            template <String_Concept T>
-            u0 note(bb_t& bb, const T& value) {
-                str_array::append(bb.emitter->strtab, value);
-                array::append(bb.notes, bb.emitter->strtab.size);
-            }
-
-            u0 apply_label(bb_t& bb, label_t label);
-
-            reg_t* find_bind(bb_t& bb, obj_t* obj);
-
-            u0 set_bind(bb_t& bb, reg_t reg, obj_t* obj);
-
-            u0 imm1(bb_t& bb, op_code_t opcode, imm_t imm);
-
             u0 init(bb_t& bb, emitter_t* e, bb_type_t type);
-
-            template <String_Concept T>
-            u0 comment(bb_t& bb, const T& value, s32 line = -1) {
-                line = line == -1 ? bb.entries.size : line;
-                auto notes = hashtab::find(bb.comments, line);
-                if (!notes) {
-                    notes = hashtab::emplace(bb.comments, line);
-                    array::init(*notes, bb.emitter->alloc);
-                }
-                str_array::append(bb.emitter->strtab, value);
-                array::append(*notes, bb.emitter->strtab.size);
-            }
-
-            bb_t& make_succ(bb_t& bb, bb_type_t type = bb_type_t::code);
         }
 
         namespace emitter {
@@ -243,13 +189,6 @@ namespace basecode::scm {
             u0 free(emitter_t& e);
 
             u0 reset(emitter_t& e);
-
-            constexpr imm_t imm(bb_t* bb) {
-                return imm_t{
-                    .b = bb,
-                    .type = imm_type_t::block,
-                };
-            }
 
             template <String_Concept T>
             var_t* make_var(emitter_t& e, const T& name) {
@@ -293,25 +232,13 @@ namespace basecode::scm {
                 return var;
             }
 
+            status_t encode_inst(vm_t& vm, const inst_t& inst, u64 addr);
+
             inline str::slice_t get_string(emitter_t& e, label_t label) {
                 return e.strtab[label - 1];
             }
 
             u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf);
-
-            constexpr imm_t imm(s32 v, imm_type_t type = imm_type_t::value) {
-                return imm_t{
-                    .s = v,
-                    .type = type,
-                };
-            }
-
-            constexpr imm_t imm(u32 v, imm_type_t type = imm_type_t::value) {
-                return imm_t{
-                    .u = v,
-                    .type = type,
-                };
-            }
 
             bb_t& make_basic_block(emitter_t& e, bb_type_t type = bb_type_t::code);
         }
@@ -325,19 +252,9 @@ namespace basecode::scm {
 
             u0 todo(bb_t& bb, str::slice_t msg);
 
-            u0 get(bb_t& bb, u32 idx, reg_t reg);
-
-            u0 set(bb_t& bb, u32 idx, reg_t reg);
-
-            u0 get(bb_t& bb, reg_t sym, reg_t reg);
-
-            u0 set(bb_t& bb, reg_t sym, reg_t val);
-
             u0 pop_env(compiler_t& comp, bb_t& bb);
 
             u0 push_env(compiler_t& comp, bb_t& bb);
-
-            u0 const_(bb_t& bb, u32 idx, reg_t reg);
 
             compile_result_t prim(compiler_t& comp,
                                   const context_t& c,
@@ -354,8 +271,6 @@ namespace basecode::scm {
                                       const context_t& c,
                                       op_code_t op_code,
                                       obj_t* args);
-
-            u0 error(bb_t& bb, u32 idx, reg_t target_reg);
 
             u0 save_protected(bb_t& bb, compiler_t& comp);
 
@@ -519,7 +434,7 @@ namespace basecode::scm {
         public:
             reg1_builder_t(bb_builder_t* builder) : _builder(builder) {};
 
-            bb_builder_t& next();
+            bb_builder_t& build();
 
             reg1_builder_t& dst(reg_t reg);
 
@@ -533,7 +448,7 @@ namespace basecode::scm {
         public:
             reg2_builder_t(bb_builder_t* builder) : _builder(builder) {};
 
-            bb_builder_t& next();
+            bb_builder_t& build();
 
             reg2_builder_t& aux(s8 value);
 
@@ -550,12 +465,82 @@ namespace basecode::scm {
             reg2_builder_t& op(op_code_t op_code);
         };
 
+        class reg3_builder_t final {
+            bb_builder_t*   _builder;
+        public:
+            reg3_builder_t(bb_builder_t* builder) : _builder(builder) {};
+
+            bb_builder_t& build();
+
+            reg3_builder_t& a(reg_t reg);
+
+            reg3_builder_t& a(var_t* var);
+
+            reg3_builder_t& b(reg_t reg);
+
+            reg3_builder_t& b(var_t* var);
+
+            reg3_builder_t& c(reg_t reg);
+
+            reg3_builder_t& c(var_t* var);
+
+            reg3_builder_t& op(op_code_t op_code);
+        };
+
+        class offs_builder_t final {
+            bb_builder_t*   _builder;
+        public:
+            offs_builder_t(bb_builder_t* builder) : _builder(builder) {};
+
+            bb_builder_t& build();
+
+            offs_builder_t& mode(b8 flag);
+
+            offs_builder_t& dst(reg_t reg);
+
+            offs_builder_t& src(reg_t reg);
+
+            offs_builder_t& dst(var_t* var);
+
+            offs_builder_t& src(var_t* var);
+
+            offs_builder_t& offset(s32 value);
+
+            offs_builder_t& op(op_code_t op_code);
+        };
+
+        class reg2_imm_builder_t final {
+            bb_builder_t*   _builder;
+        public:
+            reg2_imm_builder_t(bb_builder_t* builder) : _builder(builder) {};
+
+            bb_builder_t& build();
+
+            reg2_imm_builder_t& dst(reg_t reg);
+
+            reg2_imm_builder_t& dst(var_t* var);
+
+            reg2_imm_builder_t& src(reg_t reg);
+
+            reg2_imm_builder_t& src(var_t* var);
+
+            reg2_imm_builder_t& is_signed(b8 flag);
+
+            reg2_imm_builder_t& value(s32 value);
+
+            reg2_imm_builder_t& value(u32 value);
+
+            reg2_imm_builder_t& value(bb_t* value);
+
+            reg2_imm_builder_t& op(op_code_t op_code);
+        };
+
         class none_builder_t final {
             bb_builder_t*   _builder;
         public:
             none_builder_t(bb_builder_t* builder) : _builder(builder) {};
 
-            bb_builder_t& next();
+            bb_builder_t& build();
 
             none_builder_t& op(op_code_t op_code);
         };
@@ -565,7 +550,7 @@ namespace basecode::scm {
         public:
             imm1_builder_t(bb_builder_t* builder) : _builder(builder) {};
 
-            bb_builder_t& next();
+            bb_builder_t& build();
 
             imm1_builder_t& value(s32 value);
 
@@ -583,58 +568,106 @@ namespace basecode::scm {
         public:
             imm2_builder_t(bb_builder_t* builder) : _builder(builder) {};
 
-            bb_builder_t& next();
+            bb_builder_t& build();
 
             imm2_builder_t& mode(b8 flag);
-
-            imm2_builder_t& src(reg_t reg);
-
-            imm2_builder_t& src(var_t* var);
 
             imm2_builder_t& dst(reg_t reg);
 
             imm2_builder_t& dst(var_t* var);
 
-            imm2_builder_t& value(s32 value);
+            imm2_builder_t& src(s32 value);
 
-            imm2_builder_t& value(u32 value);
+            imm2_builder_t& src(u32 value);
 
-            imm2_builder_t& op(op_code_t op);
-
-            imm2_builder_t& value(bb_t* value);
+            imm2_builder_t& src(bb_t* value);
 
             imm2_builder_t& is_signed(b8 flag);
+
+            imm2_builder_t& op(op_code_t op_code);
         };
 
         class bb_builder_t final {
-            bb_t*           _bb;
-            str::slice_t    _str;
-            imm_t           _imm;
-            reg_oper_t      _reg[4];
-            imm1_builder_t  _imm1;
-            imm2_builder_t  _imm2;
-            reg1_builder_t  _reg1;
-            reg2_builder_t  _reg2;
-            none_builder_t  _none;
-            s32             _offset;
-            s8              _aux;
-            op_code_t       _op_code;
-            u8              _encoding;
-            b8              _mode;
-            b8              _is_signed;
+            bb_t*                   _bb;
+            [[maybe_unused]] emitter_t*              _em;
+            inst_t*                 _inst;
+            imm1_builder_t          _imm1;
+            imm2_builder_t          _imm2;
+            reg1_builder_t          _reg1;
+            reg2_builder_t          _reg2;
+            none_builder_t          _none;
+            offs_builder_t          _offs;
+            reg3_builder_t          _reg3;
+            reg2_imm_builder_t      _reg2_imm;
 
             friend class imm1_builder_t;
             friend class imm2_builder_t;
             friend class reg1_builder_t;
             friend class reg2_builder_t;
+            friend class reg3_builder_t;
+            friend class offs_builder_t;
             friend class none_builder_t;
+            friend class reg2_imm_builder_t;
+
+            operand_t operand(s32 value) {
+                return operand_t{
+                    .kind.s = value,
+                    .type = operand_type_t::value
+                };
+            }
+
+            operand_t operand(bb_t* bb) {
+                return operand_t{
+                    .kind.bb = bb,
+                    .type = operand_type_t::block
+                };
+            }
+
+            operand_t operand(bb_t& bb) {
+                return operand_t{
+                    .kind.bb = &bb,
+                    .type = operand_type_t::block
+                };
+            }
+
+            operand_t operand(reg_t reg) {
+                return operand_t{
+                    .kind.reg = reg,
+                    .type = operand_type_t::reg
+                };
+            }
+
+            operand_t operand(var_t* var) {
+                return operand_t{
+                    .kind.var = var,
+                    .type = operand_type_t::var
+                };
+            }
+
+            operand_t operand(u32 value,
+                              operand_type_t type = operand_type_t::value) {
+                operand_t oper{};
+                oper.type = type;
+                switch (oper.type) {
+                    case operand_type_t::label:
+                        oper.kind.label = value;
+                        break;
+                    case operand_type_t::trap:
+                    case operand_type_t::value:
+                        oper.kind.u = value;
+                        break;
+                    default:
+                        oper.type = operand_type_t::value;
+                        oper.kind.u = value;
+                        break;
+                }
+                return oper;
+            }
 
         public:
             bb_builder_t(bb_t* bb);
 
             bb_builder_t(bb_t& bb);
-
-            status_t build();
 
             bb_builder_t& label(label_t label) {
                 _bb->label = label;
@@ -667,7 +700,7 @@ namespace basecode::scm {
             template <String_Concept T>
             bb_builder_t& comment(const T& value, s32 line = -1) {
                 auto& strtab = _bb->emitter->strtab;
-                line = (line == -1 ? _bb->entries.size : line);
+                line = (line == -1 ? _bb->insts.size : line);
                 auto notes = hashtab::find(_bb->comments, line);
                 if (!notes) {
                     notes = hashtab::emplace(_bb->comments, line);
@@ -687,6 +720,49 @@ namespace basecode::scm {
             reg2_builder_t& reg2();
 
             none_builder_t& none();
+
+            offs_builder_t& offs();
+
+            reg3_builder_t& reg3();
+
+            reg2_imm_builder_t& reg2_imm();
         };
     }
 }
+
+FORMAT_TYPE(
+    basecode::scm::operand_t,
+    {
+    switch (data.type) {
+        case basecode::scm::operand_type_t::none:
+            break;
+        case basecode::scm::operand_type_t::label:
+            format_to(
+                ctx.out(),
+                "{}",
+                *basecode::string::interned::get_slice(data.kind.u));
+            break;
+        case basecode::scm::operand_type_t::value:
+            format_to(ctx.out(), "{}", data.kind.s);
+            break;
+        case basecode::scm::operand_type_t::block:
+            format_to(ctx.out(), "bb_{}", data.kind.bb->id);
+            break;
+        case basecode::scm::operand_type_t::reg:
+            format_to(
+                ctx.out(),
+                "{}",
+                basecode::scm::register_file::name(data.kind.reg));
+            break;
+        case basecode::scm::operand_type_t::var:
+            format_to(ctx.out(), "{}", *data.kind.var);
+            break;
+        case basecode::scm::operand_type_t::trap:
+            format_to(
+                ctx.out(),
+                "{} ({})",
+                basecode::scm::trap::name(data.kind.u),
+                data.kind.u);
+            break;
+        }
+    });
