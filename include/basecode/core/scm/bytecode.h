@@ -353,17 +353,11 @@ namespace basecode::scm {
         namespace bytecode {
             bb_t& leave(bb_t& bb);
 
-            bb_t& arith_op(bb_t& bb,
-                           op_code_t op_code,
-                           reg_t base_reg,
-                           reg_t target_reg,
-                           u32 size);
-
             bb_t& enter(bb_t& bb, u32 locals);
 
             u0 free_stack(bb_t& bb, u32 words);
 
-            u0 lnot(bb_t& bb, reg_t target_reg);
+            u0 todo(bb_t& bb, str::slice_t msg);
 
             u0 get(bb_t& bb, u32 idx, reg_t reg);
 
@@ -373,11 +367,27 @@ namespace basecode::scm {
 
             u0 set(bb_t& bb, reg_t sym, reg_t val);
 
+            u0 pop_env(compiler_t& comp, bb_t& bb);
+
+            u0 push_env(compiler_t& comp, bb_t& bb);
+
             u0 const_(bb_t& bb, u32 idx, reg_t reg);
 
-            u0 qt(bb_t& bb, u32 idx, reg_t target_reg);
+            compile_result_t prim(compiler_t& comp,
+                                  const context_t& c,
+                                  obj_t* form,
+                                  obj_t* args,
+                                  prim_type_t type);
 
-            u0 qq(bb_t& bb, u32 idx, reg_t target_reg);
+            compile_result_t cmp_op(compiler_t& comp,
+                                    const context_t& c,
+                                    prim_type_t type,
+                                    obj_t* args);
+
+            compile_result_t arith_op(compiler_t& comp,
+                                      const context_t& c,
+                                      op_code_t op_code,
+                                      obj_t* args);
 
             u0 error(bb_t& bb, u32 idx, reg_t target_reg);
 
@@ -385,31 +395,65 @@ namespace basecode::scm {
 
             u0 restore_protected(bb_t& bb, compiler_t& comp);
 
-            u0 car(bb_t& bb, reg_t val_reg, reg_t target_reg);
-
-            u0 cdr(bb_t& bb, reg_t val_reg, reg_t target_reg);
-
-            u0 lnot(bb_t& bb, reg_t val_reg, reg_t target_reg);
-
             u0 alloc_stack(bb_t& bb, u32 words, reg_t base_reg);
 
-            u0 setcar(bb_t& bb, reg_t val_reg, reg_t target_reg);
+            compile_result_t lookup(compiler_t& comp, const context_t& c);
 
-            u0 setcdr(bb_t& bb, reg_t val_reg, reg_t target_reg);
+            compile_result_t self_eval(compiler_t& comp, const context_t& c);
 
-            u0 is(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg);
+            compile_result_t qt(compiler_t& comp, const context_t& c, obj_t* args);
 
-            u0 lt(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg);
+            compile_result_t qq(compiler_t& comp, const context_t& c, obj_t* args);
 
-            u0 gt(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg);
+            compile_result_t uq(compiler_t& comp, const context_t& c, obj_t* args);
 
-            u0 lte(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg);
+            compile_result_t uqs(compiler_t& comp, const context_t& c, obj_t* args);
 
-            u0 gte(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg);
+            compile_result_t car(compiler_t& comp, const context_t& c, obj_t* args);
 
-            u0 cons(bb_t& bb, reg_t car, reg_t cdr, reg_t target_reg);
+            compile_result_t cdr(compiler_t& comp, const context_t& c, obj_t* args);
 
-            bb_t& list(bb_t& bb, reg_t base_reg, reg_t target_reg, u32 size);
+            compile_result_t or_(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t do_(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t if_(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t atom(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t eval(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t list(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t cons(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t and_(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t not_(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t error(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t print(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t while_(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t set_car(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t set_cdr(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t let_set(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t comp_proc(compiler_t& comp, const context_t& c, proc_t* proc);
+
+            compile_result_t fn(compiler_t& comp, const context_t& c, obj_t* form, obj_t* args);
+
+            compile_result_t ffi(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args);
+
+            compile_result_t apply(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args);
+
+            compile_result_t inline_(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args);
+
+            compile_result_t call_back(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args);
         }
 
         namespace reg_alloc {

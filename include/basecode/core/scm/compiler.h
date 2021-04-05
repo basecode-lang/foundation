@@ -22,25 +22,9 @@
 #include <basecode/core/scm/bytecode.h>
 
 namespace basecode::scm::compiler {
-    namespace proc {
-        compile_result_t apply(compiler_t& comp, const context_t& c);
-
-        compile_result_t compile(compiler_t& comp, const context_t& c);
-    }
-
-    namespace prim {
-        compile_result_t compile(compiler_t& comp, const context_t& c);
-    }
-
     u0 free(compiler_t& comp);
 
     u0 reset(compiler_t& comp);
-
-    context_t make_context(bb_t& bb,
-                           ctx_t* ctx,
-                           obj_t* obj,
-                           obj_t* env,
-                           b8 top_level = false);
 
     u0 release_reg(compiler_t& comp, reg_t reg);
 
@@ -55,4 +39,6 @@ namespace basecode::scm::compiler {
     u0 init(compiler_t& comp, vm_t* vm, u64 addr, alloc_t* alloc);
 
     compile_result_t compile(compiler_t& comp, const context_t& c);
+
+    context_t make_context(bb_t& bb, ctx_t* ctx, obj_t* obj, obj_t* env, b8 top_level = false);
 }

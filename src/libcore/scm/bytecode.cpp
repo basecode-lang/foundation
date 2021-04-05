@@ -180,7 +180,7 @@ namespace basecode::scm {
                 opers->imm.dest = dest;
                 opers->imm.type = u8(imm.type);
                 opers->imm.size = u8(imm.size);
-                auto area = vm::find_memory_map_entry(*bb.emitter->vm, dest);
+                auto area = find_memory_map_entry(*bb.emitter->vm, dest);
                 if (area) {
                     opers->imm.aux = area->top ? -1 : 1;
                 } else {
@@ -235,7 +235,7 @@ namespace basecode::scm {
                 operands->reg2.src  = src;
                 operands->reg2.dest = dest;
                 operands->reg2.pad  = 0;
-                auto area = vm::find_memory_map_entry(*bb.emitter->vm, src);
+                auto area = find_memory_map_entry(*bb.emitter->vm, src);
                 if (area && !aux) {
                     operands->reg2.aux = area->top ? -1 : 1;
                 } else {
@@ -791,12 +791,24 @@ namespace basecode::scm {
                 return arith_bb;
             }
 
-            bb_t& if_(bb_t& bb,
-                      bb_t& pred_block,
-                      bb_t& true_bb,
-                      bb_t& false_bb) {
-                auto& exit_bb = emitter::make_basic_block(*bb.emitter);
-                return exit_bb;
+            compile_result_t fn(compiler_t& comp,
+                                const context_t& c,
+                                obj_t* form,
+                                obj_t* args) {
+                auto& vm = *comp.vm;
+                auto ctx        = c.ctx;
+                b8   is_mac     = PRIM(form) == prim_type_t::mac;
+                auto proc       = make_proc(c.ctx,
+                                            CAR(args),
+                                            CDR(args),
+                                            c.env,
+                                            is_mac);
+                auto idx        = OBJ_IDX(proc);
+                auto target_reg = compiler::reserve_reg(comp, c);
+                G(target_reg) = idx;
+                if (!c.top_level)
+                    bytecode::const_(*c.bb, idx, target_reg);
+                return {c.bb, target_reg, true};
             }
 
             bb_t& enter(bb_t& bb, u32 locals) {
@@ -823,49 +835,203 @@ namespace basecode::scm {
             u0 free_stack(bb_t& bb, u32 words) {
                 basic_block::imm2(bb,
                                   op::add,
-                                  vm::emitter::imm(words * 8),
+                                  emitter::imm(words * 8),
                                   rf::sp);
             }
 
-            u0 lnot(bb_t& bb, reg_t target_reg) {
-                basic_block::reg1(bb, op::lnot, target_reg);
+            u0 todo(bb_t& bb, str::slice_t msg) {
+                basic_block::none(bb, op::nop);
+                basic_block::comment(bb, msg);
             }
 
             u0 set(bb_t& bb, u32 idx, reg_t reg) {
                 basic_block::imm2(bb,
                                   op::set,
-                                  vm::emitter::imm(idx),
+                                  emitter::imm(idx),
                                   reg,
                                   false,
                                   true);
             }
 
             u0 get(bb_t& bb, u32 idx, reg_t reg) {
-                basic_block::imm2(bb, op::get, vm::emitter::imm(idx), reg);
+                basic_block::imm2(bb, op::get, emitter::imm(idx), reg);
             }
 
-            u0 get(bb_t& bb, reg_t sym, reg_t reg) {
-                basic_block::reg2(bb, op::get, sym, reg);
+            compile_result_t inline_(compiler_t& comp,
+                                     const context_t& c,
+                                     obj_t* sym,
+                                     obj_t* form,
+                                     obj_t* args) {
+                todo(*c.bb, "XXX: macro call"_ss);
+                return {c.bb, 0};
             }
 
             u0 set(bb_t& bb, reg_t sym, reg_t val) {
                 basic_block::reg2(bb, op::set, val, sym);
             }
 
+            u0 get(bb_t& bb, reg_t sym, reg_t reg) {
+                basic_block::reg2(bb, op::get, sym, reg);
+            }
+
+            u0 pop_env(compiler_t& comp, bb_t& bb) {
+                auto reg = reg_alloc::reserve(bb.emitter->gp);
+                basic_block::reg2(bb, op::pop, rf::ep, reg[0]);
+                basic_block::comment(bb, "drop apply env"_ss);
+            }
+
+            u0 push_env(compiler_t& comp, bb_t& bb) {
+                auto reg = reg_alloc::reserve(bb.emitter->gp);
+                bytecode::save_protected(bb, comp);
+                basic_block::reg2(bb, op::env, rf::ep, reg[0]);
+                basic_block::reg2(bb, op::push, reg[0], rf::ep);
+            }
+
             u0 const_(bb_t& bb, u32 idx, reg_t reg) {
-                basic_block::imm2(bb, op::const_, vm::emitter::imm(idx), reg);
+                basic_block::imm2(bb, op::const_, emitter::imm(idx), reg);
             }
 
-            u0 qt(bb_t& bb, u32 idx, reg_t target_reg) {
-                auto reg = reg_alloc::reserve(bb.emitter->gp);
-                const_(bb, idx, reg[0]);
-                basic_block::reg2(bb, op::qt, reg[0], target_reg);
+            compile_result_t prim(compiler_t& comp,
+                                  const context_t& c,
+                                  obj_t* form,
+                                  obj_t* args,
+                                  prim_type_t type) {
+                switch (type) {
+                    case prim_type_t::is:
+                    case prim_type_t::gt:
+                    case prim_type_t::lt:
+                    case prim_type_t::lte:
+                    case prim_type_t::gte:              return cmp_op(comp, c, type, args);
+                    case prim_type_t::add:              return arith_op(comp, c, op::ladd, args);
+                    case prim_type_t::sub:              return arith_op(comp, c, op::lsub, args);
+                    case prim_type_t::mul:              return arith_op(comp, c, op::lmul, args);
+                    case prim_type_t::div:              return arith_op(comp, c, op::ldiv, args);
+                    case prim_type_t::mod:              return arith_op(comp, c, op::lmod, args);
+                    case prim_type_t::let:
+                    case prim_type_t::set:              return let_set(comp, c, args);
+                    case prim_type_t::fn:
+                    case prim_type_t::mac:              return fn(comp, c, form, args);
+                    case prim_type_t::if_:              return if_(comp, c, args);
+                    case prim_type_t::do_:              return do_(comp, c, args);
+                    case prim_type_t::or_:              return or_(comp, c, args);
+                    case prim_type_t::and_:             return and_(comp, c, args);
+                    case prim_type_t::not_:             return not_(comp, c, args);
+                    case prim_type_t::car:              return car(comp, c, args);
+                    case prim_type_t::cdr:              return cdr(comp, c, args);
+                    case prim_type_t::cons:             return cons(comp, c, args);
+                    case prim_type_t::atom:             return atom(comp, c, args);
+                    case prim_type_t::eval:             return eval(comp, c, args);
+                    case prim_type_t::list:             return list(comp, c, args);
+                    case prim_type_t::while_:           return while_(comp, c, args);
+                    case prim_type_t::setcar:           return set_car(comp, c, args);
+                    case prim_type_t::setcdr:           return set_cdr(comp, c, args);
+                    case prim_type_t::error:            return error(comp, c, args);
+                    case prim_type_t::print:            return print(comp, c, args);
+                    case prim_type_t::quote:            return qt(comp, c, args);
+                    case prim_type_t::unquote:          return uq(comp, c, args);
+                    case prim_type_t::quasiquote:       return qq(comp, c, args);
+                    case prim_type_t::unquote_splicing: return uqs(comp, c, args);
+                    default:                            return {c.bb, 0};
+                }
             }
 
-            u0 qq(bb_t& bb, u32 idx, reg_t target_reg) {
-                auto reg = reg_alloc::reserve(bb.emitter->gp);
-                const_(bb, idx, reg[0]);
-                basic_block::reg2(bb, op::qq, reg[0], target_reg);
+            compile_result_t cmp_op(compiler_t& comp,
+                                    const context_t& c,
+                                    prim_type_t type,
+                                    obj_t* args) {
+                auto ctx  = c.ctx;
+                auto oc = c;
+                oc.obj = CAR(args);
+                auto lhs_res = compiler::compile(comp, oc);
+                oc.bb  = lhs_res.bb;
+                oc.obj = CADR(args);
+                auto rhs_res    = compiler::compile(comp, oc);
+                auto target_reg = compiler::reserve_reg(comp, c);
+
+                switch (type) {
+                    case prim_type_t::is:
+                        basic_block::reg2(*rhs_res.bb, op::lcmp, lhs_res.reg, rhs_res.reg);
+                        basic_block::comment(*rhs_res.bb, "prim: is"_ss);
+                        basic_block::reg1(*rhs_res.bb, op::seq, target_reg);
+                        break;
+
+                    case prim_type_t::lt:
+                        basic_block::reg2(*rhs_res.bb, op::lcmp, lhs_res.reg, rhs_res.reg);
+                        basic_block::comment(*rhs_res.bb, "prim: lt"_ss);
+                        basic_block::reg1(*rhs_res.bb, op::sl, target_reg);
+                        break;
+
+                    case prim_type_t::gt:
+                        basic_block::reg2(*rhs_res.bb, op::lcmp, lhs_res.reg, rhs_res.reg);
+                        basic_block::comment(*rhs_res.bb, "prim: gt"_ss);
+                        basic_block::reg1(*rhs_res.bb, op::sg, target_reg);
+                        break;
+
+                    case prim_type_t::lte:
+                        basic_block::reg2(*rhs_res.bb, op::lcmp, lhs_res.reg, rhs_res.reg);
+                        basic_block::comment(*rhs_res.bb, "prim: lte"_ss);
+                        basic_block::reg1(*rhs_res.bb, op::sle, target_reg);
+                        break;
+
+                    case prim_type_t::gte:
+                        basic_block::reg2(*rhs_res.bb, op::lcmp, lhs_res.reg, rhs_res.reg);
+                        basic_block::comment(*rhs_res.bb, "prim: gte"_ss);
+                        basic_block::reg1(*rhs_res.bb, op::sge, target_reg);
+                        break;
+
+                    default:
+                        error(ctx, "unknown compare prim");
+                }
+
+                compiler::release_result(comp, lhs_res);
+                compiler::release_result(comp, rhs_res);
+
+                return {c.bb, target_reg, true};
+            }
+
+            compile_result_t arith_op(compiler_t& comp,
+                                      const context_t& c,
+                                      op_code_t op_code,
+                                      obj_t* args) {
+                auto ctx = c.ctx;
+                auto reg = reg_alloc::reserve(comp.emitter.gp);
+                reg_alloc::protect(comp.emitter.gp, reg[0], true);
+                u32 size = length(ctx, args);
+                alloc_stack(*c.bb, size, reg[0]);
+                s32  offs = 0;
+                auto ac   = c;
+                while (!IS_NIL(args)) {
+                    ac.obj = CAR(args);
+                    auto res = compiler::compile(comp, ac);
+                    ac.bb = res.bb;
+                    basic_block::offs(*res.bb,
+                                      op::store,
+                                      offs,
+                                      res.reg,
+                                      reg[0],
+                                      true);
+                    args = CDR(args);
+                    offs += 8;
+                    compiler::release_result(comp, res);
+                }
+                auto target_reg = compiler::reserve_reg(comp, ac);
+                auto& arith_bb = basic_block::make_succ(*c.bb);
+                basic_block::reg2_imm(arith_bb,
+                                      op_code,
+                                      reg[0],
+                                      target_reg,
+                                      emitter::imm(size * 8));
+                free_stack(arith_bb, size);
+                return {&arith_bb, target_reg, true};
+            }
+
+            compile_result_t call_back(compiler_t& comp,
+                                       const context_t& c,
+                                       obj_t* sym,
+                                       obj_t* form,
+                                       obj_t* args) {
+                todo(*c.bb, "XXX: cfunc call"_ss);
+                return {c.bb, 0};
             }
 
             u0 error(bb_t& bb, u32 idx, reg_t target_reg) {
@@ -876,8 +1042,8 @@ namespace basecode::scm {
 
             u0 save_protected(bb_t& bb, compiler_t& comp) {
                 for (reg_t r = rf::r0; r < rf::r15; ++r) {
-                    if (vm::reg_alloc::is_protected(comp.emitter.gp, r)) {
-                        vm::basic_block::reg2(bb, op::push, r, rf::sp);
+                    if (reg_alloc::is_protected(comp.emitter.gp, r)) {
+                        basic_block::reg2(bb, op::push, r, rf::sp);
                         comp.prot[comp.prot_count++] = r;
                         reg_alloc::release_one(comp.emitter.gp, r);
                     }
@@ -887,89 +1053,442 @@ namespace basecode::scm {
             u0 restore_protected(bb_t& bb, compiler_t& comp) {
                 for (s32 i = comp.prot_count - 1; i >= 0; --i) {
                     reg_t r = comp.prot[i];
-                    vm::reg_alloc::reserve_and_protect_reg(comp.emitter.gp, r);
-                    vm::basic_block::reg2(bb, op::pop, rf::sp, r);
+                    reg_alloc::reserve_and_protect_reg(comp.emitter.gp, r);
+                    basic_block::reg2(bb, op::pop, rf::sp, r);
                     comp.prot[i] = 0;
                 }
                 comp.prot_count = 0;
             }
 
-            u0 car(bb_t& bb, reg_t val_reg, reg_t target_reg) {
-                basic_block::reg2(bb, op::car, val_reg, target_reg);
-            }
-
-            u0 cdr(bb_t& bb, reg_t val_reg, reg_t target_reg) {
-                basic_block::reg2(bb, op::cdr, val_reg, target_reg);
-            }
-
-            u0 lnot(bb_t& bb, reg_t val_reg, reg_t target_reg) {
-                basic_block::reg2(bb, op::lnot, val_reg, target_reg);
-            }
-
             u0 alloc_stack(bb_t& bb, u32 words, reg_t base_reg) {
-                vm::basic_block::imm2(bb,
-                                      op::sub,
-                                      vm::emitter::imm(words * 8),
-                                      rf::sp);
-                vm::basic_block::offs(bb,
-                                      op::lea,
-                                      -(words * 8),
-                                      rf::sp,
-                                      base_reg);
+                basic_block::imm2(bb,
+                                  op::sub,
+                                  emitter::imm(words * 8),
+                                  rf::sp);
+                basic_block::offs(bb,
+                                  op::lea,
+                                  -(words * 8),
+                                  rf::sp,
+                                  base_reg);
             }
 
-            u0 setcar(bb_t& bb, reg_t val_reg, reg_t target_reg) {
-                basic_block::reg2(bb, op::setcar, val_reg, target_reg);
+            compile_result_t lookup(compiler_t& comp, const context_t& c) {
+                auto ctx = c.ctx;
+                auto target_reg = basic_block::find_bind(*c.bb, c.obj);
+                if (!target_reg) {
+                    auto reg = compiler::reserve_reg(comp, c);
+                    bytecode::get(*c.bb, (u32) OBJ_IDX(c.obj), reg);
+                    basic_block::comment(
+                        *c.bb,
+                        format::format("symbol: {}", scm::to_string(c.ctx, c.obj)));
+                    basic_block::set_bind(*c.bb, reg, c.obj);
+                    return {c.bb, reg, false};
+                }
+                return {c.bb, *target_reg, false};
             }
 
-            u0 setcdr(bb_t& bb, reg_t val_reg, reg_t target_reg) {
-                basic_block::reg2(bb, op::setcdr, val_reg, target_reg);
+            compile_result_t self_eval(compiler_t& comp, const context_t& c) {
+                auto ctx = c.ctx;
+                auto target_reg = basic_block::find_bind(*c.bb, c.obj);
+                if (!target_reg) {
+                    auto reg = compiler::reserve_reg(comp, c);
+                    bytecode::const_(*c.bb, OBJ_IDX(c.obj), reg);
+                    basic_block::comment(
+                        *c.bb,
+                        format::format("literal: {}", scm::to_string(c.ctx, c.obj)));
+                    basic_block::set_bind(*c.bb, reg, c.obj);
+                    return {c.bb, reg, false};
+                }
+                return {c.bb, *target_reg, false};
             }
 
-            u0 gt(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
-                vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
-                vm::basic_block::comment(bb, "prim: gt"_ss);
-                vm::basic_block::reg1(bb, op::sg, target_reg);
+            compile_result_t qt(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto target_reg = compiler::reserve_reg(comp, c);
+                auto reg = reg_alloc::reserve(comp.emitter.gp);
+                const_(*c.bb, OBJ_IDX(CAR(args)), reg[0]);
+                basic_block::reg2(*c.bb, op::qt, reg[0], target_reg);
+                return {c.bb, target_reg, true};
             }
 
-            u0 lt(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
-                vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
-                vm::basic_block::comment(bb, "prim: lt"_ss);
-                vm::basic_block::reg1(bb, op::sl, target_reg);
+            compile_result_t qq(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto target_reg = compiler::reserve_reg(comp, c);
+                auto reg = reg_alloc::reserve(comp.emitter.gp);
+                const_(*c.bb, OBJ_IDX(CAR(args)), reg[0]);
+                basic_block::reg2(*c.bb, op::qq, reg[0], target_reg);
+                return {c.bb, target_reg, true};
             }
 
-            u0 is(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
-                vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
-                vm::basic_block::comment(bb, "prim: is"_ss);
-                vm::basic_block::reg1(bb, op::seq, target_reg);
+            compile_result_t uq(compiler_t& comp, const context_t& c, obj_t* args) {
+                UNUSED(args);
+                scm::error(c.ctx, "unquote is not valid in this context.");
+                return {c.bb, 0};
             }
 
-            u0 lte(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
-                vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
-                vm::basic_block::comment(bb, "prim: lte"_ss);
-                vm::basic_block::reg1(bb, op::sle, target_reg);
+            compile_result_t car(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto target_reg = compiler::reserve_reg(comp, c);
+                auto cc = c;
+                cc.obj = CAR(args);
+                auto res = compiler::compile(comp, cc);
+                basic_block::reg2(*res.bb, op::car, res.reg, target_reg);
+                compiler::release_result(comp, res);
+                return {res.bb, target_reg, true};
             }
 
-            u0 gte(bb_t& bb, reg_t lhs, reg_t rhs, reg_t target_reg) {
-                vm::basic_block::reg2(bb, op::lcmp, lhs, rhs);
-                vm::basic_block::comment(bb, "prim: gte"_ss);
-                vm::basic_block::reg1(bb, op::sge, target_reg);
+            compile_result_t cdr(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto target_reg = compiler::reserve_reg(comp, c);
+                auto cc = c;
+                cc.obj = CAR(args);
+                auto res = compiler::compile(comp, cc);
+                basic_block::reg2(*res.bb, op::cdr, res.reg, target_reg);
+                compiler::release_result(comp, res);
+                return {res.bb, target_reg, true};
             }
 
-            u0 cons(bb_t& bb, reg_t car, reg_t cdr, reg_t target_reg) {
-                vm::basic_block::reg3(bb, op::cons, car, cdr, target_reg);
+            compile_result_t or_(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto& exit_bb   = emitter::make_basic_block(comp.emitter);
+                auto target_reg = compiler::reserve_reg(comp, c);
+                auto oc         = c;
+                while (!IS_NIL(args)) {
+                    oc.obj = CAR(args);
+                    if (IS_NIL(CDR(args)))
+                        oc.target = &comp.ret_reg;
+                    auto res = compiler::compile(comp, oc);
+                    oc.bb = res.bb;
+                    basic_block::reg1(*oc.bb, op::truep, res.reg);
+                    basic_block::imm1(*oc.bb, op::beq, emitter::imm(&exit_bb));
+                    compiler::release_result(comp, res);
+                    args = CDR(args);
+                }
+                basic_block::succ(*oc.bb, exit_bb);
+                return {&exit_bb, target_reg};
             }
 
-            bb_t& list(bb_t& bb, reg_t base_reg, reg_t target_reg, u32 size) {
-                auto reg = reg_alloc::reserve(bb.emitter->gp);
-                auto& list_bb = basic_block::make_succ(bb);
+            compile_result_t do_(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto dc = c;
+                while (!IS_NIL(args)) {
+                    dc.obj   = CAR(args);
+                    auto res = compiler::compile(comp, dc);
+                    dc.bb = res.bb;
+                    args = CDR(args);
+                    compiler::release_result(comp, res);
+                }
+                return {dc.bb, 0};
+            }
+
+            compile_result_t uqs(compiler_t& comp, const context_t& c, obj_t* args) {
+                UNUSED(args);
+                scm::error(c.ctx, "unquote-splicing is not valid in this context.");
+                return {c.bb, 0};
+            }
+
+            compile_result_t if_(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+
+                auto& true_bb  = basic_block::make_succ(*c.bb);
+                auto& false_bb = emitter::make_basic_block(*c.bb->emitter);
+                auto& exit_bb  = emitter::make_basic_block(*c.bb->emitter);
+
+                auto ic  = c;
+                auto reg = reg_alloc::reserve(comp.emitter.gp);
+
+                ic.obj = CAR(args);
+                auto pred_res = compiler::compile(comp, ic);
+                basic_block::reg1(*c.bb, op::truep, pred_res.reg);
+                basic_block::imm1(*c.bb, op::bne, emitter::imm(&false_bb));
+                compiler::release_result(comp, pred_res);
+
+                ic.bb     = &true_bb;
+                ic.obj    = CADR(args);
+                ic.target = &comp.ret_reg;
+                auto true_res = compiler::compile(comp, ic);
+                basic_block::imm1(*true_res.bb, op::br, emitter::imm(&exit_bb));
+                basic_block::succ(*true_res.bb, false_bb);
+                compiler::release_result(comp, true_res);
+
+                ic.bb     = &false_bb;
+                ic.obj    = CADDR(args);
+                ic.target = &comp.ret_reg;
+                auto false_res = compiler::compile(comp, ic);
+                basic_block::succ(*false_res.bb, exit_bb);
+                compiler::release_result(comp, false_res);
+
+                return {&exit_bb, 0};
+            }
+
+            compile_result_t cons(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto target_reg = compiler::reserve_reg(comp, c);
+                auto cc = c;
+                cc.obj = CAR(args);
+                auto lhs_res = compiler::compile(comp, cc);
+                cc.bb  = lhs_res.bb;
+                cc.obj = CADR(args);
+                auto rhs_res = compiler::compile(comp, cc);
+                basic_block::reg3(*rhs_res.bb, op::cons, lhs_res.reg, rhs_res.reg, target_reg);
+                compiler::release_result(comp, lhs_res);
+                compiler::release_result(comp, rhs_res);
+                return {rhs_res.bb, target_reg, true};
+            }
+
+            compile_result_t atom(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto target_reg = compiler::reserve_reg(comp, c);
+                auto ac = c;
+                ac.obj = CAR(args);
+                auto res = compiler::compile(comp, ac);
+                basic_block::reg2(*res.bb, op::atomp, res.reg, target_reg);
+                compiler::release_result(comp, res);
+                return {res.bb, target_reg, true};
+            }
+
+            compile_result_t eval(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto target_reg = compiler::reserve_reg(comp, c);
+                auto ec = c;
+                ec.obj = CAR(args);
+                auto res = compiler::compile(comp, ec);
+                basic_block::reg2(*res.bb, op::eval, res.reg, target_reg);
+                compiler::release_result(comp, res);
+                return {res.bb, target_reg, true};
+            }
+
+            compile_result_t list(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx  = c.ctx;
+                auto reg  = reg_alloc::reserve(comp.emitter.gp);
+                u32  size = length(ctx, args);
+                alloc_stack(*c.bb, size, reg[0]);
+                s32  offs = 0;
+                auto lc   = c;
+                while (!IS_NIL(args)) {
+                    lc.obj   = CAR(args);
+                    auto res = compiler::compile(comp, lc);
+                    lc.bb = res.bb;
+                    basic_block::offs(*res.bb,
+                                      op::store,
+                                      offs,
+                                      res.reg,
+                                      reg[0],
+                                      true);
+                    args = CDR(args);
+                    offs += 8;
+                    compiler::release_result(comp, res);
+                }
+                auto target_reg = compiler::reserve_reg(comp, lc);
+                auto& list_bb = basic_block::make_succ(*c.bb);
                 basic_block::reg2_imm(list_bb,
                                       op::list,
-                                      base_reg,
+                                      reg[0],
                                       target_reg,
                                       emitter::imm(size * 8));
                 free_stack(list_bb, size);
-                return list_bb;
+                return {&list_bb, target_reg, true};
+            }
+
+            compile_result_t and_(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto& exit_bb   = emitter::make_basic_block(comp.emitter);
+                auto target_reg = compiler::reserve_reg(comp, c);
+                auto oc         = c;
+                while (!IS_NIL(args)) {
+                    oc.obj = CAR(args);
+                    if (IS_NIL(CDR(args)))
+                        oc.target = &comp.ret_reg;
+                    auto res = compiler::compile(comp, oc);
+                    oc.bb = res.bb;
+                    basic_block::reg1(*oc.bb, op::truep, res.reg);
+                    basic_block::imm1(*oc.bb, op::bne, emitter::imm(&exit_bb));
+                    compiler::release_result(comp, res);
+                    args = CDR(args);
+                }
+                basic_block::succ(*oc.bb, exit_bb);
+                return {&exit_bb, target_reg};
+            }
+
+            compile_result_t not_(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto nc = c;
+                nc.obj = CAR(args);
+                auto res = compiler::compile(comp, nc);
+                basic_block::reg1(*res.bb, op::lnot, res.reg);
+                compiler::release_result(comp, res);
+                return res;
+            }
+
+            compile_result_t error(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto target_reg = compiler::reserve_reg(comp, c);
+                bytecode::error(*c.bb, OBJ_IDX(args), target_reg);
+                basic_block::comment(
+                    *c.bb,
+                    format::format("literal: {}",
+                                   to_string(c.ctx, args)),
+                    c.bb->entries.size - 1);
+                return {c.bb, target_reg, true};
+            }
+
+            compile_result_t print(compiler_t& comp, const context_t& c, obj_t* args) {
+                UNUSED(args);
+                return {c.bb, 0};
+            }
+
+            compile_result_t while_(compiler_t& comp, const context_t& c, obj_t* args) {
+                UNUSED(args);
+                return {c.bb, 0};
+            }
+
+            compile_result_t let_set(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto& vm = *comp.vm;
+                auto key = CAR(args);
+                u32  idx = OBJ_IDX(key);
+                auto vc  = c;
+                vc.obj    = CADR(args);
+                vc.target = &comp.ret_reg;
+                vc.label  = emitter::make_label(
+                    comp.emitter,
+                    *string::interned::get_slice(STRING_ID(OBJ_AT(idx))));
+                auto res = compiler::compile(comp, vc);
+                if (c.top_level) {
+                    auto value = OBJ_AT(G(res.reg));
+                    set(ctx, (obj_t*) OBJ_AT(idx), value, c.env);
+                    compiler::release_result(comp, res);
+                    if (TYPE(value) == obj_type_t::func
+                        ||  TYPE(value) == obj_type_t::macro) {
+                        auto proc = (proc_t*) NATIVE_PTR(CDR(value));
+                        if (!proc->is_compiled) {
+                            auto pc = c;
+                            pc.label     = vc.label;
+                            pc.top_level = false;
+                            return comp_proc(comp, pc, proc);
+                        }
+                    }
+                } else {
+                    bytecode::set(*res.bb, idx, res.reg);
+                    basic_block::comment(
+                        *res.bb,
+                        format::format("symbol: {}",
+                                       printable_t{c.ctx, key, true}));
+                    compiler::release_result(comp, res);
+                }
+                return res;
+            }
+
+            compile_result_t set_cdr(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto sc = c;
+                sc.obj = CADR(args);
+                auto rhs_res = compiler::compile(comp, sc);
+                sc.bb  = rhs_res.bb;
+                sc.obj = CAR(args);
+                auto lhs_res = compiler::compile(comp, sc);
+                basic_block::reg2(*lhs_res.bb, op::setcdr, lhs_res.reg, rhs_res.reg);
+                compiler::release_result(comp, lhs_res);
+                compiler::release_result(comp, rhs_res);
+                return {lhs_res.bb, 0};
+            }
+
+            compile_result_t set_car(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto sc = c;
+                sc.obj = CADR(args);
+                auto rhs_res = compiler::compile(comp, sc);
+                sc.bb  = rhs_res.bb;
+                sc.obj = CAR(args);
+                auto lhs_res = compiler::compile(comp, sc);
+                basic_block::reg2(*lhs_res.bb, op::setcar, lhs_res.reg, rhs_res.reg);
+                compiler::release_result(comp, lhs_res);
+                compiler::release_result(comp, rhs_res);
+                return {lhs_res.bb, 0};
+            }
+
+            compile_result_t ffi(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args) {
+                todo(*c.bb, "XXX: ffi call"_ss);
+                return {c.bb, 0};
+            }
+
+            compile_result_t apply(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args) {
+                auto ctx = c.ctx;
+                auto proc = (proc_t*) NATIVE_PTR(CDR(form));
+                push_env(comp, *c.bb);
+                {
+                    auto keys = proc->params;
+                    auto vals = args;
+                    auto vc   = c;
+                    vc.target = {};
+                    while (!IS_NIL(keys)) {
+                        if (TYPE(keys) != obj_type_t::pair) {
+                            vc.obj = vals;
+                            auto res = compiler::compile(comp, vc);
+                            vc.bb  = res.bb;
+                            bytecode::set(*vc.bb,
+                                          (u32) OBJ_IDX(keys),
+                                          res.reg);
+                            compiler::release_result(comp, res);
+                            break;
+                        } else {
+                            vc.obj = CAR(vals);
+                            auto res = compiler::compile(comp, vc);
+                            vc.bb  = res.bb;
+                            bytecode::set(*vc.bb,
+                                          (u32) OBJ_IDX(CAR(keys)),
+                                          res.reg);
+                            keys = CDR(keys);
+                            vals = CDR(vals);
+                            compiler::release_result(comp, res);
+                        }
+                    }
+                }
+                assert(proc->addr.bb);
+                basic_block::imm1(
+                    *c.bb,
+                    op::blr,
+                    proc->is_assembled ?
+                    emitter::imm(proc->addr.absolute) :
+                    emitter::imm(proc->addr.bb));
+                basic_block::comment(*c.bb,
+                                     format::format("call: {}",
+                                                    printable_t{c.ctx, sym, true}));
+                pop_env(comp, *c.bb);
+                return {c.bb, 0};
+            }
+
+            compile_result_t comp_proc(compiler_t& comp, const context_t& c, proc_t* proc) {
+                auto ctx  = c.ctx;
+                auto& proc_bb = basic_block::make_succ(*c.bb);
+                proc->addr.bb = &proc_bb;
+                str_t note_str;
+                if (c.label) {
+                    basic_block::apply_label(proc_bb, c.label);
+                    note_str = format::format(
+                        "proc: ({} (fn {} {}))",
+                        emitter::get_string(comp.emitter, c.label),
+                        printable_t{c.ctx, proc->params, true},
+                        printable_t{c.ctx, proc->body, true});
+                } else {
+                    note_str = format::format(
+                        "proc: (_ (fn {} {}))",
+                        printable_t{c.ctx, proc->params, true},
+                        printable_t{c.ctx, proc->body, true});
+                }
+                basic_block::note(proc_bb, note_str);
+                auto body = proc->body;
+                auto bc   = c;
+                bc.bb     = &enter(proc_bb, 0);
+                while (!IS_NIL(body)) {
+                    bc.obj = CAR(body);
+                    auto res = compiler::compile(comp, bc);
+                    bc.bb = res.bb;
+                    body = CDR(body);
+                    compiler::release_result(comp, res);
+                }
+                proc->is_compiled = true;
+                return {&leave(*bc.bb), 0};
             }
         }
     }

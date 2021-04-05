@@ -165,12 +165,6 @@ namespace basecode::scm {
         max,
     };
 
-    enum class context_kind_t : u8 {
-        none,
-        proc,
-        prim,
-    };
-
     enum class memory_area_t : u8 {
         code,
         heap,
@@ -398,16 +392,8 @@ namespace basecode::scm {
         ctx_t*                  ctx;
         obj_t*                  obj;
         obj_t*                  env;
-        union {
-            proc_t*             proc;
-            struct {
-                obj_t*          form;
-                obj_t*          args;
-            }                   prim;
-        }                       kind;
         reg_t*                  target;
         label_t                 label;
-        context_kind_t          type;
         b8                      top_level;
     };
 
