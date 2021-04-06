@@ -537,7 +537,7 @@ namespace basecode::scm {
 
         class bb_builder_t final {
             bb_t*                   _bb;
-            [[maybe_unused]] emitter_t*              _em;
+            emitter_t*              _em;
             inst_t*                 _inst;
             imm1_builder_t          _imm1;
             imm2_builder_t          _imm2;
@@ -641,21 +641,36 @@ namespace basecode::scm {
             bb_builder_t& note(const T& value) {
                 auto& strtab = _bb->emitter->strtab;
                 str_array::append(strtab, value);
-                array::append(_bb->notes, strtab.size);
+                auto& c = array::append(_em->comments);
+                c.id       = strtab.size;
+                c.line     = 0;
+                c.type     = comment_type_t::note;
+                c.block_id = _bb->id;
+                if (_bb->notes.eidx == 0) {
+                    _bb->notes.sidx = _em->comments.size - 1;
+                    _bb->notes.eidx = _bb->notes.sidx + 1;
+                } else {
+                    _bb->notes.eidx = _em->comments.size;
+                }
                 return *this;
             }
 
             template <String_Concept T>
             bb_builder_t& comment(const T& value, s32 line = -1) {
-                auto& strtab = _bb->emitter->strtab;
-                line = (line == -1 ? _bb->insts.size : line);
-                auto notes = hashtab::find(_bb->comments, line);
-                if (!notes) {
-                    notes = hashtab::emplace(_bb->comments, line);
-                    array::init(*notes, _bb->emitter->alloc);
-                }
+                auto& strtab = _em->strtab;
+                line = (line == -1 ? std::max<u32>(_bb->insts.eidx - _bb->insts.sidx, 0) : line);
                 str_array::append(strtab, value);
-                array::append(*notes, strtab.size);
+                auto& c = array::append(_em->comments);
+                c.id       = strtab.size;
+                c.line     = line;
+                c.type     = comment_type_t::margin;
+                c.block_id = _bb->id;
+                if (_bb->notes.eidx == 0) {
+                    _bb->notes.sidx = _em->comments.size - 1;
+                    _bb->notes.eidx = _bb->notes.sidx + 1;
+                } else {
+                    _bb->notes.eidx = _em->comments.size;
+                }
                 return *this;
             }
 

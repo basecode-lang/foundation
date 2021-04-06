@@ -163,14 +163,6 @@ namespace basecode::scm {
 
     namespace vm {
         namespace basic_block {
-            u0 free(bb_t& bb) {
-                for (const auto& pair : bb.comments)
-                    array::free(const_cast<note_array_t&>(pair.value));
-                array::free(bb.notes);
-                array::free(bb.insts);
-                hashtab::free(bb.comments);
-            }
-
             bb_builder_t encode(bb_t* bb) {
                 return bb_builder_t(bb);
             }
@@ -184,10 +176,9 @@ namespace basecode::scm {
                 bb.addr    = 0;
                 bb.type    = type;
                 bb.label   = 0;
+                bb.notes   = {};
+                bb.insts   = {};
                 bb.emitter = e;
-                array::init(bb.notes, e->alloc);
-                array::init(bb.insts, e->alloc);
-                hashtab::init(bb.comments, e->alloc);
             }
 
             bb_builder_t::bb_builder_t(bb_t* bb) : _bb(bb),
@@ -217,50 +208,106 @@ namespace basecode::scm {
             }
 
             imm1_builder_t& bb_builder_t::imm1() {
-                _inst = &array::append(_bb->insts);
+                _inst = &array::append(_em->insts);
+                _inst->block_id = _bb->id;
                 _inst->encoding = instruction::encoding::imm;
+                if (_bb->insts.eidx == 0) {
+                    _bb->insts.sidx = _em->insts.size - 1;
+                    _bb->insts.eidx = _bb->insts.sidx + 1;
+                } else {
+                    _bb->insts.eidx = _em->insts.size;
+                }
                 return _imm1;
             }
 
             imm2_builder_t& bb_builder_t::imm2() {
-                _inst = &array::append(_bb->insts);
+                _inst = &array::append(_em->insts);
+                _inst->block_id = _bb->id;
                 _inst->encoding = instruction::encoding::imm;
+                if (_bb->insts.eidx == 0) {
+                    _bb->insts.sidx = _em->insts.size - 1;
+                    _bb->insts.eidx = _bb->insts.sidx + 1;
+                } else {
+                    _bb->insts.eidx = _em->insts.size;
+                }
                 return _imm2;
             }
 
             reg1_builder_t& bb_builder_t::reg1() {
-                _inst = &array::append(_bb->insts);
+                _inst = &array::append(_em->insts);
+                _inst->block_id = _bb->id;
                 _inst->encoding = instruction::encoding::reg1;
+                if (_bb->insts.eidx == 0) {
+                    _bb->insts.sidx = _em->insts.size - 1;
+                    _bb->insts.eidx = _bb->insts.sidx + 1;
+                } else {
+                    _bb->insts.eidx = _em->insts.size;
+                }
                 return _reg1;
             }
 
             reg2_builder_t& bb_builder_t::reg2() {
-                _inst = &array::append(_bb->insts);
+                _inst = &array::append(_em->insts);
+                _inst->block_id = _bb->id;
                 _inst->encoding = instruction::encoding::reg2;
+                if (_bb->insts.eidx == 0) {
+                    _bb->insts.sidx = _em->insts.size - 1;
+                    _bb->insts.eidx = _bb->insts.sidx + 1;
+                } else {
+                    _bb->insts.eidx = _em->insts.size;
+                }
                 return _reg2;
             }
 
             none_builder_t& bb_builder_t::none() {
-                _inst = &array::append(_bb->insts);
+                _inst = &array::append(_em->insts);
+                _inst->block_id = _bb->id;
                 _inst->encoding = instruction::encoding::none;
+                if (_bb->insts.eidx == 0) {
+                    _bb->insts.sidx = _em->insts.size - 1;
+                    _bb->insts.eidx = _bb->insts.sidx + 1;
+                } else {
+                    _bb->insts.eidx = _em->insts.size;
+                }
                 return _none;
             }
 
             reg3_builder_t& bb_builder_t::reg3() {
-                _inst = &array::append(_bb->insts);
+                _inst = &array::append(_em->insts);
+                _inst->block_id = _bb->id;
                 _inst->encoding = instruction::encoding::reg3;
+                if (_bb->insts.eidx == 0) {
+                    _bb->insts.sidx = _em->insts.size - 1;
+                    _bb->insts.eidx = _bb->insts.sidx + 1;
+                } else {
+                    _bb->insts.eidx = _em->insts.size;
+                }
                 return _reg3;
             }
 
             offs_builder_t& bb_builder_t::offs() {
-                _inst = &array::append(_bb->insts);
+                _inst = &array::append(_em->insts);
+                _inst->block_id = _bb->id;
                 _inst->encoding = instruction::encoding::offset;
+                if (_bb->insts.eidx == 0) {
+                    _bb->insts.sidx = _em->insts.size - 1;
+                    _bb->insts.eidx = _bb->insts.sidx + 1;
+                } else {
+                    _bb->insts.eidx = _em->insts.size;
+                }
                 return _offs;
             }
 
             reg2_imm_builder_t& bb_builder_t::reg2_imm() {
-                _inst = &array::append(_bb->insts);
+                _inst = &array::append(_em->insts);
+                _inst->block_id = _bb->id;
                 _inst->encoding = instruction::encoding::reg2_imm;
+                if (_bb->insts.eidx == 0) {
+                    _bb->insts.sidx = _em->insts.size - 1;
+                    _bb->insts.eidx = _bb->insts.sidx + 1;
+                } else {
+                    _bb->insts.eidx = _em->insts.size;
+                }
                 return _reg2_imm;
             }
 
@@ -560,20 +607,22 @@ namespace basecode::scm {
 
         namespace emitter {
             u0 free(emitter_t& e) {
-                for (auto bb : e.blocks)
-                    basic_block::free(*bb);
+                array::free(e.insts);
                 symtab::free(e.vartab);
+                array::free(e.comments);
                 hashtab::free(e.labtab);
+                digraph::free(e.digraph);
                 str_array::free(e.strtab);
                 stable_array::free(e.vars);
                 stable_array::free(e.blocks);
             }
 
             u0 reset(emitter_t& e) {
-                for (auto bb : e.blocks)
-                    basic_block::free(*bb);
+                array::reset(e.insts);
                 symtab::reset(e.vartab);
+                array::reset(e.comments);
                 hashtab::reset(e.labtab);
+                digraph::reset(e.digraph);
                 str_array::reset(e.strtab);
                 stable_array::reset(e.vars);
                 stable_array::reset(e.blocks);
@@ -581,40 +630,68 @@ namespace basecode::scm {
 
             static u0 format_comments(str_buf_t& buf,
                                       u32 len,
-                                      const note_array_t* notes,
+                                      const comment_array_t& comments,
                                       const str_array_t& strings,
+                                      comment_type_t type,
+                                      u32 block_id,
+                                      u32 sidx,
+                                      u32 eidx,
+                                      s32 line,
                                       u64 addr) {
-                if (!notes) {
-                    format::format_to(buf, "\n");
-                    return;
-                }
-                for (u32 i = 0; i < notes->size; ++i) {
-                    if (i > 0) {
-                        format::format_to(buf,
-                                          "${:08X}:{:<{}}",
-                                          addr,
-                                          " ",
-                                          54 - len);
+                u32 j{};
+                for (u32 i = sidx; i < eidx; ++i) {
+                    const auto& c = comments[i];
+                    if (c.type != type
+                    ||  c.block_id != block_id) {
+                        continue;
                     }
-                    format::format_to(buf,
-                                      "{:<{}}; {}\n",
-                                      " ",
-                                      52 - len,
-                                      strings[(*notes)[i] - 1]);
+                    const auto& str = strings[c.id - 1];
+                    switch (type) {
+                        case comment_type_t::note:
+                        case comment_type_t::line: {
+                            format::format_to(buf, "${:08X}: ; {}\n", addr, str);
+                            ++j;
+                            break;
+                        }
+                        case comment_type_t::margin: {
+                            if (c.line != line)
+                                break;
+                            if (j > 0) {
+                                format::format_to(buf,
+                                                  "${:08X}:{:<{}}",
+                                                  addr,
+                                                  " ",
+                                                  54 - len);
+                            }
+                            format::format_to(buf,
+                                              "{:<{}}; {}\n",
+                                              " ",
+                                              52 - len,
+                                              str);
+                            ++j;
+                            break;
+                        }
+                    }
                 }
+                if (!j && type != comment_type_t::note)
+                    format::format_to(buf, "\n");
             }
 
             u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf) {
                 auto curr = &start_block;
                 u64  addr = curr->addr;
+                u32  line{};
                 while (curr) {
-                    for (auto str_id : curr->notes) {
-                        format::format_to(
-                            buf,
-                            "${:08X}: ; {}\n",
-                            addr,
-                            e.strtab[str_id - 1]);
-                    }
+                    format_comments(buf,
+                                    0,
+                                    e.comments,
+                                    e.strtab,
+                                    comment_type_t::note,
+                                    curr->id,
+                                    curr->notes.sidx,
+                                    curr->notes.eidx,
+                                    -1,
+                                    addr);
                     format::format_to(
                         buf,
                         "${:08X}: bb_{}:\n",
@@ -641,8 +718,10 @@ namespace basecode::scm {
                             addr,
                             curr->next->id);
                     }
-                    for (s32 i = 0; i < curr->insts.size; ++i) {
-                        const auto& inst = curr->insts[i];
+                    for (s32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
+                        const auto& inst = e.insts[i];
+                        if (inst.block_id != curr->id)
+                            continue;
                         auto start_pos = buf.size();
                         format::format_to(
                             buf,
@@ -752,11 +831,18 @@ namespace basecode::scm {
                         }
                         format_comments(buf,
                                         buf.size() - start_pos,
-                                        hashtab::find(curr->comments, i),
+                                        e.comments,
                                         e.strtab,
+                                        comment_type_t::margin,
+                                        curr->id,
+                                        curr->notes.sidx,
+                                        curr->notes.eidx,
+                                        line,
                                         addr);
                         addr += sizeof(encoded_inst_t);
+                        ++line;
                     }
+                    line = {};
                     curr = curr->next;
                 }
             }
@@ -914,7 +1000,7 @@ namespace basecode::scm {
                 // assign block addresses
                 while (curr) {
                     curr->addr = addr;
-                    addr += curr->insts.size * sizeof(encoded_inst_t);
+                    addr += curr->insts.size() * sizeof(encoded_inst_t);
                     curr = curr->next;
                 }
 
@@ -922,7 +1008,10 @@ namespace basecode::scm {
                 curr = &start_block;
                 addr = LP;
                 while (curr) {
-                    for (const auto& inst : curr->insts) {
+                    for (u32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
+                        const auto& inst = e.insts[i];
+                        if (inst.block_id != curr->id)
+                            continue;
                         auto status = encode_inst(e, inst, addr);
                         if (!OK(status))
                             return status;
@@ -938,6 +1027,7 @@ namespace basecode::scm {
                 auto& bb = stable_array::append(e.blocks);
                 bb.id = e.blocks.size;
                 basic_block::init(bb, &e, type);
+                digraph::make_node(e.digraph, bb);
                 return bb;
             }
 
@@ -945,8 +1035,11 @@ namespace basecode::scm {
                 e.vm    = vm;
                 e.addr  = addr;
                 e.alloc = alloc;
+                array::init(e.insts, e.alloc);
                 symtab::init(e.vartab, e.alloc);
+                array::init(e.comments, e.alloc);
                 hashtab::init(e.labtab, e.alloc);
+                digraph::init(e.digraph, e.alloc);
                 str_array::init(e.strtab, e.alloc);
                 stable_array::init(e.vars, e.alloc);
                 stable_array::init(e.blocks, e.alloc);
@@ -1642,7 +1735,7 @@ namespace basecode::scm {
                 basic_block::encode(c.bb)
                     .comment(format::format("literal: {}",
                                             to_string(c.ctx, args)),
-                             c.bb->insts.size - 1);
+                             c.bb->insts.size() - 1);
                 return {c.bb, res};
             }
 

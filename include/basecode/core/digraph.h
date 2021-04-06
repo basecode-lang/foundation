@@ -28,10 +28,19 @@ namespace basecode {
     concept Directed_Graph = requires(const T& t) {
         typename                T::Node;
         typename                T::Edge;
+        typename                T::Value_Type;
+        typename                T::Node_Array;
+        typename                T::Edge_Array;
+        typename                T::Node_Stack;
+        typename                T::Component_Array;
 
         {t.alloc}               -> same_as<alloc_t*>;
         {t.node_slab}           -> same_as<alloc_t*>;
         {t.edge_slab}           -> same_as<alloc_t*>;
+        {t.nodes}               -> same_as<typename T::Node_Array>;
+        {t.edges}               -> same_as<typename T::Edge_Array>;
+        {t.size}                -> same_as<u32>;
+        {t.id}                  -> same_as<u32>;
     };
 
     template <typename V>
@@ -59,6 +68,7 @@ namespace basecode {
             const Node*         src;
             const Node*         dst;
             f64                 w;
+            s32                 type;
         };
 
         static constexpr u32    Node_Size    = sizeof(node_t);
@@ -91,6 +101,15 @@ namespace basecode {
             memory::system::free(graph.node_slab);
             array::free(graph.edges);
             array::free(graph.nodes);
+            graph.id = graph.size = {};
+        }
+
+        template <Directed_Graph T>
+        u0 reset(T& graph) {
+            array::reset(graph.edges);
+            array::reset(graph.nodes);
+            memory::slab::reset(graph.edge_slab);
+            memory::slab::reset(graph.node_slab);
             graph.id = graph.size = {};
         }
 
@@ -142,7 +161,6 @@ namespace basecode {
         template <Directed_Graph T,
                   typename Edge = typename T::Edge,
                   typename Node = typename T::Node,
-                  typename Node_Array = typename T::Node_Array,
                   typename Node_Stack = typename T::Node_Stack,
                   typename Component_Array = typename T::Component_Array>
         Component_Array strongly_connected(const T& graph) {
@@ -185,18 +203,6 @@ namespace basecode {
             }
         }
 
-        template <Directed_Graph T,
-                  typename Edge = typename T::Edge,
-                  typename Node = typename T::Node>
-        Edge* make_edge(T& graph, const Node* src, const Node* dst, f64 weight = 1.0) {
-            auto edge = (Edge*) memory::alloc(graph.edge_slab);
-            edge->src = src;
-            edge->dst = dst;
-            edge->w   = weight;
-            array::append(graph.edges, edge);
-            return edge;
-        }
-
         template <Directed_Graph T>
         status_t init(T& graph, alloc_t* alloc = context::top()->alloc) {
             graph.alloc = alloc;
@@ -216,6 +222,19 @@ namespace basecode {
             graph.edge_slab    = memory::system::make(alloc_type_t::slab, &edge_cfg);
 
             return status_t::ok;
+        }
+
+        template <Directed_Graph T,
+                  typename Edge = typename T::Edge,
+                  typename Node = typename T::Node>
+        Edge* make_edge(T& graph, const Node* src, const Node* dst, s32 type = 0, f64 weight = 1.0) {
+            auto edge = (Edge*) memory::alloc(graph.edge_slab);
+            edge->src  = src;
+            edge->dst  = dst;
+            edge->w    = weight;
+            edge->type = type;
+            array::append(graph.edges, edge);
+            return edge;
         }
     }
 }

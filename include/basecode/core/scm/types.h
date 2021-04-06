@@ -25,6 +25,7 @@
 #include <basecode/core/string.h>
 #include <basecode/core/scm/scm.h>
 #include <basecode/core/hashtab.h>
+#include <basecode/core/digraph.h>
 #include <basecode/core/str_array.h>
 #include <basecode/core/stable_array.h>
 
@@ -77,9 +78,9 @@ namespace basecode::scm {
     struct var_t;
     struct proc_t;
     struct inst_t;
+    struct comment_t;
     struct operand_t;
     struct emitter_t;
-    struct reg_result_t;
     struct encoded_inst_t;
     union  encoded_operand_t;
 
@@ -93,14 +94,14 @@ namespace basecode::scm {
     using label_map_t           = hashtab_t<u32, bb_t*>;
     using var_table_t           = symtab_t<var_t*>;
     using var_array_t           = stable_array_t<var_t>;
-    using note_array_t          = array_t<u32>;
+    using bb_digraph_t          = digraph_t<bb_t>;
     using inst_array_t          = array_t<inst_t>;
     using proc_array_t          = array_t<proc_t>;
     using bind_table_t          = hashtab_t<u32, obj_t*>;
     using trap_table_t          = hashtab_t<u32, trap_t>;
     using symbol_table_t        = hashtab_t<u32, obj_t*>;
     using string_table_t        = hashtab_t<u32, obj_t*>;
-    using comment_table_t       = hashtab_t<u32, note_array_t>;
+    using comment_array_t       = array_t<comment_t>;
 
     enum class bb_type_t : u8 {
         code,
@@ -158,6 +159,12 @@ namespace basecode::scm {
         env_stack,
         code_stack,
         data_stack,
+    };
+
+    enum class comment_type_t : u8 {
+        note,
+        line,
+        margin,
     };
 
     enum class operand_type_t : u8 {
@@ -312,6 +319,7 @@ namespace basecode::scm {
         alloc_t*                alloc;
         operand_t               operands[4];
         s32                     aux;
+        u32                     block_id;
         op_code_t               type;
         u8                      mode:       1;
         u8                      encoding:   4;
@@ -319,17 +327,49 @@ namespace basecode::scm {
         u8                      pad:        2;
     };
 
+    struct comment_t final {
+        u32                     id;
+        u32                     line;
+        u32                     block_id;
+        comment_type_t          type;
+    };
+
     struct bb_t final {
         emitter_t*              emitter;
         bb_t*                   prev;
         bb_t*                   next;
         u64                     addr;
-        note_array_t            notes;
-        inst_array_t            insts;
-        comment_table_t         comments;
-        label_t                 label;
         u32                     id;
+        label_t                 label;
+        struct {
+            u32                 sidx;
+            u32                 eidx;
+            inline u32 size() const {
+                return (eidx - sidx) + 1;
+            }
+        }                       notes;
+        struct {
+            u32                 sidx;
+            u32                 eidx;
+            inline u32 size() const {
+                return (eidx - sidx) + 1;
+            }
+        }                       insts;
         bb_type_t               type;
+    };
+
+    struct emitter_t final {
+        alloc_t*                alloc;
+        vm_t*                   vm;
+        u64                     addr;
+        bb_array_t              blocks;
+        var_array_t             vars;
+        var_table_t             vartab;
+        str_array_t             strtab;
+        label_map_t             labtab;
+        inst_array_t            insts;
+        bb_digraph_t            digraph;
+        comment_array_t         comments;
     };
 
     struct memory_map_entry_t final {
@@ -365,17 +405,6 @@ namespace basecode::scm {
 
         u64& operator[](u32 idx)        { return heap[idx]; }
         u64 operator[](u32 idx) const   { return heap[idx]; }
-    };
-
-    struct emitter_t final {
-        alloc_t*                alloc;
-        vm_t*                   vm;
-        u64                     addr;
-        bb_array_t              blocks;
-        var_array_t             vars;
-        var_table_t             vartab;
-        str_array_t             strtab;
-        label_map_t             labtab;
     };
 
     struct compiler_t final {
