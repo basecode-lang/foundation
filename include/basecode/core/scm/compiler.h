@@ -26,16 +26,6 @@ namespace basecode::scm::compiler {
 
     u0 reset(compiler_t& comp);
 
-    u0 release_reg(compiler_t& comp, reg_t reg);
-
-    inline u0 release_result(compiler_t& comp,
-                             const compile_result_t& r) {
-        if (r.should_release && r.reg != 0)
-            vm::reg_alloc::release_one(comp.emitter.gp, r.reg);
-    }
-
-    reg_t reserve_reg(compiler_t& comp, const context_t& c);
-
     u0 init(compiler_t& comp, vm_t* vm, u64 addr, alloc_t* alloc);
 
     compile_result_t compile(compiler_t& comp, const context_t& c);

@@ -289,6 +289,7 @@ namespace basecode::scm {
         const var_t*            pred;
         intern_id               symbol;
         u32                     version;
+        b8                      spilled;
     };
 
     struct operand_t final {
@@ -325,13 +326,6 @@ namespace basecode::scm {
         label_t                 label;
         u32                     id;
         bb_type_t               type;
-    };
-
-    struct reg_alloc_t final {
-        u64                     slots;
-        u64                     prots;
-        reg_t                   start;
-        reg_t                   end;
     };
 
     struct memory_map_entry_t final {
@@ -378,14 +372,11 @@ namespace basecode::scm {
         var_table_t             vartab;
         str_array_t             strtab;
         label_map_t             labtab;
-        reg_alloc_t             gp;
     };
 
     struct compiler_t final {
         vm_t*                   vm;
         emitter_t               emitter;
-        reg_t                   prot[16];
-        u32                     prot_count;
         reg_t                   ret_reg;
     };
 
@@ -401,8 +392,7 @@ namespace basecode::scm {
 
     struct compile_result_t final {
         bb_t*                   bb;
-        reg_t                   reg;
-        b8                      should_release;
+        var_t*                  var;
     };
 
     struct ctx_t final {

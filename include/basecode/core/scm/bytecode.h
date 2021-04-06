@@ -192,22 +192,18 @@ namespace basecode::scm {
 
             template <String_Concept T>
             var_t* make_var(emitter_t& e, const T& name) {
-                assoc_array_t<var_t*> pairs{};
-                assoc_array::init(pairs, e.alloc);
-                defer(assoc_array::free(pairs));
-                symtab::find_prefix(e.vartab, pairs, name);
-                if (pairs.size > 0)
-                    return nullptr;
+                var_t* var{};
+                if (symtab::find(e.vartab, name, var))
+                    return var;
                 auto rc = string::interned::fold_for_result(name);
                 if (!OK(rc.status))
                     return nullptr;
-                auto var = &stable_array::append(e.vars);
+                var = &stable_array::append(e.vars);
                 var->pred    = var->succ = {};
                 var->symbol  = rc.id;
-                var->version = 1;
-                symtab::insert(e.vartab,
-                               format::format("{}", *var),
-                               var);
+                var->version = 0;
+                var->spilled = true;
+                symtab::insert(e.vartab, name, var);
                 return var;
             }
 
@@ -224,12 +220,48 @@ namespace basecode::scm {
                 var->succ    = {};
                 var->pred    = pred;
                 var->symbol  = pred->symbol;
+                var->spilled = pred->spilled;
                 var->version = pred->version + 1;
-                symtab::insert(e.vartab,
-                               format::format("{}", *var),
-                               var);
+                symtab::set(e.vartab,
+                            *string::interned::get_slice(var->symbol),
+                            var);
                 pred->succ = var;
                 return var;
+            }
+
+            inline var_t* fill_var(emitter_t& e, var_t* pred) {
+                if (pred->version == 0) {
+                    // N.B. this case allows creation of var_t instances
+                    //      prior to their first fill and we don't version
+                    pred->version = 1;
+                    pred->spilled = false;
+                    return pred;
+                }
+                auto var = make_var(e, pred);
+                var->spilled = false;
+                return var;
+            }
+
+            inline var_t* spill_var(emitter_t& e, var_t* pred) {
+                auto var = make_var(e, pred);
+                var->spilled = true;
+                return var;
+            }
+
+            template <String_Concept T>
+            var_t* fill_var(emitter_t& e, const T& name) {
+                var_t* var{};
+                if (!symtab::find(e.vartab, name, var))
+                    var = make_var(e, name);
+                return fill_var(e, var);
+            }
+
+            template <String_Concept T>
+            var_t* spill_var(emitter_t& e, const T& name) {
+                var_t* var{};
+                if (!symtab::find(e.vartab, name, var))
+                    var = make_var(e, name);
+                return spill_var(e, var);
             }
 
             status_t encode_inst(vm_t& vm, const inst_t& inst, u64 addr);
@@ -272,11 +304,7 @@ namespace basecode::scm {
                                       op_code_t op_code,
                                       obj_t* args);
 
-            u0 save_protected(bb_t& bb, compiler_t& comp);
-
-            u0 restore_protected(bb_t& bb, compiler_t& comp);
-
-            u0 alloc_stack(bb_t& bb, u32 words, reg_t base_reg);
+            u0 alloc_stack(bb_t& bb, u32 words, var_t* base_addr);
 
             compile_result_t lookup(compiler_t& comp, const context_t& c);
 
@@ -335,96 +363,6 @@ namespace basecode::scm {
             compile_result_t inline_(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args);
 
             compile_result_t call_back(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args);
-        }
-
-        namespace reg_alloc {
-            inline u0 release(reg_alloc_t& alloc, const reg_result_t& result);
-        }
-    }
-
-    struct reg_result_t final {
-        u32                     count;
-
-        ~reg_result_t() {
-            vm::reg_alloc::release(*alloc, *this);
-        }
-
-        reg_t& operator[](u32 idx) {
-            return regs[idx];
-        };
-
-        const reg_t operator[](u32 idx) const {
-            return regs[idx];
-        };
-
-        reg_result_t(reg_alloc_t& a) : count(0), alloc(&a), regs() {
-        }
-
-    private:
-        reg_alloc_t*            alloc;
-        reg_t                   regs[16];
-    };
-
-    namespace vm::reg_alloc {
-        inline u0 reset(reg_alloc_t& alloc) {
-            alloc.slots = {};
-            alloc.prots = {};
-        }
-
-        inline reg_t reserve_one(reg_alloc_t& alloc) {
-            u32 msb_zeros = alloc.slots != 0 ? __builtin_clzll(alloc.slots) : 64;
-            if (!msb_zeros)
-                return 0;
-            u32 idx = 64 - msb_zeros;
-            alloc.slots |= (1UL << idx);
-            return alloc.start + idx;
-        }
-
-        inline u0 release_one(reg_alloc_t& alloc, reg_t reg) {
-            const u32 idx = reg - alloc.start;
-            if (!(alloc.slots & (1UL << idx)))
-                return;
-            const auto mask = ~(1UL << idx);
-            alloc.slots &= mask;
-            alloc.prots &= mask;
-        }
-
-        inline b8 is_protected(reg_alloc_t& alloc, reg_t reg) {
-            const auto mask = 1UL << reg;
-            return (alloc.prots & mask) == mask;
-        }
-
-        inline u0 protect(reg_alloc_t& alloc, reg_t reg, b8 flag) {
-            if (flag) {
-                alloc.prots |= (1UL << reg);
-            } else {
-                alloc.prots &= ~(1UL << reg);
-            }
-        }
-
-        inline u0 init(reg_alloc_t& alloc, reg_t start, reg_t end) {
-            alloc.end   = end;
-            alloc.start = start;
-            alloc.slots = alloc.prots = {};
-        }
-
-        inline reg_result_t reserve(reg_alloc_t& alloc, u32 count = 1) {
-            reg_result_t r(alloc);
-            for (u32 i = 0; i < count; ++i)
-                r[r.count++] = reserve_one(alloc);
-            return r;
-        }
-
-        inline u0 reserve_and_protect_reg(reg_alloc_t& alloc, reg_t reg) {
-            const u32 idx = reg - alloc.start;
-            const auto mask = (1UL << idx);
-            alloc.slots |= mask;
-            alloc.prots |= mask;
-        }
-
-        inline u0 release(reg_alloc_t& alloc, const reg_result_t& result) {
-            for (u32 i = 0; i < result.count; ++i)
-                release_one(alloc, result[i]);
         }
     }
 
@@ -755,7 +693,10 @@ FORMAT_TYPE(
                 basecode::scm::register_file::name(data.kind.reg));
             break;
         case basecode::scm::operand_type_t::var:
-            format_to(ctx.out(), "{}", *data.kind.var);
+            if (data.kind.var)
+                format_to(ctx.out(), "{}", *data.kind.var);
+            else
+                format_to(ctx.out(), "__nil__@0");
             break;
         case basecode::scm::operand_type_t::trap:
             format_to(

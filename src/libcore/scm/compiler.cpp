@@ -31,16 +31,6 @@ namespace basecode::scm::compiler {
         vm::emitter::reset(comp.emitter);
     }
 
-    u0 release_reg(compiler_t& comp, reg_t reg) {
-        vm::reg_alloc::release_one(comp.emitter.gp, reg);
-    }
-
-    reg_t reserve_reg(compiler_t& comp, const context_t& c) {
-        if (c.target)
-            return *c.target;
-        return vm::reg_alloc::reserve_one(comp.emitter.gp);
-    }
-
     u0 init(compiler_t& comp, vm_t* vm, u64 addr, alloc_t* alloc) {
         comp.vm = vm;
         vm::emitter::init(comp.emitter, vm, addr, alloc);

@@ -241,6 +241,31 @@ namespace basecode {
 
         template <Symbol_Table T,
                   typename Value_Type = typename T::Value_Type>
+        b8 set(T& table, str::slice_t key, Value_Type& value) {
+            u32 next_node_id = 1;
+            const symtab_node_t* level{};
+            for (u32 i = 0; i < key.length; ++i) {
+                level = GET_NODE(table, next_node_id);
+                while (level) {
+                    if (level->sym == key[i]) {
+                        next_node_id = level->child;
+                        if (level->type != leaf && !next_node_id)
+                            return false;
+                        break;
+                    }
+                    if (!level->next)
+                        return false;
+                    level = GET_NODE(table, level->next);
+                }
+            }
+            if (!level || level->type != leaf)
+                return false;
+            table.values[level->value - 1] = value;
+            return true;
+        }
+
+        template <Symbol_Table T,
+                  typename Value_Type = typename T::Value_Type>
         b8 insert(T& table, str::slice_t key, Value_Type& value) {
             symtab_node_t* leaf_node{};
             if (!insert_key(table, key, &leaf_node))

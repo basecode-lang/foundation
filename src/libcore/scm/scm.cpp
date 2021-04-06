@@ -324,7 +324,7 @@ namespace basecode::scm {
 
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
         compiler::reset(ctx->compiler);
-        ctx->compiler.ret_reg = vm::reg_alloc::reserve_one(ctx->compiler.emitter.gp);
+        ctx->compiler.ret_reg = scm::register_file::r0; // FIXME
 
         auto& bb = vm::emitter::make_basic_block(ctx->compiler.emitter);
         TIME_BLOCK(
@@ -336,11 +336,7 @@ namespace basecode::scm {
                     .op(instruction::type::exit)
                     .value(1)
                     .build();
-            compiler::release_result(ctx->compiler, comp_result);
             );
-
-        vm::reg_alloc::release_one(ctx->compiler.emitter.gp,
-                                   ctx->compiler.ret_reg);
 
         str_t str{};
         str::init(str, ctx->alloc);
