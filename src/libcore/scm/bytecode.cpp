@@ -1138,6 +1138,15 @@ namespace basecode::scm {
                 return exit_block;
             }
 
+            compile_result_t ffi(compiler_t& comp,
+                                 const context_t& c,
+                                 obj_t* sym,
+                                 obj_t* form,
+                                 obj_t* args) {
+                todo(*c.bb, "XXX: ffi call"_ss);
+                return {c.bb, {}};
+            }
+
             u0 free_stack(bb_t& bb, u32 words) {
                 basic_block::encode(bb)
                     .imm2()
@@ -1153,6 +1162,65 @@ namespace basecode::scm {
                     .none()
                         .op(op::nop)
                         .build();
+            }
+
+            compile_result_t apply(compiler_t& comp,
+                                   const context_t& c,
+                                   obj_t* sym,
+                                   obj_t* form,
+                                   obj_t* args) {
+                auto ctx = c.ctx;
+                auto proc = (proc_t*) NATIVE_PTR(CDR(form));
+                push_env(comp, *c.bb);
+                {
+                    auto keys = proc->params;
+                    auto vals = args;
+                    auto vc   = c;
+                    while (!IS_NIL(keys)) {
+                        auto key = TYPE(keys) == obj_type_t::pair ? CAR(keys) : keys;
+                        auto name = *string::interned::get_slice(STRING_ID(key));
+//                        emitter::read_var(comp.emitter, name, *vc.bb);
+                        if (TYPE(keys) != obj_type_t::pair) {
+                            vc.obj = vals;
+                            auto comp_res = compiler::compile(comp, vc);
+                            vc.bb = comp_res.bb;
+                            basic_block::encode(vc.bb)
+                                .comment(format::format("symbol: {}", name))
+                                .imm2()
+                                .src(u32(OBJ_IDX(keys)))
+                                .op(op::set)
+                                .dst(emitter::read_var(comp.emit, comp_res.var, *vc.bb))
+                                .mode(true)
+                                .build();
+                            break;
+                        } else {
+                            vc.obj = CAR(vals);
+                            auto comp_res = compiler::compile(comp, vc);
+                            vc.bb  = comp_res.bb;
+                            basic_block::encode(vc.bb)
+                                .comment(format::format("symbol: {}", name))
+                                .imm2()
+                                .src(u32(OBJ_IDX(key)))
+                                .op(op::set)
+                                .dst(emitter::read_var(comp.emit, comp_res.var, *vc.bb))
+                                .mode(true)
+                                .build();
+                            keys = CDR(keys);
+                            vals = CDR(vals);
+                        }
+                    }
+                }
+                auto res = emitter::get_var(comp.emit, "res"_ss);
+                basic_block::encode(c.bb)
+                    .comment(format::format(
+                        "call: {}",
+                        printable_t{c.ctx, sym, true}))
+                    .imm1()
+                    .op(op::blr)
+                    .value(proc->addr.bb)
+                    .build();
+                pop_env(comp, *c.bb);
+                return {c.bb, res};
             }
 
             compile_result_t inline_(compiler_t& comp,
@@ -1840,67 +1908,9 @@ namespace basecode::scm {
                 return {lhs_res.bb, {}};
             }
 
-            compile_result_t ffi(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args) {
-                todo(*c.bb, "XXX: ffi call"_ss);
-                return {c.bb, {}};
-            }
-
-            compile_result_t apply(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args) {
-                auto ctx = c.ctx;
-                auto proc = (proc_t*) NATIVE_PTR(CDR(form));
-                push_env(comp, *c.bb);
-                {
-                    auto keys = proc->params;
-                    auto vals = args;
-                    auto vc   = c;
-                    while (!IS_NIL(keys)) {
-                        auto key = TYPE(keys) == obj_type_t::pair ? CAR(keys) : keys;
-                        auto name = *string::interned::get_slice(STRING_ID(key));
-//                        emitter::read_var(comp.emitter, name, *vc.bb);
-                        if (TYPE(keys) != obj_type_t::pair) {
-                            vc.obj = vals;
-                            auto comp_res = compiler::compile(comp, vc);
-                            vc.bb = comp_res.bb;
-                            basic_block::encode(vc.bb)
-                                .comment(format::format("symbol: {}", name))
-                                .imm2()
-                                    .src(u32(OBJ_IDX(keys)))
-                                    .op(op::set)
-                                    .dst(emitter::read_var(comp.emit, comp_res.var, *vc.bb))
-                                    .mode(true)
-                                    .build();
-                            break;
-                        } else {
-                            vc.obj = CAR(vals);
-                            auto comp_res = compiler::compile(comp, vc);
-                            vc.bb  = comp_res.bb;
-                            basic_block::encode(vc.bb)
-                                .comment(format::format("symbol: {}", name))
-                                .imm2()
-                                    .src(u32(OBJ_IDX(key)))
-                                    .op(op::set)
-                                    .dst(emitter::read_var(comp.emit, comp_res.var, *vc.bb))
-                                    .mode(true)
-                                    .build();
-                            keys = CDR(keys);
-                            vals = CDR(vals);
-                        }
-                    }
-                }
-                auto res = emitter::get_var(comp.emit, "res"_ss);
-                basic_block::encode(c.bb)
-                    .comment(format::format(
-                        "call: {}",
-                        printable_t{c.ctx, sym, true}))
-                    .imm1()
-                        .op(op::blr)
-                        .value(proc->addr.bb)
-                        .build();
-                pop_env(comp, *c.bb);
-                return {c.bb, res};
-            }
-
-            compile_result_t comp_proc(compiler_t& comp, const context_t& c, proc_t* proc) {
+            compile_result_t comp_proc(compiler_t& comp,
+                                       const context_t& c,
+                                       proc_t* proc) {
                 auto ctx  = c.ctx;
                 auto& e   = *c.bb->emit;
 
