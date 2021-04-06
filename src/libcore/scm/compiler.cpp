@@ -20,20 +20,17 @@
 #include <basecode/core/scm/compiler.h>
 
 namespace basecode::scm::compiler {
-    namespace rf = register_file;
-    namespace op = instruction::type;
-
     u0 free(compiler_t& comp) {
-        vm::emitter::free(comp.emitter);
+        vm::emitter::free(comp.emit);
     }
 
     u0 reset(compiler_t& comp) {
-        vm::emitter::reset(comp.emitter);
+        vm::emitter::reset(comp.emit);
     }
 
     u0 init(compiler_t& comp, vm_t* vm, u64 addr, alloc_t* alloc) {
         comp.vm = vm;
-        vm::emitter::init(comp.emitter, vm, addr, alloc);
+        vm::emitter::init(comp.emit, vm, addr, alloc);
     }
 
     compile_result_t compile(compiler_t& comp, const context_t& c) {
@@ -50,7 +47,7 @@ namespace basecode::scm::compiler {
 
                 switch (TYPE(form)) {
                     case obj_type_t::ffi:   return vm::bytecode::ffi(comp, c, sym, form, args);
-                    case obj_type_t::prim:  return vm::bytecode::prim(comp, c, form, args, PRIM(form));
+                    case obj_type_t::prim:  return vm::bytecode::prim(comp, c, sym, form, args, PRIM(form));
                     case obj_type_t::func:  return vm::bytecode::apply(comp, c, sym, form, args);
                     case obj_type_t::macro: return vm::bytecode::inline_(comp, c, sym, form, args);
                     case obj_type_t::cfunc: return vm::bytecode::call_back(comp, c, sym, form, args);

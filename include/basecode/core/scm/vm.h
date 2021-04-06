@@ -21,13 +21,6 @@
 #include <basecode/core/scm/types.h>
 
 namespace basecode::scm::vm {
-    enum class status_t : u8 {
-        ok,
-        fail,
-        error,
-        unresolved_label,
-    };
-
     u0 free(vm_t& vm);
 
     u0 reset(vm_t& vm);

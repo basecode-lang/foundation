@@ -171,18 +171,8 @@ namespace basecode::scm {
                 return bb_builder_t(bb);
             }
 
-            u0 init(bb_t& bb, emitter_t* e, bb_type_t type) {
-                bb.next    = bb.prev = {};
-                bb.addr    = 0;
-                bb.type    = type;
-                bb.label   = 0;
-                bb.notes   = {};
-                bb.insts   = {};
-                bb.emitter = e;
-            }
-
             bb_builder_t::bb_builder_t(bb_t* bb) : _bb(bb),
-                                                   _em(bb->emitter),
+                                                   _em(bb->emit),
                                                    _inst(),
                                                    _imm1(this),
                                                    _imm2(this),
@@ -195,7 +185,7 @@ namespace basecode::scm {
             }
 
             bb_builder_t::bb_builder_t(bb_t& bb) : _bb(&bb),
-                                                   _em(bb.emitter),
+                                                   _em(bb.emit),
                                                    _inst(),
                                                    _imm1(this),
                                                    _imm2(this),
@@ -326,6 +316,26 @@ namespace basecode::scm {
             // --------------------------------------------
 
             bb_builder_t& imm1_builder_t::build() {
+                switch (_builder->_inst->type) {
+                    case instruction::type::br:
+                    case instruction::type::bl:
+                    case instruction::type::bg:
+                    case instruction::type::ble:
+                    case instruction::type::bge:
+                    case instruction::type::beq:
+                    case instruction::type::bne:
+                    case instruction::type::blr:
+                    case instruction::type::bra: {
+                        auto& imm = _builder->_inst->operands[0];
+                        digraph::make_edge(_builder->_em->digraph,
+                                           _builder->_bb->node,
+                                           imm.kind.bb->node);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+
                 _builder->_inst = {};
                 return *_builder;
             }
@@ -610,7 +620,6 @@ namespace basecode::scm {
                 array::free(e.insts);
                 symtab::free(e.vartab);
                 array::free(e.comments);
-                hashtab::free(e.labtab);
                 digraph::free(e.digraph);
                 str_array::free(e.strtab);
                 stable_array::free(e.vars);
@@ -621,7 +630,6 @@ namespace basecode::scm {
                 array::reset(e.insts);
                 symtab::reset(e.vartab);
                 array::reset(e.comments);
-                hashtab::reset(e.labtab);
                 digraph::reset(e.digraph);
                 str_array::reset(e.strtab);
                 stable_array::reset(e.vars);
@@ -677,6 +685,33 @@ namespace basecode::scm {
                     format::format_to(buf, "\n");
             }
 
+            static u0 format_edges(str_buf_t& buf, bb_t* block, u64 addr) {
+                bb_digraph_t::Node_Array nodes{};
+                array::init(nodes, block->emit->alloc);
+                defer(array::free(nodes));
+
+                digraph::incoming_nodes(block->emit->digraph, block->node, nodes);
+                if (nodes.size > 0) {
+                    format::format_to(buf, "${:08X}:    .preds      ", addr);
+                    for (u32 i = 0; i < nodes.size; ++i) {
+                        if (i > 0) format::format_to(buf, ", ");
+                        format::format_to(buf, "{}", *(nodes[i]->value));
+                    }
+                    format::format_to(buf, "\n");
+                }
+
+                array::reset(nodes);
+                digraph::outgoing_nodes(block->emit->digraph, block->node, nodes);
+                if (nodes.size > 0) {
+                    format::format_to(buf, "${:08X}:    .succs      ", addr);
+                    for (u32 i = 0; i < nodes.size; ++i) {
+                        if (i > 0) format::format_to(buf, ", ");
+                        format::format_to(buf, "{}", *(nodes[i]->value));
+                    }
+                    format::format_to(buf, "\n");
+                }
+            }
+
             u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf) {
                 auto curr = &start_block;
                 u64  addr = curr->addr;
@@ -692,32 +727,8 @@ namespace basecode::scm {
                                     curr->notes.eidx,
                                     -1,
                                     addr);
-                    format::format_to(
-                        buf,
-                        "${:08X}: bb_{}:\n",
-                        addr,
-                        curr->id);
-                    if (curr->label) {
-                        format::format_to(
-                            buf,
-                            "${:08X}: {}:\n",
-                            addr,
-                            e.strtab[curr->label - 1]);
-                    }
-                    if (curr->prev) {
-                        format::format_to(
-                            buf,
-                            "${:08X}:    .pred bb_{}\n",
-                            addr,
-                            curr->prev->id);
-                    }
-                    if (curr->next) {
-                        format::format_to(
-                            buf,
-                            "${:08X}:    .succ bb_{}\n",
-                            addr,
-                            curr->next->id);
-                    }
+                    format::format_to(buf, "${:08X}: {}:\n", addr, *curr);
+                    format_edges(buf, curr, addr);
                     for (s32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
                         const auto& inst = e.insts[i];
                         if (inst.block_id != curr->id)
@@ -853,21 +864,16 @@ namespace basecode::scm {
                                 const operand_t& oper,
                                 T& field) {
                 switch (oper.type) {
+                    case operand_type_t::trap:
+                    case operand_type_t::value: {
+                        field = oper.kind.s;
+                        break;
+                    }
                     case operand_type_t::block: {
                         auto target_block = &e.blocks[oper.kind.bb->id - 1];
                         field = s32(target_block->addr - addr);
                         break;
                     }
-                    case operand_type_t::label: {
-                        auto target_block  = hashtab::find(e.labtab, oper.kind.u);
-                        if (!target_block)
-                            return status_t::unresolved_label;
-                        field = s32(target_block->addr - addr);
-                        break;
-                    }
-                    case operand_type_t::trap:
-                    case operand_type_t::value:
-                        field = oper.kind.s;
                     default:
                         return status_t::fail;
                 }
@@ -1023,14 +1029,6 @@ namespace basecode::scm {
                 return status_t::ok;
             }
 
-            bb_t& make_basic_block(emitter_t& e, bb_type_t type) {
-                auto& bb = stable_array::append(e.blocks);
-                bb.id = e.blocks.size;
-                basic_block::init(bb, &e, type);
-                digraph::make_node(e.digraph, bb);
-                return bb;
-            }
-
             u0 init(emitter_t& e, vm_t* vm, u64 addr, alloc_t* alloc) {
                 e.vm    = vm;
                 e.addr  = addr;
@@ -1038,7 +1036,6 @@ namespace basecode::scm {
                 array::init(e.insts, e.alloc);
                 symtab::init(e.vartab, e.alloc);
                 array::init(e.comments, e.alloc);
-                hashtab::init(e.labtab, e.alloc);
                 digraph::init(e.digraph, e.alloc);
                 str_array::init(e.strtab, e.alloc);
                 stable_array::init(e.vars, e.alloc);
@@ -1051,12 +1048,18 @@ namespace basecode::scm {
             namespace op = instruction::type;
 
             bb_t& leave(bb_t& bb) {
-                auto& entry_block = emitter::make_basic_block(*bb.emitter);
+                auto& entry_block = emitter::make_basic_block(*bb.emit,
+                                                              "proc_epilogue"_ss,
+                                                              &bb);
+                basic_block::encode(bb)
+                    .imm1()
+                        .op(op::br)
+                        .value(&entry_block)
+                        .build();
                 basic_block::encode(entry_block)
                     .comment("*"_ss)
                     .comment("**"_ss)
                     .comment("*** proc epilogue"_ss)
-                    .pred(bb)
                     .reg2()
                         .op(op::move)
                         .src(rf::fp)
@@ -1076,16 +1079,13 @@ namespace basecode::scm {
 
             compile_result_t fn(compiler_t& comp,
                                 const context_t& c,
+                                obj_t* sym,
                                 obj_t* form,
                                 obj_t* args) {
                 auto& vm = *comp.vm;
                 auto ctx        = c.ctx;
                 b8   is_mac     = PRIM(form) == prim_type_t::mac;
-                auto proc       = make_proc(c.ctx,
-                                            CAR(args),
-                                            CDR(args),
-                                            c.env,
-                                            is_mac);
+                auto proc       = make_proc(c.ctx, sym, CAR(args), CDR(args), c.env, is_mac);
                 auto idx        = OBJ_IDX(proc);
                 auto target_reg = rf::m;       //FIXME
                 G(target_reg) = idx;
@@ -1102,9 +1102,14 @@ namespace basecode::scm {
             }
 
             bb_t& enter(bb_t& bb, u32 locals) {
-                auto& entry_block = emitter::make_basic_block(*bb.emitter);
+                auto& entry_block = emitter::make_basic_block(*bb.emit, "proc_prologue"_ss, &bb);
+                auto& exit_block  = emitter::make_basic_block(*bb.emit, "proc_begin"_ss, &entry_block);
+                basic_block::encode(bb)
+                    .imm1()
+                        .op(op::br)
+                        .value(&entry_block)
+                        .build();
                 basic_block::encode(entry_block)
-                    .pred(bb)
                     .comment("*** proc prologue"_ss)
                     .comment("**"_ss)
                     .comment("*"_ss)
@@ -1117,12 +1122,13 @@ namespace basecode::scm {
                         .op(op::move)
                         .src(rf::sp)
                         .dst(rf::fp)
+                        .build()
+                    .imm1()
+                        .op(op::br)
+                        .value(&exit_block)
                         .build();
-                auto& exit_block = emitter::make_basic_block(*bb.emitter);
-                auto exit_encoder = basic_block::encode(exit_block);
-                exit_encoder.pred(entry_block);
                 if (locals > 0) {
-                    exit_encoder
+                    basic_block::encode(exit_block)
                         .imm2()
                             .src(locals)
                             .dst(rf::sp)
@@ -1167,27 +1173,28 @@ namespace basecode::scm {
                     .reg2()
                         .op(op::pop)
                         .src(rf::ep)
-                        .dst(emitter::write_var(comp.emitter, "_"_ss, bb))
+                        .dst(emitter::write_var(comp.emit, "_"_ss, bb))
                         .build();
             }
 
             u0 push_env(compiler_t& comp, bb_t& bb) {
-                auto tmp = emitter::get_var(comp.emitter, "_"_ss);
+                auto tmp = emitter::get_var(comp.emit, "_"_ss);
                 basic_block::encode(bb)
                     .reg2()
                         .op(op::env)
                         .src(rf::ep)
-                        .dst((tmp = emitter::write_var(comp.emitter, tmp, bb)))
+                        .dst((tmp = emitter::write_var(comp.emit, tmp, bb)))
                         .build()
                     .reg2()
                         .op(op::push)
-                        .src(emitter::read_var(comp.emitter, tmp, bb))
+                        .src(emitter::read_var(comp.emit, tmp, bb))
                         .dst(rf::ep)
                         .build();
             }
 
             compile_result_t prim(compiler_t& comp,
                                   const context_t& c,
+                                  obj_t* sym,
                                   obj_t* form,
                                   obj_t* args,
                                   prim_type_t type) {
@@ -1205,7 +1212,7 @@ namespace basecode::scm {
                     case prim_type_t::let:
                     case prim_type_t::set:              return let_set(comp, c, args);
                     case prim_type_t::fn:
-                    case prim_type_t::mac:              return fn(comp, c, form, args);
+                    case prim_type_t::mac:              return fn(comp, c, c.ctx->nil, form, args);
                     case prim_type_t::if_:              return if_(comp, c, args);
                     case prim_type_t::do_:              return do_(comp, c, args);
                     case prim_type_t::or_:              return or_(comp, c, args);
@@ -1241,7 +1248,7 @@ namespace basecode::scm {
                 oc.bb  = lhs_res.bb;
                 oc.obj = CADR(args);
                 auto rhs_res = compiler::compile(comp, oc);
-                auto res     = emitter::get_var(comp.emitter, "res"_ss);
+                auto res     = emitter::get_var(comp.emit, "res"_ss);
 
                 switch (type) {
                     case prim_type_t::is:
@@ -1249,12 +1256,12 @@ namespace basecode::scm {
                             .comment("prim: is"_ss)
                             .reg2()
                                 .op(op::lcmp)
-                                .src(emitter::read_var(comp.emitter, lhs_res.var, *rhs_res.bb))
-                                .dst(emitter::read_var(comp.emitter, rhs_res.var, *rhs_res.bb))
+                                .src(emitter::read_var(comp.emit, lhs_res.var, *rhs_res.bb))
+                                .dst(emitter::read_var(comp.emit, rhs_res.var, *rhs_res.bb))
                                 .build()
                             .reg1()
                                 .op(op::seq)
-                                .dst((res = emitter::write_var(comp.emitter, res, *rhs_res.bb)))
+                                .dst((res = emitter::write_var(comp.emit, res, *rhs_res.bb)))
                                 .build();
                         break;
 
@@ -1263,12 +1270,12 @@ namespace basecode::scm {
                             .comment("prim: lt"_ss)
                             .reg2()
                                 .op(op::lcmp)
-                                .src(emitter::read_var(comp.emitter, lhs_res.var, *rhs_res.bb))
-                                .dst(emitter::read_var(comp.emitter, rhs_res.var, *rhs_res.bb))
+                                .src(emitter::read_var(comp.emit, lhs_res.var, *rhs_res.bb))
+                                .dst(emitter::read_var(comp.emit, rhs_res.var, *rhs_res.bb))
                                 .build()
                             .reg1()
                                 .op(op::sl)
-                                .dst((res = emitter::write_var(comp.emitter, res, *rhs_res.bb)))
+                                .dst((res = emitter::write_var(comp.emit, res, *rhs_res.bb)))
                                 .build();
                         break;
 
@@ -1277,12 +1284,12 @@ namespace basecode::scm {
                             .comment("prim: gt"_ss)
                             .reg2()
                                 .op(op::lcmp)
-                                .src(emitter::read_var(comp.emitter, lhs_res.var, *rhs_res.bb))
-                                .dst(emitter::read_var(comp.emitter, rhs_res.var, *rhs_res.bb))
+                                .src(emitter::read_var(comp.emit, lhs_res.var, *rhs_res.bb))
+                                .dst(emitter::read_var(comp.emit, rhs_res.var, *rhs_res.bb))
                                 .build()
                             .reg1()
                                 .op(op::sg)
-                                .dst((res = emitter::write_var(comp.emitter, res, *rhs_res.bb)))
+                                .dst((res = emitter::write_var(comp.emit, res, *rhs_res.bb)))
                                 .build();
                         break;
 
@@ -1291,12 +1298,12 @@ namespace basecode::scm {
                             .comment("prim: lte"_ss)
                             .reg2()
                                 .op(op::lcmp)
-                                .src(emitter::read_var(comp.emitter, lhs_res.var, *rhs_res.bb))
-                                .dst(emitter::read_var(comp.emitter, rhs_res.var, *rhs_res.bb))
+                                .src(emitter::read_var(comp.emit, lhs_res.var, *rhs_res.bb))
+                                .dst(emitter::read_var(comp.emit, rhs_res.var, *rhs_res.bb))
                                 .build()
                             .reg1()
                                 .op(op::sle)
-                                .dst((res = emitter::write_var(comp.emitter, res, *rhs_res.bb)))
+                                .dst((res = emitter::write_var(comp.emit, res, *rhs_res.bb)))
                                 .build();
                         break;
 
@@ -1305,12 +1312,12 @@ namespace basecode::scm {
                             .comment("prim: gte"_ss)
                             .reg2()
                                 .op(op::lcmp)
-                                .src(emitter::read_var(comp.emitter, lhs_res.var, *rhs_res.bb))
-                                .dst(emitter::read_var(comp.emitter, rhs_res.var, *rhs_res.bb))
+                                .src(emitter::read_var(comp.emit, lhs_res.var, *rhs_res.bb))
+                                .dst(emitter::read_var(comp.emit, rhs_res.var, *rhs_res.bb))
                                 .build()
                             .reg1()
                                 .op(op::sge)
-                                .dst((res = emitter::write_var(comp.emitter, res, *rhs_res.bb)))
+                                .dst((res = emitter::write_var(comp.emit, res, *rhs_res.bb)))
                                 .build();
                         break;
 
@@ -1327,7 +1334,7 @@ namespace basecode::scm {
                                       obj_t* args) {
                 auto ctx = c.ctx;
                 u32 size = length(ctx, args);
-                auto base_addr = emitter::get_var(comp.emitter, "base"_ss);
+                auto base_addr = emitter::get_var(comp.emit, "base"_ss);
                 alloc_stack(*c.bb, size, &base_addr);
                 s32  offs = 0;
                 auto ac   = c;
@@ -1339,19 +1346,19 @@ namespace basecode::scm {
                         .offs()
                             .op(op::store)
                             .offset(offs)
-                            .src(emitter::read_var(comp.emitter, res.var, *res.bb))
-                            .dst(emitter::read_var(comp.emitter, base_addr, *res.bb))
+                            .src(emitter::read_var(comp.emit, res.var, *res.bb))
+                            .dst(emitter::read_var(comp.emit, base_addr, *res.bb))
                             .mode(true)
                             .build();
                     args = CDR(args);
                     offs += 8;
                 }
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
                 basic_block::encode(*ac.bb)
                     .reg2_imm()
                         .op(op_code)
-                        .src(emitter::read_var(comp.emitter, base_addr, *ac.bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, *ac.bb)))
+                        .src(emitter::read_var(comp.emit, base_addr, *ac.bb))
+                        .dst((res = emitter::write_var(comp.emit, res, *ac.bb)))
                         .value(size * 8)
                         .build();
                 free_stack(*ac.bb, size);
@@ -1380,7 +1387,7 @@ namespace basecode::scm {
                     .offs()
                         .op(op::lea)
                         .offset(-(words * 8))
-                        .dst((*base_addr = emitter::write_var(*bb.emitter, *base_addr, bb)))
+                        .dst((*base_addr = emitter::write_var(*bb.emit, *base_addr, bb)))
                         .src(rf::sp)
                         .build();
             }
@@ -1388,64 +1395,64 @@ namespace basecode::scm {
             compile_result_t lookup(compiler_t& comp, const context_t& c) {
                 auto ctx = c.ctx;
                 auto sym = scm::to_string(c.ctx, c.obj);
-                auto res = emitter::get_var(*c.bb->emitter, sym);
+                auto res = emitter::get_var(*c.bb->emit, sym);
                 basic_block::encode(c.bb)
                     .comment(format::format("symbol: {}", sym))
                     .imm2()
                         .src((u32) OBJ_IDX(c.obj))
                         .op(op::get)
-                        .dst((res = emitter::write_var(*c.bb->emitter, res, *c.bb)))
+                        .dst((res = emitter::write_var(*c.bb->emit, res, *c.bb)))
                         .build();
                 return {c.bb, res};
             }
 
             compile_result_t self_eval(compiler_t& comp, const context_t& c) {
                 auto ctx = c.ctx;
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
                 basic_block::encode(c.bb)
                     .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)))
                     .imm2()
                         .op(op::const_)
                         .src(u32(OBJ_IDX(c.obj)))
-                        .dst((res = emitter::write_var(comp.emitter, res, *c.bb)))
+                        .dst((res = emitter::write_var(comp.emit, res, *c.bb)))
                         .build();
                 return {c.bb, res};
             }
 
             compile_result_t qt(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
-                auto tmp = emitter::get_var(comp.emitter, "_"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
+                auto tmp = emitter::get_var(comp.emit, "_"_ss);
                 basic_block::encode(c.bb)
                     .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)))
                     .imm2()
                         .op(op::const_)
                         .src(u32(OBJ_IDX(CAR(args))))
-                        .dst((tmp = emitter::write_var(comp.emitter, tmp, *c.bb)))
+                        .dst((tmp = emitter::write_var(comp.emit, tmp, *c.bb)))
                         .build()
                     .reg2()
                         .op(op::qt)
-                        .src(emitter::read_var(comp.emitter, tmp, *c.bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, *c.bb)))
+                        .src(emitter::read_var(comp.emit, tmp, *c.bb))
+                        .dst((res = emitter::write_var(comp.emit, res, *c.bb)))
                         .build();
                 return {c.bb, res};
             }
 
             compile_result_t qq(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
-                auto tmp = emitter::get_var(comp.emitter, "tmp"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
+                auto tmp = emitter::get_var(comp.emit, "tmp"_ss);
                 basic_block::encode(c.bb)
                     .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)))
                     .imm2()
                         .op(op::const_)
                         .src(u32(OBJ_IDX(CAR(args))))
-                        .dst((tmp = emitter::write_var(comp.emitter, tmp, *c.bb)))
+                        .dst((tmp = emitter::write_var(comp.emit, tmp, *c.bb)))
                         .build()
                     .reg2()
                         .op(op::qq)
-                        .src(emitter::read_var(comp.emitter, tmp, *c.bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, *c.bb)))
+                        .src(emitter::read_var(comp.emit, tmp, *c.bb))
+                        .dst((res = emitter::write_var(comp.emit, res, *c.bb)))
                         .build();
                 return {c.bb, res};
             }
@@ -1458,39 +1465,39 @@ namespace basecode::scm {
 
             compile_result_t car(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
                 auto cc = c;
                 cc.obj = CAR(args);
                 auto comp_res = compiler::compile(comp, cc);
                 basic_block::encode(comp_res.bb)
                     .reg2()
                         .op(op::car)
-                        .src(emitter::read_var(comp.emitter, comp_res.var, *comp_res.bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, *comp_res.bb)))
+                        .src(emitter::read_var(comp.emit, comp_res.var, *comp_res.bb))
+                        .dst((res = emitter::write_var(comp.emit, res, *comp_res.bb)))
                         .build();
                 return {comp_res.bb, res};
             }
 
             compile_result_t cdr(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
                 auto cc  = c;
                 cc.obj = CAR(args);
                 auto comp_res = compiler::compile(comp, cc);
                 basic_block::encode(comp_res.bb)
                     .reg2()
                         .op(op::cdr)
-                        .src(emitter::read_var(comp.emitter, comp_res.var, *comp_res.bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, *comp_res.bb)))
+                        .src(emitter::read_var(comp.emit, comp_res.var, *comp_res.bb))
+                        .dst((res = emitter::write_var(comp.emit, res, *comp_res.bb)))
                         .build();
                 return {comp_res.bb, res};
             }
 
             compile_result_t or_(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto& exit_bb = emitter::make_basic_block(comp.emitter);
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
-                auto tmp = emitter::get_var(comp.emitter, "_"_ss);
+                auto& exit_bb = emitter::make_basic_block(comp.emit, "or_exit"_ss, c.bb);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
+                auto tmp = emitter::get_var(comp.emit, "_"_ss);
                 auto oc = c;
                 while (!IS_NIL(args)) {
                     oc.obj = CAR(args);
@@ -1499,8 +1506,8 @@ namespace basecode::scm {
                     basic_block::encode(oc.bb)
                         .reg2()
                             .op(op::truep)
-                            .src(emitter::read_var(comp.emitter, comp_res.var, *oc.bb))
-                            .dst((tmp = emitter::write_var(comp.emitter, tmp, *oc.bb)))
+                            .src(emitter::read_var(comp.emit, comp_res.var, *oc.bb))
+                            .dst((tmp = emitter::write_var(comp.emit, tmp, *oc.bb)))
                             .build()
                         .imm1()
                             .op(op::beq)
@@ -1508,7 +1515,11 @@ namespace basecode::scm {
                             .build();
                     args = CDR(args);
                 }
-                basic_block::encode(oc.bb).succ(exit_bb);
+                basic_block::encode(oc.bb)
+                    .imm1()
+                        .op(op::br)
+                        .value(&exit_bb)
+                        .build();
                 return {&exit_bb, res};
             }
 
@@ -1533,29 +1544,30 @@ namespace basecode::scm {
             compile_result_t if_(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
 
-                auto& true_bb  = emitter::make_basic_block(*c.bb->emitter);
-                auto& false_bb = emitter::make_basic_block(*c.bb->emitter);
-                auto& exit_bb  = emitter::make_basic_block(*c.bb->emitter);
+                auto& true_bb  = emitter::make_basic_block(*c.bb->emit, "if_true"_ss, c.bb);
+                auto& false_bb = emitter::make_basic_block(*c.bb->emit, "if_false"_ss, &true_bb);
+                auto& exit_bb  = emitter::make_basic_block(*c.bb->emit, "if_exit"_ss, &false_bb);
 
-                auto tmp = emitter::get_var(comp.emitter, "_"_ss);
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
+                auto tmp = emitter::get_var(comp.emit, "_"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
 
                 auto ic  = c;
                 ic.obj = CAR(args);
                 auto pred_res = compiler::compile(comp, ic);
                 basic_block::encode(c.bb)
-                    .succ(true_bb)
                     .reg2()
                         .op(op::truep)
-                        .src(emitter::read_var(comp.emitter, pred_res.var, *c.bb))
-                        .dst((tmp = emitter::write_var(comp.emitter, tmp, *c.bb)))
+                        .src(emitter::read_var(comp.emit, pred_res.var, *c.bb))
+                        .dst((tmp = emitter::write_var(comp.emit, tmp, *c.bb)))
                         .build()
                     .imm1()
-                        .value(&false_bb)
                         .op(op::bne)
+                        .value(&false_bb)
+                        .build()
+                    .imm1()
+                        .op(op::br)
+                        .value(&true_bb)
                         .build();
-
-                basic_block::encode(true_bb).succ(false_bb);
 
                 ic.bb  = &true_bb;
                 ic.obj = CADR(args);
@@ -1563,8 +1575,8 @@ namespace basecode::scm {
                 basic_block::encode(true_res.bb)
                     .reg2()
                         .op(op::move)
-                        .src(emitter::read_var(comp.emitter, true_res.var, *true_res.bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, *true_res.bb)))
+                        .src(emitter::read_var(comp.emit, true_res.var, *true_res.bb))
+                        .dst((res = emitter::write_var(comp.emit, res, *true_res.bb)))
                         .build()
                     .imm1()
                         .op(op::br)
@@ -1575,11 +1587,15 @@ namespace basecode::scm {
                 ic.obj = CADDR(args);
                 auto false_res = compiler::compile(comp, ic);
                 basic_block::encode(false_res.bb)
-                    .succ(exit_bb)
+                    .next(exit_bb)
                     .reg2()
                         .op(op::move)
-                        .src(emitter::read_var(comp.emitter, false_res.var, *false_res.bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, *false_res.bb)))
+                        .src(emitter::read_var(comp.emit, false_res.var, *false_res.bb))
+                        .dst((res = emitter::write_var(comp.emit, res, *false_res.bb)))
+                        .build()
+                    .imm1()
+                        .op(op::br)
+                        .value(&exit_bb)
                         .build();
 
                 return {&exit_bb, res};
@@ -1587,7 +1603,7 @@ namespace basecode::scm {
 
             compile_result_t cons(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
                 auto cc = c;
                 cc.obj = CAR(args);
                 auto lhs_res = compiler::compile(comp, cc);
@@ -1599,14 +1615,14 @@ namespace basecode::scm {
                     .op(op::cons)
                         .a(lhs_res.var)
                         .b(rhs_res.var)
-                        .c((res = emitter::write_var(comp.emitter, res, *rhs_res.bb)))
+                        .c((res = emitter::write_var(comp.emit, res, *rhs_res.bb)))
                         .build();
                 return {rhs_res.bb, res};
             }
 
             compile_result_t atom(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
                 auto ac = c;
                 ac.obj = CAR(args);
                 auto comp_res = compiler::compile(comp, ac);
@@ -1614,14 +1630,14 @@ namespace basecode::scm {
                     .reg2()
                         .op(op::atomp)
                         .src(comp_res.var)
-                        .dst((res = emitter::write_var(comp.emitter, res, *comp_res.bb)))
+                        .dst((res = emitter::write_var(comp.emit, res, *comp_res.bb)))
                         .build();
                 return {comp_res.bb, res};
             }
 
             compile_result_t eval(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
                 auto ec = c;
                 ec.obj = CAR(args);
                 auto comp_res = compiler::compile(comp, ec);
@@ -1629,7 +1645,7 @@ namespace basecode::scm {
                     .reg2()
                         .op(op::eval)
                         .src(comp_res.var)
-                        .dst((res = emitter::write_var(comp.emitter, res, *comp_res.bb)))
+                        .dst((res = emitter::write_var(comp.emit, res, *comp_res.bb)))
                         .build();
                 return {comp_res.bb, res};
             }
@@ -1637,7 +1653,7 @@ namespace basecode::scm {
             compile_result_t list(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx  = c.ctx;
                 u32  size = length(ctx, args);
-                auto base_addr = emitter::get_var(comp.emitter, "base"_ss);
+                auto base_addr = emitter::get_var(comp.emit, "base"_ss);
                 alloc_stack(*c.bb, size, &base_addr);
                 s32  offs = 0;
                 auto lc   = c;
@@ -1649,21 +1665,20 @@ namespace basecode::scm {
                         .offs()
                             .op(op::store)
                             .offset(offs)
-                            .src(emitter::read_var(comp.emitter, res.var, *res.bb))
-                            .dst(emitter::read_var(comp.emitter, base_addr, *res.bb))
+                            .src(emitter::read_var(comp.emit, res.var, *res.bb))
+                            .dst(emitter::read_var(comp.emit, base_addr, *res.bb))
                             .mode(true)
                             .build();
                     args = CDR(args);
                     offs += 8;
                 }
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
-                auto& list_bb = emitter::make_basic_block(*c.bb->emitter);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
+                auto& list_bb = emitter::make_basic_block(*c.bb->emit, "make_list"_ss, lc.bb);
                 basic_block::encode(list_bb)
-                    .pred(*c.bb)
                     .reg2_imm()
                         .op(op::list)
-                        .src(emitter::read_var(comp.emitter, base_addr, list_bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, list_bb)))
+                        .src(emitter::read_var(comp.emit, base_addr, list_bb))
+                        .dst((res = emitter::write_var(comp.emit, res, list_bb)))
                         .value(size * 8)
                         .build();
                 free_stack(list_bb, size);
@@ -1672,9 +1687,9 @@ namespace basecode::scm {
 
             compile_result_t and_(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto& exit_bb = emitter::make_basic_block(comp.emitter);
-                auto tmp = emitter::get_var(comp.emitter, "_"_ss);
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
+                auto& exit_bb = emitter::make_basic_block(comp.emit, "and_exit"_ss, c.bb);
+                auto tmp = emitter::get_var(comp.emit, "_"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
                 auto oc = c;
                 while (!IS_NIL(args)) {
                     oc.obj = CAR(args);
@@ -1683,13 +1698,13 @@ namespace basecode::scm {
                     basic_block::encode(oc.bb)
                         .reg2()
                             .op(op::move)
-                            .src(emitter::read_var(comp.emitter, comp_res.var, *oc.bb))
-                            .dst((res = emitter::write_var(comp.emitter, res, *oc.bb)))
+                            .src(emitter::read_var(comp.emit, comp_res.var, *oc.bb))
+                            .dst((res = emitter::write_var(comp.emit, res, *oc.bb)))
                             .build()
                         .reg2()
                             .op(op::truep)
-                            .src(emitter::read_var(comp.emitter, res, *oc.bb))
-                            .dst((tmp = emitter::write_var(comp.emitter, tmp, *oc.bb)))
+                            .src(emitter::read_var(comp.emit, res, *oc.bb))
+                            .dst((tmp = emitter::write_var(comp.emit, tmp, *oc.bb)))
                             .build()
                         .imm1()
                             .op(op::bne)
@@ -1697,7 +1712,7 @@ namespace basecode::scm {
                             .build();
                     args = CDR(args);
                 }
-                basic_block::encode(oc.bb).succ(exit_bb);
+//                basic_block::encode(oc.bb).succ(exit_bb);
                 return {&exit_bb, res};
             }
 
@@ -1705,32 +1720,32 @@ namespace basecode::scm {
                 auto ctx = c.ctx;
                 auto nc  = c;
                 nc.obj = CAR(args);
-                auto res      = emitter::get_var(comp.emitter, "res"_ss);
+                auto res      = emitter::get_var(comp.emit, "res"_ss);
                 auto comp_res = compiler::compile(comp, nc);
                 basic_block::encode(comp_res.bb)
                     .reg2()
                         .op(op::lnot)
-                        .src(emitter::read_var(comp.emitter, comp_res.var, *comp_res.bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, *comp_res.bb)))
+                        .src(emitter::read_var(comp.emit, comp_res.var, *comp_res.bb))
+                        .dst((res = emitter::write_var(comp.emit, res, *comp_res.bb)))
                         .build();
                 return {comp_res.bb, res};
             }
 
             compile_result_t error(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
-                auto tmp = emitter::get_var(comp.emitter, "_"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
+                auto tmp = emitter::get_var(comp.emit, "_"_ss);
                 basic_block::encode(c.bb)
                     .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)))
                     .imm2()
                         .op(op::const_)
                         .src(u32(OBJ_IDX(args)))
-                        .dst((tmp = emitter::write_var(comp.emitter, tmp, *c.bb)))
+                        .dst((tmp = emitter::write_var(comp.emit, tmp, *c.bb)))
                         .build()
                     .reg2()
                         .op(op::error)
-                        .src(emitter::read_var(comp.emitter, tmp, *c.bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, *c.bb)))
+                        .src(emitter::read_var(comp.emit, tmp, *c.bb))
+                        .dst((res = emitter::write_var(comp.emit, res, *c.bb)))
                         .build();
                 basic_block::encode(c.bb)
                     .comment(format::format("literal: {}",
@@ -1755,10 +1770,9 @@ namespace basecode::scm {
                 auto key      = CAR(args);
                 u32  idx      = OBJ_IDX(key);
                 auto key_name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
-                auto res      = emitter::declare_var(comp.emitter, key_name, *c.bb);
+                auto res      = emitter::declare_var(comp.emit, key_name, *c.bb);
                 auto vc = c;
-                vc.obj   = CADR(args);
-                vc.label = emitter::make_label(comp.emitter, key_name);
+                vc.obj = CADR(args);
                 auto comp_res = compiler::compile(comp, vc);
                 if (c.top_level) {
                     auto value = OBJ_AT(G(rf::m));  // FIXME: this is a temporary hack
@@ -1768,8 +1782,8 @@ namespace basecode::scm {
                         auto proc = (proc_t*) NATIVE_PTR(CDR(value));
                         if (!proc->is_compiled) {
                             auto pc = c;
-                            pc.label     = vc.label;
                             pc.top_level = false;
+                            proc->sym    = key;
                             return comp_proc(comp, pc, proc);
                         }
                     }
@@ -1781,13 +1795,13 @@ namespace basecode::scm {
                     .imm2()
                         .src(u32(idx))
                         .op(op::set)
-                        .dst(emitter::read_var(comp.emitter, comp_res.var, *comp_res.bb))
+                        .dst(emitter::read_var(comp.emit, comp_res.var, *comp_res.bb))
                         .mode(true)
                         .build()
                     .reg2()
                         .op(op::move)
-                        .src(emitter::read_var(comp.emitter, comp_res.var, *comp_res.bb))
-                        .dst((res = emitter::write_var(comp.emitter, res, *comp_res.bb)))
+                        .src(emitter::read_var(comp.emit, comp_res.var, *comp_res.bb))
+                        .dst((res = emitter::write_var(comp.emit, res, *comp_res.bb)))
                         .build();
                 return {comp_res.bb, res};
             }
@@ -1803,8 +1817,8 @@ namespace basecode::scm {
                 basic_block::encode(lhs_res.bb)
                     .reg2()
                         .op(op::setcdr)
-                        .src(emitter::read_var(comp.emitter, lhs_res.var, *lhs_res.bb))
-                        .dst(emitter::write_var(comp.emitter, rhs_res.var, *lhs_res.bb))
+                        .src(emitter::read_var(comp.emit, lhs_res.var, *lhs_res.bb))
+                        .dst(emitter::write_var(comp.emit, rhs_res.var, *lhs_res.bb))
                         .build();
                 return {lhs_res.bb, {}};
             }
@@ -1820,8 +1834,8 @@ namespace basecode::scm {
                 basic_block::encode(lhs_res.bb)
                     .reg2()
                         .op(op::setcar)
-                        .src(emitter::read_var(comp.emitter, lhs_res.var, *lhs_res.bb))
-                        .dst(emitter::write_var(comp.emitter, rhs_res.var, *lhs_res.bb))
+                        .src(emitter::read_var(comp.emit, lhs_res.var, *lhs_res.bb))
+                        .dst(emitter::write_var(comp.emit, rhs_res.var, *lhs_res.bb))
                         .build();
                 return {lhs_res.bb, {}};
             }
@@ -1852,7 +1866,7 @@ namespace basecode::scm {
                                 .imm2()
                                     .src(u32(OBJ_IDX(keys)))
                                     .op(op::set)
-                                    .dst(emitter::read_var(comp.emitter, comp_res.var, *vc.bb))
+                                    .dst(emitter::read_var(comp.emit, comp_res.var, *vc.bb))
                                     .mode(true)
                                     .build();
                             break;
@@ -1865,7 +1879,7 @@ namespace basecode::scm {
                                 .imm2()
                                     .src(u32(OBJ_IDX(key)))
                                     .op(op::set)
-                                    .dst(emitter::read_var(comp.emitter, comp_res.var, *vc.bb))
+                                    .dst(emitter::read_var(comp.emit, comp_res.var, *vc.bb))
                                     .mode(true)
                                     .build();
                             keys = CDR(keys);
@@ -1873,7 +1887,7 @@ namespace basecode::scm {
                         }
                     }
                 }
-                auto res = emitter::get_var(comp.emitter, "res"_ss);
+                auto res = emitter::get_var(comp.emit, "res"_ss);
                 basic_block::encode(c.bb)
                     .comment(format::format(
                         "call: {}",
@@ -1888,7 +1902,7 @@ namespace basecode::scm {
 
             compile_result_t comp_proc(compiler_t& comp, const context_t& c, proc_t* proc) {
                 auto ctx  = c.ctx;
-                auto& e   = *c.bb->emitter;
+                auto& e   = *c.bb->emit;
 
                 auto params = proc->params;
                 while (!IS_NIL(params)) {
@@ -1897,27 +1911,17 @@ namespace basecode::scm {
                     params = CDR(params);
                 }
 
-                auto& proc_bb = emitter::make_basic_block(*c.bb->emitter);
+                auto name = *string::interned::get_slice(STRING_ID(proc->sym));
+                auto& proc_bb = emitter::make_basic_block(*c.bb->emit, name, c.bb);
                 proc->addr.bb = &proc_bb;
 
-                auto proc_encoder = basic_block::encode(proc_bb);
-                proc_encoder.pred(*c.bb);
-
-                str_t note_str;
-                if (c.label) {
-                    proc_encoder.label(c.label);
-                    note_str = format::format(
-                        "proc: ({} (fn {} {}))",
-                        emitter::get_string(comp.emitter, c.label),
-                        printable_t{c.ctx, proc->params, true},
-                        printable_t{c.ctx, proc->body, true});
-                } else {
-                    note_str = format::format(
-                        "proc: (_ (fn {} {}))",
-                        printable_t{c.ctx, proc->params, true},
-                        printable_t{c.ctx, proc->body, true});
-                }
-                proc_encoder.note(note_str);
+                basic_block::encode(proc_bb)
+                    .note("-------------------------------------------------------------------"_ss)
+                    .note(format::format("procedure: {}", name))
+                    .note(format::format("(fn {} {})",
+                                         printable_t{c.ctx, proc->params, true},
+                                         printable_t{c.ctx, CAR(proc->body), true}))
+                    .note("-------------------------------------------------------------------"_ss);
 
                 auto body = proc->body;
                 auto bc   = c;
@@ -1929,7 +1933,7 @@ namespace basecode::scm {
                     body = CDR(body);
                 }
                 proc->is_compiled = true;
-                return {&leave(*bc.bb), emitter::get_var(comp.emitter, "res"_ss)};
+                return {&leave(*bc.bb), emitter::get_var(comp.emit, "res"_ss)};
             }
         }
     }

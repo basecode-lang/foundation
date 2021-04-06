@@ -86,12 +86,10 @@ namespace basecode::scm {
 
     using reg_t                 = u8;
     using trap_t                = b8 (*)(vm_t& vm, u64 arg);
-    using label_t               = u32;
     using op_code_t             = u8;
     using bb_array_t            = stable_array_t<bb_t>;
     using ptr_array_t           = array_t<u0*>;
     using env_array_t           = array_t<env_t>;
-    using label_map_t           = hashtab_t<u32, bb_t*>;
     using var_table_t           = symtab_t<var_t*>;
     using var_array_t           = stable_array_t<var_t>;
     using bb_digraph_t          = digraph_t<bb_t>;
@@ -102,6 +100,14 @@ namespace basecode::scm {
     using symbol_table_t        = hashtab_t<u32, obj_t*>;
     using string_table_t        = hashtab_t<u32, obj_t*>;
     using comment_array_t       = array_t<comment_t>;
+
+    enum class status_t : u8 {
+        ok,
+        fail,
+        error,
+        unresolved_label,
+        missing_sequential_branch,
+    };
 
     enum class bb_type_t : u8 {
         code,
@@ -173,7 +179,6 @@ namespace basecode::scm {
         var,
         trap,
         value,
-        label,
         block,
     };
 
@@ -188,6 +193,7 @@ namespace basecode::scm {
     struct proc_t final {
         env_t*                  e;
         obj_t*                  env;
+        obj_t*                  sym;
         obj_t*                  body;
         obj_t*                  params;
         union {
@@ -305,12 +311,11 @@ namespace basecode::scm {
 
     struct operand_t final {
         union {
+            bb_t*               bb;
             reg_t               reg;
             var_t*              var;
             s32                 s;
             u32                 u;
-            bb_t*               bb;
-            label_t             label;
         }                       kind;
         operand_type_t          type;
     };
@@ -335,12 +340,15 @@ namespace basecode::scm {
     };
 
     struct bb_t final {
-        emitter_t*              emitter;
+        using Node_Type         = typename bb_digraph_t::Node;
+
+        emitter_t*              emit;
+        Node_Type*              node;
         bb_t*                   prev;
         bb_t*                   next;
         u64                     addr;
         u32                     id;
-        label_t                 label;
+        u32                     str_id;
         struct {
             u32                 sidx;
             u32                 eidx;
@@ -366,7 +374,6 @@ namespace basecode::scm {
         var_array_t             vars;
         var_table_t             vartab;
         str_array_t             strtab;
-        label_map_t             labtab;
         inst_array_t            insts;
         bb_digraph_t            digraph;
         comment_array_t         comments;
@@ -409,7 +416,7 @@ namespace basecode::scm {
 
     struct compiler_t final {
         vm_t*                   vm;
-        emitter_t               emitter;
+        emitter_t               emit;
     };
 
     struct context_t final {
@@ -417,7 +424,6 @@ namespace basecode::scm {
         ctx_t*                  ctx;
         obj_t*                  obj;
         obj_t*                  env;
-        label_t                 label;
         b8                      top_level;
     };
 
@@ -458,6 +464,12 @@ namespace basecode::scm {
         u8                      size;
     } __attribute__((aligned(2)));
 }
+
+FORMAT_TYPE(basecode::scm::bb_t,
+            format_to(ctx.out(),
+                        "{}_{}",
+                        data.emit->strtab[data.str_id - 1],
+                        data.id));
 
 FORMAT_TYPE(basecode::scm::var_t,
             format_to(ctx.out(),

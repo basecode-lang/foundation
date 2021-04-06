@@ -167,6 +167,29 @@ namespace basecode::scm {
         return TYPE(obj);
     }
 
+    obj_t* make_proc(ctx_t* ctx,
+                     obj_t* sym,
+                     obj_t* params,
+                     obj_t* body,
+                     obj_t* env,
+                     b8 macro) {
+        auto proc = &array::append(ctx->procedures);
+        proc->e            = (env_t*) NATIVE_PTR(CDR(env));
+        proc->env          = env;
+        proc->addr         = {};
+        proc->sym          = sym;
+        proc->body         = body;
+        proc->params       = params;
+        proc->is_tco       = false;
+        proc->is_macro     = macro;
+        proc->is_compiled  = false;
+        proc->is_assembled = false;
+        auto obj = make_object(ctx);
+        SET_TYPE(obj, macro ? obj_type_t::macro : obj_type_t::func);
+        SET_CDR(obj, make_user_ptr(ctx, proc));
+        return obj;
+    }
+
     u0 collect_garbage(ctx_t* ctx) {
 //        format::print("before: ctx->object_used = {}\n", ctx->object_used);
         for (const auto& pair : ctx->strtab)
@@ -325,11 +348,11 @@ namespace basecode::scm {
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
         compiler::reset(ctx->compiler);
 
-        auto& bb = vm::emitter::make_basic_block(ctx->compiler.emitter);
-        vm::emitter::declare_var(ctx->compiler.emitter, "_"_ss, bb);
-        vm::emitter::declare_var(ctx->compiler.emitter, "tmp"_ss, bb);
-        vm::emitter::declare_var(ctx->compiler.emitter, "res"_ss, bb);
-        vm::emitter::declare_var(ctx->compiler.emitter, "base"_ss, bb);
+        auto& bb = vm::emitter::make_basic_block(ctx->compiler.emit, "eval2"_ss, {});
+        vm::emitter::declare_var(ctx->compiler.emit, "_"_ss, bb);
+        vm::emitter::declare_var(ctx->compiler.emit, "tmp"_ss, bb);
+        vm::emitter::declare_var(ctx->compiler.emit, "res"_ss, bb);
+        vm::emitter::declare_var(ctx->compiler.emit, "base"_ss, bb);
 
         TIME_BLOCK(
             "compile expr"_ss,
@@ -346,7 +369,7 @@ namespace basecode::scm {
         str::init(str, ctx->alloc);
         {
             str_buf_t buf{&str};
-            vm::emitter::disassemble(ctx->compiler.emitter, bb, buf);
+            vm::emitter::disassemble(ctx->compiler.emit, bb, buf);
         }
         format::print("{}\n", str);
 
@@ -712,7 +735,7 @@ namespace basecode::scm {
 
                         case prim_type_t::fn:
                         case prim_type_t::mac:
-                            res = make_proc(ctx, CAR(arg), CADR(arg), env, PRIM(fn) == prim_type_t::mac);
+                            res = make_proc(ctx, kar, CAR(arg), CADR(arg), env, PRIM(fn) == prim_type_t::mac);
                             break;
 
                         case prim_type_t::error:
@@ -1476,18 +1499,18 @@ namespace basecode::scm {
             case obj_type_t::keyword:
                 fmt::format_to(o, "#:");
             case obj_type_t::symbol:
-                fmt::format_to(o, "{}", to_string(ctx, obj));
+                fmt::format_to(o, "{}", *string::interned::get_slice(STRING_ID(obj)));
                 break;
 
             case obj_type_t::string:
                 if (printable.quote)
-                    fmt::format_to(o, "\"{}\"", to_string(ctx, obj));
+                    fmt::format_to(o, "\"{}\"", *string::interned::get_slice(STRING_ID(obj)));
                 else
-                    fmt::format_to(o, "{}", to_string(ctx, obj));
+                    fmt::format_to(o, "{}", *string::interned::get_slice(STRING_ID(obj)));
                 break;
 
             case obj_type_t::boolean:
-                fmt::format_to(o, "{}", to_string(ctx, obj));
+                fmt::format_to(o, "{}", IS_TRUE(obj) ? "#t" : "#f");
                 break;
 
             case obj_type_t::environment:
@@ -1528,23 +1551,6 @@ namespace basecode::scm {
             args = CDR(args);
         }
         return len;
-    }
-
-    obj_t* make_proc(ctx_t* ctx, obj_t* params, obj_t* body, obj_t* env, b8 macro) {
-        auto proc = &array::append(ctx->procedures);
-        proc->e            = (env_t*) NATIVE_PTR(CDR(env));
-        proc->env          = env;
-        proc->addr         = {};
-        proc->body         = body;
-        proc->params       = params;
-        proc->is_tco       = false;
-        proc->is_macro     = macro;
-        proc->is_compiled  = false;
-        proc->is_assembled = false;
-        auto obj = make_object(ctx);
-        SET_TYPE(obj, macro ? obj_type_t::macro : obj_type_t::func);
-        SET_CDR(obj, make_user_ptr(ctx, proc));
-        return obj;
     }
 
     static u0 format_environment(ctx_t* ctx, obj_t* env, fmt_ctx_t& fmt_ctx, u32 indent) {

@@ -67,7 +67,7 @@ namespace basecode {
         struct edge_t final {
             const Node*         src;
             const Node*         dst;
-            f64                 w;
+            f64                 wgt;
             s32                 type;
         };
 
@@ -94,6 +94,11 @@ namespace basecode {
                   typename Node = typename T::Node,
                   typename Node_Array = typename T::Node_Array>
         u0 outgoing_nodes(const T& graph, Node* node, Node_Array& nodes);
+
+        template <Directed_Graph T,
+                  typename Node = typename T::Node,
+                  typename Node_Array = typename T::Node_Array>
+        u0 incoming_nodes(const T& graph, Node* node, Node_Array& nodes);
 
         template <Directed_Graph T>
         u0 free(T& graph) {
@@ -195,14 +200,6 @@ namespace basecode {
             return node;
         }
 
-        template <Directed_Graph T, typename Node, typename Node_Array>
-        u0 outgoing_nodes(const T& graph, Node* node, Node_Array& nodes) {
-            for (auto e : graph.edges) {
-                if (e->src != node) continue;
-                array::append(nodes, const_cast<Node*>(e->dst));
-            }
-        }
-
         template <Directed_Graph T>
         status_t init(T& graph, alloc_t* alloc = context::top()->alloc) {
             graph.alloc = alloc;
@@ -224,14 +221,35 @@ namespace basecode {
             return status_t::ok;
         }
 
+        template <Directed_Graph T, typename Node, typename Node_Array>
+        u0 outgoing_nodes(const T& graph, Node* node, Node_Array& nodes) {
+            for (auto e : graph.edges) {
+                if (e->src != node) continue;
+                array::append(nodes, const_cast<Node*>(e->dst));
+            }
+        }
+
+        template <Directed_Graph T, typename Node, typename Node_Array>
+        u0 incoming_nodes(const T& graph, Node* node, Node_Array& nodes) {
+            for (auto e : graph.edges) {
+                if (e->dst != node) continue;
+                array::append(nodes, const_cast<Node*>(e->src));
+            }
+        }
+
         template <Directed_Graph T,
                   typename Edge = typename T::Edge,
                   typename Node = typename T::Node>
-        Edge* make_edge(T& graph, const Node* src, const Node* dst, s32 type = 0, f64 weight = 1.0) {
+        Edge* make_edge(T& graph, const Node* src, const Node* dst, s32 type = 0, f64 wgt = 1.0) {
+            for (auto e : graph.edges) {
+                if (e->src == src)
+                    return e;
+            }
+
             auto edge = (Edge*) memory::alloc(graph.edge_slab);
             edge->src  = src;
             edge->dst  = dst;
-            edge->w    = weight;
+            edge->wgt  = wgt;
             edge->type = type;
             array::append(graph.edges, edge);
             return edge;

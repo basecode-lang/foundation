@@ -171,13 +171,9 @@ namespace basecode::scm {
         namespace basic_block {
             class bb_builder_t;
 
-            u0 free(bb_t& bb);
-
             bb_builder_t encode(bb_t* bb);
 
             bb_builder_t encode(bb_t& bb);
-
-            u0 init(bb_t& bb, emitter_t* e, bb_type_t type);
         }
 
         namespace emitter {
@@ -207,12 +203,6 @@ namespace basecode::scm {
             }
 
             template <String_Concept T>
-            label_t make_label(emitter_t& e, const T& name) {
-                str_array::append(e.strtab, name);
-                return e.strtab.size;
-            }
-
-            template <String_Concept T>
             var_t* declare_var(emitter_t& e, const T& name, bb_t& bb) {
                 var_t* var{};
                 if (symtab::find(e.vartab, name, var)) {
@@ -235,6 +225,30 @@ namespace basecode::scm {
 
             status_t assemble(emitter_t& e, bb_t& start_block);
 
+            template <String_Concept T>
+            bb_t& make_basic_block(emitter_t& e,
+                                   const T& name,
+                                   bb_t* prev,
+                                   bb_type_t type = bb_type_t::code) {
+                str_array::append(e.strtab, name);
+                auto& bb = stable_array::append(e.blocks);
+                bb.id     = e.blocks.size;
+                bb.node   = digraph::make_node(e.digraph, bb);
+                bb.prev   = prev;
+                bb.next   = {};
+                bb.addr   = 0;
+                bb.emit   = &e;
+                bb.type   = type;
+                bb.notes  = {};
+                bb.insts  = {};
+                bb.str_id = e.strtab.size;
+                if (prev) {
+                    prev->next = &bb;
+                    digraph::make_edge(e.digraph, prev->node, bb.node);
+                }
+                return bb;
+            }
+
             inline var_t* read_var(emitter_t& e, var_t* var, bb_t& bb) {
                 assert(var && "cannot read a null var_t!");
                 var->read_block = &bb;
@@ -242,10 +256,6 @@ namespace basecode::scm {
             }
 
             status_t encode_inst(vm_t& vm, const inst_t& inst, u64 addr);
-
-            inline str::slice_t get_string(emitter_t& e, label_t label) {
-                return e.strtab[label - 1];
-            }
 
             inline var_t* write_var(emitter_t& e, var_t* pred, bb_t& bb) {
                 pred = get_var_latest(e, pred->symbol);
@@ -281,8 +291,6 @@ namespace basecode::scm {
             }
 
             u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf);
-
-            bb_t& make_basic_block(emitter_t& e, bb_type_t type = bb_type_t::code);
         }
 
         namespace bytecode {
@@ -300,6 +308,7 @@ namespace basecode::scm {
 
             compile_result_t prim(compiler_t& comp,
                                   const context_t& c,
+                                  obj_t* sym,
                                   obj_t* form,
                                   obj_t* args,
                                   prim_type_t type);
@@ -364,7 +373,7 @@ namespace basecode::scm {
 
             compile_result_t comp_proc(compiler_t& comp, const context_t& c, proc_t* proc);
 
-            compile_result_t fn(compiler_t& comp, const context_t& c, obj_t* form, obj_t* args);
+            compile_result_t fn(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args);
 
             compile_result_t ffi(compiler_t& comp, const context_t& c, obj_t* sym, obj_t* form, obj_t* args);
 
@@ -557,13 +566,6 @@ namespace basecode::scm {
             friend class none_builder_t;
             friend class reg2_imm_builder_t;
 
-            operand_t operand(s32 value) {
-                return operand_t{
-                    .kind.s = value,
-                    .type = operand_type_t::value
-                };
-            }
-
             operand_t operand(bb_t* bb) {
                 return operand_t{
                     .kind.bb = bb,
@@ -575,6 +577,13 @@ namespace basecode::scm {
                 return operand_t{
                     .kind.bb = &bb,
                     .type = operand_type_t::block
+                };
+            }
+
+            operand_t operand(s32 value) {
+                return operand_t{
+                    .kind.s = value,
+                    .type = operand_type_t::value
                 };
             }
 
@@ -597,9 +606,6 @@ namespace basecode::scm {
                 operand_t oper{};
                 oper.type = type;
                 switch (oper.type) {
-                    case operand_type_t::label:
-                        oper.kind.label = value;
-                        break;
                     case operand_type_t::trap:
                     case operand_type_t::value:
                         oper.kind.u = value;
@@ -617,29 +623,16 @@ namespace basecode::scm {
 
             bb_builder_t(bb_t& bb);
 
-            bb_builder_t& label(label_t label) {
-                _bb->label = label;
-                hashtab::insert(_bb->emitter->labtab, label, _bb);
-                return *this;
-            }
-
-            bb_builder_t& pred(bb_t& prev) {
-                assert((!prev.next && !_bb->prev) && (_bb != &prev));
-                prev.next = _bb;
-                _bb->prev = &prev;
-                return *this;
-            }
-
-            bb_builder_t& succ(bb_t& next) {
-                assert((!next.prev && !_bb->next) && (_bb != &next));
+            bb_builder_t& next(bb_t& next) {
                 next.prev = _bb;
                 _bb->next = &next;
+                digraph::make_edge(_em->digraph, _bb->node, next.node);
                 return *this;
             }
 
             template <String_Concept T>
             bb_builder_t& note(const T& value) {
-                auto& strtab = _bb->emitter->strtab;
+                auto& strtab = _bb->emit->strtab;
                 str_array::append(strtab, value);
                 auto& c = array::append(_em->comments);
                 c.id       = strtab.size;
@@ -699,17 +692,11 @@ FORMAT_TYPE(
     switch (data.type) {
         case basecode::scm::operand_type_t::none:
             break;
-        case basecode::scm::operand_type_t::label:
-            format_to(
-                ctx.out(),
-                "{}",
-                *basecode::string::interned::get_slice(data.kind.u));
-            break;
         case basecode::scm::operand_type_t::value:
             format_to(ctx.out(), "{}", data.kind.s);
             break;
         case basecode::scm::operand_type_t::block:
-            format_to(ctx.out(), "bb_{}", data.kind.bb->id);
+            format_to(ctx.out(), "{}", *data.kind.bb);
             break;
         case basecode::scm::operand_type_t::reg:
             format_to(
