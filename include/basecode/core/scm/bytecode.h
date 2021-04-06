@@ -191,19 +191,18 @@ namespace basecode::scm {
             u0 reset(emitter_t& e);
 
             template <String_Concept T>
-            var_t* make_var(emitter_t& e, const T& name) {
+            var_t* get_var(emitter_t& e, const T& name) {
                 var_t* var{};
-                if (symtab::find(e.vartab, name, var))
-                    return var;
-                auto rc = string::interned::fold_for_result(name);
-                if (!OK(rc.status))
+                if (!symtab::find(e.vartab, name, var))
                     return nullptr;
-                var = &stable_array::append(e.vars);
-                var->pred    = var->succ = {};
-                var->symbol  = rc.id;
-                var->version = 0;
-                var->spilled = true;
-                symtab::insert(e.vartab, name, var);
+                return var;
+            }
+
+            inline var_t* get_var_latest(emitter_t& e, intern_id symbol) {
+                auto key = *string::interned::get_slice(symbol);
+                var_t* var{};
+                if (!symtab::find(e.vartab, key, var))
+                    assert(false && "get_var_latest should always find something!");
                 return var;
             }
 
@@ -213,61 +212,72 @@ namespace basecode::scm {
                 return e.strtab.size;
             }
 
+            template <String_Concept T>
+            var_t* declare_var(emitter_t& e, const T& name, bb_t& bb) {
+                var_t* var{};
+                if (symtab::find(e.vartab, name, var)) {
+                    assert(false && "ssa var can only be declared once!");
+                }
+                auto rc = string::interned::fold_for_result(name);
+                if (!OK(rc.status))
+                    return nullptr;
+                var = &stable_array::append(e.vars);
+                var->pred        = var->succ = {};
+                var->symbol      = rc.id;
+                var->version     = 0;
+                var->spilled     = true;
+                var->decl_block  = &bb;
+                var->read_block  = {};
+                var->write_block = {};
+                symtab::insert(e.vartab, name, var);
+                return var;
+            }
+
             status_t assemble(emitter_t& e, bb_t& start_block);
 
-            inline var_t* make_var(emitter_t& e, var_t* pred) {
-                auto var = &stable_array::append(e.vars);
-                var->succ    = {};
-                var->pred    = pred;
-                var->symbol  = pred->symbol;
-                var->spilled = pred->spilled;
-                var->version = pred->version + 1;
-                symtab::set(e.vartab,
-                            *string::interned::get_slice(var->symbol),
-                            var);
-                pred->succ = var;
+            inline var_t* read_var(emitter_t& e, var_t* var, bb_t& bb) {
+                assert(var && "cannot read a null var_t!");
+                var->read_block = &bb;
                 return var;
-            }
-
-            inline var_t* fill_var(emitter_t& e, var_t* pred) {
-                if (pred->version == 0) {
-                    // N.B. this case allows creation of var_t instances
-                    //      prior to their first fill and we don't version
-                    pred->version = 1;
-                    pred->spilled = false;
-                    return pred;
-                }
-                auto var = make_var(e, pred);
-                var->spilled = false;
-                return var;
-            }
-
-            inline var_t* spill_var(emitter_t& e, var_t* pred) {
-                auto var = make_var(e, pred);
-                var->spilled = true;
-                return var;
-            }
-
-            template <String_Concept T>
-            var_t* fill_var(emitter_t& e, const T& name) {
-                var_t* var{};
-                if (!symtab::find(e.vartab, name, var))
-                    var = make_var(e, name);
-                return fill_var(e, var);
-            }
-
-            template <String_Concept T>
-            var_t* spill_var(emitter_t& e, const T& name) {
-                var_t* var{};
-                if (!symtab::find(e.vartab, name, var))
-                    var = make_var(e, name);
-                return spill_var(e, var);
             }
 
             status_t encode_inst(vm_t& vm, const inst_t& inst, u64 addr);
 
             inline str::slice_t get_string(emitter_t& e, label_t label) {
                 return e.strtab[label - 1];
+            }
+
+            inline var_t* write_var(emitter_t& e, var_t* pred, bb_t& bb) {
+                pred = get_var_latest(e, pred->symbol);
+                auto var = &stable_array::append(e.vars);
+                pred->succ       = var;
+                var->pred        = pred;
+                var->symbol      = pred->symbol;
+                var->spilled     = pred->spilled;
+                var->version     = pred->version + 1;
+                var->read_block  = pred->read_block;
+                var->decl_block  = pred->decl_block;
+                var->write_block = &bb;
+                symtab::set(e.vartab,
+                            *string::interned::get_slice(var->symbol),
+                            var);
+                return var;
+            }
+
+            template <String_Concept T>
+            var_t* read_var(emitter_t& e, const T& name, bb_t& bb) {
+                var_t* var{};
+                if (!symtab::find(e.vartab, name, var))
+                    assert(false && "cannot read an undeclared var_t!");
+                return read_var(e, var, bb);
+            }
+
+            template <String_Concept T>
+            var_t* write_var(emitter_t& e, const T& name, bb_t& bb) {
+                var_t* var{};
+                if (!symtab::find(e.vartab, name, var))
+                    assert(false && "cannot write an undeclared var_t!");
+                return write_var(e, var, bb);
             }
 
             u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf);
@@ -304,7 +314,7 @@ namespace basecode::scm {
                                       op_code_t op_code,
                                       obj_t* args);
 
-            u0 alloc_stack(bb_t& bb, u32 words, var_t* base_addr);
+            u0 alloc_stack(bb_t& bb, u32 words, var_t** base_addr);
 
             compile_result_t lookup(compiler_t& comp, const context_t& c);
 

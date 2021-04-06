@@ -69,7 +69,6 @@ namespace basecode::scm::compiler {
         c.ctx       = ctx;
         c.obj       = obj;
         c.env       = env;
-        c.target    = {};
         c.top_level = top_level;
         return c;
     }

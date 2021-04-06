@@ -287,9 +287,13 @@ namespace basecode::scm {
     struct var_t final {
         const var_t*            succ;
         const var_t*            pred;
+        bb_t*                   decl_block;
+        bb_t*                   read_block;
+        bb_t*                   write_block;
         intern_id               symbol;
         u32                     version;
-        b8                      spilled;
+        u8                      spilled:    1;
+        u8                      pad:        7;
     };
 
     struct operand_t final {
@@ -377,7 +381,6 @@ namespace basecode::scm {
     struct compiler_t final {
         vm_t*                   vm;
         emitter_t               emitter;
-        reg_t                   ret_reg;
     };
 
     struct context_t final {
@@ -385,7 +388,6 @@ namespace basecode::scm {
         ctx_t*                  ctx;
         obj_t*                  obj;
         obj_t*                  env;
-        reg_t*                  target;
         label_t                 label;
         b8                      top_level;
     };

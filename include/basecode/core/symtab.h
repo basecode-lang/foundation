@@ -127,11 +127,9 @@ namespace basecode {
         template <Symbol_Table T>
         u0 reset(T& table) {
             table.size = {};
-            for (auto& node : table.nodes) {
-                node.sym  = {};
-                node.type = empty;
-            }
+            array::reset(table.nodes);
             array::reset(table.values);
+            append_node(table, 0, 0, 0, empty);
         }
 
         template <Symbol_Table T>

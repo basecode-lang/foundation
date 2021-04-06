@@ -324,9 +324,13 @@ namespace basecode::scm {
 
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
         compiler::reset(ctx->compiler);
-        ctx->compiler.ret_reg = scm::register_file::r0; // FIXME
 
         auto& bb = vm::emitter::make_basic_block(ctx->compiler.emitter);
+        vm::emitter::declare_var(ctx->compiler.emitter, "_"_ss, bb);
+        vm::emitter::declare_var(ctx->compiler.emitter, "tmp"_ss, bb);
+        vm::emitter::declare_var(ctx->compiler.emitter, "res"_ss, bb);
+        vm::emitter::declare_var(ctx->compiler.emitter, "base"_ss, bb);
+
         TIME_BLOCK(
             "compile expr"_ss,
             auto tc = compiler::make_context(bb, ctx, obj, ctx->env, true);
