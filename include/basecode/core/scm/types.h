@@ -85,6 +85,7 @@ namespace basecode::scm {
     struct comment_t;
     struct operand_t;
     struct emitter_t;
+    struct var_access_t;
     struct encoded_inst_t;
     union  encoded_operand_t;
 
@@ -103,6 +104,7 @@ namespace basecode::scm {
     using trap_table_t          = hashtab_t<u32, trap_t>;
     using symbol_table_t        = hashtab_t<u32, obj_t*>;
     using string_table_t        = hashtab_t<u32, obj_t*>;
+    using access_array_t        = array_t<var_access_t>;
     using comment_array_t       = array_t<comment_t>;
 
     enum class status_t : u8 {
@@ -184,6 +186,13 @@ namespace basecode::scm {
         trap,
         value,
         block,
+    };
+
+    enum class var_access_type_t : u8 {
+        none,
+        def,
+        read,
+        write
     };
 
     [[maybe_unused]] constexpr u32 max_memory_areas = 6;
@@ -305,16 +314,22 @@ namespace basecode::scm {
     };
     static_assert(sizeof(encoded_inst_t) <= 8, "encoded_inst_t is now greater than 8 bytes!");
 
+    struct var_access_t final {
+        u32                     inst_id;
+        var_access_type_t       type;
+    };
+
     struct var_t final {
-        const var_t*            succ;
-        const var_t*            pred;
-        bb_t*                   decl_block;
-        bb_t*                   read_block;
-        bb_t*                   write_block;
+        const var_t*            next;
+        const var_t*            prev;
+        access_array_t          accesses;
         intern_id               symbol;
         u32                     version;
+        reg_t                   reg;
+        u8                      active:     1;
         u8                      spilled:    1;
-        u8                      pad:        7;
+        u8                      incubate:   1;
+        u8                      pad:        5;
     };
 
     struct operand_t final {
@@ -331,6 +346,7 @@ namespace basecode::scm {
     struct inst_t final {
         alloc_t*                alloc;
         operand_t               operands[4];
+        u32                     id;
         s32                     aux;
         u32                     block_id;
         op_code_t               type;

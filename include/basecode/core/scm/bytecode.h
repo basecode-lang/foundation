@@ -45,32 +45,33 @@ namespace basecode::scm {
     }
 
     namespace register_file {
-        constexpr reg_t pc              = 0;
-        constexpr reg_t ep              = 1;
-        constexpr reg_t dp              = 2;
-        constexpr reg_t hp              = 3;
-        constexpr reg_t fp              = 4;
-        constexpr reg_t sp              = 5;   // code stack ptr
-        constexpr reg_t lp              = 6;   // code load ptr
-        constexpr reg_t m               = 7;   // mode
-        constexpr reg_t f               = 8;   // flags register
-        constexpr reg_t lr              = 9;   // link register
-        constexpr reg_t r0              = 10;
-        constexpr reg_t r1              = 11;
-        constexpr reg_t r2              = 12;
-        constexpr reg_t r3              = 13;
-        constexpr reg_t r4              = 14;
-        constexpr reg_t r5              = 15;
-        constexpr reg_t r6              = 16;
-        constexpr reg_t r7              = 17;
-        constexpr reg_t r8              = 18;
-        constexpr reg_t r9              = 19;
-        constexpr reg_t r10             = 20;
-        constexpr reg_t r11             = 21;
-        constexpr reg_t r12             = 22;
-        constexpr reg_t r13             = 23;
-        constexpr reg_t r14             = 24;
-        constexpr reg_t r15             = 25;
+        constexpr reg_t none            = 0;
+        constexpr reg_t pc              = 1;
+        constexpr reg_t ep              = 2;
+        constexpr reg_t dp              = 3;
+        constexpr reg_t hp              = 4;
+        constexpr reg_t fp              = 5;
+        constexpr reg_t sp              = 6;   // code stack ptr
+        constexpr reg_t lp              = 7;   // code load ptr
+        constexpr reg_t m               = 8;   // mode
+        constexpr reg_t f               = 9;   // flags register
+        constexpr reg_t lr              = 10;  // link register
+        constexpr reg_t r0              = 11;
+        constexpr reg_t r1              = 12;
+        constexpr reg_t r2              = 13;
+        constexpr reg_t r3              = 14;
+        constexpr reg_t r4              = 15;
+        constexpr reg_t r5              = 16;
+        constexpr reg_t r6              = 17;
+        constexpr reg_t r7              = 18;
+        constexpr reg_t r8              = 19;
+        constexpr reg_t r9              = 20;
+        constexpr reg_t r10             = 21;
+        constexpr reg_t r11             = 22;
+        constexpr reg_t r12             = 23;
+        constexpr reg_t r13             = 24;
+        constexpr reg_t r14             = 25;
+        constexpr reg_t r15             = 26;
 
         str::slice_t name(reg_t reg);
     }
@@ -178,43 +179,6 @@ namespace basecode::scm {
 
             u0 reset(emitter_t& e);
 
-            template <String_Concept T>
-            var_t* get_var(emitter_t& e, const T& name) {
-                var_t* var{};
-                if (!symtab::find(e.vartab, name, var))
-                    return nullptr;
-                return var;
-            }
-
-            inline var_t* get_var_latest(emitter_t& e, intern_id symbol) {
-                auto key = *string::interned::get_slice(symbol);
-                var_t* var{};
-                if (!symtab::find(e.vartab, key, var))
-                    assert(false && "get_var_latest should always find something!");
-                return var;
-            }
-
-            template <String_Concept T>
-            var_t* declare_var(emitter_t& e, const T& name, bb_t& bb) {
-                var_t* var{};
-                if (symtab::find(e.vartab, name, var)) {
-                    assert(false && "ssa var can only be declared once!");
-                }
-                auto rc = string::interned::fold_for_result(name);
-                if (!OK(rc.status))
-                    return nullptr;
-                var = &stable_array::append(e.vars);
-                var->pred        = var->succ = {};
-                var->symbol      = rc.id;
-                var->version     = 0;
-                var->spilled     = true;
-                var->decl_block  = &bb;
-                var->read_block  = {};
-                var->write_block = {};
-                symtab::insert(e.vartab, name, var);
-                return var;
-            }
-
             status_t assemble(emitter_t& e, bb_t& start_block);
 
             template <String_Concept T>
@@ -241,48 +205,99 @@ namespace basecode::scm {
                 return bb;
             }
 
-            inline var_t* read_var(emitter_t& e, var_t* var, bb_t& bb) {
-                assert(var && "cannot read a null var_t!");
-                var->read_block = &bb;
-                return var;
-            }
-
             status_t encode_inst(vm_t& vm, const inst_t& inst, u64 addr);
 
-            inline var_t* write_var(emitter_t& e, var_t* pred, bb_t& bb) {
-                pred = get_var_latest(e, pred->symbol);
-                auto var = &stable_array::append(e.vars);
-                pred->succ       = var;
-                var->pred        = pred;
-                var->symbol      = pred->symbol;
-                var->spilled     = pred->spilled;
-                var->version     = pred->version + 1;
-                var->read_block  = pred->read_block;
-                var->decl_block  = pred->decl_block;
-                var->write_block = &bb;
-                symtab::set(e.vartab,
-                            *string::interned::get_slice(var->symbol),
-                            var);
-                return var;
-            }
-
-            template <String_Concept T>
-            var_t* read_var(emitter_t& e, const T& name, bb_t& bb) {
-                var_t* var{};
-                if (!symtab::find(e.vartab, name, var))
-                    assert(false && "cannot read an undeclared var_t!");
-                return read_var(e, var, bb);
-            }
-
-            template <String_Concept T>
-            var_t* write_var(emitter_t& e, const T& name, bb_t& bb) {
-                var_t* var{};
-                if (!symtab::find(e.vartab, name, var))
-                    assert(false && "cannot write an undeclared var_t!");
-                return write_var(e, var, bb);
-            }
-
             u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf);
+
+            namespace virtual_var {
+                template <String_Concept T>
+                var_t* get(emitter_t& e, const T& name) {
+                    var_t* var{};
+                    if (!symtab::find(e.vartab, name, var))
+                        return nullptr;
+                    return var;
+                }
+
+                template <String_Concept T>
+                var_t* declare(emitter_t& e, const T& name) {
+                    var_t* var{};
+                    if (symtab::find(e.vartab, name, var))
+                        assert(false && "virtual_var: ssa var can only be declared once!");
+                    auto rc = string::interned::fold_for_result(name);
+                    if (!OK(rc.status))
+                        return nullptr;
+                    var = &stable_array::append(e.vars);
+                    array::init(var->accesses, e.alloc);
+                    var->prev     = {};
+                    var->next     = {};
+                    var->active   = false;
+                    var->symbol   = rc.id;
+                    var->version  = 1;
+                    var->spilled  = false;
+                    var->incubate = true;
+                    symtab::insert(e.vartab, name, var);
+                    return var;
+                }
+
+                inline var_t* latest(emitter_t& e, intern_id symbol) {
+                    auto key = *string::interned::get_slice(symbol);
+                    var_t* var{};
+                    if (!symtab::find(e.vartab, key, var))
+                        assert(false && "virtual_var: latest should always find something!");
+                    return var;
+                }
+
+                inline var_t* read(emitter_t& e, var_t* var, u32 inst_id) {
+                    assert(var && "virtual_var: cannot read a null var_t!");
+                    auto& ac = array::append(var->accesses);
+                    ac.type    = var_access_type_t::read;
+                    ac.inst_id = inst_id;
+                    return var;
+                }
+
+                template <String_Concept T>
+                var_t* read(emitter_t& e, const T& name, u32 inst_id) {
+                    var_t* var{};
+                    if (!symtab::find(e.vartab, name, var))
+                        assert(false && "virtual_var: cannot read an undeclared var_t!");
+                    return read(e, var, inst_id);
+                }
+
+                inline var_t* write(emitter_t& e, var_t* prev, u32 inst_id) {
+                    const auto curr = latest(e, prev->symbol);
+                    auto var = &stable_array::append(e.vars);
+                    array::init(var->accesses, e.alloc);
+                    var->prev  = prev;
+                    prev->next = var;
+                    if (prev->incubate && curr->incubate) {
+                        auto& ac      = array::append(var->accesses);
+                        ac.type       = var_access_type_t::def;
+                        ac.inst_id    = inst_id;
+                        var->version  = prev->version;
+                        var->incubate = false;
+                    } else {
+                        var->version = curr->version + 1;
+                    }
+                    var->symbol  = prev->symbol;
+                    var->active  = prev->active;
+                    var->spilled = prev->spilled;
+                    auto& ac = array::append(var->accesses);
+                    ac.type    = var_access_type_t::write;
+                    ac.inst_id = inst_id;
+                    symtab::set(e.vartab,
+                                *string::interned::get_slice(var->symbol),
+                                var);
+                    return var;
+                }
+
+                template <String_Concept T>
+                var_t* write(emitter_t& e, const T& name, u32 inst_id) {
+                    var_t* var{};
+                    if (!symtab::find(e.vartab, name, var))
+                        assert(false && "virtual_var: cannot write an undeclared var_t!");
+                    return write(e, var, inst_id);
+                }
+            }
         }
 
         namespace bytecode {
@@ -402,23 +417,34 @@ namespace basecode::scm {
             class bb_builder_t;
 
             class reg1_builder_t final {
+                var_t**         _dst;
                 bb_builder_t*   _builder;
             public:
-                reg1_builder_t(bb_builder_t* builder) : _builder(builder) {};
+                reg1_builder_t(bb_builder_t* builder) : _dst(),
+                                                        _builder(builder) {};
+
+                u0 reset() { _dst = {}; }
 
                 bb_builder_t& build();
 
                 reg1_builder_t& dst(reg_t reg);
 
-                reg1_builder_t& dst(var_t* var);
+                reg1_builder_t& dst(var_t** var);
 
                 reg1_builder_t& op(op_code_t op_code);
             };
 
             class reg2_builder_t final {
+                var_t**         _src;
+                var_t**         _dst;
                 bb_builder_t*   _builder;
+
             public:
-                reg2_builder_t(bb_builder_t* builder) : _builder(builder) {};
+                reg2_builder_t(bb_builder_t* builder) : _src(),
+                                                        _dst(),
+                                                        _builder(builder) {};
+
+                u0 reset() { _src = _dst = {}; }
 
                 bb_builder_t& build();
 
@@ -426,11 +452,11 @@ namespace basecode::scm {
 
                 reg2_builder_t& dst(reg_t reg);
 
-                reg2_builder_t& dst(var_t* var);
-
                 reg2_builder_t& src(reg_t reg);
 
-                reg2_builder_t& src(var_t* var);
+                reg2_builder_t& dst(var_t** var);
+
+                reg2_builder_t& src(var_t** var);
 
                 reg2_builder_t& is_signed(b8 flag);
 
@@ -438,31 +464,45 @@ namespace basecode::scm {
             };
 
             class reg3_builder_t final {
+                var_t**         _a;
+                var_t**         _b;
+                var_t**         _c;
                 bb_builder_t*   _builder;
             public:
-                reg3_builder_t(bb_builder_t* builder) : _builder(builder) {};
+                reg3_builder_t(bb_builder_t* builder) : _a(),
+                                                        _b(),
+                                                        _c(),
+                                                        _builder(builder) {};
+
+                u0 reset() { _a = _b = _c = {}; }
 
                 bb_builder_t& build();
 
                 reg3_builder_t& a(reg_t reg);
 
-                reg3_builder_t& a(var_t* var);
-
                 reg3_builder_t& b(reg_t reg);
-
-                reg3_builder_t& b(var_t* var);
 
                 reg3_builder_t& c(reg_t reg);
 
-                reg3_builder_t& c(var_t* var);
+                reg3_builder_t& a(var_t** var);
+
+                reg3_builder_t& b(var_t** var);
+
+                reg3_builder_t& c(var_t** var);
 
                 reg3_builder_t& op(op_code_t op_code);
             };
 
             class offs_builder_t final {
+                var_t**         _src;
+                var_t**         _dst;
                 bb_builder_t*   _builder;
             public:
-                offs_builder_t(bb_builder_t* builder) : _builder(builder) {};
+                offs_builder_t(bb_builder_t* builder) : _src(),
+                                                        _dst(),
+                                                        _builder(builder) {};
+
+                u0 reset() { _src = _dst = {}; }
 
                 bb_builder_t& build();
 
@@ -472,9 +512,9 @@ namespace basecode::scm {
 
                 offs_builder_t& src(reg_t reg);
 
-                offs_builder_t& dst(var_t* var);
+                offs_builder_t& dst(var_t** var);
 
-                offs_builder_t& src(var_t* var);
+                offs_builder_t& src(var_t** var);
 
                 offs_builder_t& offset(s32 value);
 
@@ -482,25 +522,31 @@ namespace basecode::scm {
             };
 
             class reg2_imm_builder_t final {
+                var_t**         _src;
+                var_t**         _dst;
                 bb_builder_t*   _builder;
             public:
-                reg2_imm_builder_t(bb_builder_t* builder) : _builder(builder) {};
+                reg2_imm_builder_t(bb_builder_t* builder) : _src(),
+                                                            _dst(),
+                                                            _builder(builder) {};
+
+                u0 reset() { _src = _dst = {}; }
 
                 bb_builder_t& build();
 
                 reg2_imm_builder_t& dst(reg_t reg);
 
-                reg2_imm_builder_t& dst(var_t* var);
-
                 reg2_imm_builder_t& src(reg_t reg);
 
-                reg2_imm_builder_t& src(var_t* var);
+                reg2_imm_builder_t& dst(var_t** var);
 
-                reg2_imm_builder_t& is_signed(b8 flag);
+                reg2_imm_builder_t& src(var_t** var);
 
                 reg2_imm_builder_t& value(s32 value);
 
                 reg2_imm_builder_t& value(u32 value);
+
+                reg2_imm_builder_t& is_signed(b8 flag);
 
                 reg2_imm_builder_t& value(bb_t* value);
 
@@ -512,6 +558,8 @@ namespace basecode::scm {
             public:
                 none_builder_t(bb_builder_t* builder) : _builder(builder) {};
 
+                u0 reset() {}
+
                 bb_builder_t& build();
 
                 none_builder_t& op(op_code_t op_code);
@@ -521,6 +569,8 @@ namespace basecode::scm {
                 bb_builder_t*   _builder;
             public:
                 imm1_builder_t(bb_builder_t* builder) : _builder(builder) {};
+
+                u0 reset() {}
 
                 bb_builder_t& build();
 
@@ -536,9 +586,13 @@ namespace basecode::scm {
             };
 
             class imm2_builder_t final {
+                var_t**         _dst;
                 bb_builder_t*   _builder;
             public:
-                imm2_builder_t(bb_builder_t* builder) : _builder(builder) {};
+                imm2_builder_t(bb_builder_t* builder) : _dst(),
+                                                        _builder(builder) {};
+
+                u0 reset() { _dst = {}; }
 
                 bb_builder_t& build();
 
@@ -546,11 +600,11 @@ namespace basecode::scm {
 
                 imm2_builder_t& dst(reg_t reg);
 
-                imm2_builder_t& dst(var_t* var);
-
                 imm2_builder_t& src(s32 value);
 
                 imm2_builder_t& src(u32 value);
+
+                imm2_builder_t& dst(var_t** var);
 
                 imm2_builder_t& src(bb_t* value);
 

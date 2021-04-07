@@ -349,10 +349,10 @@ namespace basecode::scm {
         compiler::reset(ctx->compiler);
 
         auto& bb = vm::emitter::make_basic_block(ctx->compiler.emit, "eval2"_ss, {});
-        vm::emitter::declare_var(ctx->compiler.emit, "_"_ss, bb);
-        vm::emitter::declare_var(ctx->compiler.emit, "tmp"_ss, bb);
-        vm::emitter::declare_var(ctx->compiler.emit, "res"_ss, bb);
-        vm::emitter::declare_var(ctx->compiler.emit, "base"_ss, bb);
+        vm::emitter::virtual_var::declare(ctx->compiler.emit, "_"_ss);
+        vm::emitter::virtual_var::declare(ctx->compiler.emit, "tmp"_ss);
+        vm::emitter::virtual_var::declare(ctx->compiler.emit, "res"_ss);
+        vm::emitter::virtual_var::declare(ctx->compiler.emit, "base"_ss);
 
         TIME_BLOCK(
             "compile expr"_ss,
