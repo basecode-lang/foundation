@@ -120,8 +120,10 @@ namespace basecode::log {
     }
 
     u0 fini(logger_t* logger) {
-        for (auto child_logger : logger->children)
-            fini(child_logger);
+        for (auto child_logger : logger->children) {
+            if (child_logger)
+                fini(child_logger);
+        }
         if (logger->system && logger->system->fini)
             logger->system->fini(logger);
         array::free(logger->children);

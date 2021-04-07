@@ -53,7 +53,11 @@
 #define SET_FLONUM(x, v)        ((x)->number.value = std::bit_cast<u32>(f32(v)))
 #define PRIM(x)                 (prim_type_t((x)->prim.code))
 #define SET_PRIM(x, p)          ((x)->prim.code = fixnum_t((p)))
-#define NATIVE_PTR(x)           (ctx->native_ptrs[FIXNUM((x))])
+#define ENV(x)                  ((env_t*) ctx->native_ptrs[FIXNUM((x)) - 1])
+#define PROC(x)                 ((proc_t*) ctx->native_ptrs[FIXNUM((x)) - 1])
+#define CFUNC(x)                ((native_func_t) ctx->native_ptrs[FIXNUM((x)) - 1])
+#define PROTO(x)                ((proto_t*) ctx->native_ptrs[FIXNUM((x)) - 1])
+#define NATIVE_PTR(x)           (ctx->native_ptrs[FIXNUM((x)) - 1])
 #define EVAL(o)                 eval(ctx, (o), env)
 #define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env)
 #define SYM(o)                  make_symbol(ctx, (o))
@@ -185,9 +189,13 @@ namespace basecode::scm {
     [[maybe_unused]] constexpr u32 max_memory_areas = 6;
 
     struct env_t final {
+        obj_t*                  self;
         obj_t*                  parent;
         bind_table_t            bindings;
-        b8                      gc_protect;
+        u32                     native_ptr_idx;
+        u8                      protect:    1;
+        u8                      free:       1;
+        u8                      pad:        6;
     };
 
     struct proc_t final {

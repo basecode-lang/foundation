@@ -1170,7 +1170,7 @@ namespace basecode::scm {
                                    obj_t* form,
                                    obj_t* args) {
                 auto ctx = c.ctx;
-                auto proc = (proc_t*) NATIVE_PTR(CDR(form));
+                auto proc = PROC(form);
                 push_env(comp, *c.bb);
                 {
                     auto keys = proc->params;
@@ -1847,7 +1847,7 @@ namespace basecode::scm {
                     set(ctx, key, value, c.env);
                     if (TYPE(value) == obj_type_t::func
                     ||  TYPE(value) == obj_type_t::macro) {
-                        auto proc = (proc_t*) NATIVE_PTR(CDR(value));
+                        auto proc = PROC(value);
                         if (!proc->is_compiled) {
                             auto pc = c;
                             pc.top_level = false;

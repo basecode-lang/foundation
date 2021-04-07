@@ -134,8 +134,6 @@ namespace basecode::scm {
 
     obj_t* make_bool(ctx_t* ctx, b8 value);
 
-    str_t to_string(ctx_t* ctx, obj_t* obj);
-
     u0* to_user_ptr(ctx_t* ctx, obj_t* obj);
 
     obj_t* make_bool(ctx_t* ctx, obj_t* obj);
@@ -185,6 +183,10 @@ namespace basecode::scm {
     obj_t* quasiquote(ctx_t* ctx, obj_t* obj, obj_t* env);
 
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn);
+
+    str_t to_string(ctx_t* ctx, obj_t* obj, b8 quote = false);
+
+    u0 set_upvalue(ctx_t* ctx, obj_t* sym, obj_t* v, obj_t* env);
 
     obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len = -1);
 

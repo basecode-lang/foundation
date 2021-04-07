@@ -12,28 +12,28 @@
 (= map (fn (proc lst)
     (let res nil)
     (while lst
-        (= res (cons (proc (car lst)) res))
-        (= lst (cdr lst)))
+        (let res (cons (proc (car lst)) res))
+        (let lst (cdr lst)))
     (reverse res)))
 
 (= range (fn (a b step)
     (let lst '())
     (while (<= a b)
-        (= lst (cons a lst))
-        (= a (+ a step)))
+        (let lst (cons a lst))
+        (let a (+ a step)))
     (reverse lst)))
 
 (= length (fn (ls)
     (let count 0)
     (while ls
-        (= count (add1 count))
-        (= ls (cdr ls)))
+        (let count (add1 count))
+        (let ls (cdr ls)))
     count))
 
 (= list-tail (fn (ls k)
     (while (> k 0)
-        (= ls (cdr ls))
-        (= k (sub1 k)))
+        (let ls (cdr ls))
+        (let k (sub1 k)))
     ls))
 
 (= list-ref (fn (ls k)
@@ -42,16 +42,16 @@
 (= reverse (fn (lst)
     (let res nil)
     (while lst
-        (= res (cons (car lst) res))
-        (= lst (cdr lst)))
+        (let res (cons (car lst) res))
+        (let lst (cdr lst)))
     res))
 
 (= append (fn (a b)
     (let a1 (reverse a))
     (let b1 b)
     (while a1
-        (= b1 (cons (car a1) b1))
-        (= a1 (cdr a1)))
+        (let b1 (cons (car a1) b1))
+        (let a1 (cdr a1)))
     b1))
 
 (= append-reverse (fn (rev tail)
@@ -60,7 +60,7 @@
         (append-reverse (cdr rev) (cons (car rev) tail)))))
 
 (= cons* (fn (first . rest)
-    (= loop (fn (rev next rest)
+    (let loop (fn (rev next rest)
         (if (not rest)
             (append-reverse rev next)
             (loop (cons next rev) (car rest) (cdr rest)))))
@@ -84,7 +84,7 @@
         (let for-iter ,lst)
         (while for-iter
             (let ,item (car for-iter))
-            (= for-iter (cdr for-iter))
+            (let for-iter (cdr for-iter))
             (do ,@body)))))
 
 (= test-suite (mac (title . body)
@@ -368,22 +368,21 @@
             )
 
         (do
-            (let parent-logger (current-logger))
-            (let color-logger (log-create-color 'out))
-            (let syslog-logger (syslog-create "bc-libcore-tests"
-                           (list 'opt-pid 'opt-ndelay 'opt-cons 'opt-perror)
-                           'local0))
-            (let basic-file-logger (log-create-basic-file "test.log"))
-            (let daily-file-logger (log-create-daily-file "daily.log" 23 0))
-            (let rotating-file-logger (log-create-rotating-file "rotating.log"
-                                                                (* 256 1024)
-                                                                256))
+            (= color-logger  (log-create-color 'out))
+            (= syslog-logger (syslog-create "bc-libcore-tests"
+                             (list 'opt-pid 'opt-ndelay 'opt-cons 'opt-perror)
+                             'local0))
+            (= basic-file-logger (log-create-basic-file "test.log"))
+            (= daily-file-logger (log-create-daily-file "daily.log" 23 0))
+            (= rotating-file-logger (log-create-rotating-file "rotating.log"
+                                                              (* 256 1024)
+                                                              256))
 
-            (logger-append-child parent-logger color-logger)
-            (logger-append-child parent-logger basic-file-logger)
-            (logger-append-child parent-logger daily-file-logger)
-            (logger-append-child parent-logger rotating-file-logger)
-            (logger-append-child parent-logger syslog-logger)
+            (logger-append-child (current-logger) color-logger)
+            (logger-append-child (current-logger) basic-file-logger)
+            (logger-append-child (current-logger) daily-file-logger)
+            (logger-append-child (current-logger) rotating-file-logger)
+            (logger-append-child (current-logger) syslog-logger)
 
 ;            (log-info "example log message!")
 ;            (log-warn "oh, shit!")
@@ -395,4 +394,6 @@
         (let product-name (cvar-ref *product-name*))
         (cond
             [(is product-name "Basecode Foundation Binary Format Library") (binfmt-tests)]
-            [(is product-name "Basecode Foundation Core Library")          (core-tests)])))
+            [(is product-name "Basecode Foundation Core Library")          (core-tests)]
+            [else                                                          (print "shit")]))
+    (print "wtf!!!???"))

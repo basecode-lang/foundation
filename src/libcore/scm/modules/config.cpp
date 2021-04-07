@@ -32,6 +32,9 @@ namespace basecode::config {
     struct system_t final {
         alloc_t*                alloc;
         scm::ctx_t*             ctx;
+        scm::obj_t*             current_user;
+        scm::obj_t*             current_alloc;
+        scm::obj_t*             current_logger;
         cvar_t                  vars[max_cvar_size];
         str_t                   buf;
         u32                     heap_size;
@@ -85,15 +88,21 @@ namespace basecode::config {
     };
 
     static scm::obj_t* current_user() {
-        return scm::make_user_ptr(g_cfg_sys.ctx, context::top()->user);
+        if (scm::is_nil(g_cfg_sys.ctx, g_cfg_sys.current_user))
+            g_cfg_sys.current_user = scm::make_user_ptr(g_cfg_sys.ctx, context::top()->user);
+        return g_cfg_sys.current_user;
     }
 
     static scm::obj_t* current_alloc() {
-        return scm::make_user_ptr(g_cfg_sys.ctx, context::top()->alloc);
+        if (scm::is_nil(g_cfg_sys.ctx, g_cfg_sys.current_alloc))
+            g_cfg_sys.current_alloc = scm::make_user_ptr(g_cfg_sys.ctx, context::top()->alloc);
+        return g_cfg_sys.current_alloc;
     }
 
     static scm::obj_t* current_logger() {
-        return scm::make_user_ptr(g_cfg_sys.ctx, context::top()->logger);
+        if (scm::is_nil(g_cfg_sys.ctx, g_cfg_sys.current_logger))
+            g_cfg_sys.current_logger = scm::make_user_ptr(g_cfg_sys.ctx, context::top()->logger);
+        return g_cfg_sys.current_logger;
     }
 
     static scm::obj_t* current_command_line() {
@@ -580,14 +589,18 @@ namespace basecode::config {
         }
 
         status_t init(const config_settings_t& settings, alloc_t* alloc) {
-            g_cfg_sys.alloc     = alloc;
-            g_cfg_sys.heap_size = settings.heap_size;
-            g_cfg_sys.ctx       = (scm::ctx_t*) memory::alloc(g_cfg_sys.alloc, g_cfg_sys.heap_size);
-
+            g_cfg_sys.alloc          = alloc;
+            g_cfg_sys.heap_size      = settings.heap_size;
+            g_cfg_sys.ctx            = (scm::ctx_t*) memory::alloc(g_cfg_sys.alloc,
+                                                                   g_cfg_sys.heap_size);
             str::init(g_cfg_sys.buf, g_cfg_sys.alloc);
             str::reserve(g_cfg_sys.buf, 8192);
 
             scm::init(g_cfg_sys.ctx, g_cfg_sys.heap_size, g_cfg_sys.alloc);
+            g_cfg_sys.current_user   = scm::nil(g_cfg_sys.ctx);
+            g_cfg_sys.current_alloc  = scm::nil(g_cfg_sys.ctx);
+            g_cfg_sys.current_logger = scm::nil(g_cfg_sys.ctx);
+
             {
                 auto b8_type = ffi::param::make_type(param_cls_t::int_,
                                                      param_size_t::byte,
@@ -995,18 +1008,9 @@ namespace basecode::config {
         );
         auto gc = scm::save_gc(g_cfg_sys.ctx);
         while (true) {
-            scm::obj_t* expr;
-//            TIME_BLOCK(
-//                "eval::scm::read"_ss,
-                expr = scm::read(g_cfg_sys.ctx, crsr);
-//                    );
+            auto expr = scm::read(g_cfg_sys.ctx, crsr);
             if (!expr) break;
-//            format::print("read::expr = {}\n", scm::printable_t{g_cfg_sys.ctx, expr, true});
-//            fflush(stdout);
-//            TIME_BLOCK(
-//                "eval::scm::eval"_ss,
-//                *obj = scm::eval(g_cfg_sys.ctx, expr);
-//                    );
+            *obj = scm::eval(g_cfg_sys.ctx, expr);
             scm::restore_gc(g_cfg_sys.ctx, gc);
         }
         scm::restore_gc(g_cfg_sys.ctx, gc);
