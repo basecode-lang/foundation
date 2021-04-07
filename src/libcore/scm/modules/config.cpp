@@ -87,6 +87,8 @@ namespace basecode::config {
         {nullptr,       0},
     };
 
+    static const s8* vlog(str::slice_t fmt_str, scm::rest_array_t& arg);
+
     static scm::obj_t* current_user() {
         if (scm::is_nil(g_cfg_sys.ctx, g_cfg_sys.current_user))
             g_cfg_sys.current_user = scm::make_user_ptr(g_cfg_sys.ctx, context::top()->user);
@@ -172,33 +174,6 @@ namespace basecode::config {
         return pos;
     }
 
-    static const s8* vlog(str::slice_t fmt_str, scm::obj_t* arg) {
-        using fmt_ctx = fmt::format_context;
-        using fmt_arg = fmt::basic_format_arg<fmt_ctx>;
-
-        array_t<fmt_arg> objs{};
-        array::init(objs, g_cfg_sys.alloc);
-        defer(array::free(objs));
-
-        while (true) {
-            auto obj = scm::next_arg_no_chk(g_cfg_sys.ctx, &arg);
-            if (scm::type(obj) == scm::obj_type_t::nil)
-                break;
-            array::append(objs,
-                          fmt::detail::make_arg<fmt_ctx>(scm::printable_t{g_cfg_sys.ctx, obj}));
-        }
-
-        auto& buf = g_cfg_sys.buf;
-        str::reset(buf); {
-            str_buf_t str_buf{&buf};
-            fmt::vformat_to(str_buf,
-                            (std::string_view) fmt_str,
-                            fmt::basic_format_args<fmt_ctx>(objs.data, objs.size));
-        }
-
-        return str::c_str(g_cfg_sys.buf);
-    }
-
     static scm::obj_t* cvar_ref(u32 id) {
         cvar_t* cvar{};
         if (!OK(cvar::get(id, &cvar)))
@@ -252,38 +227,6 @@ namespace basecode::config {
             scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
         cvar->value.ptr = value->data;
         return true;
-    }
-
-    static u0 log_warn(str::slice_t* fmt_msg, scm::obj_t* rest) {
-        log::warn(vlog(*fmt_msg, rest));
-    }
-
-    static u0 log_info(str::slice_t* fmt_msg, scm::obj_t* rest) {
-        log::info(vlog(*fmt_msg, rest));
-    }
-
-    static u0 log_alert(str::slice_t* fmt_msg, scm::obj_t* rest) {
-        log::alert(vlog(*fmt_msg, rest));
-    }
-
-    static u0 log_debug(str::slice_t* fmt_msg, scm::obj_t* rest) {
-        log::debug(vlog(*fmt_msg, rest));
-    }
-
-    static u0 log_error(str::slice_t* fmt_msg, scm::obj_t* rest) {
-        log::error(vlog(*fmt_msg, rest));
-    }
-
-    static u0 log_notice(str::slice_t* fmt_msg, scm::obj_t* rest) {
-        log::notice(vlog(*fmt_msg, rest));
-    }
-
-    static u0 log_critical(str::slice_t* fmt_msg, scm::obj_t* rest) {
-        log::critical(vlog(*fmt_msg, rest));
-    }
-
-    static u0 log_emergency(str::slice_t* fmt_msg, scm::obj_t* rest) {
-        log::emergency(vlog(*fmt_msg, rest));
     }
 
     static scm::obj_t* syslog_create(scm::ctx_t* ctx, scm::obj_t* arg) {
@@ -341,6 +284,18 @@ namespace basecode::config {
         return scm::make_user_ptr(ctx, logger);
     }
 
+    static u0 log_warn(str::slice_t* fmt_msg, scm::rest_array_t* rest) {
+        log::warn(vlog(*fmt_msg, *rest));
+    }
+
+    static u0 log_info(str::slice_t* fmt_msg, scm::rest_array_t* rest) {
+        log::info(vlog(*fmt_msg, *rest));
+    }
+
+    static u0 log_alert(str::slice_t* fmt_msg, scm::rest_array_t* rest) {
+        log::alert(vlog(*fmt_msg, *rest));
+    }
+
     static u0 adjust_log_path(path_t& log_path, str::slice_t file_name) {
         path_t tmp_path{};
         path::init(tmp_path, file_name, g_cfg_sys.alloc);
@@ -357,6 +312,38 @@ namespace basecode::config {
         } else {
             path::init(log_path, file_name, g_cfg_sys.alloc);
         }
+    }
+
+    static u0 log_debug(str::slice_t* fmt_msg, scm::rest_array_t* rest) {
+        log::debug(vlog(*fmt_msg, *rest));
+    }
+
+    static u0 log_error(str::slice_t* fmt_msg, scm::rest_array_t* rest) {
+        log::error(vlog(*fmt_msg, *rest));
+    }
+
+    static const s8* vlog(str::slice_t fmt_str, scm::rest_array_t& arg) {
+        auto& buf = g_cfg_sys.buf;
+        str::reset(buf); {
+            str_buf_t str_buf{&buf};
+            fmt::dynamic_format_arg_store<fmt::format_context> fmt_args{};
+            for (u32 i = 0; i < arg.size; ++i)
+                fmt_args.push_back(scm::printable_t{g_cfg_sys.ctx, arg[i]});
+            fmt::vformat_to(str_buf, (std::string_view) fmt_str, fmt_args);
+        }
+        return str::c_str(g_cfg_sys.buf);
+    }
+
+    static u0 log_notice(str::slice_t* fmt_msg, scm::rest_array_t* rest) {
+        log::notice(vlog(*fmt_msg, *rest));
+    }
+
+    static u0 log_critical(str::slice_t* fmt_msg, scm::rest_array_t* rest) {
+        log::critical(vlog(*fmt_msg, *rest));
+    }
+
+    static u0 log_emergency(str::slice_t* fmt_msg, scm::rest_array_t* rest) {
+        log::emergency(vlog(*fmt_msg, *rest));
     }
 
     static scm::obj_t* log_create_color(scm::ctx_t* ctx, scm::obj_t* arg) {
@@ -705,7 +692,9 @@ namespace basecode::config {
                                                      u0_type,
                                                      (u0*) log_info);
                     ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    auto rest_param = ffi::param::make("rest"_ss, list_type);
+                    rest_param->is_rest = true;
+                    ffi::overload::append(ol, rest_param);
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "log-info"),
@@ -718,7 +707,9 @@ namespace basecode::config {
                                                      u0_type,
                                                      (u0*) log_warn);
                     ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    auto rest_param = ffi::param::make("rest"_ss, list_type);
+                    rest_param->is_rest = true;
+                    ffi::overload::append(ol, rest_param);
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "log-warn"),
@@ -731,7 +722,9 @@ namespace basecode::config {
                                                      u0_type,
                                                      (u0*) log_error);
                     ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    auto rest_param = ffi::param::make("rest"_ss, list_type);
+                    rest_param->is_rest = true;
+                    ffi::overload::append(ol, rest_param);
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "log-error"),
@@ -744,7 +737,9 @@ namespace basecode::config {
                                                      u0_type,
                                                      (u0*) log_alert);
                     ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    auto rest_param = ffi::param::make("rest"_ss, list_type);
+                    rest_param->is_rest = true;
+                    ffi::overload::append(ol, rest_param);
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "log-alert"),
@@ -757,7 +752,9 @@ namespace basecode::config {
                                                      u0_type,
                                                      (u0*) log_debug);
                     ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    auto rest_param = ffi::param::make("rest"_ss, list_type);
+                    rest_param->is_rest = true;
+                    ffi::overload::append(ol, rest_param);
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "log-debug"),
@@ -770,7 +767,9 @@ namespace basecode::config {
                                                      u0_type,
                                                      (u0*) log_notice);
                     ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    auto rest_param = ffi::param::make("rest"_ss, list_type);
+                    rest_param->is_rest = true;
+                    ffi::overload::append(ol, rest_param);
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "log-notice"),
@@ -783,7 +782,9 @@ namespace basecode::config {
                                                      u0_type,
                                                      (u0*) log_critical);
                     ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    auto rest_param = ffi::param::make("rest"_ss, list_type);
+                    rest_param->is_rest = true;
+                    ffi::overload::append(ol, rest_param);
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "log-critical"),
@@ -796,7 +797,9 @@ namespace basecode::config {
                                                      u0_type,
                                                      (u0*) log_emergency);
                     ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("rest"_ss, list_type));
+                    auto rest_param = ffi::param::make("rest"_ss, list_type);
+                    rest_param->is_rest = true;
+                    ffi::overload::append(ol, rest_param);
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "log-emergency"),

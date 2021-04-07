@@ -47,7 +47,7 @@ namespace basecode {
 
     struct error_report_t final {
         buf_t*                  buf;
-        fmt_arg_t               args[max_report_args_count];
+        fmt_dyn_args_t          args;
         time_t                  ts;
         source_info_t           src_info;
         u32                     id;
@@ -75,7 +75,7 @@ namespace basecode {
                 u0 add_arg(error_report_t* report, const T& arg) {
                     if (report->args_size == max_report_args_count - 1)
                         return;
-                    report->args[report->args_size++] = fmt::detail::make_arg<fmt_ctx_t>(arg);
+                    report->args.push_back(arg);
                 }
             }
 
@@ -93,7 +93,8 @@ namespace basecode {
             u0 add_src(Error_Id auto id,
                        error_report_level_t level,
                        buf_t* buf,
-                       const source_info_t& src_info, Args&&... args) {
+                       const source_info_t& src_info,
+                       Args&&... args) {
                 auto report = append();
                 report->type      = error_report_type_t::source;
                 report->level     = level;

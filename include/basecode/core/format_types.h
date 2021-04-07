@@ -50,5 +50,6 @@ namespace basecode {
     using fmt_arg_t         = fmt::basic_format_arg<fmt_ctx_t>;
     using fmt_args_t        = fmt::format_args;
     using fmt_alloc_t       = std_alloc_t<char>;
+    using fmt_dyn_args_t    = fmt::dynamic_format_arg_store<fmt_ctx_t>;
     using fmt_buf_t         = fmt::basic_memory_buffer<char, fmt::inline_buffer_size, fmt_alloc_t>;
 }

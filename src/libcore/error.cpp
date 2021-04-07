@@ -51,9 +51,7 @@ namespace basecode::error {
                 format::format_to(str_buf, "ERROR: ");
                 break;
         }
-        fmt::vformat_to(str_buf,
-                        fmt_msg,
-                        fmt_args_t(report.args, report.args_size));
+        fmt::vformat_to(str_buf, fmt_msg, report.args);
         format::format_to(str_buf, "\n");
     }
 
@@ -90,9 +88,7 @@ namespace basecode::error {
                                       "\n{:<{}}^ ",
                                       " ",
                                       10 + report.src_info.start.column);
-                    fmt::vformat_to(str_buf,
-                                    fmt_msg,
-                                    fmt_args_t(report.args, report.args_size));
+                    fmt::vformat_to(str_buf, fmt_msg, report.args);
                     term::emit_color_reset(str_buf);
                 }
             } else {

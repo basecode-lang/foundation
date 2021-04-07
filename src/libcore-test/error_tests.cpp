@@ -45,8 +45,16 @@ TEST_CASE("basecode::error add & find") {
     REQUIRE(def->code == test_code);
     REQUIRE(def->locale == en_gb_lc);
 
-    error::report::add(error_id, error_report_level_t::error, "hello world!", 13, "foo"_ss);
-    error::report::add(error_id, error_report_level_t::error, "test", 42.111, "bar"_ss);
+    error::report::add(error_id,
+                       error_report_level_t::error,
+                       "hello world!",
+                       13,
+                       "foo"_ss);
+    error::report::add(error_id,
+                       error_report_level_t::error,
+                       "test",
+                       42.111,
+                       "bar"_ss);
 
     error::report::print_range(0, error::report::count());
 }
@@ -70,19 +78,6 @@ TEST_CASE("basecode::error source formatted", "[source_formatted]") {
 };
 )"_ss;
 
-    // N.B. in release builds passing literal str::slice_t (e.g. via "foo"_ss)
-    //      as a format argument to add or add_src can result in segfaults because
-    //      the compiler tries to be too clever and elide out the const
-    //      temporary.
-    //
-    //      passing a cstr literal is OK because the compiler doesn't optimize
-    //      these away if they're referenced anywhere.
-    //
-    //      in this case, hoisting the slices into local variables in a parent
-    //      scope solves the issue.
-    auto foo_arg = "foo"_ss;
-    auto defer_arg = "defer"_ss;
-
     buf_t buf{};
     buf::init(buf);
     defer(buf::free(buf));
@@ -98,7 +93,7 @@ TEST_CASE("basecode::error source formatted", "[source_formatted]") {
                                error_report_level_t::error,
                                &buf,
                                src_info,
-                               foo_arg);        // N.B. beware format argument elision
+                               "foo");
     }
     auto start_id = error::report::count() - 1;
 
@@ -111,11 +106,11 @@ TEST_CASE("basecode::error source formatted", "[source_formatted]") {
                                error_report_level_t::error,
                                &buf,
                                src_info,
-                               defer_arg);      // N.B. beware format argument elision
+                               "defer");
     }
 
     str_t fmt_buf{};
     str::init(fmt_buf);
     error::report::format_range(fmt_buf, start_id, start_id + 2);
-//    format::print("{}", fmt_buf);
+    format::print("{}", fmt_buf);
 }

@@ -207,10 +207,29 @@ namespace basecode::ffi {
         }
 
         overload_t* match_signature(proto_t* proto, const u8* buf, u32 len) {
-            overload_t* ol{};
-            if (!symtab::find(proto->overloads, slice::make(buf, len), ol))
-                return nullptr;
-            return ol;
+            assoc_array_t<overload_t*> pairs{};
+            assoc_array::init(pairs, g_ffi_system.alloc);
+            defer(assoc_array::free(pairs));
+
+            auto prefix = slice::make(buf, len);
+        retry:
+            symtab::find_prefix(proto->overloads, pairs, prefix);
+
+            if (pairs.size == 1)
+                return pairs[0].value;
+            else if (pairs.size > 1) {
+                for (u32 i = 0; i < pairs.size; ++i) {
+                    const auto& pair = pairs[i];
+                    if (pair.value->has_rest)
+                        return pair.value;
+                }
+            } else {
+                if (prefix.length > 0) {
+                    prefix.length -= 2;
+                    goto retry;
+                }
+            }
+            return nullptr;
         }
     }
 
@@ -244,14 +263,17 @@ namespace basecode::ffi {
             array::append(overload->params, param);
             if (overload->key_len > 14)
                 return status_t::parameter_overflow;
-            overload->key[overload->key_len++] = param->value.type.user != 0 ?
-                param->value.type.user :
-                u8(param->value.type.cls);
-            overload->key[overload->key_len++] = u8(param->value.type.size);
-            if (param->is_rest)
+            if (param->is_rest) {
                 overload->has_rest = true;
-            if (!param->has_dft)
-                ++overload->req_count;
+                overload->key[overload->key_len++] = '_';
+            } else {
+                overload->key[overload->key_len++] = param->value.type.user != 0 ?
+                    param->value.type.user :
+                    u8(param->value.type.cls);
+                overload->key[overload->key_len++] = u8(param->value.type.size);
+                if (!param->has_dft)
+                    ++overload->req_count;
+            }
             return status_t::ok;
         }
 
@@ -367,6 +389,7 @@ namespace basecode::ffi {
                     case param_size_t::qword:   ret.qw = dcCallLongLong(ffi.vm, ol->func);   break;
                 }
                 break;
+            case param_cls_t::void_:            dcCallVoid(ffi.vm, ol->func); ret.qw = {};   break;
             case param_cls_t::float_:
                 switch (ol->ret_type.size) {
                     case param_size_t::dword:   ret.fdw = dcCallFloat(ffi.vm, ol->func);     break;

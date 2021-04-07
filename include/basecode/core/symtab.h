@@ -369,7 +369,8 @@ namespace basecode {
                 auto node = GET_NODE(table, next_node_id);
                 while (node) {
                     if (node->sym == prefix[i]) {
-                        next_node_id = node->child;
+                        if (node->child)
+                            next_node_id = node->child;
                         break;
                     }
                     if (!node->next)

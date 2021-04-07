@@ -38,6 +38,7 @@ namespace basecode::scm {
     using flonum_t              = f32;
 
     using obj_stack_t           = stack_t<obj_t*>;
+    using rest_array_t          = array_t<obj_t*>;
     using error_func_t          = u0 (*)(ctx_t*, const s8*, obj_t*);
     using native_func_t         = obj_t* (*)(ctx_t*, obj_t*);
 
