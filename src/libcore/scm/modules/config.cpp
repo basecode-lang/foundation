@@ -453,35 +453,23 @@ namespace basecode::config {
         return scm::make_user_ptr(ctx, logger);
     }
 
-    static scm::obj_t* log_create_basic_file(scm::ctx_t* ctx, scm::obj_t* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
-
+    static scm::obj_t* log_create_basic_file(str::slice_t* file_name,
+                                             str::slice_t* name = {},
+                                             str::slice_t* pattern = {},
+                                             str::slice_t* maskv = {}) {
         log_level_t mask = log_level_t::debug;
         spdlog_basic_file_config_t config{};
-        scm::obj_t* name;
-        if (symtab::find(args, "#:name"_ss, name))
-            config.name = scm::to_string(ctx, name);
-        else
-            config.name = string::interned::fold("basic-file"_ss);
-
-        scm::obj_t* pattern;
-        if (symtab::find(args, "#:pattern"_ss, pattern))
-            config.pattern = scm::to_string(ctx, pattern);
-
-        scm::obj_t* maskv;
-        if (symtab::find(args, "#:mask"_ss, maskv)) {
-            auto ll = find_log_level(scm::to_string(ctx, maskv));
+        config.name = name ? *name : string::interned::fold("basic-file"_ss);
+        config.pattern = pattern ? *pattern : str::slice_t{};
+        if (maskv) {
+            auto ll = find_log_level(*maskv);
             if (ll == -1)
-                scm::error(ctx, "#:mask invalid log level symbol");
+                scm::error(g_cfg_sys.ctx, "#:mask invalid log level symbol");
             mask = log_level_t(ll);
         }
 
-        auto file_name = scm::to_string(ctx, get_map_arg(args, 0));
         path_t log_path{};
-        adjust_log_path(log_path, file_name);
+        adjust_log_path(log_path, *file_name);
         defer(path::free(log_path));
         config.file_name = string::interned::fold(log_path.str);
 
@@ -491,9 +479,9 @@ namespace basecode::config {
                                         &config,
                                         mask);
         if (!OK(status))
-            scm::error(ctx, "failed to create basic file logger");
+            scm::error(g_cfg_sys.ctx, "failed to create basic file logger");
 
-        return scm::make_user_ptr(ctx, logger);
+        return scm::make_user_ptr(g_cfg_sys.ctx, logger);
     }
 
     static scm::obj_t* log_create_rotating_file(scm::ctx_t* ctx, scm::obj_t* arg) {
@@ -557,7 +545,7 @@ namespace basecode::config {
     static kernel_func_t s_kernel_funcs[] = {
         {"log-create-color",         log_create_color},
         {"log-create-daily-file",    log_create_daily_file},
-        {"log-create-basic-file",    log_create_basic_file},
+//        {"log-create-basic-file",    log_create_basic_file},
         {"log-create-rotating-file", log_create_rotating_file},
         {"logger-append-child",      logger_append_child},
         {"syslog-create",            syslog_create},
@@ -847,6 +835,34 @@ namespace basecode::config {
                     ffi::proto::append(proto, ol);
                     scm::set(g_cfg_sys.ctx,
                              scm::make_symbol(g_cfg_sys.ctx, "current-command-line"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_create_basic_file"_ss);
+                    auto ol    = ffi::overload::make("log_create_basic_file"_ss,
+                                                     obj_type,
+                                                     (u0*) log_create_basic_file);
+                    ffi::overload::append(ol, ffi::param::make("file_name"_ss, slice_type));
+
+                    auto name_kwd = ffi::param::make("name"_ss, slice_type);
+                    name_kwd->has_dft       = true;
+                    name_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, name_kwd);
+
+                    auto pattern_kwd = ffi::param::make("pattern"_ss, slice_type);
+                    pattern_kwd->has_dft       = true;
+                    pattern_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, pattern_kwd);
+
+                    auto mask_kwd = ffi::param::make("mask"_ss, slice_type);
+                    mask_kwd->has_dft       = true;
+                    mask_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, mask_kwd);
+
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-create-basic-file"),
                              scm::make_ffi(g_cfg_sys.ctx, proto));
                 }
             }

@@ -103,7 +103,9 @@ namespace basecode {
         param_type_t            ret_type;
         u32                     key_len;
         u32                     req_count;
-        b8                      has_rest;
+        u8                      has_dft:    1;
+        u8                      has_rest:   1;
+        u8                      pad:        6;
         call_mode_t             mode;
     };
 

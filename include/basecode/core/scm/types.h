@@ -105,6 +105,7 @@ namespace basecode::scm {
     using symbol_table_t        = hashtab_t<u32, obj_t*>;
     using string_table_t        = hashtab_t<u32, obj_t*>;
     using access_array_t        = array_t<var_access_t>;
+    using keyword_table_t       = hashtab_t<str::slice_t, obj_t*>;
     using comment_array_t       = array_t<comment_t>;
 
     enum class status_t : u8 {

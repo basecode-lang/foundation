@@ -273,6 +273,8 @@ namespace basecode::ffi {
                 overload->key[overload->key_len++] = u8(param->value.type.size);
                 if (!param->has_dft)
                     ++overload->req_count;
+                else
+                    overload->has_dft = true;
             }
             return status_t::ok;
         }

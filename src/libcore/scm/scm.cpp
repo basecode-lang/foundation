@@ -117,12 +117,13 @@ namespace basecode::scm {
 
     static obj_t* make_object(ctx_t* ctx);
 
+    static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b);
+
     static u32 make_ffi_signature(ctx_t* ctx,
                                   obj_t* args,
                                   obj_t* env,
-                                  u8* buf);
-
-    static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b);
+                                  u8* buf,
+                                  keyword_table_t& keywords);
 
     static num_type_t get_numtype(const s8* buf, s32 len);
 
@@ -405,17 +406,26 @@ namespace basecode::scm {
     static u32 make_ffi_signature(ctx_t* ctx,
                                   obj_t* args,
                                   obj_t* env,
-                                  u8* buf) {
+                                  u8* buf,
+                                  keyword_table_t& keywords) {
         u32 len{};
         if (IS_NIL(args)) {
             buf[len++] = u8(param_cls_t::void_);
             return len;
         }
         while (!IS_NIL(args)) {
-            const auto type = TYPE(EVAL(CAR(args)));
-            const auto& mapping = s_types[u32(type)];
-            buf[len++] = mapping.type;
-            buf[len++] = mapping.size;
+            auto va = EVAL(CAR(args));
+            const auto type = TYPE(va);
+            if (type == obj_type_t::keyword) {
+                if (IS_NIL(CDR(args)))
+                    error(ctx, "ffi: argument value expected after keyword");
+                args = CDR(args);
+                hashtab::insert(keywords, to_string(ctx, va), EVAL(CAR(args)));
+            } else {
+                const auto& mapping = s_types[u32(type)];
+                buf[len++] = mapping.type;
+                buf[len++] = mapping.size;
+            }
             args = CDR(args);
         }
         return len;
@@ -913,26 +923,50 @@ namespace basecode::scm {
 
             case obj_type_t::ffi: {
                 auto proto = PROTO(fn);
-                auto ol = ffi::proto::match_signature(proto,
-                                                      buf,
-                                                      make_ffi_signature(ctx, arg, env, buf));
-                if (!ol)
-                    error(ctx, "ffi: no matching overload for function: {}", proto->name);
+                keyword_table_t keywords{};
+                hashtab::init(keywords, ctx->alloc);
+                auto ol = ffi::proto::match_signature(
+                    proto,
+                    buf,
+                    make_ffi_signature(ctx, arg, env, buf, keywords));
+                if (!ol) {
+                    error(ctx,
+                          "ffi: no matching overload for function: {}",
+                          proto->name);
+                }
                 n = 0;
                 rest_array_t rest{};
                 array::init(rest, ctx->alloc);
                 ffi::reset(ctx->ffi);
                 while (!IS_NIL(arg)) {
-                    if (n >= ol->req_count) {
-                        if (!ol->has_rest)
-                            error(ctx, "ffi: too many arguments: {}@{}", ol->name, proto->name);
-                        array::append(rest, EVAL(CAR(arg)));
-                        ++n;
-                        arg = CDR(arg);
-                        continue;
+                    if (n >= ol->params.size) {
+                        error(ctx,
+                              "ffi: too many arguments: {}@{}",
+                              ol->name,
+                              proto->name);
                     }
                     auto& param = ol->params[n];
-                    va = EVAL(CAR(arg));
+                    if (n >= ol->req_count) {
+                        if (param->has_dft && keywords.size > 0) {
+                            va = hashtab::find(keywords, param->name);
+                            if (!va)
+                                va = EVAL(CAR(arg));
+                        } else if (ol->has_rest) {
+                            array::append(rest, EVAL(CAR(arg)));
+                            if (n < ol->params.size - 1)
+                                ++n;
+                            arg = CDR(arg);
+                            continue;
+                        } else {
+                            error(ctx,
+                                  "ffi: too many arguments: {}@{}",
+                                  ol->name,
+                                  proto->name);
+                        }
+                    }
+                    else {
+                        va = EVAL(CAR(arg));
+                    }
                     switch (TYPE(va)) {
                         case obj_type_t::nil:
                             ffi::push(ctx->ffi, (u0*) nullptr);
@@ -1010,11 +1044,16 @@ namespace basecode::scm {
                     arg = CDR(arg);
                     ++n;
                 }
-                if (ol->has_rest)
+                if (ol->has_rest) {
                     ffi::push(ctx->ffi, &rest);
+                } else if (ol->has_dft) {
+                    for (u32 i = n; i < ol->params.size; ++i)
+                        ffi::push(ctx->ffi, ol->params[i]->value);
+                }
                 param_alias_t ret{};
                 auto status = ffi::call(ctx->ffi, ol, ret);
                 array::free(rest);
+                hashtab::free(keywords);
                 if (!OK(status))
                     error(ctx, "ffi: call failed: {}", ol->name);
                 switch (ol->ret_type.cls) {
