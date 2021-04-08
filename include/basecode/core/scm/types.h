@@ -502,10 +502,4 @@ FORMAT_TYPE(basecode::scm::bb_t,
                         data.emit->strtab[data.str_id - 1],
                         data.id));
 
-FORMAT_TYPE(basecode::scm::var_t,
-            format_to(ctx.out(),
-                      "{}@{}",
-                      *basecode::string::interned::get_slice(data.symbol),
-                      data.version));
-
 #pragma clang diagnostic pop

@@ -386,8 +386,8 @@ namespace basecode::scm {
 
         auto& bb = vm::emitter::make_basic_block(ctx->compiler.emit, "eval2"_ss, {});
         vm::emitter::virtual_var::declare(ctx->compiler.emit, "_"_ss);
-        vm::emitter::virtual_var::declare(ctx->compiler.emit, "tmp"_ss);
         vm::emitter::virtual_var::declare(ctx->compiler.emit, "res"_ss);
+        vm::emitter::virtual_var::declare(ctx->compiler.emit, "lit"_ss);
         vm::emitter::virtual_var::declare(ctx->compiler.emit, "base"_ss);
 
         TIME_BLOCK(

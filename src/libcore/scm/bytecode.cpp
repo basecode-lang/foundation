@@ -1125,52 +1125,133 @@ namespace basecode::scm {
             status_t create_dot(emitter_t& e, const path_t& path) {
                 using namespace graphviz;
 
+                graph_t bb_sg{};
+                graph::init(bb_sg, graph_type_t::directed, "bb"_ss);
+
+                graph_t var_sg{};
+                graph::init(var_sg, graph_type_t::directed, "vvar"_ss);
+
                 graph_t g{};
-                graph::init(g, graph_type_t::directed, "emitter model"_ss);
-                defer(graph::free(g));
+                graph::init(g, graph_type_t::directed, "compiler"_ss);
+                graph::node_sep(g, 1);
+                graph::add_cluster_subgraph(g, &bb_sg);
+                graph::add_cluster_subgraph(g, &var_sg);
+                defer(
+                    graph::free(g);
+                    graph::free(bb_sg);
+                    graph::free(var_sg));
 
-                bb_digraph_t::Node_Array nodes{};
-                array::init(nodes, e.alloc);
-                defer(array::free(nodes));
+                u32 block_node_ids[e.bb_graph.size];
+                {
+                    bb_digraph_t::Node_Array nodes{};
+                    array::init(nodes, e.alloc);
+                    defer(array::free(nodes));
 
-                for (auto bb_node : e.bb_graph.nodes) {
-                    auto node = graph::make_node(g);
-                    node::label(*node, format::format("block: {}", *(bb_node->value)));
-                    node::shape(*node, shape_t::record);
-                    node::style(*node, node_style_t::filled);
-                    node::fill_color(*node, color_t::aliceblue);
-
-                    array::reset(nodes);
-                    digraph::incoming_nodes(e.bb_graph, bb_node, nodes);
-                    for (auto incoming : nodes) {
-                        auto edge = graph::make_edge(g);
-                        edge->first  = incoming->id;
-                        edge->second = bb_node->id;
-                        edge::label(*edge, "pred"_ss);
-                        edge::style(*edge, edge_style_t::dotted);
-                        edge::dir(*edge, dir_type_t::back);
+                    for (auto bb_node : e.bb_graph.nodes) {
+                        auto block_node = graph::make_node(bb_sg);
+                        block_node_ids[bb_node->id - 1] = block_node->id;
+                        node::label(*block_node, format::format(
+                            "block: {}",
+                            *(bb_node->value)));
+                        node::shape(*block_node, shape_t::record);
+                        node::style(*block_node, node_style_t::filled);
+                        node::fill_color(*block_node, color_t::aliceblue);
                     }
 
-                    array::reset(nodes);
-                    digraph::outgoing_nodes(e.bb_graph, bb_node, nodes);
-                    for (auto outgoing : nodes) {
-                        auto edge = graph::make_edge(g);
-                        edge->first  = bb_node->id;
-                        edge->second = outgoing->id;
-                        edge::label(*edge, "succ"_ss);
-                        edge::dir(*edge, dir_type_t::forward);
-                    }
+                    for (auto bb_node : e.bb_graph.nodes) {
+                        array::reset(nodes);
+                        digraph::incoming_nodes(e.bb_graph, bb_node, nodes);
+                        for (auto incoming : nodes) {
+                            auto edge = graph::make_edge(bb_sg);
+                            edge->first  = block_node_ids[incoming->id - 1];
+                            edge->second = block_node_ids[bb_node->id - 1];
+                            edge::label(*edge, "pred"_ss);
+                            edge::style(*edge, edge_style_t::dotted);
+                            edge::dir(*edge, dir_type_t::back);
+                        }
 
-                    if (bb_node->value->next) {
-                        auto straight_edge = graph::make_edge(g);
-                        straight_edge->first  = bb_node->id;
-                        straight_edge->second = bb_node->value->next->node->id;
-                        edge::label(*straight_edge, "next"_ss);
-                        edge::dir(*straight_edge, dir_type_t::forward);
-                        edge::color(*straight_edge, color_t::lightblue);
-                        edge::style(*straight_edge, edge_style_t::dashed);
+                        array::reset(nodes);
+                        digraph::outgoing_nodes(e.bb_graph, bb_node, nodes);
+                        for (auto outgoing : nodes) {
+                            auto edge = graph::make_edge(bb_sg);
+                            edge->first  = block_node_ids[bb_node->id - 1];
+                            edge->second = block_node_ids[outgoing->id - 1];
+                            edge::label(*edge, "succ"_ss);
+                            edge::dir(*edge, dir_type_t::forward);
+                        }
+
+                        if (bb_node->value->next) {
+                            auto straight_edge = graph::make_edge(bb_sg);
+                            straight_edge->first  = block_node_ids[bb_node->id - 1];
+                            straight_edge->second = block_node_ids[bb_node->value->next->node->id - 1];
+                            edge::label(*straight_edge, "next"_ss);
+                            edge::dir(*straight_edge, dir_type_t::forward);
+                            edge::color(*straight_edge, color_t::lightblue);
+                            edge::style(*straight_edge, edge_style_t::dashed);
+                        }
                     }
                 }
+
+                {
+                    u32 var_node_ids[e.var_graph.size];
+                    var_digraph_t::Node_Array nodes{};
+                    array::init(nodes, e.alloc);
+                    defer(array::free(nodes));
+
+                    str_t str{};
+                    str::init(str, e.alloc);
+                    for (auto vv_node : e.var_graph.nodes) {
+                        auto var_node = graph::make_node(var_sg);
+                        var_node_ids[vv_node->id - 1] = var_node->id;
+                        {
+                            str::reset(str); {
+                                str_buf_t buf{&str};
+                                auto var = vv_node->value;
+                                format::format_to(buf, "{}", *var);
+//                                if (var->accesses.size > 0) {
+//                                    format::format_to(buf, "\n");
+//                                    for (u32 i = 0; i < var->accesses.size; ++i) {
+//                                        if (i > 0) format::format_to(buf, "\n");
+//                                        const auto& ac = var->accesses[i];
+//                                        format::format_to(buf,
+//                                                       "{}({})",
+//                                                       virtual_var::access_type::name(ac.type),
+//                                                       ac.inst_id);
+//                                    }
+//                                }
+                            }
+                        }
+                        node::label(*var_node, str);
+                        node::shape(*var_node, shape_t::component);
+                        node::style(*var_node, node_style_t::filled);
+                        node::fill_color(*var_node, color_t::lavender);
+                    }
+
+                    for (auto vv_node : e.var_graph.nodes) {
+                        array::reset(nodes);
+                        digraph::outgoing_nodes(e.var_graph, vv_node, nodes);
+                        for (auto outgoing : nodes) {
+                            auto edge = graph::make_edge(var_sg);
+                            edge->first  = var_node_ids[vv_node->id - 1];
+                            edge->second = var_node_ids[outgoing->id - 1];
+//                            edge::tail_label(*edge, "next"_ss);
+                            edge::dir(*edge, dir_type_t::both);
+                            edge::arrow_tail(*edge, arrow_type_t::dot);
+                            edge::arrow_head(*edge, arrow_type_t::normal);
+                        }
+//                        auto var = vv_node->value;
+//                        for (const auto& ac : var->accesses) {
+//                            const auto& inst = e.insts[ac.inst_id];
+//                            auto edge = graph::make_edge(g);
+//                            edge->first  = block_node_ids[inst.block_id - 1];
+//                            edge->second = var_node_ids[vv_node->id - 1];
+//                            edge::head_label(*edge, virtual_var::access_type::name(ac.type));
+//                            edge::color(*edge, color_t::pink);
+//                            edge::dir(*edge, dir_type_t::forward);
+//                        }
+                    }
+                }
+
 
                 buf_t buf{};
                 buf.mode = buf_mode_t::alloc;
@@ -1367,9 +1448,20 @@ namespace basecode::scm {
                                    obj_t* args) {
                 auto ctx  = c.ctx;
                 auto proc = PROC(form);
+                auto tmp       = emitter::virtual_var::get(comp.emit, "_"_ss);
                 auto base_addr = emitter::virtual_var::get(comp.emit, "base"_ss);
                 auto& apply_bb = emitter::make_basic_block(comp.emit, "apply"_ss, c.bb);
-                push_env(comp, apply_bb);
+                basic_block::encode(apply_bb)
+                    .reg2()
+                        .op(op::env)
+                        .src(rf::ep)
+                        .dst(&tmp)
+                        .build()
+                    .reg2()
+                        .op(op::push)
+                        .src(&tmp)
+                        .dst(rf::ep)
+                        .build();
                 alloc_stack(apply_bb, 1, &base_addr);
                 auto keys = proc->params;
                 auto vals = args;
@@ -1418,7 +1510,9 @@ namespace basecode::scm {
                         .build();
 
                 auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto& cleanup_bb = emitter::make_basic_block(comp.emit, "apply_cleanup"_ss, vc.bb);
+                auto& cleanup_bb = emitter::make_basic_block(comp.emit,
+                                                             "apply_cleanup"_ss,
+                                                             vc.bb);
                 basic_block::encode(cleanup_bb)
                     .comment("load return value from proc call"_ss)
                     .offs()
@@ -1428,7 +1522,13 @@ namespace basecode::scm {
                         .offset(0)
                         .build();
                 free_stack(cleanup_bb, 1);
-                pop_env(comp, cleanup_bb);
+                basic_block::encode(cleanup_bb)
+                    .comment("drop apply env"_ss)
+                    .reg2()
+                        .op(op::pop)
+                        .src(rf::ep)
+                        .dst(&tmp)
+                        .build();
                 return {&cleanup_bb, res};
             }
 
@@ -1492,32 +1592,6 @@ namespace basecode::scm {
 
                 proc->is_compiled = true;
                 return {&leave(*bc.bb), res};
-            }
-
-            u0 pop_env(compiler_t& comp, bb_t& bb) {
-                auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
-                basic_block::encode(bb)
-                    .comment("drop apply env"_ss)
-                    .reg2()
-                        .op(op::pop)
-                        .src(rf::ep)
-                        .dst(&tmp)
-                        .build();
-            }
-
-            u0 push_env(compiler_t& comp, bb_t& bb) {
-                auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
-                basic_block::encode(bb)
-                    .reg2()
-                        .op(op::env)
-                        .src(rf::ep)
-                        .dst(&tmp)
-                        .build()
-                    .reg2()
-                        .op(op::push)
-                        .src(&tmp)
-                        .dst(rf::ep)
-                        .build();
             }
 
             compile_result_t prim(compiler_t& comp,
@@ -1737,23 +1811,27 @@ namespace basecode::scm {
 
             compile_result_t self_eval(compiler_t& comp, const context_t& c) {
                 auto ctx = c.ctx;
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
+                auto lit = emitter::virtual_var::get(comp.emit, "lit"_ss);
                 basic_block::encode(c.bb)
-                    .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)))
+                    .comment(format::format(
+                        "literal: {}",
+                        scm::to_string(c.ctx, c.obj)))
                     .imm2()
                         .op(op::const_)
                         .src(u32(OBJ_IDX(c.obj)))
-                        .dst(&res)
+                        .dst(&lit)
                         .build();
-                return {c.bb, res};
+                return {c.bb, lit};
             }
 
             compile_result_t qt(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
                 auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
+                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
                 basic_block::encode(c.bb)
-                    .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)))
+                    .comment(format::format(
+                        "literal: {}",
+                        scm::to_string(c.ctx, c.obj)))
                     .imm2()
                         .op(op::const_)
                         .src(u32(OBJ_IDX(CAR(args))))
@@ -1769,10 +1847,12 @@ namespace basecode::scm {
 
             compile_result_t qq(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
+                auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
                 auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto tmp = emitter::virtual_var::get(comp.emit, "tmp"_ss);
                 basic_block::encode(c.bb)
-                    .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)))
+                    .comment(format::format(
+                        "literal: {}",
+                        scm::to_string(c.ctx, c.obj)))
                     .imm2()
                         .op(op::const_)
                         .src(u32(OBJ_IDX(CAR(args))))
@@ -1824,7 +1904,9 @@ namespace basecode::scm {
 
             compile_result_t or_(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto& exit_bb = emitter::make_basic_block(comp.emit, "or_exit"_ss, c.bb);
+                auto& exit_bb = emitter::make_basic_block(comp.emit,
+                                                          "or_exit"_ss,
+                                                          c.bb);
                 auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
                 auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
                 auto oc  = c;
@@ -1873,9 +1955,15 @@ namespace basecode::scm {
             compile_result_t if_(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
 
-                auto& true_bb  = emitter::make_basic_block(*c.bb->emit, "if_true"_ss, c.bb);
-                auto& false_bb = emitter::make_basic_block(*c.bb->emit, "if_false"_ss, &true_bb);
-                auto& exit_bb  = emitter::make_basic_block(*c.bb->emit, "if_exit"_ss, &false_bb);
+                auto& true_bb  = emitter::make_basic_block(*c.bb->emit,
+                                                           "if_true"_ss,
+                                                           c.bb);
+                auto& false_bb = emitter::make_basic_block(*c.bb->emit,
+                                                           "if_false"_ss,
+                                                           &true_bb);
+                auto& exit_bb  = emitter::make_basic_block(*c.bb->emit,
+                                                           "if_exit"_ss,
+                                                           &false_bb);
 
                 auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
                 auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
@@ -1996,7 +2084,9 @@ namespace basecode::scm {
                     offs += 8;
                 }
                 auto res  = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto& list_bb = emitter::make_basic_block(*c.bb->emit, "make_list"_ss, lc.bb);
+                auto& list_bb = emitter::make_basic_block(*c.bb->emit,
+                                                          "make_list"_ss,
+                                                          lc.bb);
                 basic_block::encode(list_bb)
                     .reg2_imm()
                         .op(op::list)
@@ -2010,7 +2100,9 @@ namespace basecode::scm {
 
             compile_result_t and_(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
-                auto& exit_bb = emitter::make_basic_block(comp.emit, "and_exit"_ss, c.bb);
+                auto& exit_bb = emitter::make_basic_block(comp.emit,
+                                                          "and_exit"_ss,
+                                                          c.bb);
                 auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
                 auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
                 auto oc  = c;
@@ -2058,7 +2150,9 @@ namespace basecode::scm {
                 auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
                 auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
                 basic_block::encode(c.bb)
-                    .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)))
+                    .comment(format::format(
+                        "literal: {}",
+                        scm::to_string(c.ctx, c.obj)))
                     .imm2()
                         .op(op::const_)
                         .src(u32(OBJ_IDX(args)))

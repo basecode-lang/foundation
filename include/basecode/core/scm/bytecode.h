@@ -213,6 +213,17 @@ namespace basecode::scm {
             u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf);
 
             namespace virtual_var {
+                namespace access_type {
+                    inline str::slice_t name(var_access_type_t type) {
+                        switch (type) {
+                            case var_access_type_t::def:    return "def"_ss;
+                            case var_access_type_t::none:   return "none"_ss;
+                            case var_access_type_t::read:   return "read"_ss;
+                            case var_access_type_t::write:  return "write"_ss;
+                        }
+                    }
+                }
+
                 template <String_Concept T>
                 var_t* get(emitter_t& e, const T& name) {
                     var_t* var{};
@@ -239,6 +250,16 @@ namespace basecode::scm {
                     var->incubate = true;
                     symtab::insert(e.vartab, name, var);
                     return var;
+                }
+
+                inline u0 format_to(fmt_ctx_t& ctx, const var_t* var) {
+                    auto buf = ctx.out();
+                    fmt::format_to(buf,
+                                   "{}",
+                                   *string::interned::get_slice(var->symbol));
+                    if (!var->incubate) {
+                        fmt::format_to(buf, "@{}", var->version);
+                    }
                 }
 
                 inline var_t* latest(emitter_t& e, intern_id symbol) {
@@ -269,27 +290,31 @@ namespace basecode::scm {
                     const auto curr = latest(e, prev->symbol);
                     auto var = &stable_array::append(e.vars);
                     array::init(var->accesses, e.alloc);
-                    var->node = digraph::make_node(e.var_graph, *var);
-                    digraph::make_edge(e.var_graph, prev->node, var->node);
-                    digraph::make_edge(e.var_graph, var->node, prev->node);
-                    if (prev->incubate && curr->incubate) {
-                        auto& ac      = array::append(var->accesses);
-                        ac.type       = var_access_type_t::def;
-                        ac.inst_id    = inst_id;
-                        var->version  = prev->version;
-                        var->incubate = false;
-                    } else {
+                    if (prev->incubate) {
+                        if (curr->incubate) {
+                            auto& ac      = array::append(var->accesses);
+                            ac.type       = var_access_type_t::def;
+                            ac.inst_id    = inst_id;
+                            var->version  = prev->version;
+                        } else {
+                            prev = curr;
+                        }
+                    }
+                    if (!prev->incubate) {
                         var->version = curr->version + 1;
+                        auto& ac = array::append(var->accesses);
+                        ac.type    = var_access_type_t::write;
+                        ac.inst_id = inst_id;
                     }
                     var->symbol  = prev->symbol;
                     var->active  = prev->active;
                     var->spilled = prev->spilled;
-                    auto& ac = array::append(var->accesses);
-                    ac.type    = var_access_type_t::write;
-                    ac.inst_id = inst_id;
+                    var->incubate = false;
                     symtab::set(e.vartab,
                                 *string::interned::get_slice(var->symbol),
                                 var);
+                    var->node = digraph::make_node(e.var_graph, *var);
+                    digraph::make_edge(e.var_graph, prev->node, var->node);
                     return var;
                 }
 
@@ -323,10 +348,6 @@ namespace basecode::scm {
                                  obj_t* sym,
                                  obj_t* form,
                                  obj_t* args);
-
-            u0 pop_env(compiler_t& comp, bb_t& bb);
-
-            u0 push_env(compiler_t& comp, bb_t& bb);
 
             compile_result_t prim(compiler_t& comp,
                                   const context_t& c,
@@ -798,3 +819,7 @@ FORMAT_TYPE(
             break;
         }
     });
+
+FORMAT_TYPE(basecode::scm::var_t,
+            basecode::scm::vm::emitter::virtual_var::format_to(ctx, &data));
+

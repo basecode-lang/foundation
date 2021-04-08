@@ -1007,6 +1007,15 @@ namespace basecode::graphviz {
             [u32(node_style_t::rounded)]        = "rounded"_ss,
         };
 
+        static str::slice_t s_spline_mode_names[] = {
+            [u32(spline_mode_t::none)]          = "none"_ss,
+            [u32(spline_mode_t::spline)]        = "spline"_ss,
+            [u32(spline_mode_t::line)]          = "line"_ss,
+            [u32(spline_mode_t::polyline)]      = "polyline"_ss,
+            [u32(spline_mode_t::ortho)]         = "ortho"_ss,
+            [u32(spline_mode_t::curved)]        = "curved"_ss,
+        };
+
         static str::slice_t s_output_mode_names[] = {
             [u32(output_mode_t::breadth_first)] = "breadthfirst"_ss,
             [u32(output_mode_t::nodes_first )]  = "nodesfirst"_ss,
@@ -1105,6 +1114,10 @@ namespace basecode::graphviz {
 
         str::slice_t node_style_name(node_style_t style) {
             return s_node_style_names[u32(style)];
+        }
+
+        str::slice_t spline_mode_name(spline_mode_t mode) {
+            return s_spline_mode_names[u32(mode)];
         }
 
         str::slice_t output_mode_name(output_mode_t mode) {
@@ -1373,6 +1386,11 @@ namespace basecode::graphviz {
                     format::format_to(mb, "{},{}", attr.value.point.x, attr.value.point.y);
                     break;
                 }
+                case attr_type_t::splines: {
+                    const auto type = spline_mode_t(attr.value.dw);
+                    format::format_to(mb, "{}", spline_mode_name(type));
+                    break;
+                }
                 case attr_type_t::viewport: {
                     const auto& vp = attr.value.viewport;
                     format::format_to(mb, "{},{},{},{},{}", vp.w, vp.h, vp.z, vp.x, vp.y);
@@ -1388,7 +1406,6 @@ namespace basecode::graphviz {
                 case attr_type_t::layer:
                 case attr_type_t::layout:
                 case attr_type_t::layers:
-                case attr_type_t::splines:
                 case attr_type_t::layer_sep:
                 case attr_type_t::shape_file:
                 case attr_type_t::background:
@@ -1886,15 +1903,14 @@ namespace basecode::graphviz {
         status_t init(graph_t& g,
                       graph_type_t type,
                       str::slice_t name,
-                      graph_t* parent,
                       alloc_t* alloc) {
             auto r = string::interned::fold_for_result(name);
             if (!OK(r.status))
                 return status_t::intern_failure;
-            g.alloc  = alloc;
             g.type   = type;
             g.name   = r.id;
-            g.parent = parent;
+            g.alloc  = alloc;
+            g.parent = {};
             str::init(g.scratch, g.alloc);
             str::reserve(g.scratch, 64);
             array::init(g.edges, g.alloc);
@@ -1909,7 +1925,7 @@ namespace basecode::graphviz {
             {
                 str::reset(g.scratch);
                 str_buf_t buf(&g.scratch);
-                format::format_to(buf, "node_{}", g.nodes.size);
+                format::format_to(buf, "node_{}_{}", g.name, g.nodes.size);
             }
             node::init(*node, g.nodes.size, slice::make(g.scratch), g.alloc);
             return node;
@@ -1976,7 +1992,17 @@ namespace basecode::graphviz {
         }
 
         node_t* get_node(graph_t& g, u32 id) {
-            return id == 0 || id > g.nodes.size ? nullptr : &g.nodes[id - 1];
+            if (id == 0)
+                return nullptr;
+            if (id > g.nodes.size) {
+                for (auto sg : g.subgraphs) {
+                    auto found = get_node(*sg, id);
+                    if (found)
+                        return found;
+                }
+                return nullptr;
+            }
+            return &g.nodes[id - 1];
         }
 
         u0 gradient_angle(graph_t& g, u32 v) {
@@ -2004,8 +2030,7 @@ namespace basecode::graphviz {
         }
 
         u0 splines(graph_t& g, spline_mode_t v) {
-            UNUSED(g);
-            UNUSED(v);
+            attr_set::set(g.attrs, attr_type_t::splines, u32(v));
         }
 
         u0 pack_mode(graph_t& g, pack_mode_t v) {
@@ -2017,44 +2042,67 @@ namespace basecode::graphviz {
             UNUSED(v);
         }
 
-        status_t serialize(graph_t& g, buf_t& buf) {
-            mem_buf_t mb{&buf};
+        status_t serialize(graph_t& g, mem_buf_t& mb, u32 indent) {
             auto graph_name = string::interned::get(g.name);
             if (!OK(graph_name.status))
                 return status_t::intern_failure;
-            format::format_to(mb,
-                              g.type == graph_type_t::directed ? "digraph \"{}\" {{\n" : "graph {} {{\n",
-                              graph_name.slice);
+
+            format::format_to(mb, "{:<{}}", " ", indent);
+            if (g.subgraph) {
+                auto leader = g.cluster ?
+                              "subgraph cluster_{} {{\n" :
+                              "subgraph {} {{\n";
+                format::format_to(mb, leader, graph_name.slice);
+            } else {
+                auto leader = g.type == graph_type_t::directed ?
+                              "digraph \"{}\" {{\n" :
+                              "graph \"{}\" {{\n";
+                format::format_to(mb, leader, graph_name.slice);
+            }
 
             for (u32 i = 0; i < g.attrs.values.size; ++i) {
                 if (i > 0) format::format_to(mb, "\n");
-                format::format_to(mb, "\t");
+                format::format_to(mb, "{:<{}}", " ", indent + 3);
                 attr::serialize(g, g.attrs.values[i], mb);
                 format::format_to(mb, ";");
             }
 
-            if (g.nodes.size > 0) {
-                if (g.attrs.values.size > 0)
-                    format::format_to(mb, "\n\n");
-                for (u32 i = 0; i < g.nodes.size; ++i) {
-                    if (i > 0) format::format_to(mb, "\n");
-                    format::format_to(mb, "\t");
-                    node::serialize(g, g.nodes[i], mb);
-                }
+            if ((g.nodes.size > 0 && g.attrs.values.size > 0)
+            ||  g.subgraphs.size > 0) {
+                format::format_to(mb, "\n\n");
             }
 
-            if (g.edges.size > 0) {
-                if (g.nodes.size > 0)
-                    format::format_to(mb, "\n\n");
-                for (u32 i = 0; i < g.edges.size; ++i) {
-                    if (i > 0) format::format_to(mb, "\n");
-                    format::format_to(mb, "\t");
-                    edge::serialize(g, g.edges[i], mb);
-                }
+            for (auto sg : g.subgraphs) {
+                auto status = serialize(*sg, mb, indent + 3);
+                if (!OK(status))
+                    return status;
             }
 
-            format::format_to(mb, "\n}}\n");
+            if (g.nodes.size > 0 && g.attrs.values.size > 0)
+                format::format_to(mb, "\n\n");
+
+            for (u32 i = 0; i < g.nodes.size; ++i) {
+                if (i > 0) format::format_to(mb, "\n");
+                format::format_to(mb, "{:<{}}", " ", indent + 3);
+                node::serialize(g, g.nodes[i], mb);
+            }
+
+            if (g.edges.size > 0 && g.nodes.size > 0)
+                format::format_to(mb, "\n\n");
+
+            for (u32 i = 0; i < g.edges.size; ++i) {
+                if (i > 0) format::format_to(mb, "\n");
+                format::format_to(mb, "{:<{}}", " ", indent + 3);
+                edge::serialize(g, g.edges[i], mb);
+            }
+
+            format::format_to(mb, "\n{:<{}}}}\n", " ", indent);
             return status_t::ok;
+        }
+
+        status_t serialize(graph_t& g, buf_t& buf) {
+            mem_buf_t mb{&buf};
+            return serialize(g, mb, 0);
         }
 
         u0 image_path(graph_t& g, const path_t& v) {
@@ -2082,8 +2130,22 @@ namespace basecode::graphviz {
             attr_set::set(g.attrs, attr_type_t::cluster_rank, u32(v));
         }
 
+        u0 add_subgraph(graph_t& g, graph_t* subgraph) {
+            subgraph->parent   = &g;
+            subgraph->cluster  = false;
+            subgraph->subgraph = true;
+            array::append(g.subgraphs, subgraph);
+        }
+
         u0 label_justification(graph_t& g, justification_t v) {
             attr_set::set(g.attrs, attr_type_t::label_just, u32(v));
+        }
+
+        u0 add_cluster_subgraph(graph_t& g, graph_t* subgraph) {
+            subgraph->parent   = &g;
+            subgraph->cluster  = true;
+            subgraph->subgraph = true;
+            array::append(g.subgraphs, subgraph);
         }
     }
 

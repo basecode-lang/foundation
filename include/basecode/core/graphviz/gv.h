@@ -1197,6 +1197,9 @@ namespace basecode::graphviz {
         str_t                   scratch;
         intern_id               name;
         graph_type_t            type;
+        u8                      subgraph:   1;
+        u8                      cluster:    1;
+        u8                      pad:        6;
     };
 
     namespace attr {
@@ -1592,7 +1595,6 @@ namespace basecode::graphviz {
         status_t init(graph_t& g,
                       graph_type_t type,
                       str::slice_t name,
-                      graph_t* parent = {},
                       alloc_t* alloc = context::top()->alloc);
 
         u0 rank(graph_t& g, rank_type_t v);
@@ -1639,6 +1641,8 @@ namespace basecode::graphviz {
 
         u0 cluster_rank(graph_t& g, cluster_mode_t v);
 
+        u0 add_subgraph(graph_t& g, graph_t* subgraph);
+
         u0 label(graph_t& g, const String_Concept auto& v) {
             attr_set::set(g.attrs, attr_type_t::label, v);
         }
@@ -1653,6 +1657,8 @@ namespace basecode::graphviz {
         u0 comment(graph_t& g, const String_Concept auto& v) {
             attr_set::set(g.attrs, attr_type_t::comment, v);
         }
+
+        u0 add_cluster_subgraph(graph_t& g, graph_t* subgraph);
 
         u0 font_name(graph_t& g, const String_Concept auto& v) {
             attr_set::set(g.attrs, attr_type_t::font_name, v);
