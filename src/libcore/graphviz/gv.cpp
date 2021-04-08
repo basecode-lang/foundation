@@ -1740,8 +1740,8 @@ namespace basecode::graphviz {
 
         u0 serialize(graph_t& g, const edge_t& e, mem_buf_t& mb) {
             const auto node_connector = g.type == graph_type_t::directed ? "->"_ss : "--"_ss;
-            auto lhs = graph::get_node(g, e.first);
-            auto rhs = graph::get_node(g, e.second);
+            auto lhs = graph::get_node(*e.first.graph, e.first.id);
+            auto rhs = graph::get_node(*e.second.graph, e.second.id);
             if (!lhs || !rhs) {
                 format::format_to(mb, "// empty edge: {}", e.id);
                 return;
@@ -1992,17 +1992,7 @@ namespace basecode::graphviz {
         }
 
         node_t* get_node(graph_t& g, u32 id) {
-            if (id == 0)
-                return nullptr;
-            if (id > g.nodes.size) {
-                for (auto sg : g.subgraphs) {
-                    auto found = get_node(*sg, id);
-                    if (found)
-                        return found;
-                }
-                return nullptr;
-            }
-            return &g.nodes[id - 1];
+            return id == 0 || id > g.nodes.size ? nullptr : &g.nodes[id - 1];
         }
 
         u0 gradient_angle(graph_t& g, u32 v) {

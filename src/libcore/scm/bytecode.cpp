@@ -1127,13 +1127,16 @@ namespace basecode::scm {
 
                 graph_t bb_sg{};
                 graph::init(bb_sg, graph_type_t::directed, "bb"_ss);
+                graph::label(bb_sg, "basic blocks"_ss);
 
                 graph_t var_sg{};
                 graph::init(var_sg, graph_type_t::directed, "vvar"_ss);
+                graph::label(var_sg, "virtual variables"_ss);
 
                 graph_t g{};
                 graph::init(g, graph_type_t::directed, "compiler"_ss);
                 graph::node_sep(g, 1);
+                graph::label(g, "IR data structures"_ss);
                 graph::add_cluster_subgraph(g, &bb_sg);
                 graph::add_cluster_subgraph(g, &var_sg);
                 defer(
@@ -1163,8 +1166,8 @@ namespace basecode::scm {
                         digraph::incoming_nodes(e.bb_graph, bb_node, nodes);
                         for (auto incoming : nodes) {
                             auto edge = graph::make_edge(bb_sg);
-                            edge->first  = block_node_ids[incoming->id - 1];
-                            edge->second = block_node_ids[bb_node->id - 1];
+                            edge->first  = graph::node_ref(&bb_sg, block_node_ids[incoming->id - 1]);
+                            edge->second = graph::node_ref(&bb_sg, block_node_ids[bb_node->id - 1]);
                             edge::label(*edge, "pred"_ss);
                             edge::style(*edge, edge_style_t::dotted);
                             edge::dir(*edge, dir_type_t::back);
@@ -1174,19 +1177,19 @@ namespace basecode::scm {
                         digraph::outgoing_nodes(e.bb_graph, bb_node, nodes);
                         for (auto outgoing : nodes) {
                             auto edge = graph::make_edge(bb_sg);
-                            edge->first  = block_node_ids[bb_node->id - 1];
-                            edge->second = block_node_ids[outgoing->id - 1];
+                            edge->first  = graph::node_ref(&bb_sg, block_node_ids[bb_node->id - 1]);
+                            edge->second = graph::node_ref(&bb_sg, block_node_ids[outgoing->id - 1]);
                             edge::label(*edge, "succ"_ss);
                             edge::dir(*edge, dir_type_t::forward);
                         }
 
                         if (bb_node->value->next) {
                             auto straight_edge = graph::make_edge(bb_sg);
-                            straight_edge->first  = block_node_ids[bb_node->id - 1];
-                            straight_edge->second = block_node_ids[bb_node->value->next->node->id - 1];
+                            straight_edge->first  = graph::node_ref(&bb_sg, block_node_ids[bb_node->id - 1]);
+                            straight_edge->second = graph::node_ref(&bb_sg, block_node_ids[bb_node->value->next->node->id - 1]);
                             edge::label(*straight_edge, "next"_ss);
                             edge::dir(*straight_edge, dir_type_t::forward);
-                            edge::color(*straight_edge, color_t::lightblue);
+                            edge::color(*straight_edge, color_t::blue);
                             edge::style(*straight_edge, edge_style_t::dashed);
                         }
                     }
@@ -1232,23 +1235,25 @@ namespace basecode::scm {
                         digraph::outgoing_nodes(e.var_graph, vv_node, nodes);
                         for (auto outgoing : nodes) {
                             auto edge = graph::make_edge(var_sg);
-                            edge->first  = var_node_ids[vv_node->id - 1];
-                            edge->second = var_node_ids[outgoing->id - 1];
-//                            edge::tail_label(*edge, "next"_ss);
+                            edge->first  = graph::node_ref(&var_sg, var_node_ids[vv_node->id - 1]);
+                            edge->second = graph::node_ref(&var_sg, var_node_ids[outgoing->id - 1]);
+                            edge::label(*edge, "next"_ss);
                             edge::dir(*edge, dir_type_t::both);
                             edge::arrow_tail(*edge, arrow_type_t::dot);
                             edge::arrow_head(*edge, arrow_type_t::normal);
                         }
-//                        auto var = vv_node->value;
-//                        for (const auto& ac : var->accesses) {
-//                            const auto& inst = e.insts[ac.inst_id];
-//                            auto edge = graph::make_edge(g);
-//                            edge->first  = block_node_ids[inst.block_id - 1];
-//                            edge->second = var_node_ids[vv_node->id - 1];
-//                            edge::head_label(*edge, virtual_var::access_type::name(ac.type));
-//                            edge::color(*edge, color_t::pink);
-//                            edge::dir(*edge, dir_type_t::forward);
-//                        }
+                        auto var = vv_node->value;
+                        for (const auto& ac : var->accesses) {
+                            if (ac.type != var_access_type_t::def)
+                                continue;
+                            const auto& inst = e.insts[ac.inst_id];
+                            auto edge = graph::make_edge(g);
+                            edge->first  = graph::node_ref(&bb_sg, block_node_ids[inst.block_id - 1]);
+                            edge->second = graph::node_ref(&var_sg, var_node_ids[vv_node->id - 1]);
+                            edge::label(*edge, virtual_var::access_type::name(ac.type));
+                            edge::color(*edge, color_t::darkgreen);
+                            edge::dir(*edge, dir_type_t::forward);
+                        }
                     }
                 }
 

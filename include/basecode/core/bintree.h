@@ -103,8 +103,8 @@ namespace basecode {
                                            u32 second,
                                            str::slice_t label = {}) {
             auto e = graphviz::graph::make_edge(g);
-            e->first  = first;
-            e->second = second;
+            e->first  = graphviz::graph::node_ref(&g, first);
+            e->second = graphviz::graph::node_ref(&g, second);
             if (!slice::empty(label))
                 graphviz::edge::label(*e, label);
             graphviz::edge::arrow_size(*e, .5f);

@@ -1180,10 +1180,15 @@ namespace basecode::graphviz {
         u32                     id;
     };
 
+    struct node_ref_t final {
+        graph_t*                graph;
+        u32                     id;
+    };
+
     struct edge_t final {
         attr_set_t              attrs;
-        u32                     first;
-        u32                     second;
+        node_ref_t              first;
+        node_ref_t              second;
         u32                     id;
     };
 
@@ -1642,6 +1647,10 @@ namespace basecode::graphviz {
         u0 cluster_rank(graph_t& g, cluster_mode_t v);
 
         u0 add_subgraph(graph_t& g, graph_t* subgraph);
+
+        constexpr node_ref_t node_ref(graph_t* g, u32 id) {
+            return {g, id};
+        }
 
         u0 label(graph_t& g, const String_Concept auto& v) {
             attr_set::set(g.attrs, attr_type_t::label, v);

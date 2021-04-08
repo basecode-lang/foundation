@@ -25,40 +25,42 @@
 using namespace basecode;
 
 TEST_CASE("basecode::graphviz basics") {
-    graphviz::graph_t g{};
-    graphviz::graph::init(g, graphviz::graph_type_t::directed, "test"_ss);
-    defer(graphviz::graph::free(g));
+    using namespace graphviz;
 
-    auto root = graphviz::graph::make_node(g);
-    graphviz::node::label(*root, "root"_ss);
-    graphviz::node::style(*root, graphviz::node_style_t::filled);
-    graphviz::node::fill_color(*root, graphviz::color_t::aliceblue);
+    graph_t g{};
+    graph::init(g, graph_type_t::directed, "test"_ss);
+    defer(graph::free(g));
 
-    auto lhs  = graphviz::graph::make_node(g);
-    graphviz::node::label(*lhs, "lhs"_ss);
-    graphviz::node::style(*lhs, graphviz::node_style_t::filled);
-    graphviz::node::fill_color(*lhs, graphviz::color_t::pink);
+    auto root = graph::make_node(g);
+    node::label(*root, "root"_ss);
+    node::style(*root, node_style_t::filled);
+    node::fill_color(*root, color_t::aliceblue);
 
-    auto rhs  = graphviz::graph::make_node(g);
-    graphviz::node::label(*rhs, "rhs"_ss);
-    graphviz::node::style(*rhs, graphviz::node_style_t::filled);
-    graphviz::node::fill_color(*rhs, graphviz::color_t::green);
+    auto lhs  = graph::make_node(g);
+    node::label(*lhs, "lhs"_ss);
+    node::style(*lhs, node_style_t::filled);
+    node::fill_color(*lhs, color_t::pink);
+
+    auto rhs  = graph::make_node(g);
+    node::label(*rhs, "rhs"_ss);
+    node::style(*rhs, node_style_t::filled);
+    node::fill_color(*rhs, color_t::green);
 
     auto edge1 = graphviz::graph::make_edge(g);
-    edge1->first  = root->id;
-    edge1->second = lhs->id;
-    graphviz::edge::label(*edge1, "lhs"_ss);
-    graphviz::edge::dir(*edge1, graphviz::dir_type_t::both);
-    graphviz::edge::arrow_tail(*edge1, graphviz::arrow_type_t::dot);
-    graphviz::edge::arrow_head(*edge1, graphviz::arrow_type_t::normal);
+    edge1->first  = graph::node_ref(&g, root->id);
+    edge1->second = graph::node_ref(&g, lhs->id);
+    edge::label(*edge1, "lhs"_ss);
+    edge::dir(*edge1, dir_type_t::both);
+    edge::arrow_tail(*edge1, arrow_type_t::dot);
+    edge::arrow_head(*edge1, arrow_type_t::normal);
 
-    auto edge2 = graphviz::graph::make_edge(g);
-    edge2->first  = root->id;
-    edge2->second = rhs->id;
-    graphviz::edge::label(*edge2, "rhs"_ss);
-    graphviz::edge::dir(*edge2, graphviz::dir_type_t::both);
-    graphviz::edge::arrow_tail(*edge2, graphviz::arrow_type_t::dot);
-    graphviz::edge::arrow_head(*edge2, graphviz::arrow_type_t::normal);
+    auto edge2 = graph::make_edge(g);
+    edge2->first  = graph::node_ref(&g, root->id);
+    edge2->second = graph::node_ref(&g, rhs->id);
+    edge::label(*edge2, "rhs"_ss);
+    edge::dir(*edge2, dir_type_t::both);
+    edge::arrow_tail(*edge2, arrow_type_t::dot);
+    edge::arrow_head(*edge2, arrow_type_t::normal);
 
     auto p = "test.dot"_path;
 
@@ -70,6 +72,6 @@ TEST_CASE("basecode::graphviz basics") {
         path::free(p);
         );
 
-    REQUIRE(OK(graphviz::graph::serialize(g, buf)));
+    REQUIRE(OK(graph::serialize(g, buf)));
     REQUIRE(OK(buf::save(buf, p)));
 }
