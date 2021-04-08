@@ -27,22 +27,16 @@
 namespace basecode::config {
     constexpr u32 max_cvar_size = 256;
 
-    using arg_map_t             = symtab_t<scm::obj_t*>;
-
     struct system_t final {
         alloc_t*                alloc;
         scm::ctx_t*             ctx;
         scm::obj_t*             current_user;
         scm::obj_t*             current_alloc;
         scm::obj_t*             current_logger;
+        scm::obj_t*             current_command_line;
         cvar_t                  vars[max_cvar_size];
         str_t                   buf;
         u32                     heap_size;
-    };
-
-    struct kernel_func_t final {
-        const s8*               symbol;
-        scm::native_func_t      func;
     };
 
     struct named_flag_t final {
@@ -53,39 +47,43 @@ namespace basecode::config {
     system_t                    g_cfg_sys;
 
     static named_flag_t s_log_level_map[] = {
-        {"emergency", s32(log_level_t::emergency)},
-        {"alert",     s32(log_level_t::alert)},
-        {"critical",  s32(log_level_t::critical)},
-        {"error",     s32(log_level_t::error)},
-        {"warn",      s32(log_level_t::warn)},
-        {"notice",    s32(log_level_t::notice)},
-        {"info",      s32(log_level_t::info)},
-        {"debug",     s32(log_level_t::debug)},
-        {nullptr,     0},
+        {"emergency",    s32(log_level_t::emergency)},
+        {"alert",        s32(log_level_t::alert)},
+        {"critical",     s32(log_level_t::critical)},
+        {"error",        s32(log_level_t::error)},
+        {"warn",         s32(log_level_t::warn)},
+        {"notice",       s32(log_level_t::notice)},
+        {"info",         s32(log_level_t::info)},
+        {"debug",        s32(log_level_t::debug)},
+        {nullptr,        0},
     };
 
     static named_flag_t s_syslog_opts[] = {
-        {"opt-pid",     opt_pid},
-        {"opt-cons",    opt_cons},
-        {"opt-odelay",  opt_odelay},
-        {"opt-ndelay",  opt_ndelay},
-        {"opt-nowait",  opt_nowait},
-        {"opt-perror",  opt_perror},
-        {nullptr,       0},
+        {"opt-pid",      opt_pid},
+        {"opt-cons",     opt_cons},
+        {"opt-odelay",   opt_odelay},
+        {"opt-ndelay",   opt_ndelay},
+        {"opt-nowait",   opt_nowait},
+        {"opt-perror",   opt_perror},
+        {nullptr,        0},
     };
 
     static named_flag_t s_syslog_facilities[] = {
-        {"daemon",      facility_daemon},
-        {"local0",      facility_local0},
-        {"local1",      facility_local1},
-        {"local2",      facility_local2},
-        {"local3",      facility_local3},
-        {"local4",      facility_local4},
-        {"local5",      facility_local5},
-        {"local6",      facility_local6},
-        {"local7",      facility_local7},
-        {nullptr,       0},
+        {"daemon",       facility_daemon},
+        {"local0",       facility_local0},
+        {"local1",       facility_local1},
+        {"local2",       facility_local2},
+        {"local3",       facility_local3},
+        {"local4",       facility_local4},
+        {"local5",       facility_local5},
+        {"local6",       facility_local6},
+        {"local7",       facility_local7},
+        {nullptr,        0},
     };
+
+    static s32 find_syslog_facility_value(str::slice_t name);
+
+    static u0 adjust_log_path(path_t& log_path, str::slice_t file_name);
 
     static const s8* vlog(str::slice_t fmt_str, scm::rest_array_t& arg);
 
@@ -105,73 +103,6 @@ namespace basecode::config {
         if (scm::is_nil(g_cfg_sys.ctx, g_cfg_sys.current_logger))
             g_cfg_sys.current_logger = scm::make_user_ptr(g_cfg_sys.ctx, context::top()->logger);
         return g_cfg_sys.current_logger;
-    }
-
-    static scm::obj_t* current_command_line() {
-        const auto argc = context::top()->argc;
-        const auto argv = context::top()->argv;
-        scm::obj_t* objs[argc];
-        for (u32 i = 0; i < argc; ++i)
-            objs[i] = scm::make_string(g_cfg_sys.ctx, argv[i]);
-        return scm::make_list(g_cfg_sys.ctx, &objs[0], argc);
-    }
-
-    static s32 find_log_level(str::slice_t name) {
-        for (u32 i = 0; s_log_level_map[i].name != nullptr; ++i) {
-            if (strncmp((const s8*) name.data, s_log_level_map[i].name, name.length) == 0)
-                return s_log_level_map[i].value;
-        }
-        return -1;
-    }
-
-    static s32 find_syslog_opt_value(str::slice_t name) {
-        for (u32 i = 0; s_syslog_opts[i].name != nullptr; ++i) {
-            if (strncmp((const s8*) name.data, s_syslog_opts[i].name, name.length) == 0)
-                return s_syslog_opts[i].value;
-        }
-        return -1;
-    }
-
-    static scm::obj_t* get_map_arg(arg_map_t& args, u32 pos) {
-        scm::obj_t* arg;
-        ++pos;
-        if (symtab::find(args, slice::make((const u8*) &pos, sizeof(u32)), arg))
-            return arg;
-        return nullptr;
-    }
-
-    static s32 find_syslog_facility_value(str::slice_t name) {
-        for (u32 i = 0; s_syslog_facilities[i].name != nullptr; ++i) {
-            if (strncmp((const s8*) name.data, s_syslog_facilities[i].name, name.length) == 0) {
-                return s_syslog_facilities[i].value;
-            }
-        }
-        return -1;
-    }
-
-    static u32 make_arg_map(scm::ctx_t* ctx, scm::obj_t* arg, arg_map_t& args) {
-        u32 pos = 1;
-        while (true) {
-            auto obj = scm::next_arg_no_chk(ctx, &arg);
-            auto type = scm::type(obj);
-            if (type == scm::obj_type_t::nil) {
-                break;
-            } else if (type == scm::obj_type_t::keyword) {
-                auto value_obj = scm::next_arg_no_chk(ctx, &arg);
-                type = scm::type(value_obj);
-                if (type == scm::obj_type_t::nil)
-                    scm::error(ctx, "keyword parameter requires value");
-                else if (type == scm::obj_type_t::keyword)
-                    scm::error(ctx, "keyword parameter value cannot be another keyword");
-                else {
-                    symtab::insert(args, scm::to_string(ctx, obj), value_obj);
-                }
-            } else {
-                symtab::insert(args, slice::make((const u8*) &pos, sizeof(u32)), obj);
-                ++pos;
-            }
-        }
-        return pos;
     }
 
     static scm::obj_t* cvar_ref(u32 id) {
@@ -205,6 +136,26 @@ namespace basecode::config {
         return true;
     }
 
+    static scm::obj_t* current_command_line() {
+        if (scm::is_nil(g_cfg_sys.ctx, g_cfg_sys.current_command_line)) {
+            const auto argc = context::top()->argc;
+            const auto argv = context::top()->argv;
+            scm::obj_t* objs[argc];
+            for (u32 i = 0; i < argc; ++i)
+                objs[i] = scm::make_string(g_cfg_sys.ctx, argv[i]);
+            g_cfg_sys.current_command_line = scm::make_list(g_cfg_sys.ctx, &objs[0], argc);
+        }
+        return g_cfg_sys.current_command_line;
+    }
+
+    static s32 find_log_level(str::slice_t name) {
+        for (u32 i = 0; s_log_level_map[i].name != nullptr; ++i) {
+            if (strncmp((const s8*) name.data, s_log_level_map[i].name, name.length) == 0)
+                return s_log_level_map[i].value;
+        }
+        return -1;
+    }
+
     static b8 cvar_set_number(u32 id, f32 value) {
         cvar_t* cvar{};
         if (!OK(cvar::get(id, &cvar)))
@@ -221,6 +172,14 @@ namespace basecode::config {
         return true;
     }
 
+    static s32 find_syslog_opt_value(str::slice_t name) {
+        for (u32 i = 0; s_syslog_opts[i].name != nullptr; ++i) {
+            if (strncmp((const s8*) name.data, s_syslog_opts[i].name, name.length) == 0)
+                return s_syslog_opts[i].value;
+        }
+        return -1;
+    }
+
     static b8 cvar_set_string(u32 id, str::slice_t* value) {
         cvar_t* cvar{};
         if (!OK(cvar::get(id, &cvar)))
@@ -229,46 +188,87 @@ namespace basecode::config {
         return true;
     }
 
-    static scm::obj_t* syslog_create(scm::ctx_t* ctx, scm::obj_t* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
+    static s32 find_syslog_facility_value(str::slice_t name) {
+        for (u32 i = 0; s_syslog_facilities[i].name != nullptr; ++i) {
+            if (strncmp((const s8*) name.data, s_syslog_facilities[i].name, name.length) == 0) {
+                return s_syslog_facilities[i].value;
+            }
+        }
+        return -1;
+    }
+
+    static scm::obj_t* log_create_color(str::slice_t* color_type,
+                                        str::slice_t* name = {},
+                                        str::slice_t* pattern = {},
+                                        str::slice_t* maskv = {}) {
+        log_level_t mask = log_level_t::debug;
+        spdlog_color_config_t config{};
+        config.name = name ? *name : string::interned::fold("console"_ss);
+        config.pattern = pattern ? *pattern : str::slice_t{};
+        if (maskv) {
+            auto ll = find_log_level(*maskv);
+            if (ll == -1)
+                scm::error(g_cfg_sys.ctx, "#:mask invalid log level symbol");
+            mask = log_level_t(ll);
+        }
+
+        if (*color_type == "out"_ss) {
+            config.color_type = spdlog_color_type_t::out;
+        } else if (*color_type == "err"_ss) {
+            config.color_type = spdlog_color_type_t::err;
+        } else {
+            scm::error(g_cfg_sys.ctx,
+                       "invalid color-type value; expected: 'out or 'err");
+        }
+
+        logger_t* logger{};
+        auto status = log::system::make(&logger,
+                                        logger_type_t::spdlog,
+                                        &config,
+                                        mask);
+        if (!OK(status))
+            scm::error(g_cfg_sys.ctx, "failed to create color logger");
+
+        return scm::make_user_ptr(g_cfg_sys.ctx, logger);
+    }
+
+    static scm::obj_t* syslog_create(str::slice_t* ident,
+                                     scm::obj_t* opts,
+                                     str::slice_t* facility_name,
+                                     str::slice_t* name = {},
+                                     str::slice_t* maskv = {}) {
+        auto ctx = g_cfg_sys.ctx;
 
         log_level_t mask = log_level_t::debug;
         syslog_config_t config{};
-        config.name = string::interned::fold("syslog"_ss);
-        config.opts = {};
-
-        auto ident_str = scm::to_string(ctx, get_map_arg(args, 0));
-        config.ident = (const s8*) string::interned::fold(ident_str).data;
-
-        scm::obj_t* maskv;
-        if (symtab::find(args, "#:mask"_ss, maskv)) {
-            auto ll = find_log_level(scm::to_string(ctx, maskv));
+        config.opts  = {};
+        config.name  = name ? *name : string::interned::fold("syslog"_ss);
+        config.ident = (const s8*) ident->data;
+        if (maskv) {
+            auto ll = find_log_level(*maskv);
             if (ll == -1)
                 scm::error(ctx, "#:mask invalid log level symbol");
             mask = log_level_t(ll);
         }
 
-        auto opts = get_map_arg(args, 1);
-        if (scm::type(opts) != scm::obj_type_t::pair)
-            scm::error(ctx, "opts argument must be a list");
-        while (true) {
-            auto obj = scm::next_arg_no_chk(ctx, &opts);
+        while (!scm::is_nil(ctx, opts)) {
+            auto obj = scm::car(ctx, opts);
             auto type = scm::type(obj);
             if (type == scm::obj_type_t::nil)
                 break;
-            else if (type != scm::obj_type_t::symbol)
-                scm::error(ctx, "syslog opts list may only contain symbols");
-            auto opt_value = find_syslog_opt_value(scm::to_string(ctx, obj));
+            else if (type != scm::obj_type_t::symbol) {
+                scm::error(ctx,
+                           "syslog opts list may only contain symbols");
+            }
+            const auto opt_name = scm::to_string(ctx, obj);
+            auto opt_value = find_syslog_opt_value(opt_name);
             if (opt_value == -1)
                 scm::error(ctx, "invalid syslog opt flag");
             config.opts |= opt_value;
+            opts = scm::cdr(ctx, opts);
         }
 
-        auto facility = find_syslog_facility_value(scm::to_string(ctx,
-                                                                  get_map_arg(args, 2)));
+        auto facility = find_syslog_facility_value(*facility_name);
         if (facility == -1)
             scm::error(ctx, "invalid syslog facility value");
         config.facility = facility;
@@ -290,6 +290,41 @@ namespace basecode::config {
 
     static u0 log_info(str::slice_t* fmt_msg, scm::rest_array_t* rest) {
         log::info(vlog(*fmt_msg, *rest));
+    }
+
+    static scm::obj_t* log_create_daily_file(str::slice_t* file_name,
+                                             u32 hour,
+                                             u32 minute,
+                                             str::slice_t* name = {},
+                                             str::slice_t* pattern = {},
+                                             str::slice_t* maskv = {}) {
+        log_level_t mask = log_level_t::debug;
+        spdlog_daily_file_config_t config{};
+        config.hour    = hour;
+        config.name    = name ? *name : string::interned::fold("daily-file"_ss);
+        config.minute  = minute;
+        config.pattern = pattern ? *pattern : str::slice_t{};
+        if (maskv) {
+            auto ll = find_log_level(*maskv);
+            if (ll == -1)
+                scm::error(g_cfg_sys.ctx, "#:mask invalid log level symbol");
+            mask = log_level_t(ll);
+        }
+
+        path_t log_path{};
+        adjust_log_path(log_path, *file_name);
+        defer(path::free(log_path));
+        config.file_name = string::interned::fold(log_path.str);
+
+        logger_t* logger{};
+        auto status = log::system::make(&logger,
+                                        logger_type_t::spdlog,
+                                        &config,
+                                        mask);
+        if (!OK(status))
+            scm::error(g_cfg_sys.ctx, "failed to create daily file logger");
+
+        return scm::make_user_ptr(g_cfg_sys.ctx, logger);
     }
 
     static u0 log_alert(str::slice_t* fmt_msg, scm::rest_array_t* rest) {
@@ -346,113 +381,6 @@ namespace basecode::config {
         log::emergency(vlog(*fmt_msg, *rest));
     }
 
-    static scm::obj_t* log_create_color(scm::ctx_t* ctx, scm::obj_t* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
-
-        log_level_t mask = log_level_t::debug;
-        spdlog_color_config_t config{};
-        scm::obj_t* name;
-        if (symtab::find(args, "#:name"_ss, name))
-            config.name = string::interned::fold(scm::to_string(ctx, name));
-        else
-            config.name = string::interned::fold("console"_ss);
-
-        scm::obj_t* pattern;
-        if (symtab::find(args, "#:pattern"_ss, pattern))
-            config.pattern = string::interned::fold(scm::to_string(ctx, pattern));
-
-        scm::obj_t* maskv;
-        if (symtab::find(args, "#:mask"_ss, maskv)) {
-            auto ll = find_log_level(scm::to_string(ctx, maskv));
-            if (ll == -1)
-                scm::error(ctx, "#:mask invalid log level symbol");
-            mask = log_level_t(ll);
-        }
-
-        auto color_type = scm::to_string(ctx, get_map_arg(args, 0));
-        if (color_type == "out"_ss) {
-            config.color_type = spdlog_color_type_t::out;
-        } else if (color_type == "err"_ss) {
-            config.color_type = spdlog_color_type_t::err;
-        } else {
-            scm::error(ctx, "invalid color-type value; expected: 'out or 'err");
-        }
-
-        logger_t* logger{};
-        auto status = log::system::make(&logger,
-                                        logger_type_t::spdlog,
-                                        &config,
-                                        mask);
-        if (!OK(status))
-            scm::error(ctx, "failed to create color logger");
-
-        return scm::make_user_ptr(ctx, logger);
-    }
-
-    static scm::obj_t* logger_append_child(scm::ctx_t* ctx, scm::obj_t* arg) {
-        auto parent = scm::next_arg(ctx, &arg);
-        if (scm::type(parent) != scm::obj_type_t::ptr)
-            scm::error(ctx, "parent: expected pointer argument");
-        auto child = scm::next_arg(ctx, &arg);
-        if (scm::type(child) != scm::obj_type_t::ptr)
-            scm::error(ctx, "child: expected pointer argument");
-        log::append_child((logger_t*) scm::to_user_ptr(ctx, parent),
-                          (logger_t*) scm::to_user_ptr(ctx, child));
-        return scm::nil(ctx);
-    }
-
-    static scm::obj_t* log_create_daily_file(scm::ctx_t* ctx, scm::obj_t* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
-
-        log_level_t mask = log_level_t::debug;
-        spdlog_daily_file_config_t config{};
-        scm::obj_t* name;
-        if (symtab::find(args, "#:name"_ss, name))
-            config.name = scm::to_string(ctx, name);
-        else
-            config.name = string::interned::fold("daily-file"_ss);
-
-        scm::obj_t* pattern;
-        if (symtab::find(args, "#:pattern"_ss, pattern))
-            config.pattern = scm::to_string(ctx, pattern);
-
-        scm::obj_t* maskv;
-        if (symtab::find(args, "#:mask"_ss, maskv)) {
-            auto ll = find_log_level(scm::to_string(ctx, maskv));
-            if (ll == -1)
-                scm::error(ctx, "#:mask invalid log level symbol");
-            mask = log_level_t(ll);
-        }
-
-        auto file_name = scm::to_string(ctx, get_map_arg(args, 0));
-        path_t log_path{};
-        adjust_log_path(log_path, file_name);
-        defer(path::free(log_path));
-        config.file_name = string::interned::fold(log_path.str);
-
-        auto hour = get_map_arg(args, 1);
-        config.hour = scm::to_fixnum(hour);
-
-        auto minute = get_map_arg(args, 1);
-        config.minute = scm::to_fixnum(minute);
-
-        logger_t* logger{};
-        auto status = log::system::make(&logger,
-                                        logger_type_t::spdlog,
-                                        &config,
-                                        mask);
-        if (!OK(status))
-            scm::error(ctx, "failed to create daily file logger");
-
-        return scm::make_user_ptr(ctx, logger);
-    }
-
     static scm::obj_t* log_create_basic_file(str::slice_t* file_name,
                                              str::slice_t* name = {},
                                              str::slice_t* pattern = {},
@@ -484,53 +412,50 @@ namespace basecode::config {
         return scm::make_user_ptr(g_cfg_sys.ctx, logger);
     }
 
-    static scm::obj_t* log_create_rotating_file(scm::ctx_t* ctx, scm::obj_t* arg) {
-        arg_map_t args{};
-        symtab::init(args, g_cfg_sys.alloc);
-        defer(symtab::free(args));
-        make_arg_map(ctx, arg, args);
-
+    static scm::obj_t* log_create_rotating_file(str::slice_t* file_name,
+                                                u32 max_size,
+                                                u32 max_files,
+                                                str::slice_t* name = {},
+                                                str::slice_t* pattern = {},
+                                                str::slice_t* maskv = {}) {
         log_level_t mask = log_level_t::debug;
         spdlog_rotating_file_config_t config{};
-        scm::obj_t* name;
-        if (symtab::find(args, "#:name"_ss, name))
-            config.name = scm::to_string(ctx, name);
-        else
-            config.name = string::interned::fold("rotating-file"_ss);
-
-        scm::obj_t* pattern;
-        if (symtab::find(args, "#:pattern"_ss, pattern))
-            config.pattern = scm::to_string(ctx, pattern);
-
-        scm::obj_t* maskv;
-        if (symtab::find(args, "#:mask"_ss, maskv)) {
-            auto ll = find_log_level(scm::to_string(ctx, maskv));
+        config.name      = name ? *name : string::interned::fold("rotating-file"_ss);
+        config.pattern   = pattern ? *pattern : str::slice_t{};
+        config.max_size  = max_size;
+        config.max_files = max_files;
+        if (maskv) {
+            auto ll = find_log_level(*maskv);
             if (ll == -1)
-                scm::error(ctx, "#:mask invalid log level symbol");
+                scm::error(g_cfg_sys.ctx, "#:mask invalid log level symbol");
             mask = log_level_t(ll);
         }
 
-        auto file_name = scm::to_string(ctx, get_map_arg(args, 0));
         path_t log_path{};
-        adjust_log_path(log_path, file_name);
+        adjust_log_path(log_path, *file_name);
         defer(path::free(log_path));
         config.file_name = string::interned::fold(log_path.str);
-
-        auto max_size = get_map_arg(args, 1);
-        config.max_size  = scm::to_fixnum(max_size);
-
-        auto max_files = get_map_arg(args, 2);
-        config.max_files = scm::to_fixnum(max_files);
 
         logger_t* logger{};
         auto status = log::system::make(&logger,
                                         logger_type_t::spdlog,
                                         &config,
                                         mask);
-        if (!OK(status))
-            scm::error(ctx, "failed to create rotating file logger");
+        if (!OK(status)) {
+            scm::error(g_cfg_sys.ctx,
+                       "failed to create rotating file logger");
+        }
 
-        return scm::make_user_ptr(ctx, logger);
+        return scm::make_user_ptr(g_cfg_sys.ctx, logger);
+    }
+
+    static u0 logger_append_child(scm::obj_t* parent, scm::obj_t* child) {
+        if (scm::type(parent) != scm::obj_type_t::ptr)
+            scm::error(g_cfg_sys.ctx, "parent: expected pointer argument");
+        if (scm::type(child) != scm::obj_type_t::ptr)
+            scm::error(g_cfg_sys.ctx, "child: expected pointer argument");
+        log::append_child((logger_t*) scm::to_user_ptr(g_cfg_sys.ctx, parent),
+                          (logger_t*) scm::to_user_ptr(g_cfg_sys.ctx, child));
     }
 
     static u32 localized_string(u32 id, str::slice_t* locale, str::slice_t* value) {
@@ -541,16 +466,6 @@ namespace basecode::config {
     static b8 localized_error(u32 id, str::slice_t* locale, str::slice_t* code, u32 str_id) {
         return OK(error::localized::add(id, str_id, *locale, *code));
     }
-
-    static kernel_func_t s_kernel_funcs[] = {
-        {"log-create-color",         log_create_color},
-        {"log-create-daily-file",    log_create_daily_file},
-//        {"log-create-basic-file",    log_create_basic_file},
-        {"log-create-rotating-file", log_create_rotating_file},
-        {"logger-append-child",      logger_append_child},
-        {"syslog-create",            syslog_create},
-        {nullptr,                    nullptr}
-    };
 
     namespace system {
         u0 fini() {
@@ -572,9 +487,10 @@ namespace basecode::config {
             str::reserve(g_cfg_sys.buf, 8192);
 
             scm::init(g_cfg_sys.ctx, g_cfg_sys.heap_size, g_cfg_sys.alloc);
-            g_cfg_sys.current_user   = scm::nil(g_cfg_sys.ctx);
-            g_cfg_sys.current_alloc  = scm::nil(g_cfg_sys.ctx);
-            g_cfg_sys.current_logger = scm::nil(g_cfg_sys.ctx);
+            g_cfg_sys.current_user         = scm::nil(g_cfg_sys.ctx);
+            g_cfg_sys.current_alloc        = scm::nil(g_cfg_sys.ctx);
+            g_cfg_sys.current_logger       = scm::nil(g_cfg_sys.ctx);
+            g_cfg_sys.current_command_line = scm::nil(g_cfg_sys.ctx);
 
             {
                 auto b8_type = ffi::param::make_type(param_cls_t::int_,
@@ -583,9 +499,6 @@ namespace basecode::config {
                 auto u0_type = ffi::param::make_type(param_cls_t::void_, param_size_t::none);
                 auto u32_type = ffi::param::make_type(param_cls_t::int_, param_size_t::dword);
                 auto f32_type = ffi::param::make_type(param_cls_t::float_, param_size_t::dword);
-//                auto ctx_type = ffi::param::make_type(param_cls_t::ptr,
-//                                                      param_size_t::qword,
-//                                                      u8(scm::ffi_type_t::context));
                 auto obj_type = ffi::param::make_type(param_cls_t::ptr,
                                                       param_size_t::qword,
                                                       u8(scm::ffi_type_t::object));
@@ -865,12 +778,132 @@ namespace basecode::config {
                              scm::make_symbol(g_cfg_sys.ctx, "log-create-basic-file"),
                              scm::make_ffi(g_cfg_sys.ctx, proto));
                 }
-            }
 
-            for (u32 i = 0; s_kernel_funcs[i].symbol != nullptr; ++i) {
-                auto symbol = scm::make_symbol(g_cfg_sys.ctx, s_kernel_funcs[i].symbol);
-                auto func = scm::make_native_func(g_cfg_sys.ctx, s_kernel_funcs[i].func);
-                scm::set(g_cfg_sys.ctx, symbol, func);
+                {
+                    auto proto = ffi::proto::make("log_create_daily_file"_ss);
+                    auto ol    = ffi::overload::make("log_create_daily_file"_ss,
+                                                     obj_type,
+                                                     (u0*) log_create_daily_file);
+                    ffi::overload::append(ol, ffi::param::make("file_name"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("hour"_ss, u32_type));
+                    ffi::overload::append(ol, ffi::param::make("minute"_ss, u32_type));
+
+                    auto name_kwd = ffi::param::make("name"_ss, slice_type);
+                    name_kwd->has_dft       = true;
+                    name_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, name_kwd);
+
+                    auto pattern_kwd = ffi::param::make("pattern"_ss, slice_type);
+                    pattern_kwd->has_dft       = true;
+                    pattern_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, pattern_kwd);
+
+                    auto mask_kwd = ffi::param::make("mask"_ss, slice_type);
+                    mask_kwd->has_dft       = true;
+                    mask_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, mask_kwd);
+
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-create-daily-file"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_create_color"_ss);
+                    auto ol    = ffi::overload::make("log_create_color"_ss,
+                                                     obj_type,
+                                                     (u0*) log_create_color);
+                    ffi::overload::append(ol, ffi::param::make("color_type"_ss, slice_type));
+
+                    auto name_kwd = ffi::param::make("name"_ss, slice_type);
+                    name_kwd->has_dft       = true;
+                    name_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, name_kwd);
+
+                    auto pattern_kwd = ffi::param::make("pattern"_ss, slice_type);
+                    pattern_kwd->has_dft       = true;
+                    pattern_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, pattern_kwd);
+
+                    auto mask_kwd = ffi::param::make("mask"_ss, slice_type);
+                    mask_kwd->has_dft       = true;
+                    mask_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, mask_kwd);
+
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-create-color"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("log_create_rotating_file"_ss);
+                    auto ol    = ffi::overload::make("log_create_rotating_file"_ss,
+                                                     obj_type,
+                                                     (u0*) log_create_rotating_file);
+                    ffi::overload::append(ol, ffi::param::make("file_name"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("max_size"_ss, u32_type));
+                    ffi::overload::append(ol, ffi::param::make("max_files"_ss, u32_type));
+
+                    auto name_kwd = ffi::param::make("name"_ss, slice_type);
+                    name_kwd->has_dft       = true;
+                    name_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, name_kwd);
+
+                    auto pattern_kwd = ffi::param::make("pattern"_ss, slice_type);
+                    pattern_kwd->has_dft       = true;
+                    pattern_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, pattern_kwd);
+
+                    auto mask_kwd = ffi::param::make("mask"_ss, slice_type);
+                    mask_kwd->has_dft       = true;
+                    mask_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, mask_kwd);
+
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "log-create-rotating-file"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("syslog_create"_ss);
+                    auto ol    = ffi::overload::make("syslog_create"_ss,
+                                                     obj_type,
+                                                     (u0*) syslog_create);
+                    ffi::overload::append(ol, ffi::param::make("ident"_ss, slice_type));
+                    ffi::overload::append(ol, ffi::param::make("opts"_ss, list_type));
+                    ffi::overload::append(ol, ffi::param::make("facility"_ss, slice_type));
+
+                    auto name_kwd = ffi::param::make("name"_ss, slice_type);
+                    name_kwd->has_dft       = true;
+                    name_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, name_kwd);
+
+                    auto mask_kwd = ffi::param::make("mask"_ss, slice_type);
+                    mask_kwd->has_dft       = true;
+                    mask_kwd->value.alias.p = {};
+                    ffi::overload::append(ol, mask_kwd);
+
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "syslog-create"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
+
+                {
+                    auto proto = ffi::proto::make("logger_append_child"_ss);
+                    auto ol    = ffi::overload::make("logger_append_child"_ss,
+                                                     obj_type,
+                                                     (u0*) logger_append_child);
+                    ffi::overload::append(ol, ffi::param::make("parent"_ss, obj_type));
+                    ffi::overload::append(ol, ffi::param::make("child"_ss, obj_type));
+                    ffi::proto::append(proto, ol);
+                    scm::set(g_cfg_sys.ctx,
+                             scm::make_symbol(g_cfg_sys.ctx, "logger-append-child"),
+                             scm::make_ffi(g_cfg_sys.ctx, proto));
+                }
             }
 
             std::memset(g_cfg_sys.vars, 0, sizeof(cvar_t) * max_cvar_size);

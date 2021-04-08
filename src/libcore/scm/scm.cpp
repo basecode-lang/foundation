@@ -987,7 +987,7 @@ namespace basecode::scm {
                         case obj_type_t::pair:
                             switch (ffi_type_t(param->value.type.user)) {
                                 case ffi_type_t::list:
-                                    ffi::push(ctx->ffi, arg);
+                                    ffi::push(ctx->ffi, EVAL(CAR(arg)));
                                     break;
                                 default:
                                     error(ctx, "ffi: invalid pair argument");
