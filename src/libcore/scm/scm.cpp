@@ -409,6 +409,12 @@ namespace basecode::scm {
         }
         format::print("{}\n", str);
 
+        auto dot_file = "eval2.dot"_path;
+        if (!OK(vm::emitter::create_dot(ctx->compiler.emit, dot_file))) {
+            format::print("error writing dot file.\n");
+        }
+        path::free(dot_file);
+
         return ctx->nil;
     }
 

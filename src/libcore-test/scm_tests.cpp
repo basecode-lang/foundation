@@ -49,22 +49,17 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
     format::print("\n");
 
     const auto source = R"(
-(= length (fn (ls)
-    (if (not ls)
-        0
-        (if (not (atom ls))
-            (+ 1 (length (cdr ls)))
-            (error "invalid argument to length")))))
-
 (do
+    (= length (fn (ls)
+        (if (not ls)
+            0
+            (if (not (atom ls))
+                (+ 1 (length (cdr ls)))
+                (error "invalid argument to length")))))
+
     (let nums (list 1 2 3 4 5 6))
     (length nums))
-
-(do
-    (let build-type "RelWithDebInfo")
-    (or (is "Debug"             build-type)
-        (is "RelWithDebInfo"    build-type)
-        (is "Release"           build-type))))"_ss;
+)"_ss;
 
     buf_t buf{};
     buf::init(buf);

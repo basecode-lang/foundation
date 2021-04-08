@@ -181,6 +181,8 @@ namespace basecode::scm {
 
             status_t assemble(emitter_t& e, bb_t& start_block);
 
+            status_t create_dot(emitter_t& e, const path_t& path);
+
             template <String_Concept T>
             bb_t& make_basic_block(emitter_t& e,
                                    const T& name,
@@ -189,8 +191,8 @@ namespace basecode::scm {
                 str_array::append(e.strtab, name);
                 auto& bb = stable_array::append(e.blocks);
                 bb.id     = e.blocks.size;
-                bb.node   = digraph::make_node(e.digraph, bb);
-                bb.prev   = prev;
+                bb.node   = digraph::make_node(e.bb_graph, bb);
+                bb.prev   = {};
                 bb.next   = {};
                 bb.addr   = 0;
                 bb.emit   = &e;
@@ -200,7 +202,8 @@ namespace basecode::scm {
                 bb.str_id = e.strtab.size;
                 if (prev) {
                     prev->next = &bb;
-                    digraph::make_edge(e.digraph, prev->node, bb.node);
+                    bb.prev    = prev;
+                    digraph::make_edge(e.bb_graph, prev->node, bb.node);
                 }
                 return bb;
             }
@@ -228,8 +231,7 @@ namespace basecode::scm {
                         return nullptr;
                     var = &stable_array::append(e.vars);
                     array::init(var->accesses, e.alloc);
-                    var->prev     = {};
-                    var->next     = {};
+                    var->node     = digraph::make_node(e.var_graph, *var);
                     var->active   = false;
                     var->symbol   = rc.id;
                     var->version  = 1;
@@ -267,8 +269,9 @@ namespace basecode::scm {
                     const auto curr = latest(e, prev->symbol);
                     auto var = &stable_array::append(e.vars);
                     array::init(var->accesses, e.alloc);
-                    var->prev  = prev;
-                    prev->next = var;
+                    var->node = digraph::make_node(e.var_graph, *var);
+                    digraph::make_edge(e.var_graph, prev->node, var->node);
+                    digraph::make_edge(e.var_graph, var->node, prev->node);
                     if (prev->incubate && curr->incubate) {
                         auto& ac      = array::append(var->accesses);
                         ac.type       = var_access_type_t::def;
@@ -697,7 +700,7 @@ namespace basecode::scm {
                 bb_builder_t& next(bb_t& next) {
                     next.prev = _bb;
                     _bb->next = &next;
-                    digraph::make_edge(_em->digraph, _bb->node, next.node);
+                    digraph::make_edge(_em->bb_graph, _bb->node, next.node);
                     return *this;
                 }
 

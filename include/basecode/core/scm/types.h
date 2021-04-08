@@ -103,6 +103,7 @@ namespace basecode::scm {
     using proc_array_t          = array_t<proc_t>;
     using bind_table_t          = hashtab_t<u32, obj_t*>;
     using trap_table_t          = hashtab_t<u32, trap_t>;
+    using var_digraph_t         = digraph_t<var_t>;
     using symbol_table_t        = hashtab_t<u32, obj_t*>;
     using string_table_t        = hashtab_t<u32, obj_t*>;
     using access_array_t        = array_t<var_access_t>;
@@ -323,8 +324,9 @@ namespace basecode::scm {
     };
 
     struct var_t final {
-        const var_t*            next;
-        const var_t*            prev;
+        using Node_Type         = typename var_digraph_t::Node;
+
+        Node_Type*              node;
         access_array_t          accesses;
         intern_id               symbol;
         u32                     version;
@@ -402,7 +404,8 @@ namespace basecode::scm {
         var_table_t             vartab;
         str_array_t             strtab;
         inst_array_t            insts;
-        bb_digraph_t            digraph;
+        bb_digraph_t            bb_graph;
+        var_digraph_t           var_graph;
         comment_array_t         comments;
     };
 

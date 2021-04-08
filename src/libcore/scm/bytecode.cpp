@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/graphviz/gv.h>
 #include <basecode/core/scm/compiler.h>
 #include <basecode/core/scm/bytecode.h>
 
@@ -346,7 +347,7 @@ namespace basecode::scm {
                     case instruction::type::blr:
                     case instruction::type::bra: {
                         auto& imm = _builder->_inst->operands[0];
-                        digraph::make_edge(_builder->_em->digraph,
+                        digraph::make_edge(_builder->_em->bb_graph,
                                            _builder->_bb->node,
                                            imm.kind.bb->node);
                         break;
@@ -741,8 +742,9 @@ namespace basecode::scm {
                 array::free(e.insts);
                 symtab::free(e.vartab);
                 array::free(e.comments);
-                digraph::free(e.digraph);
+                digraph::free(e.bb_graph);
                 str_array::free(e.strtab);
+                digraph::free(e.var_graph);
                 stable_array::free(e.vars);
                 stable_array::free(e.blocks);
             }
@@ -751,8 +753,9 @@ namespace basecode::scm {
                 array::reset(e.insts);
                 symtab::reset(e.vartab);
                 array::reset(e.comments);
-                digraph::reset(e.digraph);
+                digraph::reset(e.bb_graph);
                 str_array::reset(e.strtab);
+                digraph::reset(e.var_graph);
                 stable_array::reset(e.vars);
                 stable_array::reset(e.blocks);
             }
@@ -811,7 +814,7 @@ namespace basecode::scm {
                 array::init(nodes, block->emit->alloc);
                 defer(array::free(nodes));
 
-                digraph::incoming_nodes(block->emit->digraph, block->node, nodes);
+                digraph::incoming_nodes(block->emit->bb_graph, block->node, nodes);
                 if (nodes.size > 0) {
                     format::format_to(buf, "${:08X}:    .preds      ", addr);
                     for (u32 i = 0; i < nodes.size; ++i) {
@@ -822,7 +825,7 @@ namespace basecode::scm {
                 }
 
                 array::reset(nodes);
-                digraph::outgoing_nodes(block->emit->digraph, block->node, nodes);
+                digraph::outgoing_nodes(block->emit->bb_graph, block->node, nodes);
                 if (nodes.size > 0) {
                     format::format_to(buf, "${:08X}:    .succs      ", addr);
                     for (u32 i = 0; i < nodes.size; ++i) {
@@ -1119,6 +1122,74 @@ namespace basecode::scm {
                 return status_t::ok;
             }
 
+            status_t create_dot(emitter_t& e, const path_t& path) {
+                using namespace graphviz;
+
+                graph_t g{};
+                graph::init(g, graph_type_t::directed, "emitter model"_ss);
+                defer(graph::free(g));
+
+                bb_digraph_t::Node_Array nodes{};
+                array::init(nodes, e.alloc);
+                defer(array::free(nodes));
+
+                for (auto bb_node : e.bb_graph.nodes) {
+                    auto node = graph::make_node(g);
+                    node::label(*node, format::format("block: {}", *(bb_node->value)));
+                    node::shape(*node, shape_t::record);
+                    node::style(*node, node_style_t::filled);
+                    node::fill_color(*node, color_t::aliceblue);
+
+                    array::reset(nodes);
+                    digraph::incoming_nodes(e.bb_graph, bb_node, nodes);
+                    for (auto incoming : nodes) {
+                        auto edge = graph::make_edge(g);
+                        edge->first  = incoming->id;
+                        edge->second = bb_node->id;
+                        edge::label(*edge, "pred"_ss);
+                        edge::style(*edge, edge_style_t::dotted);
+                        edge::dir(*edge, dir_type_t::back);
+                    }
+
+                    array::reset(nodes);
+                    digraph::outgoing_nodes(e.bb_graph, bb_node, nodes);
+                    for (auto outgoing : nodes) {
+                        auto edge = graph::make_edge(g);
+                        edge->first  = bb_node->id;
+                        edge->second = outgoing->id;
+                        edge::label(*edge, "succ"_ss);
+                        edge::dir(*edge, dir_type_t::forward);
+                    }
+
+                    if (bb_node->value->next) {
+                        auto straight_edge = graph::make_edge(g);
+                        straight_edge->first  = bb_node->id;
+                        straight_edge->second = bb_node->value->next->node->id;
+                        edge::label(*straight_edge, "next"_ss);
+                        edge::dir(*straight_edge, dir_type_t::forward);
+                        edge::color(*straight_edge, color_t::lightblue);
+                        edge::style(*straight_edge, edge_style_t::dashed);
+                    }
+                }
+
+                buf_t buf{};
+                buf.mode = buf_mode_t::alloc;
+                buf::init(buf);
+                defer(buf::free(buf));
+                {
+                    auto status = graphviz::graph::serialize(g, buf);
+                    if (!OK(status))
+                        return status_t::fail;
+                }
+                {
+                    auto status = buf::save(buf, path);
+                    if (!OK(status))
+                        return status_t::fail;
+                }
+
+                return status_t::ok;
+            }
+
             status_t assemble(emitter_t& e, bb_t& start_block) {
                 auto& vm = *e.vm;
                 u64  addr = LP;
@@ -1157,8 +1228,9 @@ namespace basecode::scm {
                 array::init(e.insts, e.alloc);
                 symtab::init(e.vartab, e.alloc);
                 array::init(e.comments, e.alloc);
-                digraph::init(e.digraph, e.alloc);
+                digraph::init(e.bb_graph, e.alloc);
                 str_array::init(e.strtab, e.alloc);
+                digraph::init(e.var_graph, e.alloc);
                 stable_array::init(e.vars, e.alloc);
                 stable_array::init(e.blocks, e.alloc);
             }
@@ -1306,7 +1378,6 @@ namespace basecode::scm {
                 while (!IS_NIL(keys)) {
                     auto key  = TYPE(keys) == obj_type_t::pair ? CAR(keys) : keys;
                     auto name = *string::interned::get_slice(STRING_ID(key));
-//                        emitter::read_var(comp.emitter, name, *vc.bb);
                     if (TYPE(keys) != obj_type_t::pair) {
                         vc.obj = vals;
                         auto comp_res = compiler::compile(comp, vc);
@@ -1358,7 +1429,7 @@ namespace basecode::scm {
                         .build();
                 free_stack(cleanup_bb, 1);
                 pop_env(comp, cleanup_bb);
-                return {c.bb, res};
+                return {&cleanup_bb, res};
             }
 
             compile_result_t inline_(compiler_t& comp,

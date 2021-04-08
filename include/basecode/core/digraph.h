@@ -242,7 +242,7 @@ namespace basecode {
                   typename Node = typename T::Node>
         Edge* make_edge(T& graph, const Node* src, const Node* dst, s32 type = 0, f64 wgt = 1.0) {
             for (auto e : graph.edges) {
-                if (e->src == src)
+                if (e->src == src && e->dst == dst && e->type == type)
                     return e;
             }
 

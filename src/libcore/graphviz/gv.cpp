@@ -2023,7 +2023,7 @@ namespace basecode::graphviz {
             if (!OK(graph_name.status))
                 return status_t::intern_failure;
             format::format_to(mb,
-                              g.type == graph_type_t::directed ? "digraph {} {{\n" : "graph {} {{\n",
+                              g.type == graph_type_t::directed ? "digraph \"{}\" {{\n" : "graph {} {{\n",
                               graph_name.slice);
 
             for (u32 i = 0; i < g.attrs.values.size; ++i) {
