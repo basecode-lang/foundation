@@ -664,8 +664,6 @@ namespace basecode::scm {
         }
         if (TYPE(a) != TYPE(b))         return false;
         switch (TYPE(a)) {
-            case obj_type_t::nil:
-            case obj_type_t::free:      return true;
             case obj_type_t::pair: {
                 while (!IS_NIL(a)) {
                     if (IS_NIL(b))  return false;
@@ -699,6 +697,74 @@ namespace basecode::scm {
     s32 compare(ctx_t* ctx, obj_t* lhs, obj_t* rhs) {
         if (equal(ctx, lhs, rhs))
             return 0;
+
+        const auto lt = TYPE(lhs);
+        const auto rt = TYPE(rhs);
+
+        if (lt == obj_type_t::free && rt == obj_type_t::free) {
+            if (lhs < rhs) return -1;
+            return 1;
+        }
+
+        if ((lt == obj_type_t::fixnum || lt == obj_type_t::flonum)
+        &&  (rt == obj_type_t::fixnum || rt== obj_type_t::flonum)) {
+            auto a = to_flonum(lhs);
+            auto b = to_flonum(rhs);
+            if (a < b) return -1;
+            return 1;
+        }
+
+        if ((lt == obj_type_t::symbol  && rt == obj_type_t::symbol)
+        ||  (lt == obj_type_t::keyword && rt == obj_type_t::keyword)) {
+            auto a = *string::interned::get_slice(STRING_ID(lhs));
+            auto b = *string::interned::get_slice(STRING_ID(rhs));
+            if (a < b) return -1;
+            return 1;
+        }
+
+        if (lt == obj_type_t::string && rt == obj_type_t::string) {
+            auto a = *string::interned::get_slice(STRING_ID(lhs));
+            auto b = *string::interned::get_slice(STRING_ID(rhs));
+            if (a < b) return -1;
+            return 1;
+        }
+
+        if ((lt == obj_type_t::func || lt == obj_type_t::macro)
+        &&  (rt == obj_type_t::func || rt == obj_type_t::macro)) {
+            auto a = PROC(lhs);
+            auto b = PROC(rhs);
+            if (a < b) return -1;
+            return 1;
+        }
+
+        if (lt == obj_type_t::prim && rt == obj_type_t::prim) {
+            auto a = PRIM(lhs);
+            auto b = PRIM(rhs);
+            if (a < b) return -1;
+            return 1;
+        }
+
+        if (lt == obj_type_t::cfunc && rt == obj_type_t::cfunc) {
+            if (CFUNC(lhs) < CFUNC(rhs)) return -1;
+            return 1;
+        }
+
+        if (lt == obj_type_t::ptr && rt == obj_type_t::ptr) {
+            if (NATIVE_PTR(lhs) < NATIVE_PTR(rhs)) return -1;
+            return 1;
+        }
+
+        if (lt == obj_type_t::ffi && rt == obj_type_t::ffi) {
+            if (PROTO(lhs) < PROTO(rhs)) return -1;
+            return 1;
+        }
+
+        if (lt == obj_type_t::environment && rt == obj_type_t::environment) {
+            auto a = ENV(lhs);
+            auto b = ENV(rhs);
+            if (a->parent < b->parent) return -1;
+            return 1;
+        }
 
         return -1;
     }
@@ -884,26 +950,24 @@ namespace basecode::scm {
                     }
 
                     case prim_type_t::gt:
-                        va  = EVAL_ARG();
-                        vb  = EVAL_ARG();
-                        return make_bool(ctx, to_flonum(va) > to_flonum(vb));
+                        va = EVAL_ARG();
+                        vb = EVAL_ARG();
+                        return make_bool(ctx, compare(ctx, va, vb) > 0);
 
                     case prim_type_t::gte:
-                        va  = EVAL_ARG();
-                        vb  = EVAL_ARG();
-                        return make_bool(ctx, to_flonum(va) >= to_flonum(vb));
+                        va = EVAL_ARG();
+                        vb = EVAL_ARG();
+                        return make_bool(ctx, compare(ctx, va, vb) >= 0);
 
                     case prim_type_t::lt:
-                        va  = EVAL_ARG();
-                        vb  = EVAL_ARG();
-                        return make_bool(ctx, to_flonum(va) < to_flonum(vb));
+                        va = EVAL_ARG();
+                        vb = EVAL_ARG();
+                        return make_bool(ctx, compare(ctx, va, vb) < 0);
 
-                    case prim_type_t::lte: {
-                        va  = EVAL_ARG();
-                        vb  = EVAL_ARG();
-                        auto flag = to_flonum(va) <= to_flonum(vb);
-                        return make_bool(ctx, flag);
-                    }
+                    case prim_type_t::lte:
+                        va = EVAL_ARG();
+                        vb = EVAL_ARG();
+                        return make_bool(ctx, compare(ctx, va, vb) <= 0);
 
                     case prim_type_t::add: {
                         flonum_t x = to_flonum(EVAL_ARG());
