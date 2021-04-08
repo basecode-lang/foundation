@@ -17,6 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/scm/compiler.h>
+#include <basecode/core/scm/bytecode.h>
+
 
 #define ENCODE_REG(o, f)        SAFE_SCOPE(                                     \
     u8  __tmp{};                                                                \
@@ -1207,7 +1209,7 @@ namespace basecode::scm {
                 auto& vm = *comp.vm;
                 auto ctx        = c.ctx;
                 b8   is_mac     = PRIM(form) == prim_type_t::mac;
-                auto proc       = make_proc(c.ctx, sym, CAR(args), CDR(args), c.env, is_mac);
+                auto proc       = make_proc(c.ctx, sym, CAR(args), CDR(args), is_mac);
                 auto idx        = OBJ_IDX(proc);
                 auto target_reg = rf::m;       //FIXME
                 G(target_reg) = idx;
@@ -1371,6 +1373,56 @@ namespace basecode::scm {
                 return {c.bb, 0};
             }
 
+            compile_result_t comp_proc(compiler_t& comp,
+                                       const context_t& c,
+                                       proc_t* proc) {
+                auto ctx = c.ctx;
+                auto& e = *c.bb->emit;
+
+                auto params = proc->params;
+                while (!IS_NIL(params)) {
+                    auto name = *string::interned::get_slice(STRING_ID(CAR(params)));
+                    emitter::virtual_var::declare(e, name);
+                    params = CDR(params);
+                }
+
+                auto name = *string::interned::get_slice(STRING_ID(proc->sym));
+                auto& proc_bb = emitter::make_basic_block(*c.bb->emit, name, c.bb);
+                proc->addr.bb = &proc_bb;
+
+                basic_block::encode(proc_bb)
+                    .note("-------------------------------------------------------------------"_ss)
+                    .note(format::format("procedure: {}", name))
+                    .note(format::format("(fn {} {})",
+                                         printable_t{c.ctx, proc->params, true},
+                                         printable_t{c.ctx, CAR(proc->body), true}))
+                    .note("-------------------------------------------------------------------"_ss);
+
+                auto body = proc->body;
+                auto bc   = c;
+                bc.bb = &enter(proc_bb, 0);
+                while (!IS_NIL(body)) {
+                    bc.obj = CAR(body);
+                    auto comp_res = compiler::compile(comp, bc);
+                    bc.bb = comp_res.bb;
+                    body = CDR(body);
+                }
+
+                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
+                auto base = emitter::virtual_var::get(comp.emit, "base"_ss);
+                basic_block::encode(bc.bb)
+                    .offs()
+                    .op(op::store)
+                    .src(&res)
+                    .dst(&base)
+                    .offset(0)
+                    .mode(true)
+                    .build();
+
+                proc->is_compiled = true;
+                return {&leave(*bc.bb), res};
+            }
+
             u0 pop_env(compiler_t& comp, bb_t& bb) {
                 auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
                 basic_block::encode(bb)
@@ -1434,6 +1486,7 @@ namespace basecode::scm {
                     case prim_type_t::setcdr:           return set_cdr(comp, c, args);
                     case prim_type_t::error:            return error(comp, c, args);
                     case prim_type_t::print:            return print(comp, c, args);
+                    case prim_type_t::format:           return format(comp, c, args);
                     case prim_type_t::quote:            return qt(comp, c, args);
                     case prim_type_t::unquote:          return uq(comp, c, args);
                     case prim_type_t::quasiquote:       return qq(comp, c, args);
@@ -1962,11 +2015,19 @@ namespace basecode::scm {
             }
 
             compile_result_t print(compiler_t& comp, const context_t& c, obj_t* args) {
+                UNUSED(comp);
                 UNUSED(args);
                 return {c.bb, 0};
             }
 
+            compile_result_t format(compiler_t& comp, const context_t& c, obj_t* args) {
+                UNUSED(comp);
+                UNUSED(args);
+                return compile_result_t();
+            }
+
             compile_result_t while_(compiler_t& comp, const context_t& c, obj_t* args) {
+                UNUSED(comp);
                 UNUSED(args);
                 return {c.bb, 0};
             }
@@ -1983,7 +2044,7 @@ namespace basecode::scm {
                 auto comp_res = compiler::compile(comp, vc);
                 if (c.top_level) {
                     auto value = OBJ_AT(G(rf::m));  // FIXME: this is a temporary hack
-                    set(ctx, key, value, c.env);
+                    set(ctx, key, value);
                     if (TYPE(value) == obj_type_t::func
                     ||  TYPE(value) == obj_type_t::macro) {
                         auto proc = PROC(value);
@@ -2045,56 +2106,6 @@ namespace basecode::scm {
                     .dst(&rhs_res.var)
                     .build();
                 return {lhs_res.bb, {}};
-            }
-
-            compile_result_t comp_proc(compiler_t& comp,
-                                       const context_t& c,
-                                       proc_t* proc) {
-                auto ctx = c.ctx;
-                auto& e = *c.bb->emit;
-
-                auto params = proc->params;
-                while (!IS_NIL(params)) {
-                    auto name = *string::interned::get_slice(STRING_ID(CAR(params)));
-                    emitter::virtual_var::declare(e, name);
-                    params = CDR(params);
-                }
-
-                auto name = *string::interned::get_slice(STRING_ID(proc->sym));
-                auto& proc_bb = emitter::make_basic_block(*c.bb->emit, name, c.bb);
-                proc->addr.bb = &proc_bb;
-
-                basic_block::encode(proc_bb)
-                    .note("-------------------------------------------------------------------"_ss)
-                    .note(format::format("procedure: {}", name))
-                    .note(format::format("(fn {} {})",
-                                         printable_t{c.ctx, proc->params, true},
-                                         printable_t{c.ctx, CAR(proc->body), true}))
-                    .note("-------------------------------------------------------------------"_ss);
-
-                auto body = proc->body;
-                auto bc   = c;
-                bc.bb = &enter(proc_bb, 0);
-                while (!IS_NIL(body)) {
-                    bc.obj = CAR(body);
-                    auto comp_res = compiler::compile(comp, bc);
-                    bc.bb = comp_res.bb;
-                    body = CDR(body);
-                }
-
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto base = emitter::virtual_var::get(comp.emit, "base"_ss);
-                basic_block::encode(bc.bb)
-                    .offs()
-                        .op(op::store)
-                        .src(&res)
-                        .dst(&base)
-                        .offset(0)
-                        .mode(true)
-                        .build();
-
-                proc->is_compiled = true;
-                return {&leave(*bc.bb), res};
             }
         }
     }

@@ -285,10 +285,10 @@
                     [(is (mod n 3) 0)       (= fizz         (add1 fizz))]
                     [(is (mod n 5) 0)       (= buzz         (add1 buzz))]
                     [else                   (= numbers      (add1 numbers))]))
-            (print "  fizz buzz: " fizz-buzz)
-            (print "  fizz     : " fizz)
-            (print "  buzz     : " buzz)
-            (print "  numbers  : " numbers))
+            (print (format "  fizz buzz: {:.7g}" fizz-buzz))
+            (print (format "  fizz     : {:.7g}" fizz))
+            (print (format "  buzz     : {:.7g}" buzz))
+            (print (format "  numbers  : {:.7g}" numbers)))
 
         ; basic assertions around scheme terp
         (test-suite "scheme terp basic assertions"

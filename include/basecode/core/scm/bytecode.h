@@ -404,6 +404,8 @@ namespace basecode::scm {
 
             compile_result_t print(compiler_t& comp, const context_t& c, obj_t* args);
 
+            compile_result_t format(compiler_t& comp, const context_t& c, obj_t* args);
+
             compile_result_t while_(compiler_t& comp, const context_t& c, obj_t* args);
 
             compile_result_t set_car(compiler_t& comp, const context_t& c, obj_t* args);

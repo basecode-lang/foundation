@@ -58,8 +58,8 @@
 #define CFUNC(x)                ((native_func_t) ctx->native_ptrs[FIXNUM((x)) - 1])
 #define PROTO(x)                ((proto_t*) ctx->native_ptrs[FIXNUM((x)) - 1])
 #define NATIVE_PTR(x)           (ctx->native_ptrs[FIXNUM((x)) - 1])
-#define EVAL(o)                 eval(ctx, (o), env)
-#define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg), env)
+#define EVAL(o)                 eval(ctx, (o))
+#define EVAL_ARG()              eval(ctx, next_arg(ctx, &arg))
 #define SYM(o)                  make_symbol(ctx, (o))
 #define CONS1(a)                cons(ctx, (a), ctx->nil)
 #define CONS(a, d)              cons(ctx, (a), (d))
@@ -93,6 +93,7 @@ namespace basecode::scm {
     using trap_t                = b8 (*)(vm_t& vm, u64 arg);
     using op_code_t             = u8;
     using bb_array_t            = stable_array_t<bb_t>;
+    using obj_stack_t           = stack_t<obj_t*>;
     using ptr_array_t           = array_t<u0*>;
     using env_array_t           = array_t<env_t>;
     using var_table_t           = symtab_t<var_t*>;
@@ -154,6 +155,7 @@ namespace basecode::scm {
         is,
         atom,
         print,
+        format,
         gt,
         gte,
         lt,
@@ -465,6 +467,7 @@ namespace basecode::scm {
         handlers_t              handlers;
         obj_stack_t             gc_stack;
         obj_stack_t             cl_stack;
+        obj_stack_t             env_stack;
         proc_array_t            procedures;
         env_array_t             environments;
         ptr_array_t             native_ptrs;

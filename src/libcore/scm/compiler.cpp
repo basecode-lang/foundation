@@ -39,7 +39,7 @@ namespace basecode::scm::compiler {
                 auto ctx = c.ctx;
                 obj_t* sym  = CAR(c.obj);
                 obj_t* args = CDR(c.obj);
-                obj_t* form = TYPE(sym) == obj_type_t::symbol ? get(ctx, sym, c.env) : sym;
+                obj_t* form = TYPE(sym) == obj_type_t::symbol ? get(ctx, sym) : sym;
 
                 auto cl = cons(ctx, c.obj, ctx->call_list);
                 ctx->call_list = cl;

@@ -22,7 +22,6 @@
 #define EXEC_NEXT()             SAFE_SCOPE(                                         \
     if (cycles > 0)     --cycles;                                                   \
     if (cycles == 0)    return status;                                              \
-    env   = (obj_t*) H(G(register_file::ep));                                       \
     inst  = (encoded_inst_t*) &H(PC);                                               \
     data  = inst->data;                                                             \
     flags = (flag_register_t*) &F;                                                  \
@@ -629,7 +628,6 @@ namespace basecode::scm::vm {
 #endif
         u64                 data;
         u64                 carry_out;
-        obj_t*              env;
         encoded_inst_t*     inst;
         flag_register_t*    flags;
         encoded_operand_t*  opers;
@@ -1357,7 +1355,7 @@ namespace basecode::scm::vm {
         }
         qq_reg2:
         {
-            auto v = quasiquote(ctx, (obj_t*) G(opers->reg2.src), env);
+            auto v = quasiquote(ctx, (obj_t*) G(opers->reg2.src));
             flags->c = false;
             flags->z = !IS_NIL(v);
             flags->n = false;
@@ -1448,7 +1446,7 @@ namespace basecode::scm::vm {
         get_imm:
         {
             auto key = (obj_t*) OBJ_AT(G(opers->imm.src));
-            auto v   = get(ctx, key, env);
+            auto v   = get(ctx, key);
             flags->c = false;
             flags->z = !IS_NIL(v);
             flags->n = false;
@@ -1460,7 +1458,7 @@ namespace basecode::scm::vm {
         }
         get_reg2:
         {
-            auto v = get(ctx, (obj_t*) G(opers->reg2.src), env);
+            auto v = get(ctx, (obj_t*) G(opers->reg2.src));
             flags->c = false;
             flags->z = !IS_NIL(v);
             flags->n = false;
@@ -1472,19 +1470,13 @@ namespace basecode::scm::vm {
         }
         set_imm:
         {
-            set(ctx,
-                (obj_t*) G(opers->imm.dst),
-                OBJ_AT(G(opers->imm.src)),
-                env);
+            set(ctx, (obj_t*) G(opers->imm.dst), OBJ_AT(G(opers->imm.src)));
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
         set_reg2:
         {
-            set(ctx,
-                (obj_t*) G(opers->reg2.dst),
-                (obj_t*) G(opers->reg2.src),
-                env);
+            set(ctx, (obj_t*) G(opers->reg2.dst), (obj_t*) G(opers->reg2.src));
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
@@ -1552,10 +1544,9 @@ namespace basecode::scm::vm {
         }
         listp_reg2:
         {
-            // FIXME
             auto v = (obj_t*) G(opers->reg2.src);
             flags->c = false;
-            flags->z = TYPE(v) == obj_type_t::pair; // XXX: NOT CORRECT, fix!
+            flags->z = is_list(ctx, v);
             flags->n = false;
             flags->i = false;
             flags->v = false;

@@ -25,7 +25,7 @@
 using namespace basecode;
 
 static u0 validate_cvar(scm::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
-    auto binding = scm::get(ctx, scm::make_symbol(ctx, name), scm::nil(ctx));
+    auto binding = scm::get(ctx, scm::make_symbol(ctx, name));
     auto cvar_value = scm::cdr(ctx, binding);
     if (expected) {
         if (scm::type(cvar_value) != scm::obj_type_t::fixnum)
