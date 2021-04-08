@@ -24,7 +24,7 @@
 #include <basecode/core/stable_array.h>
 
 #define H(a)                    (vm[((a) / 8)])
-#define G(n)                    (vm[(vm.memory_map.heap_size - 1) - (n)])
+#define G(n)                    (vm[(vm.mem_map.heap_size - 1) - (n)])
 #define M                       G(basecode::scm::register_file::m)
 #define F                       G(basecode::scm::register_file::f)
 #define PC                      G(basecode::scm::register_file::pc)

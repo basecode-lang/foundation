@@ -33,7 +33,7 @@ namespace basecode::scm::vm {
 
     status_t step(vm_t& vm, ctx_t* ctx, s32 cycles = -1);
 
-    const memory_map_entry_t* find_memory_map_entry(const vm_t& vm, u8 reg);
+    const mem_map_entry_t* find_mem_map_entry(const vm_t& vm, u8 reg);
 
-    u0 memory_map(vm_t& vm, memory_area_t area, u8 reg, u32 size, b8 top = false);
+    u0 mem_map(vm_t& vm, mem_area_t area, u8 reg, u32 size, b8 top = false);
 }

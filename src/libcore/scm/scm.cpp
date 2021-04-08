@@ -537,6 +537,8 @@ namespace basecode::scm {
     }
 
     ctx_t* init(u0* ptr, u32 size, alloc_t* alloc) {
+        namespace rf = scm::register_file;
+
         // init context struct
         auto ctx = (ctx_t*) ptr;
         std::memset(ctx, 0, sizeof(ctx_t));
@@ -558,11 +560,11 @@ namespace basecode::scm {
         ctx->alloc = alloc;
         vm::init(vm, ctx->alloc, size);
         const auto half_heap = size / 2;
-        vm::memory_map(vm, scm::memory_area_t::code, scm::register_file::lp, half_heap / 2);
-        vm::memory_map(vm, scm::memory_area_t::code_stack, scm::register_file::sp,half_heap / 3, true);
-        vm::memory_map(vm, scm::memory_area_t::heap, scm::register_file::hp, half_heap / 2);
-        vm::memory_map(vm, scm::memory_area_t::data_stack, scm::register_file::dp, half_heap / 3, true);
-        vm::memory_map(vm, scm::memory_area_t::env_stack, scm::register_file::ep, half_heap / 3, true);
+        vm::mem_map(vm, scm::mem_area_t::code,          rf::lp, half_heap / 2, false);
+        vm::mem_map(vm, scm::mem_area_t::code_stack,    rf::sp, half_heap / 3, true);
+        vm::mem_map(vm, scm::mem_area_t::heap,          rf::hp, half_heap / 2, false);
+        vm::mem_map(vm, scm::mem_area_t::data_stack,    rf::dp, half_heap / 3, true);
+        vm::mem_map(vm, scm::mem_area_t::env_stack,     rf::ep, half_heap / 3, true);
         vm::reset(vm);
         compiler::init(ctx->compiler, &vm, LP, ctx->alloc);
         array::init(ctx->native_ptrs, ctx->alloc);

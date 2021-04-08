@@ -459,10 +459,10 @@ namespace basecode::scm::vm {
     }
 
     u0 reset(vm_t& vm) {
-        std::memset(vm.memory_map.reg_to_entry, -1, sizeof(s32) * 32);
+        std::memset(vm.mem_map.reg_to_entry, -1, sizeof(s32) * 32);
         u64 addr = 0;
         for (u32 i = 0; i < max_memory_areas; ++i) {
-            auto& area = vm.memory_map.entries[i];
+            auto& area = vm.mem_map.entries[i];
             if (!area.valid)
                 continue;
             u64 end_addr = addr + area.size;
@@ -473,7 +473,7 @@ namespace basecode::scm::vm {
                 area.addr = addr > 0 ? addr - 1 : addr;
             }
             G(area.reg) = area.addr;
-            vm.memory_map.reg_to_entry[area.reg] = i;
+            vm.mem_map.reg_to_entry[area.reg] = i;
             addr = end_addr;
         }
 
@@ -483,7 +483,7 @@ namespace basecode::scm::vm {
     }
 
     u32 heap_top(vm_t& vm) {
-        return vm.memory_map.heap_size - 1;
+        return vm.mem_map.heap_size - 1;
     }
 
     status_t step(vm_t& vm, ctx_t* ctx, s32 cycles) {
@@ -1210,7 +1210,7 @@ namespace basecode::scm::vm {
         }
         mma_imm:
         {
-            auto area = &vm.memory_map.entries[opers->imm.src];
+            auto area = &vm.mem_map.entries[opers->imm.src];
             G(opers->imm.dst) = area->valid ? area->addr : 0;
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
@@ -1827,16 +1827,16 @@ namespace basecode::scm::vm {
     }
 
     status_t init(vm_t& vm, alloc_t* alloc, u32 heap_size) {
-        vm.alloc                = alloc;
-        vm.heap                 = (u64*) memory::alloc(vm.alloc, heap_size, alignof(u64));
-        vm.memory_map           = {};
-        vm.memory_map.heap_size = heap_size / sizeof(u64);
+        vm.alloc             = alloc;
+        vm.heap              = (u64*) memory::alloc(vm.alloc, heap_size, alignof(u64));
+        vm.mem_map           = {};
+        vm.mem_map.heap_size = heap_size / sizeof(u64);
         hashtab::init(vm.traptab, vm.alloc);
         return status_t::ok;
     }
 
-    u0 memory_map(vm_t& vm, memory_area_t area, u8 reg, u32 size, b8 top) {
-        auto entry = &vm.memory_map.entries[u32(area)];
+    u0 mem_map(vm_t& vm, mem_area_t area, u8 reg, u32 size, b8 top) {
+        auto entry = &vm.mem_map.entries[u32(area)];
         entry->offs  = 0;
         entry->reg   = reg;
         entry->top   = top;
@@ -1844,10 +1844,10 @@ namespace basecode::scm::vm {
         entry->valid = true;
     }
 
-    const memory_map_entry_t* find_memory_map_entry(const vm_t& vm, u8 reg) {
-        s32 idx = vm.memory_map.reg_to_entry[reg];
+    const mem_map_entry_t* find_mem_map_entry(const vm_t& vm, u8 reg) {
+        s32 idx = vm.mem_map.reg_to_entry[reg];
         if (idx == -1)
             return nullptr;
-        return &vm.memory_map.entries[idx];
+        return &vm.mem_map.entries[idx];
     }
 }

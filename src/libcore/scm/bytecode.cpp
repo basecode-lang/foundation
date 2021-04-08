@@ -1036,7 +1036,7 @@ namespace basecode::scm {
                         auto& dst = inst.operands[1];
                         ENCODE_IMM(src, opers->imm.src);
                         ENCODE_REG(dst, opers->imm.dst);
-                        auto area = find_memory_map_entry(vm, opers->imm.dst);
+                        auto area = find_mem_map_entry(vm, opers->imm.dst);
                         if (area) {
                             opers->imm.aux = area->top ? -1 : 1;
                         } else {
@@ -1082,7 +1082,7 @@ namespace basecode::scm {
                         auto& dst = inst.operands[1];
                         ENCODE_REG(src, opers->reg2.src);
                         ENCODE_REG(dst, opers->reg2.dst);
-                        auto area = find_memory_map_entry(vm, opers->reg2.src);
+                        auto area = find_mem_map_entry(vm, opers->reg2.src);
                         if (area && !inst.aux) {
                             opers->reg2.aux = area->top ? -1 : 1;
                         } else {
@@ -1412,12 +1412,12 @@ namespace basecode::scm {
                 auto base = emitter::virtual_var::get(comp.emit, "base"_ss);
                 basic_block::encode(bc.bb)
                     .offs()
-                    .op(op::store)
-                    .src(&res)
-                    .dst(&base)
-                    .offset(0)
-                    .mode(true)
-                    .build();
+                        .op(op::store)
+                        .src(&res)
+                        .dst(&base)
+                        .offset(0)
+                        .mode(true)
+                        .build();
 
                 proc->is_compiled = true;
                 return {&leave(*bc.bb), res};
@@ -1775,9 +1775,9 @@ namespace basecode::scm {
                 }
                 basic_block::encode(oc.bb)
                     .imm1()
-                    .op(op::br)
-                    .value(&exit_bb)
-                    .build();
+                        .op(op::br)
+                        .value(&exit_bb)
+                        .build();
                 return {&exit_bb, res};
             }
 
@@ -1823,10 +1823,6 @@ namespace basecode::scm {
                         .op(op::bne)
                         .value(&false_bb)
                         .build();
-//                    .imm1()
-//                        .op(op::br)
-//                        .value(&true_bb)
-//                        .build();
 
                 ic.bb  = &true_bb;
                 ic.obj = CADR(args);
@@ -1853,10 +1849,6 @@ namespace basecode::scm {
                         .src(&false_res.var)
                         .dst(&res)
                         .build();
-//                    .imm1()
-//                        .op(op::br)
-//                        .value(&exit_bb)
-//                        .build();
 
                 return {&exit_bb, res};
             }
@@ -1872,11 +1864,11 @@ namespace basecode::scm {
                 auto rhs_res = compiler::compile(comp, cc);
                 basic_block::encode(rhs_res.bb)
                     .reg3()
-                    .op(op::cons)
-                    .a(&lhs_res.var)
-                    .b(&rhs_res.var)
-                    .c(&res)
-                    .build();
+                        .op(op::cons)
+                        .a(&lhs_res.var)
+                        .b(&rhs_res.var)
+                        .c(&res)
+                        .build();
                 return {rhs_res.bb, res};
             }
 
@@ -1888,10 +1880,10 @@ namespace basecode::scm {
                 auto comp_res = compiler::compile(comp, ac);
                 basic_block::encode(comp_res.bb)
                     .reg2()
-                    .op(op::atomp)
-                    .src(&comp_res.var)
-                    .dst(&res)
-                    .build();
+                        .op(op::atomp)
+                        .src(&comp_res.var)
+                        .dst(&res)
+                        .build();
                 return {comp_res.bb, res};
             }
 
@@ -1903,10 +1895,10 @@ namespace basecode::scm {
                 auto comp_res = compiler::compile(comp, ec);
                 basic_block::encode(comp_res.bb)
                     .reg2()
-                    .op(op::eval)
-                    .src(&comp_res.var)
-                    .dst(&res)
-                    .build();
+                        .op(op::eval)
+                        .src(&comp_res.var)
+                        .dst(&res)
+                        .build();
                 return {comp_res.bb, res};
             }
 
@@ -1923,12 +1915,12 @@ namespace basecode::scm {
                     lc.bb = res.bb;
                     basic_block::encode(res.bb)
                         .offs()
-                        .op(op::store)
-                        .offset(offs)
-                        .src(&res.var)
-                        .dst(&base_addr)
-                        .mode(true)
-                        .build();
+                            .op(op::store)
+                            .offset(offs)
+                            .src(&res.var)
+                            .dst(&base_addr)
+                            .mode(true)
+                            .build();
                     args = CDR(args);
                     offs += 8;
                 }
@@ -1936,11 +1928,11 @@ namespace basecode::scm {
                 auto& list_bb = emitter::make_basic_block(*c.bb->emit, "make_list"_ss, lc.bb);
                 basic_block::encode(list_bb)
                     .reg2_imm()
-                    .op(op::list)
-                    .src(&base_addr)
-                    .dst(&res)
-                    .value(size * 8)
-                    .build();
+                        .op(op::list)
+                        .src(&base_addr)
+                        .dst(&res)
+                        .value(size * 8)
+                        .build();
                 free_stack(list_bb, size);
                 return {&list_bb, res};
             }
@@ -1957,22 +1949,21 @@ namespace basecode::scm {
                     oc.bb = comp_res.bb;
                     basic_block::encode(oc.bb)
                         .reg2()
-                        .op(op::move)
-                        .src(&comp_res.var)
-                        .dst(&res)
-                        .build()
+                            .op(op::move)
+                            .src(&comp_res.var)
+                            .dst(&res)
+                            .build()
                         .reg2()
-                        .op(op::truep)
-                        .src(&res)
-                        .dst(&tmp)
-                        .build()
+                            .op(op::truep)
+                            .src(&res)
+                            .dst(&tmp)
+                            .build()
                         .imm1()
-                        .op(op::bne)
-                        .value(&exit_bb)
-                        .build();
+                            .op(op::bne)
+                            .value(&exit_bb)
+                            .build();
                     args = CDR(args);
                 }
-//                basic_block::encode(oc.bb).succ(exit_bb);
                 return {&exit_bb, res};
             }
 
@@ -1984,10 +1975,10 @@ namespace basecode::scm {
                 auto comp_res = compiler::compile(comp, nc);
                 basic_block::encode(comp_res.bb)
                     .reg2()
-                    .op(op::lnot)
-                    .src(&comp_res.var)
-                    .dst(&res)
-                    .build();
+                        .op(op::lnot)
+                        .src(&comp_res.var)
+                        .dst(&res)
+                        .build();
                 return {comp_res.bb, res};
             }
 
@@ -1998,15 +1989,15 @@ namespace basecode::scm {
                 basic_block::encode(c.bb)
                     .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)))
                     .imm2()
-                    .op(op::const_)
-                    .src(u32(OBJ_IDX(args)))
-                    .dst(&tmp)
-                    .build()
+                        .op(op::const_)
+                        .src(u32(OBJ_IDX(args)))
+                        .dst(&tmp)
+                        .build()
                     .reg2()
-                    .op(op::error)
-                    .src(&tmp)
-                    .dst(&res)
-                    .build();
+                        .op(op::error)
+                        .src(&tmp)
+                        .dst(&res)
+                        .build();
                 basic_block::encode(c.bb)
                     .comment(format::format("literal: {}",
                                             to_string(c.ctx, args)),
@@ -2061,16 +2052,16 @@ namespace basecode::scm {
                         "symbol: {}",
                         printable_t{c.ctx, key, true}))
                     .imm2()
-                    .op(op::set)
-                    .src(u32(idx))
-                    .dst(&comp_res.var)
-                    .mode(true)
-                    .build()
+                        .op(op::set)
+                        .src(u32(idx))
+                        .dst(&comp_res.var)
+                        .mode(true)
+                        .build()
                     .reg2()
-                    .op(op::move)
-                    .src(&comp_res.var)
-                    .dst(&res)
-                    .build();
+                        .op(op::move)
+                        .src(&comp_res.var)
+                        .dst(&res)
+                        .build();
                 return {comp_res.bb, res};
             }
 
@@ -2084,10 +2075,10 @@ namespace basecode::scm {
                 auto lhs_res = compiler::compile(comp, sc);
                 basic_block::encode(lhs_res.bb)
                     .reg2()
-                    .op(op::setcdr)
-                    .src(&lhs_res.var)
-                    .dst(&rhs_res.var)
-                    .build();
+                        .op(op::setcdr)
+                        .src(&lhs_res.var)
+                        .dst(&rhs_res.var)
+                        .build();
                 return {lhs_res.bb, {}};
             }
 
@@ -2101,10 +2092,10 @@ namespace basecode::scm {
                 auto lhs_res = compiler::compile(comp, sc);
                 basic_block::encode(lhs_res.bb)
                     .reg2()
-                    .op(op::setcar)
-                    .src(&lhs_res.var)
-                    .dst(&rhs_res.var)
-                    .build();
+                        .op(op::setcar)
+                        .src(&lhs_res.var)
+                        .dst(&rhs_res.var)
+                        .build();
                 return {lhs_res.bb, {}};
             }
         }

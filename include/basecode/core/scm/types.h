@@ -168,7 +168,7 @@ namespace basecode::scm {
         max,
     };
 
-    enum class memory_area_t : u8 {
+    enum class mem_area_t : u8 {
         code,
         heap,
         env_stack,
@@ -406,7 +406,7 @@ namespace basecode::scm {
         comment_array_t         comments;
     };
 
-    struct memory_map_entry_t final {
+    struct mem_map_entry_t final {
         u64                     addr;
         u32                     offs;
         u32                     size;
@@ -415,10 +415,10 @@ namespace basecode::scm {
         b8                      valid;
     };
 
-    struct memory_map_t final {
+    struct mem_map_t final {
         u32                     heap_size;
         s32                     reg_to_entry[32];
-        memory_map_entry_t      entries[max_memory_areas];
+        mem_map_entry_t         entries[max_memory_areas];
     };
 
     struct flag_register_t final {
@@ -433,8 +433,8 @@ namespace basecode::scm {
     struct vm_t final {
         alloc_t*                alloc;
         u64*                    heap;
+        mem_map_t               mem_map;
         trap_table_t            traptab;
-        memory_map_t            memory_map;
         b8                      exited;
 
         u64& operator[](u32 idx)        { return heap[idx]; }
