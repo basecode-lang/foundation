@@ -20,6 +20,7 @@
 #include <basecode/core/buf.h>
 #include <basecode/core/string.h>
 #include <basecode/core/stopwatch.h>
+#include <basecode/core/scm/system.h>
 #include <basecode/core/scm/modules/config.h>
 
 using namespace basecode;
@@ -40,7 +41,7 @@ static u0 validate_cvar(scm::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
 
     auto source = format::format("(if (is {} {}) #t #f)", id, name);
     scm::obj_t* obj{};
-    config::eval(source, &obj);
+    scm::system::eval(source, &obj);
     if (!obj)
         REQUIRE(false);
 
@@ -125,7 +126,7 @@ TEST_CASE("basecode::config terp eval") {
 )"_ss;
 
     scm::obj_t* obj{};
-    config::eval(source, &obj);
+    scm::system::eval(source, &obj);
     if (!obj)
         REQUIRE(false);
     if (scm::type(obj) != scm::obj_type_t::fixnum)

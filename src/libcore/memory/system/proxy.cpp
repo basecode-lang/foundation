@@ -29,7 +29,10 @@ namespace basecode::memory::proxy {
     static u32 free(alloc_t* alloc, u0* mem) {
         auto sys = alloc->backing->system;
         auto freed_size = sys->free(alloc->backing, mem);
-        alloc->total_allocated -= freed_size;
+        if (freed_size < alloc->total_allocated)
+            alloc->total_allocated -= freed_size;
+        else
+            alloc->total_allocated = 0;
         return freed_size;
     }
 

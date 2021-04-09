@@ -1,5 +1,11 @@
 HIGH
 ---------
+- memory: fucking proxy allocator needs a solid review and clean up
+            there are still situations where other allocators backed by
+            a proxy aren't aligned with total_allocated
+- symtab: just ran into a pointer stability issue.  i swapped in
+          stable_array_t easily enough, but now i want do a full review
+          and see if the stable array is really needed.
 - scm: adjust print primitive to not add spaces and line feeds
 
 MEDIUM

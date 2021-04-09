@@ -20,7 +20,7 @@
 #include <basecode/core/error.h>
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
-#include <basecode/core/scm/kernel.h>
+#include <basecode/core/scm/system.h>
 #include <basecode/core/log/system/spdlog.h>
 #include <basecode/core/log/system/syslog.h>
 #include <basecode/core/scm/modules/config.h>
@@ -712,13 +712,12 @@ namespace basecode::config {
                         }
                     }
                 },
+                {str::slice_t{}},
             };
         }
 
         u0 fini() {
-            scm::free(g_cfg_sys.ctx);
             str::free(g_cfg_sys.buf);
-            memory::free(g_cfg_sys.alloc, g_cfg_sys.ctx);
         }
 
         scm::ctx_t* context() {
@@ -726,21 +725,18 @@ namespace basecode::config {
         }
 
         status_t init(const config_settings_t& settings, alloc_t* alloc) {
-            g_cfg_sys.alloc          = alloc;
-            g_cfg_sys.heap_size      = settings.heap_size;
-            g_cfg_sys.ctx            = (scm::ctx_t*) memory::alloc(g_cfg_sys.alloc,
-                                                                   g_cfg_sys.heap_size);
+            g_cfg_sys.alloc = alloc;
+            g_cfg_sys.ctx   = settings.ctx ? settings.ctx : scm::system::global_ctx();
+
             str::init(g_cfg_sys.buf, g_cfg_sys.alloc);
             str::reserve(g_cfg_sys.buf, 8192);
 
-            scm::init(g_cfg_sys.ctx, g_cfg_sys.heap_size, g_cfg_sys.alloc);
             g_cfg_sys.current_user         = scm::nil(g_cfg_sys.ctx);
             g_cfg_sys.current_alloc        = scm::nil(g_cfg_sys.ctx);
             g_cfg_sys.current_logger       = scm::nil(g_cfg_sys.ctx);
             g_cfg_sys.current_command_line = scm::nil(g_cfg_sys.ctx);
 
-            scm::kernel::create_exports(g_cfg_sys.ctx, exports::s_exports, 22);
-
+            scm::kernel::create_exports(g_cfg_sys.ctx, exports::s_exports);
             std::memset(g_cfg_sys.vars, 0, sizeof(cvar_t) * max_cvar_size);
 
             cvar_t* cvar{};
@@ -879,51 +875,6 @@ namespace basecode::config {
             add_binding(cvar);
             return status_t::ok;
         }
-    }
-
-    status_t eval(const path_t& path, scm::obj_t** obj) {
-        buf_t buf{};
-        buf::init(buf, g_cfg_sys.alloc);
-        auto status = buf::map_existing(buf, path);
-        if (!OK(status))
-            return status_t::bad_input;
-        buf_crsr_t crsr{};
-        buf::cursor::init(crsr, buf);
-        defer(
-            buf::cursor::free(crsr);
-            buf::free(buf);
-        );
-        auto gc = scm::save_gc(g_cfg_sys.ctx);
-        while (true) {
-            auto expr = scm::read(g_cfg_sys.ctx, crsr);
-            if (!expr) break;
-            *obj = scm::eval(g_cfg_sys.ctx, expr);
-            scm::restore_gc(g_cfg_sys.ctx, gc);
-        }
-        scm::restore_gc(g_cfg_sys.ctx, gc);
-        return status_t::ok;
-    }
-
-    status_t eval(const u8* source, u32 len, scm::obj_t** obj) {
-        buf_t buf{};
-        buf::init(buf, g_cfg_sys.alloc);
-        auto status = buf::load(buf, source, len);
-        if (!OK(status))
-            return status_t::bad_input;
-        buf_crsr_t crsr{};
-        buf::cursor::init(crsr, buf);
-        auto gc = scm::save_gc(g_cfg_sys.ctx);
-        defer(
-            scm::restore_gc(g_cfg_sys.ctx, gc);
-            buf::cursor::free(crsr);
-            buf::free(buf));
-        auto expr = scm::read(g_cfg_sys.ctx, crsr);
-        if (!expr) {
-            *obj = scm::nil(g_cfg_sys.ctx);
-            return status_t::ok;
-        }
-        *obj = scm::eval(g_cfg_sys.ctx, expr);
-        return status_t::ok;
     }
 }
 

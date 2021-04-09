@@ -44,9 +44,12 @@ namespace basecode::scm::kernel {
         }
     }
 
-    u0 create_exports(scm::ctx_t* ctx, proc_export_t* exports, u32 size) {
-        for (u32 i = 0; i < size; ++i) {
+    u0 create_exports(scm::ctx_t* ctx, proc_export_t* exports) {
+        u32 i{};
+        while (true) {
             const auto& exp = exports[i];
+            if (slice::empty(exp.name))
+                break;
             auto proto = ffi::proto::make(exp.name);
             for (u32 j = 0; j < exp.num_overloads; ++j) {
                 const auto& ol_decl = exp.overloads[j];
@@ -70,6 +73,7 @@ namespace basecode::scm::kernel {
             scm::set(ctx,
                      scm::make_symbol(ctx, proto->name),
                      scm::make_ffi(ctx, proto));
+            ++i;
         }
     }
 }

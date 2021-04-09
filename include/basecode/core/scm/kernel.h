@@ -66,5 +66,5 @@ namespace basecode::scm::kernel {
 
     u0 create_types(type_decl_t* decls, u32 size);
 
-    u0 create_exports(scm::ctx_t* ctx, proc_export_t* exports, u32 size);
+    u0 create_exports(scm::ctx_t* ctx, proc_export_t* exports);
 }

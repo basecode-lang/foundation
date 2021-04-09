@@ -34,6 +34,7 @@ namespace basecode {
     };
 
     struct config_settings_t final {
+        scm::ctx_t*             ctx             {};
         str::slice_t            build_type      {};
         str::slice_t            product_name    {};
         struct {
@@ -41,7 +42,6 @@ namespace basecode {
             u32                 minor           {};
             u32                 revision        {};
         }                       version         {};
-        u32                     heap_size       {256 * 1024};
         b8                      test_runner     {};
     };
 
@@ -82,7 +82,8 @@ namespace basecode {
 
             scm::ctx_t* context();
 
-            status_t init(const config_settings_t& settings, alloc_t* alloc = context::top()->alloc);
+            status_t init(const config_settings_t& settings,
+                          alloc_t* alloc = context::top()->alloc);
         }
 
         namespace cvar {
@@ -97,14 +98,6 @@ namespace basecode {
             status_t add(u32 id, const String_Concept auto& name, cvar_type_t type) {
                 return add(id, (const s8*) name.data, type, name.length);
             }
-        }
-
-        status_t eval(const path_t& path, scm::obj_t** obj);
-
-        status_t eval(const u8* source, u32 len, scm::obj_t** obj);
-
-        status_t eval(const String_Concept auto& source, scm::obj_t** obj) {
-            return eval(source.data, source.length, obj);
         }
     }
 }

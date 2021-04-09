@@ -26,6 +26,40 @@
 
 using namespace basecode;
 
+TEST_CASE("basecode::symtab_t keys with repeated chars", "[symtab]") {
+    symtab_t<s32> symbols{};
+    symtab::init(symbols);
+    defer(symtab::free(symbols));
+
+    s32 val{};
+
+    symtab::insert(symbols, "intern/get"_ss, 1);
+    symtab::insert(symbols, "cxx/make-program"_ss, 2);
+    symtab::insert(symbols, "cxx/size-in-bits"_ss, 3);
+    symtab::insert(symbols, "cxx/size-in-bytes"_ss, 4);
+    symtab::insert(symbols, "cxx/get-scope"_ss, 5);
+    symtab::insert(symbols, "cxx/get-module"_ss, 6);
+    symtab::insert(symbols, "cxx/add-module"_ss, 7);
+    symtab::insert(symbols, "cxx/pop-scope"_ss, 8);
+    symtab::insert(symbols, "cxx/push-scope"_ss, 9);
+    symtab::insert(symbols, "cxx/make-label"_ss, 10);
+    symtab::insert(symbols, "cxx/unary/!"_ss, 11);
+    symtab::insert(symbols, "cxx/unary/~"_ss, 12);
+    symtab::insert(symbols, "cxx/unary/*"_ss, 13);
+    symtab::insert(symbols, "cxx/unary/-"_ss, 14);
+    symtab::insert(symbols, "cxx/unary/&"_ss, 15);
+    symtab::insert(symbols, "cxx/unary/&&"_ss, 16);
+    symtab::insert(symbols, "cxx/unary/++"_ss, 17);
+    symtab::insert(symbols, "cxx/unary/--"_ss, 18);
+
+    REQUIRE(symtab::find(symbols, "cxx/unary/-"_ss, val));
+    REQUIRE(val == 14);
+    REQUIRE(symtab::find(symbols, "cxx/unary/--"_ss, val));
+    REQUIRE(val == 18);
+
+//    symtab::format_nodes(symbols);
+}
+
 TEST_CASE("basecode::symtab_t remove key") {
     symtab_t<s32> symbols{};
     symtab::init(symbols);

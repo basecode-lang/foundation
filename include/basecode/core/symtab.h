@@ -25,10 +25,15 @@
 #include <basecode/core/format.h>
 #include <basecode/core/memory.h>
 #include <basecode/core/assoc_array.h>
+#include <basecode/core/stable_array.h>
 
-#define GET_NODE(t, id)         (&((t).nodes[(id) - 1]))
+#define GET_NODE(t, id)         ((id == 0 || id > (t).nodes.size) ? nullptr : &((t).nodes[(id) - 1]))
 
 namespace basecode {
+    struct symtab_node_t;
+
+    using symtab_node_array_t   = stable_array_t<symtab_node_t>;
+
     constexpr u8 empty          = 0b00;
     constexpr u8 used           = 0b01;
     constexpr u8 leaf           = 0b10;
@@ -47,7 +52,7 @@ namespace basecode {
         typename                T::Pair_Array;
 
         {t.alloc}               -> same_as<alloc_t*>;
-        {t.nodes}               -> same_as<array_t<symtab_node_t>>;
+        {t.nodes}               -> same_as<symtab_node_array_t>;
         {t.values}              -> same_as<array_t<typename T::Value_Type>>;
         {t.size}                -> same_as<u32>;
     };
@@ -59,18 +64,18 @@ namespace basecode {
         using Pair_Array        = assoc_array_t<std::remove_pointer_t<V>*>;
 
         alloc_t*                alloc;
-        array_t<symtab_node_t>  nodes;
+        symtab_node_array_t     nodes;
         array_t<V>              values;
         u32                     size;
     };
-    static_assert(sizeof(symtab_t<s32>) <= 64, "symtab_t<V> is now larger than 64 bytes!");
+    static_assert(sizeof(symtab_t<s32>) <= 72, "symtab_t<V> is now larger than 72 bytes!");
 
     struct find_level_result_t final {
         symtab_node_t*          start_node;
         symtab_node_t*          match_node;
         symtab_node_t*          avail_node;
         u32                     node_id;
-    } __attribute__((aligned(32)));
+    };
 
     namespace symtab {
         template <Symbol_Table T>
@@ -127,15 +132,15 @@ namespace basecode {
         template <Symbol_Table T>
         u0 reset(T& table) {
             table.size = {};
-            array::reset(table.nodes);
             array::reset(table.values);
+            stable_array::reset(table.nodes);
             append_node(table, 0, 0, 0, empty);
         }
 
         template <Symbol_Table T>
         u0 clear(T& table) {
-            array::free(table.nodes);
             array::free(table.values);
+            stable_array::free(table.nodes);
             table.size = {};
         }
 
@@ -182,15 +187,15 @@ namespace basecode {
         u0 init(T& table, alloc_t* alloc) {
             table.size  = {};
             table.alloc = alloc;
-            array::init(table.nodes, table.alloc);
             array::init(table.values, table.alloc);
+            stable_array::init(table.nodes, table.alloc);
             append_node(table, 0, 0, 0, empty);
         }
 
         template <Symbol_Table T>
         u0 reserve(T& table, u32 capacity) {
-            array::reserve(table.nodes, capacity);
             array::reserve(table.values, capacity);
+            stable_array::reserve(table.nodes, capacity);
         }
 
         template <Symbol_Table T>
@@ -453,7 +458,7 @@ namespace basecode {
 
         template <Symbol_Table T>
         inline u32 append_node(T& table, u8 sym, u32 next, u32 child, u8 type) {
-            auto& node = array::append(table.nodes);
+            auto& node = stable_array::append(table.nodes);
             node.sym   = sym;
             node.type  = type;
             node.next  = next;

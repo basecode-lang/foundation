@@ -35,17 +35,17 @@ namespace basecode::ffi {
     struct lib_pair_t final {
         lib_t*                  lib;
         u32                     idx;
-    } __attribute__((aligned(16)));
+    };
 
     struct overload_pair_t final {
         overload_t*             overload;
         u32                     idx;
-    } __attribute__((aligned(16)));
+    };
 
     struct proto_pair_t final {
         proto_t*                proto;
         u32                     idx;
-    } __attribute__((aligned(16)));
+    };
 
     struct system_t final {
         alloc_t*                alloc;
@@ -56,7 +56,7 @@ namespace basecode::ffi {
         param_slab_t            param_slab;
         proto_slab_t            proto_slab;
         overload_slab_t         overload_slab;
-    } __attribute__((aligned(128)));
+    };
 
     system_t                    g_ffi_system;
 

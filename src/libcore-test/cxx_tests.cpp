@@ -29,90 +29,90 @@ using namespace basecode::cxx;
 TEST_CASE("basecode::cxx create program_t") {
     TIME_BLOCK("cxx: total build time"_ss,
                cxx::program_t pgm{};
-                   cxx::program::init(pgm);
-                   defer(cxx::program::free(pgm));
-                   REQUIRE(pgm.storage.alloc);
-                   REQUIRE(pgm.modules.alloc);
-                   REQUIRE(pgm.storage.index.alloc);
-                   REQUIRE(pgm.storage.index.size == 1);
-                   REQUIRE(pgm.modules.size == 0););
+               cxx::program::init(pgm);
+               defer(cxx::program::free(pgm));
+               REQUIRE(pgm.storage.alloc);
+               REQUIRE(pgm.modules.alloc);
+               REQUIRE(pgm.storage.index.alloc);
+               REQUIRE(pgm.storage.index.size == 1);
+               REQUIRE(pgm.modules.size == 0););
 }
 
 TEST_CASE("basecode::cxx create module_t") {
     TIME_BLOCK("cxx: total build time"_ss,
                cxx::program_t pgm{};
-                   cxx::program::init(pgm);
-                   defer(cxx::program::free(pgm));
+               cxx::program::init(pgm);
+               defer(cxx::program::free(pgm));
 
-                   const auto expected_filename = "test.cpp"_ss;
-                   const auto expected_revision = cxx::revision_t::cpp20;
+               const auto expected_filename = "test.cpp"_ss;
+               const auto expected_revision = cxx::revision_t::cpp20;
 
-                   auto& mod = cxx::program::add_module(pgm, expected_filename, expected_revision);
-                   REQUIRE(mod.id != 0);
-                   REQUIRE(mod.filename_id != 0);
-                   REQUIRE(mod.revision == expected_revision);
-                   REQUIRE(mod.program == &pgm);
+               auto& mod = cxx::program::add_module(pgm, expected_filename, expected_revision);
+               REQUIRE(mod.id != 0);
+               REQUIRE(mod.filename_id != 0);
+               REQUIRE(mod.revision == expected_revision);
+               REQUIRE(mod.program == &pgm);
 
-                   const auto& root_scope = module::get_scope(mod, mod.root_scope_idx);
-                   REQUIRE(root_scope.id != 0);
-                   REQUIRE(root_scope.parent_idx == 0);
-                   REQUIRE(root_scope.stack.alloc);
-                   REQUIRE(root_scope.stack.size == 0);
-                   REQUIRE(root_scope.types.alloc);
-                   REQUIRE(root_scope.types.size == 0);
-                   REQUIRE(root_scope.labels.alloc);
-                   REQUIRE(root_scope.labels.size == 0);
-                   REQUIRE(root_scope.children.alloc);
-                   REQUIRE(root_scope.children.size == 0);
-                   REQUIRE(root_scope.statements.alloc);
-                   REQUIRE(root_scope.statements.size == 0);
-                   REQUIRE(root_scope.identifiers.alloc);
-                   REQUIRE(root_scope.identifiers.size == 0););
+               const auto& root_scope = module::get_scope(mod, mod.root_scope_idx);
+               REQUIRE(root_scope.id != 0);
+               REQUIRE(root_scope.parent_idx == 0);
+               REQUIRE(root_scope.stack.alloc);
+               REQUIRE(root_scope.stack.size == 0);
+               REQUIRE(root_scope.types.alloc);
+               REQUIRE(root_scope.types.size == 0);
+               REQUIRE(root_scope.labels.alloc);
+               REQUIRE(root_scope.labels.size == 0);
+               REQUIRE(root_scope.children.alloc);
+               REQUIRE(root_scope.children.size == 0);
+               REQUIRE(root_scope.statements.alloc);
+               REQUIRE(root_scope.statements.size == 0);
+               REQUIRE(root_scope.identifiers.alloc);
+               REQUIRE(root_scope.identifiers.size == 0););
 }
 
 TEST_CASE("basecode::cxx create identifier within scope") {
     TIME_BLOCK("cxx: total build time"_ss,
                cxx::program_t pgm{};
-                   cxx::program::init(pgm);
-                   defer(cxx::program::free(pgm));
+               cxx::program::init(pgm);
+               defer(cxx::program::free(pgm));
 
-                   const auto expected_filename = "test.cpp"_ss;
-                   const auto expected_revision = cxx::revision_t::cpp20;
+               const auto expected_filename = "test.cpp"_ss;
+               const auto expected_revision = cxx::revision_t::cpp20;
 
-                   auto& mod       = cxx::program::add_module(pgm, expected_filename, expected_revision);
-                   auto& top_level = module::get_scope(mod, mod.root_scope_idx);
+               auto& mod       = cxx::program::add_module(pgm, expected_filename, expected_revision);
+               auto& top_level = module::get_scope(mod, mod.root_scope_idx);
 
-                   const auto expected_ident = "int"_ss;
+               const auto expected_ident = "int"_ss;
 
-                   auto id = cxx::scope::expr::ident(top_level, expected_ident);
-                   REQUIRE(id != 0);
+               auto id = cxx::scope::expr::ident(top_level, expected_ident);
+               REQUIRE(id != 0);
 
-                   cxx::ident_t ident{};
-                   REQUIRE(symtab::find(top_level.identifiers, expected_ident, ident));
-                   REQUIRE(ident.record_id == id);
-                   REQUIRE(ident.intern_id != 0);
+               cxx::ident_t ident{};
+               REQUIRE(symtab::find(top_level.identifiers, expected_ident, ident));
+               REQUIRE(ident.record_id == id);
+               REQUIRE(ident.intern_id != 0);
 
-                   auto intern_result = string::interned::get(ident.intern_id);
-                   REQUIRE(OK(intern_result.status));
-                   REQUIRE(intern_result.slice == expected_ident););
+               auto intern_result = string::interned::get(ident.intern_id);
+               REQUIRE(OK(intern_result.status));
+               REQUIRE(intern_result.slice == expected_ident););
 }
 
 TEST_CASE("basecode::cxx declare s32 type within scope") {
     TIME_BLOCK("cxx: total build time"_ss,
                cxx::program_t pgm{};
-                   cxx::program::init(pgm);
-                   defer(cxx::program::free(pgm));
+               cxx::program::init(pgm);
+               defer(cxx::program::free(pgm));
 
-                   const auto expected_ident    = "int"_ss;
-                   const auto expected_filename = "test.cpp"_ss;
-                   const auto expected_revision = cxx::revision_t::cpp20;
+               const auto expected_ident    = "int"_ss;
+               const auto expected_filename = "test.cpp"_ss;
+               const auto expected_revision = cxx::revision_t::cpp20;
 
-                   auto& mod       = cxx::program::add_module(pgm, expected_filename, expected_revision);
-                   auto& top_level = module::get_scope(mod, mod.root_scope_idx);
+               auto& mod       = cxx::program::add_module(pgm, expected_filename, expected_revision);
+               auto& top_level = module::get_scope(mod, mod.root_scope_idx);
 
-                   auto int_ident_id = cxx::scope::expr::ident(top_level, expected_ident);
-                   auto int_type_id  = cxx::scope::type::s32_(top_level, int_ident_id);
-                   REQUIRE(int_type_id != 0););
+               auto int_ident_id = cxx::scope::expr::ident(top_level, expected_ident);
+               auto int_type_id  = cxx::scope::type::s32_(top_level, int_ident_id);
+               REQUIRE(int_type_id != 0););
 }
 
 TEST_CASE("basecode::cxx example program") {

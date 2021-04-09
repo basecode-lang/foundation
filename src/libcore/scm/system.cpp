@@ -17,15 +17,77 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/scm/system.h>
-#include <basecode/core/scm/kernel.h>
 
 namespace basecode::scm::system {
+    struct system_t final {
+        alloc_t*                alloc;
+        ctx_t*                  ctx;
+        u32                     heap_size;
+    };
+
+    system_t                    g_scm_sys;
+
     u0 fini() {
+        scm::free(g_scm_sys.ctx);
+        memory::free(g_scm_sys.alloc, g_scm_sys.ctx);
     }
 
-    status_t init(alloc_t* alloc) {
-        UNUSED(alloc);
-        scm::kernel::create_common_types();
+    ctx_t* global_ctx() {
+        return g_scm_sys.ctx;
+    }
+
+    status_t init(u32 heap_size, alloc_t* alloc) {
+        g_scm_sys.alloc     = alloc;
+        g_scm_sys.heap_size = heap_size;
+        g_scm_sys.ctx       = (scm::ctx_t*) memory::alloc(g_scm_sys.alloc,
+                                                          g_scm_sys.heap_size);
+        scm::init(g_scm_sys.ctx, g_scm_sys.heap_size, g_scm_sys.alloc);
+        kernel::create_common_types();
+        return status_t::ok;
+    }
+
+    status_t eval(const path_t& path, obj_t** obj) {
+        buf_t buf{};
+        buf::init(buf, g_scm_sys.alloc);
+        auto status = buf::map_existing(buf, path);
+        if (!OK(status))
+            return status_t::bad_input;
+        buf_crsr_t crsr{};
+        buf::cursor::init(crsr, buf);
+        defer(
+            buf::cursor::free(crsr);
+            buf::free(buf);
+             );
+        auto gc = save_gc(g_scm_sys.ctx);
+        while (true) {
+            auto expr = read(g_scm_sys.ctx, crsr);
+            if (!expr) break;
+            *obj = eval(g_scm_sys.ctx, expr);
+            restore_gc(g_scm_sys.ctx, gc);
+        }
+        restore_gc(g_scm_sys.ctx, gc);
+        return status_t::ok;
+    }
+
+    status_t eval(const u8* source, u32 len, obj_t** obj) {
+        buf_t buf{};
+        buf::init(buf, g_scm_sys.alloc);
+        auto status = buf::load(buf, source, len);
+        if (!OK(status))
+            return status_t::bad_input;
+        buf_crsr_t crsr{};
+        buf::cursor::init(crsr, buf);
+        auto gc = save_gc(g_scm_sys.ctx);
+        defer(
+            restore_gc(g_scm_sys.ctx, gc);
+            buf::cursor::free(crsr);
+            buf::free(buf));
+        auto expr = read(g_scm_sys.ctx, crsr);
+        if (!expr) {
+            *obj = nil(g_scm_sys.ctx);
+            return status_t::ok;
+        }
+        *obj = eval(g_scm_sys.ctx, expr);
         return status_t::ok;
     }
 }
