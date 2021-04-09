@@ -60,6 +60,7 @@ namespace basecode {
             FILE*               file;
             str_t               process_name;
             str_t               buf;
+            b8                  is_redirected;
         }                       default_;
         struct {
             const s8*           ident;

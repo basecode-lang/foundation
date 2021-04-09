@@ -30,6 +30,11 @@ namespace basecode::log::default_ {
         auto cfg = (default_config_t*) config;
         auto sc  = &logger->subclass.default_;
         sc->file = !cfg->file ? stdout : cfg->file;
+#ifdef _WIN32
+        sc->is_redirected = isatty(_fileno(sc->file));
+#else
+        sc->is_redirected = isatty(sc->file);
+#endif
 
         str::init(sc->buf, logger->alloc);
         str::reserve(sc->buf, 4096);
@@ -58,7 +63,10 @@ namespace basecode::log::default_ {
             fmt::vformat_to(fmt_buf, format_str, args);
             format::format_to(fmt_buf, "\n");
         }
-        std::fwrite(sc->buf.data, 1, sc->buf.length, sc->file);
+        if (sc->is_redirected)
+            format::print("{}", sc->buf);
+        else
+            format::print(sc->file, "{}", sc->buf);
     }
 
     logger_system_t             g_default_system{

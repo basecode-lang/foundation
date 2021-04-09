@@ -51,12 +51,7 @@ namespace basecode::term {
                 SetConsoleMode(hOut, dwMode);
                 g_term_sys.redirected = false;
             } else {
-                if (!isatty(_fileno(stdout))) {
-                    auto term_var = getenv("TERM");
-                    g_term_sys.redirected = term_var && strcmp(term_var, "xterm-256color") != 0;
-                } else {
-                    g_term_sys.redirected = true;
-                }
+                g_term_sys.redirected = true;
             }
 #else
             g_term_sys.redirected = isatty(stdout);
