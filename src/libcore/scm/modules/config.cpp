@@ -472,18 +472,8 @@ namespace basecode::config {
         namespace exports {
             using namespace scm::kernel;
 
-            [[maybe_unused]] static type_decl_t s_types[] = {
-                [type_decl::u0_]       = {param_cls_t::void_, param_size_t::none},
-                [type_decl::u32_]      = {param_cls_t::int_, param_size_t::dword},
-                [type_decl::f32_]      = {param_cls_t::float_, param_size_t::dword},
-                [type_decl::list_ptr]  = {param_cls_t::ptr, param_size_t::qword, scm::ffi_type_t::list},
-                [type_decl::obj_ptr]   = {param_cls_t::ptr, param_size_t::qword, scm::ffi_type_t::object},
-                [type_decl::slice_ptr] = {param_cls_t::ptr, param_size_t::qword, scm::ffi_type_t::string},
-                [type_decl::b8_]       = {param_cls_t::int_, param_size_t::byte, scm::ffi_type_t::boolean},
-            };
-
             [[maybe_unused]] static proc_export_t s_exports[] = {
-                {"cvar_ref"_ss, 1,
+                {"cvar-ref"_ss, 1,
                     {
                         {(u0*) cvar_ref, "cvar_ref"_ss, type_decl::obj_ptr, 1,
                             {
@@ -492,13 +482,13 @@ namespace basecode::config {
                         }
                     }
                 },
-                {"cvar_set"_ss, 4,
+                {"cvar-set!"_ss, 4,
                     {
                         {
                          (u0*) cvar_set_flag, "cvar_set_flag"_ss, type_decl::b8_, 2,
                             {
                                 {"id"_ss, type_decl::u32_},
-                                {"value"_ss, type_decl::obj_ptr},
+                                {"value"_ss, type_decl::b8_},
                             }
                         },
                         {
@@ -522,6 +512,204 @@ namespace basecode::config {
                                 {"value"_ss, type_decl::slice_ptr},
                             }
                         },
+                    }
+                },
+                {"localized-string"_ss, 1,
+                    {
+                        {(u0*) localized_string, "localized_string"_ss, type_decl::u32_, 3,
+                            {
+                                {"id"_ss, type_decl::u32_},
+                                {"locale"_ss, type_decl::slice_ptr},
+                                {"value"_ss, type_decl::slice_ptr},
+                            }
+                        }
+                    }
+                },
+                {"localized-error"_ss, 1,
+                    {
+                        {(u0*) localized_error, "localized_error"_ss, type_decl::u32_, 4,
+                            {
+                                {"id"_ss, type_decl::u32_},
+                                {"locale"_ss, type_decl::slice_ptr},
+                                {"code"_ss, type_decl::slice_ptr},
+                                {"str_id"_ss, type_decl::u32_},
+                            }
+                        }
+                    }
+                },
+                {"log-info"_ss, 1,
+                    {
+                        {(u0*) log_info, "log_info"_ss, type_decl::u0_, 2,
+                            {
+                                {"fmt_msg"_ss, type_decl::slice_ptr},
+                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
+                            }
+                        }
+                    }
+                },
+                {"log-warn"_ss, 1,
+                    {
+                        {(u0*) log_warn, "log_warn"_ss, type_decl::u0_, 2,
+                            {
+                                {"fmt_msg"_ss, type_decl::slice_ptr},
+                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
+                            }
+                        }
+                    }
+                },
+                {"log-error"_ss, 1,
+                    {
+                        {(u0*) log_error, "log_error"_ss, type_decl::u0_, 2,
+                            {
+                                {"fmt_msg"_ss, type_decl::slice_ptr},
+                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
+                            }
+                        }
+                    }
+                },
+                {"log-alert"_ss, 1,
+                    {
+                        {(u0*) log_alert, "log_alert"_ss, type_decl::u0_, 2,
+                            {
+                                {"fmt_msg"_ss, type_decl::slice_ptr},
+                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
+                            }
+                        }
+                    }
+                },
+                {"log-debug"_ss, 1,
+                    {
+                        {(u0*) log_debug, "log_debug"_ss, type_decl::u0_, 2,
+                            {
+                                {"fmt_msg"_ss, type_decl::slice_ptr},
+                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
+                            }
+                        }
+                    }
+                },
+                {"log-notice"_ss, 1,
+                    {
+                        {(u0*) log_notice, "log_notice"_ss, type_decl::u0_, 2,
+                            {
+                                {"fmt_msg"_ss, type_decl::slice_ptr},
+                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
+                            }
+                        }
+                    }
+                },
+                {"log-critical"_ss, 1,
+                    {
+                        {(u0*) log_critical, "log_critical"_ss, type_decl::u0_, 2,
+                            {
+                                {"fmt_msg"_ss, type_decl::slice_ptr},
+                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
+                            }
+                        }
+                    }
+                },
+                {"log-emergency"_ss, 1,
+                    {
+                        {(u0*) log_emergency, "log_emergency"_ss, type_decl::u0_, 2,
+                            {
+                                {"fmt_msg"_ss, type_decl::slice_ptr},
+                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
+                            }
+                        }
+                    }
+                },
+                {"current-user"_ss, 1,
+                    {
+                        {(u0*) current_user, "current_user"_ss, type_decl::obj_ptr, 0}
+                    }
+                },
+                {"current-alloc"_ss, 1,
+                    {
+                        {(u0*) current_alloc, "current_alloc"_ss, type_decl::obj_ptr, 0}
+                    }
+                },
+                {"current-logger"_ss, 1,
+                    {
+                        {(u0*) current_logger, "current_logger"_ss, type_decl::obj_ptr, 0}
+                    }
+                },
+                {"current-command-line"_ss, 1,
+                    {
+                        {(u0*) current_command_line, "current_command_line"_ss, type_decl::obj_ptr, 0}
+                    }
+                },
+                {"log-create-basic-file"_ss, 1,
+                    {
+                        {(u0*) log_create_basic_file, "log_create_basic_file"_ss, type_decl::obj_ptr, 4,
+                            {
+                                {"file_name"_ss, type_decl::slice_ptr},
+                                {"name"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                                {"pattern"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                                {"mask"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                            }
+                        }
+                    }
+                },
+                {"log-create-daily-file"_ss, 1,
+                    {
+                        {(u0*) log_create_daily_file, "log_create_daily_file"_ss, type_decl::obj_ptr, 6,
+                            {
+                                {"file_name"_ss, type_decl::slice_ptr},
+                                {"hour"_ss, type_decl::u32_},
+                                {"minute"_ss, type_decl::u32_},
+                                {"name"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                                {"pattern"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                                {"mask"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                            }
+                        }
+                    }
+                },
+                {"log-create-color"_ss, 1,
+                    {
+                        {(u0*) log_create_color, "log_create_color"_ss, type_decl::obj_ptr, 4,
+                            {
+                                {"color_type"_ss, type_decl::slice_ptr},
+                                {"name"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                                {"pattern"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                                {"mask"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                            }
+                        }
+                    }
+                },
+                {"log-create-rotating-file"_ss, 1,
+                    {
+                        {(u0*) log_create_rotating_file, "log_create_rotating_file"_ss, type_decl::obj_ptr, 6,
+                            {
+                                {"file_name"_ss, type_decl::slice_ptr},
+                                {"max_size"_ss, type_decl::u32_},
+                                {"max_files"_ss, type_decl::u32_},
+                                {"name"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                                {"pattern"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                                {"mask"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                            }
+                        }
+                    }
+                },
+                {"syslog-create"_ss, 1,
+                    {
+                        {(u0*) syslog_create, "syslog_create"_ss, type_decl::obj_ptr, 5,
+                            {
+                                {"ident"_ss, type_decl::slice_ptr},
+                                {"opts"_ss, type_decl::list_ptr},
+                                {"facility"_ss, type_decl::slice_ptr},
+                                {"name"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                                {"mask"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
+                            }
+                        }
+                    }
+                },
+                {"logger-append-child"_ss, 1,
+                    {
+                        {(u0*) logger_append_child, "logger_append_child"_ss, type_decl::obj_ptr, 2,
+                            {
+                                {"parent"_ss, type_decl::obj_ptr},
+                                {"child"_ss, type_decl::obj_ptr},
+                            }
+                        }
                     }
                 },
             };
@@ -551,419 +739,8 @@ namespace basecode::config {
             g_cfg_sys.current_logger       = scm::nil(g_cfg_sys.ctx);
             g_cfg_sys.current_command_line = scm::nil(g_cfg_sys.ctx);
 
-            {
-                auto b8_type = ffi::param::make_type(param_cls_t::int_,
-                                                     param_size_t::byte,
-                                                     u8(scm::ffi_type_t::boolean));
-                auto u0_type = ffi::param::make_type(param_cls_t::void_, param_size_t::none);
-                auto u32_type = ffi::param::make_type(param_cls_t::int_, param_size_t::dword);
-                auto f32_type = ffi::param::make_type(param_cls_t::float_, param_size_t::dword);
-                auto obj_type = ffi::param::make_type(param_cls_t::ptr,
-                                                      param_size_t::qword,
-                                                      u8(scm::ffi_type_t::object));
-                auto list_type = ffi::param::make_type(param_cls_t::ptr,
-                                                      param_size_t::qword,
-                                                      u8(scm::ffi_type_t::list));
-                auto slice_type = ffi::param::make_type(param_cls_t::ptr,
-                                                        param_size_t::qword,
-                                                        u8(scm::ffi_type_t::string));
-
-                {
-                    auto proto = ffi::proto::make("cvar_ref"_ss);
-                    auto ol    = ffi::overload::make("cvar_ref"_ss,
-                                                     obj_type,
-                                                     (u0*) cvar_ref);
-                    ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "cvar-ref"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto id_param  = ffi::param::make("id"_ss, u32_type);
-
-                    auto proto = ffi::proto::make("cvar_set"_ss);
-                    auto ol_flag   = ffi::overload::make("cvar_set_flag"_ss,
-                                                         b8_type,
-                                                         (u0*) cvar_set_flag);
-                    ffi::overload::append(ol_flag, id_param);
-                    ffi::overload::append(ol_flag, ffi::param::make("value"_ss, b8_type));
-                    ffi::proto::append(proto, ol_flag);
-
-                    auto ol_number = ffi::overload::make("cvar_set_number"_ss,
-                                                         b8_type,
-                                                         (u0*) cvar_set_number);
-                    ffi::overload::append(ol_number, id_param);
-                    ffi::overload::append(ol_number, ffi::param::make("value"_ss, f32_type));
-                    ffi::proto::append(proto, ol_number);
-
-                    auto ol_integer = ffi::overload::make("cvar_set_integer"_ss,
-                                                          b8_type,
-                                                          (u0*) cvar_set_integer);
-                    ffi::overload::append(ol_integer, id_param);
-                    ffi::overload::append(ol_integer, ffi::param::make("value"_ss, u32_type));
-                    ffi::proto::append(proto, ol_integer);
-
-                    auto ol_string = ffi::overload::make("cvar_set_string"_ss,
-                                                         b8_type,
-                                                         (u0*) cvar_set_string);
-                    ffi::overload::append(ol_string, id_param);
-                    ffi::overload::append(ol_string, ffi::param::make("value"_ss, slice_type));
-                    ffi::proto::append(proto, ol_string);
-
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "cvar-set!"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("localized_string"_ss);
-                    auto ol    = ffi::overload::make("localized_string"_ss,
-                                                     u32_type,
-                                                     (u0*) localized_string);
-                    ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
-                    ffi::overload::append(ol, ffi::param::make("locale"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("value"_ss, slice_type));
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "localized-string"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("localized_error"_ss);
-                    auto ol    = ffi::overload::make("localized_error"_ss,
-                                                     u32_type,
-                                                     (u0*) localized_error);
-                    ffi::overload::append(ol, ffi::param::make("id"_ss, u32_type));
-                    ffi::overload::append(ol, ffi::param::make("locale"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("code"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("str_id"_ss, u32_type));
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "localized-error"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_info"_ss);
-                    auto ol    = ffi::overload::make("log_info"_ss,
-                                                     u0_type,
-                                                     (u0*) log_info);
-                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    auto rest_param = ffi::param::make("rest"_ss, list_type);
-                    rest_param->is_rest = true;
-                    ffi::overload::append(ol, rest_param);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-info"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_warn"_ss);
-                    auto ol    = ffi::overload::make("log_warn"_ss,
-                                                     u0_type,
-                                                     (u0*) log_warn);
-                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    auto rest_param = ffi::param::make("rest"_ss, list_type);
-                    rest_param->is_rest = true;
-                    ffi::overload::append(ol, rest_param);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-warn"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_error"_ss);
-                    auto ol    = ffi::overload::make("log_error"_ss,
-                                                     u0_type,
-                                                     (u0*) log_error);
-                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    auto rest_param = ffi::param::make("rest"_ss, list_type);
-                    rest_param->is_rest = true;
-                    ffi::overload::append(ol, rest_param);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-error"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_alert"_ss);
-                    auto ol    = ffi::overload::make("log_alert"_ss,
-                                                     u0_type,
-                                                     (u0*) log_alert);
-                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    auto rest_param = ffi::param::make("rest"_ss, list_type);
-                    rest_param->is_rest = true;
-                    ffi::overload::append(ol, rest_param);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-alert"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_debug"_ss);
-                    auto ol    = ffi::overload::make("log_debug"_ss,
-                                                     u0_type,
-                                                     (u0*) log_debug);
-                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    auto rest_param = ffi::param::make("rest"_ss, list_type);
-                    rest_param->is_rest = true;
-                    ffi::overload::append(ol, rest_param);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-debug"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_notice"_ss);
-                    auto ol    = ffi::overload::make("log_notice"_ss,
-                                                     u0_type,
-                                                     (u0*) log_notice);
-                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    auto rest_param = ffi::param::make("rest"_ss, list_type);
-                    rest_param->is_rest = true;
-                    ffi::overload::append(ol, rest_param);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-notice"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_critical"_ss);
-                    auto ol    = ffi::overload::make("log_critical"_ss,
-                                                     u0_type,
-                                                     (u0*) log_critical);
-                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    auto rest_param = ffi::param::make("rest"_ss, list_type);
-                    rest_param->is_rest = true;
-                    ffi::overload::append(ol, rest_param);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-critical"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_emergency"_ss);
-                    auto ol    = ffi::overload::make("log_emergency"_ss,
-                                                     u0_type,
-                                                     (u0*) log_emergency);
-                    ffi::overload::append(ol, ffi::param::make("fmt_msg"_ss, slice_type));
-                    auto rest_param = ffi::param::make("rest"_ss, list_type);
-                    rest_param->is_rest = true;
-                    ffi::overload::append(ol, rest_param);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-emergency"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("current_user"_ss);
-                    auto ol    = ffi::overload::make("current_user"_ss,
-                                                     obj_type,
-                                                     (u0*) current_user);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "current-user"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("current_alloc"_ss);
-                    auto ol    = ffi::overload::make("current_alloc"_ss,
-                                                     obj_type,
-                                                     (u0*) current_alloc);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "current-alloc"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("current_logger"_ss);
-                    auto ol    = ffi::overload::make("current_logger"_ss,
-                                                     obj_type,
-                                                     (u0*) current_logger);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "current-logger"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("current_command_line"_ss);
-                    auto ol    = ffi::overload::make("current_command_line"_ss,
-                                                     obj_type,
-                                                     (u0*) current_command_line);
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "current-command-line"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_create_basic_file"_ss);
-                    auto ol    = ffi::overload::make("log_create_basic_file"_ss,
-                                                     obj_type,
-                                                     (u0*) log_create_basic_file);
-                    ffi::overload::append(ol, ffi::param::make("file_name"_ss, slice_type));
-
-                    auto name_kwd = ffi::param::make("name"_ss, slice_type);
-                    name_kwd->has_dft       = true;
-                    name_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, name_kwd);
-
-                    auto pattern_kwd = ffi::param::make("pattern"_ss, slice_type);
-                    pattern_kwd->has_dft       = true;
-                    pattern_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, pattern_kwd);
-
-                    auto mask_kwd = ffi::param::make("mask"_ss, slice_type);
-                    mask_kwd->has_dft       = true;
-                    mask_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, mask_kwd);
-
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-create-basic-file"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_create_daily_file"_ss);
-                    auto ol    = ffi::overload::make("log_create_daily_file"_ss,
-                                                     obj_type,
-                                                     (u0*) log_create_daily_file);
-                    ffi::overload::append(ol, ffi::param::make("file_name"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("hour"_ss, u32_type));
-                    ffi::overload::append(ol, ffi::param::make("minute"_ss, u32_type));
-
-                    auto name_kwd = ffi::param::make("name"_ss, slice_type);
-                    name_kwd->has_dft       = true;
-                    name_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, name_kwd);
-
-                    auto pattern_kwd = ffi::param::make("pattern"_ss, slice_type);
-                    pattern_kwd->has_dft       = true;
-                    pattern_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, pattern_kwd);
-
-                    auto mask_kwd = ffi::param::make("mask"_ss, slice_type);
-                    mask_kwd->has_dft       = true;
-                    mask_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, mask_kwd);
-
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-create-daily-file"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_create_color"_ss);
-                    auto ol    = ffi::overload::make("log_create_color"_ss,
-                                                     obj_type,
-                                                     (u0*) log_create_color);
-                    ffi::overload::append(ol, ffi::param::make("color_type"_ss, slice_type));
-
-                    auto name_kwd = ffi::param::make("name"_ss, slice_type);
-                    name_kwd->has_dft       = true;
-                    name_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, name_kwd);
-
-                    auto pattern_kwd = ffi::param::make("pattern"_ss, slice_type);
-                    pattern_kwd->has_dft       = true;
-                    pattern_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, pattern_kwd);
-
-                    auto mask_kwd = ffi::param::make("mask"_ss, slice_type);
-                    mask_kwd->has_dft       = true;
-                    mask_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, mask_kwd);
-
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-create-color"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("log_create_rotating_file"_ss);
-                    auto ol    = ffi::overload::make("log_create_rotating_file"_ss,
-                                                     obj_type,
-                                                     (u0*) log_create_rotating_file);
-                    ffi::overload::append(ol, ffi::param::make("file_name"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("max_size"_ss, u32_type));
-                    ffi::overload::append(ol, ffi::param::make("max_files"_ss, u32_type));
-
-                    auto name_kwd = ffi::param::make("name"_ss, slice_type);
-                    name_kwd->has_dft       = true;
-                    name_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, name_kwd);
-
-                    auto pattern_kwd = ffi::param::make("pattern"_ss, slice_type);
-                    pattern_kwd->has_dft       = true;
-                    pattern_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, pattern_kwd);
-
-                    auto mask_kwd = ffi::param::make("mask"_ss, slice_type);
-                    mask_kwd->has_dft       = true;
-                    mask_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, mask_kwd);
-
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "log-create-rotating-file"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("syslog_create"_ss);
-                    auto ol    = ffi::overload::make("syslog_create"_ss,
-                                                     obj_type,
-                                                     (u0*) syslog_create);
-                    ffi::overload::append(ol, ffi::param::make("ident"_ss, slice_type));
-                    ffi::overload::append(ol, ffi::param::make("opts"_ss, list_type));
-                    ffi::overload::append(ol, ffi::param::make("facility"_ss, slice_type));
-
-                    auto name_kwd = ffi::param::make("name"_ss, slice_type);
-                    name_kwd->has_dft       = true;
-                    name_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, name_kwd);
-
-                    auto mask_kwd = ffi::param::make("mask"_ss, slice_type);
-                    mask_kwd->has_dft       = true;
-                    mask_kwd->value.alias.p = {};
-                    ffi::overload::append(ol, mask_kwd);
-
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "syslog-create"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-
-                {
-                    auto proto = ffi::proto::make("logger_append_child"_ss);
-                    auto ol    = ffi::overload::make("logger_append_child"_ss,
-                                                     obj_type,
-                                                     (u0*) logger_append_child);
-                    ffi::overload::append(ol, ffi::param::make("parent"_ss, obj_type));
-                    ffi::overload::append(ol, ffi::param::make("child"_ss, obj_type));
-                    ffi::proto::append(proto, ol);
-                    scm::set(g_cfg_sys.ctx,
-                             scm::make_symbol(g_cfg_sys.ctx, "logger-append-child"),
-                             scm::make_ffi(g_cfg_sys.ctx, proto));
-                }
-            }
+            scm::kernel::create_common_types();
+            scm::kernel::create_exports(g_cfg_sys.ctx, exports::s_exports, 22);
 
             std::memset(g_cfg_sys.vars, 0, sizeof(cvar_t) * max_cvar_size);
 

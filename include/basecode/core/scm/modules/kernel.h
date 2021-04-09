@@ -32,9 +32,10 @@ namespace basecode::scm::kernel {
     struct proc_param_t final {
         str::slice_t            name;
         type_decl_id            type;
-        param_alias_t           default_value   {};
-        u8                      is_rest:    1   {};
-        u8                      pad:        7   {};
+        param_alias_t           default_value       {};
+        u8                      is_rest:        1   {};
+        u8                      has_default:    1   {};
+        u8                      pad:            7   {};
     };
 
     struct proc_overload_t final {
@@ -61,7 +62,9 @@ namespace basecode::scm::kernel {
         constexpr u32 slice_ptr = 6;
     }
 
-    u0 create_types(ffi_t& ffi, type_decl_t* decls, u32 size);
+    u0 create_common_types();
 
-    u0 create_exports(ffi_t& ffi, proc_export_t* exports, u32 size);
+    u0 create_types(type_decl_t* decls, u32 size);
+
+    u0 create_exports(scm::ctx_t* ctx, proc_export_t* exports, u32 size);
 }
