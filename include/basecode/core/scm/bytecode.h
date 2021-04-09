@@ -23,15 +23,16 @@
 #include <basecode/core/str_array.h>
 #include <basecode/core/stable_array.h>
 
-#define H(a)                    (vm[((a) / 8)])
-#define G(n)                    (vm[(vm.mem_map.heap_size - 1) - (n)])
+#define G(n)                    (vm.reg_file->operator[]((n)))
+#define HS(a)                   (vm.heap->operator[]((a) / sizeof(u64)))
+#define HU(a)                   (*(reinterpret_cast<u64*>(a)))
 #define M                       G(basecode::scm::register_file::m)
 #define F                       G(basecode::scm::register_file::f)
 #define PC                      G(basecode::scm::register_file::pc)
+#define GP                      G(basecode::scm::register_file::gp)
 #define EP                      G(basecode::scm::register_file::ep)
 #define HP                      G(basecode::scm::register_file::hp)
 #define DP                      G(basecode::scm::register_file::dp)
-#define LP                      G(basecode::scm::register_file::lp)
 #define SP                      G(basecode::scm::register_file::sp)
 #define LR                      G(basecode::scm::register_file::lr)
 #define R(n)                    G(basecode::scm::register_file::r0 + (n))
@@ -48,11 +49,11 @@ namespace basecode::scm {
         constexpr reg_t none            = 0;
         constexpr reg_t pc              = 1;
         constexpr reg_t ep              = 2;
-        constexpr reg_t dp              = 3;
-        constexpr reg_t hp              = 4;
-        constexpr reg_t fp              = 5;
-        constexpr reg_t sp              = 6;   // code stack ptr
-        constexpr reg_t lp              = 7;   // code load ptr
+        constexpr reg_t gp              = 3;
+        constexpr reg_t dp              = 4;
+        constexpr reg_t hp              = 5;
+        constexpr reg_t fp              = 6;
+        constexpr reg_t sp              = 7;   // code stack ptr
         constexpr reg_t m               = 8;   // mode
         constexpr reg_t f               = 9;   // flags register
         constexpr reg_t lr              = 10;  // link register
@@ -72,6 +73,7 @@ namespace basecode::scm {
         constexpr reg_t r13             = 24;
         constexpr reg_t r14             = 25;
         constexpr reg_t r15             = 26;
+        constexpr reg_t max             = 27;
 
         str::slice_t name(reg_t reg);
     }
@@ -172,14 +174,33 @@ namespace basecode::scm {
         namespace emitter {
             u0 init(emitter_t& e,
                     vm_t* vm,
-                    u64 addr,
                     alloc_t* alloc = context::top()->alloc);
 
             u0 free(emitter_t& e);
 
             u0 reset(emitter_t& e);
 
-            status_t assemble(emitter_t& e, bb_t& start_block);
+            template <typename T>
+            status_t encode_imm(emitter_t& e,
+                                u64 addr,
+                                const operand_t& oper,
+                                T& field) {
+                switch (oper.type) {
+                    case operand_type_t::trap:
+                    case operand_type_t::value: {
+                        field = oper.kind.s;
+                        break;
+                    }
+                    case operand_type_t::block: {
+                        auto target_block = &e.blocks[oper.kind.bb->id - 1];
+                        field = s32(target_block->addr - addr);
+                        break;
+                    }
+                    default:
+                        return status_t::fail;
+                }
+                return status_t::ok;
+            }
 
             status_t create_dot(emitter_t& e, const path_t& path);
 
@@ -208,9 +229,28 @@ namespace basecode::scm {
                 return bb;
             }
 
-            status_t encode_inst(vm_t& vm, const inst_t& inst, u64 addr);
+            u32 assembled_size_bytes(emitter_t& e, bb_t& start_block);
+
+            status_t assemble(emitter_t& e, bb_t& start_block, u64* heap);
+
+            inline status_t encode_reg(const operand_t& oper, u8& field) {
+                switch (oper.type) {
+                    case operand_type_t::reg: {
+                        field = oper.kind.reg;
+                        break;
+                    }
+                    case operand_type_t::var: {
+                        break;
+                    }
+                    default:
+                        return status_t::fail;
+                }
+                return status_t::ok;
+            }
 
             u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf);
+
+            status_t encode_inst(emitter_t& e, const inst_t& inst, u64* heap);
 
             namespace virtual_var {
                 namespace access_type {

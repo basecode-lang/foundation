@@ -143,8 +143,6 @@ namespace basecode::scm {
         collect_garbage(ctx);
         array::free(ctx->native_ptrs);
         stack::free(ctx->cl_stack);
-        stack::free(ctx->gc_stack);
-        stack::free(ctx->env_stack);
         hashtab::free(ctx->strtab);
         hashtab::free(ctx->symtab);
         for (auto& env : ctx->environments)
@@ -161,21 +159,34 @@ namespace basecode::scm {
     }
 
     u32 save_gc(ctx_t* ctx) {
-        return ctx->gc_stack.size;
+        return ctx->gc_stack->size;
     }
 
     obj_t* pop_gc(ctx_t* ctx) {
-        return stack::pop(ctx->gc_stack);
+        auto& vm = ctx->vm;
+        obj_t* tos = ctx->nil;
+        if (ctx->gc_stack->size > 0) {
+            tos = (obj_t*) HU(GP);
+            GP += sizeof(u64);
+            --ctx->gc_stack->size;
+        }
+        return tos;
     }
 
     obj_t* top_env(ctx_t* ctx) {
-        auto tos = stack::top(ctx->env_stack);
-        return tos ? tos : ctx->nil;
+        auto& vm = ctx->vm;
+        return ctx->env_stack->size == 0 ? ctx->nil : (obj_t*) HU(EP);
     }
 
     obj_t* pop_env(ctx_t* ctx) {
-        auto tos = stack::pop(ctx->env_stack);
-        return tos ? tos : ctx->nil;
+        auto& vm = ctx->vm;
+        obj_t* tos = ctx->nil;
+        if (ctx->env_stack->size > 0) {
+            tos = (obj_t*) HU(EP);
+            EP += sizeof(u64);
+            --ctx->env_stack->size;
+        }
+        return tos;
     }
 
     obj_type_t type(obj_t* obj) {
@@ -207,7 +218,7 @@ namespace basecode::scm {
     }
 
     u0 collect_garbage(ctx_t* ctx) {
-//        format::print("before: ctx->object_used = {}\n", ctx->object_used);
+        auto& vm = ctx->vm;
         for (const auto& pair : ctx->strtab)
             mark(ctx, pair.value);
         for (const auto& pair : ctx->symtab)
@@ -220,8 +231,11 @@ namespace basecode::scm {
             for (const auto& pair : env.bindings)
                 mark(ctx, pair.value);
         }
-        for (u32 i = 0; i < ctx->gc_stack.size; i++)
-            mark(ctx, ctx->gc_stack[i]);
+        auto addr = GP;
+        for (u32 i = 0; i < ctx->gc_stack->size; i++) {
+            mark(ctx, (obj_t*) HU(addr));
+            addr += sizeof(u64);
+        }
         for (u32 i = 0; i < ctx->object_count; i++) {
             obj_t* obj = &ctx->objects[i];
             if (TYPE(obj) == obj_type_t::free)
@@ -250,7 +264,6 @@ namespace basecode::scm {
                 SET_GC_MARK(obj, false);
             }
         }
-//        format::print("after : ctx->object_used = {}\n", ctx->object_used);
     }
 
     fixnum_t to_fixnum(obj_t* obj) {
@@ -306,10 +319,6 @@ namespace basecode::scm {
         return IS_NIL(obj);
     }
 
-    u0 restore_gc(ctx_t* ctx, u32 idx) {
-        stack::truncate(ctx->gc_stack, idx);
-    }
-
     b8 is_true(ctx_t* ctx, obj_t* obj) {
         return ctx->true_ == obj;
     }
@@ -354,7 +363,12 @@ namespace basecode::scm {
     u0 push_gc(ctx_t* ctx, obj_t* obj) {
         if (obj < ctx->objects || obj >= ctx->objects + ctx->object_count)
             error(ctx, "fatal: obj address outside of heap range! {}", (u0*) obj);
-        stack::push(ctx->gc_stack, obj);
+        auto& vm = ctx->vm;
+        if (ctx->gc_stack->size + 1 > ctx->gc_stack->capacity)
+            vm::mem_area::grow(*ctx->gc_stack);
+        GP -= sizeof(u64);
+        HU(GP) = u64(obj);
+        ++ctx->gc_stack->size;
     }
 
     obj_t* car(ctx_t* ctx, obj_t* obj) {
@@ -379,6 +393,12 @@ namespace basecode::scm {
             env = e->parent;
         }
         return ctx->nil;
+    }
+
+    u0 restore_gc(ctx_t* ctx, u32 idx) {
+        auto& vm = ctx->vm;
+        ctx->gc_stack->size = idx;
+        GP = ctx->gc_stack->base_addr();
     }
 
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
@@ -438,7 +458,12 @@ namespace basecode::scm {
 
     obj_t* push_env(ctx_t* ctx, obj_t* obj) {
         check_type(ctx, obj, obj_type_t::environment);
-        stack::push(ctx->env_stack, obj);
+        auto& vm = ctx->vm;
+        if (ctx->env_stack->size + 1 > ctx->env_stack->capacity)
+            vm::mem_area::grow(*ctx->env_stack);
+        EP -= sizeof(u64);
+        HU(EP) = u64(obj);
+        ++ctx->env_stack->size;
         return obj;
     }
 
@@ -564,23 +589,35 @@ namespace basecode::scm {
 
         auto& vm = ctx->vm;
         ctx->alloc = alloc;
-        vm::init(vm, ctx->alloc, size);
-        const auto half_heap = size / 2;
-        vm::mem_map(vm, scm::mem_area_t::code,          rf::lp, half_heap / 2, false);
-        vm::mem_map(vm, scm::mem_area_t::code_stack,    rf::sp, half_heap / 3, true);
-        vm::mem_map(vm, scm::mem_area_t::heap,          rf::hp, half_heap / 2, false);
-        vm::mem_map(vm, scm::mem_area_t::data_stack,    rf::dp, half_heap / 3, true);
-        vm::mem_map(vm, scm::mem_area_t::env_stack,     rf::ep, half_heap / 3, true);
-        vm::reset(vm);
-        compiler::init(ctx->compiler, &vm, LP, ctx->alloc);
+        vm::init(vm, ctx->alloc);
+        vm::add_mem_area(vm,
+                         scm::mem_area_type_t::heap,
+                         register_file::hp,
+                         ctx->alloc,
+                         0);
+        vm::add_mem_area(vm,
+                         scm::mem_area_type_t::code_stack,
+                         register_file::sp,
+                         ctx->alloc,
+                         1024,
+                         true);
+        ctx->gc_stack = &vm::add_mem_area(vm,
+                                           scm::mem_area_type_t::gc_stack,
+                                           register_file::gp,
+                                           ctx->alloc,
+                                           1024,
+                                           true);
+        ctx->env_stack = &vm::add_mem_area(vm,
+                                           scm::mem_area_type_t::env_stack,
+                                           register_file::ep,
+                                           ctx->alloc,
+                                           1024,
+                                           true);
+        compiler::init(ctx->compiler, &vm, ctx->alloc);
         array::init(ctx->native_ptrs, ctx->alloc);
         array::reserve(ctx->native_ptrs, 256);
-        stack::init(ctx->gc_stack, ctx->alloc);
-        stack::reserve(ctx->gc_stack, 1024);
         stack::init(ctx->cl_stack, ctx->alloc);
         stack::reserve(ctx->cl_stack, 1024);
-        stack::init(ctx->env_stack, ctx->alloc);
-        stack::reserve(ctx->env_stack, 64);
         hashtab::init(ctx->strtab, ctx->alloc);
         hashtab::init(ctx->symtab, ctx->alloc);
         array::init(ctx->environments, ctx->alloc);
@@ -778,7 +815,7 @@ namespace basecode::scm {
     }
 
     obj_t* eval(ctx_t* ctx, obj_t* obj) {
-        if (stack::empty(ctx->env_stack)) {
+        if (ctx->env_stack->size == 0) {
             error(ctx, "environment stack is empty: push an environment before "
                        "calling eval");
         }
@@ -790,9 +827,8 @@ namespace basecode::scm {
         obj_t* va   {};
         obj_t* vb   {};
         obj_t* cl   {};
-        u8          buf[16]{};
-        u32    n    {};
         u32    gc   {save_gc(ctx)};
+        u8          buf[16]{};
 
         defer(
             restore_gc(ctx, gc);
@@ -854,24 +890,25 @@ namespace basecode::scm {
                     case prim_type_t::error:
                         return make_error(ctx, arg, cl);
 
-                    case prim_type_t::while_:
+                    case prim_type_t::while_: {
                         va = next_arg(ctx, &arg);
-                        n  = save_gc(ctx);
+                        auto gs = save_gc(ctx);
                         while (true) {
                             vb = eval(ctx, va);
                             if (IS_NIL(vb) || IS_FALSE(vb))
                                 break;
                             auto body = arg;
                             while (!IS_NIL(body)) {
-                                restore_gc(ctx, n);
+                                restore_gc(ctx, gs);
                                 push_gc(ctx, body);
                                 push_gc(ctx, top_env(ctx));
                                 res = eval(ctx, CAR(body));
                                 body = CDR(body);
                             }
-                            restore_gc(ctx, n);
+                            restore_gc(ctx, gs);
                         }
                         return res;
+                    }
 
                     case prim_type_t::quote:
                         return next_arg(ctx, &arg);
@@ -896,7 +933,7 @@ namespace basecode::scm {
                         return res;
 
                     case prim_type_t::do_: {
-                        u32 save = save_gc(ctx);
+                        auto save = save_gc(ctx);
                         while (!IS_NIL(arg)) {
                             restore_gc(ctx, save);
                             push_gc(ctx, arg);
@@ -1030,7 +1067,7 @@ namespace basecode::scm {
                           "ffi: no matching overload for function: {}",
                           proto->name);
                 }
-                n = 0;
+                u32 n = 0;
                 rest_array_t rest{};
                 array::init(rest, ctx->alloc);
                 ffi::reset(ctx->ffi);
@@ -1180,7 +1217,7 @@ namespace basecode::scm {
                 push_env(ctx, make_environment(ctx, top_env(ctx)));
                 args_to_env(ctx, proc->params, arg);
                 auto body = proc->body;
-                u32 save = save_gc(ctx);
+                auto save = save_gc(ctx);
                 while (!IS_NIL(body)) {
                     restore_gc(ctx, save);
                     push_gc(ctx, body);
@@ -1197,7 +1234,7 @@ namespace basecode::scm {
                 push_env(ctx, make_environment(ctx, top_env(ctx)));
                 args_to_env(ctx, proc->params, arg);
                 auto body = proc->body;
-                u32 save = save_gc(ctx);
+                auto save = save_gc(ctx);
                 while (!IS_NIL(body)) {
                     restore_gc(ctx, save);
                     push_gc(ctx, body);

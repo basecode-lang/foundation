@@ -28,9 +28,9 @@ namespace basecode::scm::compiler {
         vm::emitter::reset(comp.emit);
     }
 
-    u0 init(compiler_t& comp, vm_t* vm, u64 addr, alloc_t* alloc) {
+    u0 init(compiler_t& comp, vm_t* vm, alloc_t* alloc) {
         comp.vm = vm;
-        vm::emitter::init(comp.emit, vm, addr, alloc);
+        vm::emitter::init(comp.emit, vm, alloc);
     }
 
     compile_result_t compile(compiler_t& comp, const context_t& c) {

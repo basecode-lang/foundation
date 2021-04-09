@@ -133,12 +133,12 @@ namespace basecode::scm {
         static str::slice_t s_names[] = {
             [none]  = "NONE"_ss,
             [pc]    = "PC"_ss,
+            [gp]    = "GP"_ss,
             [ep]    = "EP"_ss,
             [dp]    = "DP"_ss,
             [hp]    = "HP"_ss,
             [sp]    = "SP"_ss,
             [fp]    = "FP"_ss,
-            [lp]    = "LP"_ss,
             [m]     = "M"_ss,
             [f]     = "F"_ss,
             [lr]    = "LR"_ss,
@@ -982,49 +982,233 @@ namespace basecode::scm {
                 }
             }
 
-            template <typename T>
-            status_t encode_imm(emitter_t& e,
-                                u64 addr,
-                                const operand_t& oper,
-                                T& field) {
-                switch (oper.type) {
-                    case operand_type_t::trap:
-                    case operand_type_t::value: {
-                        field = oper.kind.s;
-                        break;
+            u0 init(emitter_t& e, vm_t* vm, alloc_t* alloc) {
+                e.vm    = vm;
+                e.alloc = alloc;
+                array::init(e.insts, e.alloc);
+                symtab::init(e.vartab, e.alloc);
+                array::init(e.comments, e.alloc);
+                digraph::init(e.bb_graph, e.alloc);
+                str_array::init(e.strtab, e.alloc);
+                digraph::init(e.var_graph, e.alloc);
+                stable_array::init(e.vars, e.alloc);
+                stable_array::init(e.blocks, e.alloc);
+            }
+
+            status_t create_dot(emitter_t& e, const path_t& path) {
+                using namespace graphviz;
+
+                graph_t bb_sg{};
+                graph::init(bb_sg,
+                            graph_type_t::directed,
+                            "bb"_ss);
+                graph::label(bb_sg, "basic blocks"_ss);
+
+                graph_t var_sg{};
+                graph::init(var_sg,
+                            graph_type_t::directed,
+                            "vvar"_ss);
+                graph::label(var_sg, "virtual variables"_ss);
+
+                graph_t g{};
+                graph::init(g,
+                            graph_type_t::directed,
+                            "compiler"_ss);
+                graph::node_sep(g, 1);
+                graph::label(g, "IR data structures"_ss);
+                graph::add_cluster_subgraph(g, &bb_sg);
+                graph::add_cluster_subgraph(g, &var_sg);
+                defer(
+                    graph::free(g);
+                    graph::free(bb_sg);
+                    graph::free(var_sg));
+
+                u32 block_node_ids[e.bb_graph.size];
+                {
+                    bb_digraph_t::Node_Array nodes{};
+                    array::init(nodes, e.alloc);
+                    defer(array::free(nodes));
+
+                    for (auto bb_node : e.bb_graph.nodes) {
+                        auto block_node = graph::make_node(bb_sg);
+                        block_node_ids[bb_node->id - 1] = block_node->id;
+                        node::label(*block_node, format::format(
+                            "block: {}",
+                            *(bb_node->value)));
+                        node::shape(*block_node, shape_t::record);
+                        node::style(*block_node, node_style_t::filled);
+                        node::fill_color(*block_node, color_t::aliceblue);
                     }
-                    case operand_type_t::block: {
-                        auto target_block = &e.blocks[oper.kind.bb->id - 1];
-                        field = s32(target_block->addr - addr);
-                        break;
+
+                    for (auto bb_node : e.bb_graph.nodes) {
+                        array::reset(nodes);
+                        digraph::incoming_nodes(e.bb_graph, bb_node, nodes);
+                        for (auto incoming : nodes) {
+                            auto edge = graph::make_edge(bb_sg);
+                            edge->first  = graph::node_ref(
+                                &bb_sg,
+                                block_node_ids[incoming->id - 1]);
+                            edge->second = graph::node_ref(
+                                &bb_sg,
+                                block_node_ids[bb_node->id - 1]);
+                            edge::label(*edge, "pred"_ss);
+                            edge::style(*edge, edge_style_t::dotted);
+                            edge::dir(*edge, dir_type_t::back);
+                        }
+
+                        array::reset(nodes);
+                        digraph::outgoing_nodes(e.bb_graph, bb_node, nodes);
+                        for (auto outgoing : nodes) {
+                            auto edge = graph::make_edge(bb_sg);
+                            edge->first  = graph::node_ref(
+                                &bb_sg,
+                                block_node_ids[bb_node->id - 1]);
+                            edge->second = graph::node_ref(
+                                &bb_sg,
+                                block_node_ids[outgoing->id - 1]);
+                            edge::label(*edge, "succ"_ss);
+                            edge::dir(*edge, dir_type_t::forward);
+                        }
+
+                        if (bb_node->value->next) {
+                            auto straight_edge = graph::make_edge(bb_sg);
+                            straight_edge->first = graph::node_ref(
+                                &bb_sg,
+                                block_node_ids[bb_node->id - 1]);
+                            straight_edge->second = graph::node_ref(
+                                &bb_sg,
+                                block_node_ids[bb_node->value->next->node->id - 1]);
+                            edge::label(*straight_edge, "next"_ss);
+                            edge::dir(*straight_edge, dir_type_t::forward);
+                            edge::color(*straight_edge, color_t::blue);
+                            edge::style(*straight_edge, edge_style_t::dashed);
+                        }
                     }
-                    default:
+                }
+
+                {
+                    u32 var_node_ids[e.var_graph.size];
+                    var_digraph_t::Node_Array nodes{};
+                    array::init(nodes, e.alloc);
+                    defer(array::free(nodes));
+
+                    str_t str{};
+                    str::init(str, e.alloc);
+                    for (auto vv_node : e.var_graph.nodes) {
+                        auto var_node = graph::make_node(var_sg);
+                        var_node_ids[vv_node->id - 1] = var_node->id;
+                        {
+                            str::reset(str); {
+                                str_buf_t buf{&str};
+                                auto var = vv_node->value;
+                                format::format_to(buf, "{}", *var);
+                            }
+                        }
+                        node::label(*var_node, str);
+                        node::shape(*var_node, shape_t::component);
+                        node::style(*var_node, node_style_t::filled);
+                        node::fill_color(*var_node, color_t::lavender);
+                    }
+
+                    for (auto vv_node : e.var_graph.nodes) {
+                        array::reset(nodes);
+                        digraph::outgoing_nodes(e.var_graph, vv_node, nodes);
+                        for (auto outgoing : nodes) {
+                            auto edge = graph::make_edge(var_sg);
+                            edge->first  = graph::node_ref(
+                                &var_sg,
+                                var_node_ids[vv_node->id - 1]);
+                            edge->second = graph::node_ref(
+                                &var_sg,
+                                var_node_ids[outgoing->id - 1]);
+                            edge::label(*edge, "next"_ss);
+                            edge::dir(*edge, dir_type_t::both);
+                            edge::arrow_tail(*edge, arrow_type_t::dot);
+                            edge::arrow_head(*edge, arrow_type_t::normal);
+                        }
+                        auto var = vv_node->value;
+                        for (const auto& ac : var->accesses) {
+                            if (ac.type != var_access_type_t::def)
+                                continue;
+                            const auto& inst = e.insts[ac.inst_id];
+                            auto edge = graph::make_edge(g);
+                            edge->first  = graph::node_ref(
+                                &bb_sg,
+                                block_node_ids[inst.block_id - 1]);
+                            edge->second = graph::node_ref(
+                                &var_sg,
+                                var_node_ids[vv_node->id - 1]);
+                            edge::label(*edge, virtual_var::access_type::name(ac.type));
+                            edge::color(*edge, color_t::darkgreen);
+                            edge::dir(*edge, dir_type_t::forward);
+                        }
+                    }
+                }
+
+
+                buf_t buf{};
+                buf.mode = buf_mode_t::alloc;
+                buf::init(buf);
+                defer(buf::free(buf));
+                {
+                    auto status = graphviz::graph::serialize(g, buf);
+                    if (!OK(status))
                         return status_t::fail;
+                }
+                {
+                    auto status = buf::save(buf, path);
+                    if (!OK(status))
+                        return status_t::fail;
+                }
+
+                return status_t::ok;
+            }
+
+            u32 assembled_size_bytes(emitter_t& e, bb_t& start_block) {
+                auto curr = &start_block;
+                u64  size = 0;
+                while (curr) {
+                    size += curr->insts.size() * sizeof(encoded_inst_t);
+                    curr = curr->next;
+                }
+                return size;
+            }
+
+            status_t assemble(emitter_t& e, bb_t& start_block, u64* heap) {
+                auto curr = &start_block;
+
+                // assign block addresses
+                u64 addr = u64(heap);
+                while (curr) {
+                    curr->addr = addr;
+                    addr += curr->insts.size() * sizeof(encoded_inst_t);
+                    curr = curr->next;
+                }
+
+                // emit blocks to vm heap
+                curr = &start_block;
+                while (curr) {
+                    for (u32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
+                        const auto& inst = e.insts[i];
+                        if (inst.block_id != curr->id)
+                            continue;
+                        auto status = encode_inst(e, inst, heap);
+                        if (!OK(status))
+                            return status;
+                        ++heap;
+                    }
+                    curr = curr->next;
                 }
                 return status_t::ok;
             }
 
-            static status_t encode_reg(const operand_t& oper, u8& field) {
-                switch (oper.type) {
-                    case operand_type_t::reg: {
-                        field = oper.kind.reg;
-                        break;
-                    }
-                    case operand_type_t::var: {
-                        break;
-                    }
-                    default:
-                        return status_t::fail;
-                }
-                return status_t::ok;
-            }
-
-            status_t encode_inst(emitter_t& e, const inst_t& inst, u64 addr) {
+            status_t encode_inst(emitter_t& e, const inst_t& inst, u64* heap) {
                 u64 buf{};
                 u64 data{};
                 auto& vm = *e.vm;
-                auto encoded = (encoded_inst_t*) &buf;
-                auto opers   = (encoded_operand_t*) &data;
+                const u64 addr    = u64(heap);
+                auto      encoded = (encoded_inst_t*) &buf;
+                auto      opers   = (encoded_operand_t*) &data;
                 encoded->type      = inst.type;
                 encoded->is_signed = inst.is_signed;
                 switch (inst.encoding) {
@@ -1039,7 +1223,7 @@ namespace basecode::scm {
                         auto& dst = inst.operands[1];
                         ENCODE_IMM(src, opers->imm.src);
                         ENCODE_REG(dst, opers->imm.dst);
-                        auto area = find_mem_map_entry(vm, opers->imm.dst);
+                        auto area = get_mem_area_by_reg(vm, opers->imm.dst);
                         if (area) {
                             opers->imm.aux = area->top ? -1 : 1;
                         } else {
@@ -1085,7 +1269,7 @@ namespace basecode::scm {
                         auto& dst = inst.operands[1];
                         ENCODE_REG(src, opers->reg2.src);
                         ENCODE_REG(dst, opers->reg2.dst);
-                        auto area = find_mem_map_entry(vm, opers->reg2.src);
+                        auto area = get_mem_area_by_reg(vm, opers->reg2.src);
                         if (area && !inst.aux) {
                             opers->reg2.aux = area->top ? -1 : 1;
                         } else {
@@ -1118,207 +1302,8 @@ namespace basecode::scm {
                         return status_t::fail;
                 }
                 encoded->data = data;
-                H(addr)       = buf;
+                *heap         = buf;
                 return status_t::ok;
-            }
-
-            status_t create_dot(emitter_t& e, const path_t& path) {
-                using namespace graphviz;
-
-                graph_t bb_sg{};
-                graph::init(bb_sg, graph_type_t::directed, "bb"_ss);
-                graph::label(bb_sg, "basic blocks"_ss);
-
-                graph_t var_sg{};
-                graph::init(var_sg, graph_type_t::directed, "vvar"_ss);
-                graph::label(var_sg, "virtual variables"_ss);
-
-                graph_t g{};
-                graph::init(g, graph_type_t::directed, "compiler"_ss);
-                graph::node_sep(g, 1);
-                graph::label(g, "IR data structures"_ss);
-                graph::add_cluster_subgraph(g, &bb_sg);
-                graph::add_cluster_subgraph(g, &var_sg);
-                defer(
-                    graph::free(g);
-                    graph::free(bb_sg);
-                    graph::free(var_sg));
-
-                u32 block_node_ids[e.bb_graph.size];
-                {
-                    bb_digraph_t::Node_Array nodes{};
-                    array::init(nodes, e.alloc);
-                    defer(array::free(nodes));
-
-                    for (auto bb_node : e.bb_graph.nodes) {
-                        auto block_node = graph::make_node(bb_sg);
-                        block_node_ids[bb_node->id - 1] = block_node->id;
-                        node::label(*block_node, format::format(
-                            "block: {}",
-                            *(bb_node->value)));
-                        node::shape(*block_node, shape_t::record);
-                        node::style(*block_node, node_style_t::filled);
-                        node::fill_color(*block_node, color_t::aliceblue);
-                    }
-
-                    for (auto bb_node : e.bb_graph.nodes) {
-                        array::reset(nodes);
-                        digraph::incoming_nodes(e.bb_graph, bb_node, nodes);
-                        for (auto incoming : nodes) {
-                            auto edge = graph::make_edge(bb_sg);
-                            edge->first  = graph::node_ref(&bb_sg, block_node_ids[incoming->id - 1]);
-                            edge->second = graph::node_ref(&bb_sg, block_node_ids[bb_node->id - 1]);
-                            edge::label(*edge, "pred"_ss);
-                            edge::style(*edge, edge_style_t::dotted);
-                            edge::dir(*edge, dir_type_t::back);
-                        }
-
-                        array::reset(nodes);
-                        digraph::outgoing_nodes(e.bb_graph, bb_node, nodes);
-                        for (auto outgoing : nodes) {
-                            auto edge = graph::make_edge(bb_sg);
-                            edge->first  = graph::node_ref(&bb_sg, block_node_ids[bb_node->id - 1]);
-                            edge->second = graph::node_ref(&bb_sg, block_node_ids[outgoing->id - 1]);
-                            edge::label(*edge, "succ"_ss);
-                            edge::dir(*edge, dir_type_t::forward);
-                        }
-
-                        if (bb_node->value->next) {
-                            auto straight_edge = graph::make_edge(bb_sg);
-                            straight_edge->first  = graph::node_ref(&bb_sg, block_node_ids[bb_node->id - 1]);
-                            straight_edge->second = graph::node_ref(&bb_sg, block_node_ids[bb_node->value->next->node->id - 1]);
-                            edge::label(*straight_edge, "next"_ss);
-                            edge::dir(*straight_edge, dir_type_t::forward);
-                            edge::color(*straight_edge, color_t::blue);
-                            edge::style(*straight_edge, edge_style_t::dashed);
-                        }
-                    }
-                }
-
-                {
-                    u32 var_node_ids[e.var_graph.size];
-                    var_digraph_t::Node_Array nodes{};
-                    array::init(nodes, e.alloc);
-                    defer(array::free(nodes));
-
-                    str_t str{};
-                    str::init(str, e.alloc);
-                    for (auto vv_node : e.var_graph.nodes) {
-                        auto var_node = graph::make_node(var_sg);
-                        var_node_ids[vv_node->id - 1] = var_node->id;
-                        {
-                            str::reset(str); {
-                                str_buf_t buf{&str};
-                                auto var = vv_node->value;
-                                format::format_to(buf, "{}", *var);
-//                                if (var->accesses.size > 0) {
-//                                    format::format_to(buf, "\n");
-//                                    for (u32 i = 0; i < var->accesses.size; ++i) {
-//                                        if (i > 0) format::format_to(buf, "\n");
-//                                        const auto& ac = var->accesses[i];
-//                                        format::format_to(buf,
-//                                                       "{}({})",
-//                                                       virtual_var::access_type::name(ac.type),
-//                                                       ac.inst_id);
-//                                    }
-//                                }
-                            }
-                        }
-                        node::label(*var_node, str);
-                        node::shape(*var_node, shape_t::component);
-                        node::style(*var_node, node_style_t::filled);
-                        node::fill_color(*var_node, color_t::lavender);
-                    }
-
-                    for (auto vv_node : e.var_graph.nodes) {
-                        array::reset(nodes);
-                        digraph::outgoing_nodes(e.var_graph, vv_node, nodes);
-                        for (auto outgoing : nodes) {
-                            auto edge = graph::make_edge(var_sg);
-                            edge->first  = graph::node_ref(&var_sg, var_node_ids[vv_node->id - 1]);
-                            edge->second = graph::node_ref(&var_sg, var_node_ids[outgoing->id - 1]);
-                            edge::label(*edge, "next"_ss);
-                            edge::dir(*edge, dir_type_t::both);
-                            edge::arrow_tail(*edge, arrow_type_t::dot);
-                            edge::arrow_head(*edge, arrow_type_t::normal);
-                        }
-                        auto var = vv_node->value;
-                        for (const auto& ac : var->accesses) {
-                            if (ac.type != var_access_type_t::def)
-                                continue;
-                            const auto& inst = e.insts[ac.inst_id];
-                            auto edge = graph::make_edge(g);
-                            edge->first  = graph::node_ref(&bb_sg, block_node_ids[inst.block_id - 1]);
-                            edge->second = graph::node_ref(&var_sg, var_node_ids[vv_node->id - 1]);
-                            edge::label(*edge, virtual_var::access_type::name(ac.type));
-                            edge::color(*edge, color_t::darkgreen);
-                            edge::dir(*edge, dir_type_t::forward);
-                        }
-                    }
-                }
-
-
-                buf_t buf{};
-                buf.mode = buf_mode_t::alloc;
-                buf::init(buf);
-                defer(buf::free(buf));
-                {
-                    auto status = graphviz::graph::serialize(g, buf);
-                    if (!OK(status))
-                        return status_t::fail;
-                }
-                {
-                    auto status = buf::save(buf, path);
-                    if (!OK(status))
-                        return status_t::fail;
-                }
-
-                return status_t::ok;
-            }
-
-            status_t assemble(emitter_t& e, bb_t& start_block) {
-                auto& vm = *e.vm;
-                u64  addr = LP;
-                auto curr = &start_block;
-
-                // assign block addresses
-                while (curr) {
-                    curr->addr = addr;
-                    addr += curr->insts.size() * sizeof(encoded_inst_t);
-                    curr = curr->next;
-                }
-
-                // emit blocks to vm heap
-                curr = &start_block;
-                addr = LP;
-                while (curr) {
-                    for (u32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
-                        const auto& inst = e.insts[i];
-                        if (inst.block_id != curr->id)
-                            continue;
-                        auto status = encode_inst(e, inst, addr);
-                        if (!OK(status))
-                            return status;
-                        addr += sizeof(encoded_inst_t);
-                    }
-                    curr = curr->next;
-                }
-                LP = addr;
-                return status_t::ok;
-            }
-
-            u0 init(emitter_t& e, vm_t* vm, u64 addr, alloc_t* alloc) {
-                e.vm    = vm;
-                e.addr  = addr;
-                e.alloc = alloc;
-                array::init(e.insts, e.alloc);
-                symtab::init(e.vartab, e.alloc);
-                array::init(e.comments, e.alloc);
-                digraph::init(e.bb_graph, e.alloc);
-                str_array::init(e.strtab, e.alloc);
-                digraph::init(e.var_graph, e.alloc);
-                stable_array::init(e.vars, e.alloc);
-                stable_array::init(e.blocks, e.alloc);
             }
         }
 

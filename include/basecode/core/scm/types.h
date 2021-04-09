@@ -85,6 +85,7 @@ namespace basecode::scm {
     struct comment_t;
     struct operand_t;
     struct emitter_t;
+    struct mem_area_t;
     struct var_access_t;
     struct encoded_inst_t;
     union  encoded_operand_t;
@@ -109,6 +110,7 @@ namespace basecode::scm {
     using access_array_t        = array_t<var_access_t>;
     using keyword_table_t       = hashtab_t<str::slice_t, obj_t*>;
     using comment_array_t       = array_t<comment_t>;
+    using mem_area_array_t      = array_t<mem_area_t>;
 
     enum class status_t : u8 {
         ok,
@@ -169,12 +171,13 @@ namespace basecode::scm {
         max,
     };
 
-    enum class mem_area_t : u8 {
-        code,
+    enum class mem_area_type_t : u8 {
         heap,
+        gc_stack,
         env_stack,
         code_stack,
         data_stack,
+        register_file,
     };
 
     enum class comment_type_t : u8 {
@@ -198,8 +201,6 @@ namespace basecode::scm {
         read,
         write
     };
-
-    [[maybe_unused]] constexpr u32 max_memory_areas = 6;
 
     struct env_t final {
         obj_t*                  self;
@@ -396,9 +397,8 @@ namespace basecode::scm {
     };
 
     struct emitter_t final {
-        alloc_t*                alloc;
         vm_t*                   vm;
-        u64                     addr;
+        alloc_t*                alloc;
         bb_array_t              blocks;
         var_array_t             vars;
         var_table_t             vartab;
@@ -409,20 +409,39 @@ namespace basecode::scm {
         comment_array_t         comments;
     };
 
-    struct mem_map_entry_t final {
-        u64                     addr;
-        u32                     offs;
+    struct mem_area_t final {
+        alloc_t*                alloc;
+        vm_t*                   vm;
+        u64*                    data;
+        u64                     null;
+        u32                     id;
         u32                     size;
-        u8                      reg;
-        b8                      top;
-        b8                      valid;
-    };
+        u32                     capacity;
+        u32                     min_capacity;
+        mem_area_type_t         type;
+        reg_t                   reg;
+        u8                      top:    1;
+        u8                      pad:    7;
 
-    struct mem_map_t final {
-        u32                     heap_size;
-        s32                     reg_to_entry[32];
-        mem_map_entry_t         entries[max_memory_areas];
-    };
+        u64& operator[](u32 idx) {
+            if (top)
+                return idx < capacity ? data[idx] : null;
+            else
+                return idx < size ? data[idx] : null;
+        }
+
+        inline u64 base_addr() const {
+            return top ? u64(data) + ((capacity - size) * sizeof(u64)) :
+                   u64(data) + (size * sizeof(u64));
+        }
+
+        u64 operator[](u32 idx) const {
+            if (top)
+                return idx < capacity ? data[idx] : null;
+            else
+                return idx < size ? data[idx] : null;
+        }
+   };
 
     struct flag_register_t final {
         u64                     n:      1;
@@ -435,13 +454,13 @@ namespace basecode::scm {
 
     struct vm_t final {
         alloc_t*                alloc;
-        u64*                    heap;
-        mem_map_t               mem_map;
+        mem_area_t*             heap;
+        mem_area_t*             reg_file;
         trap_table_t            traptab;
-        b8                      exited;
-
-        u64& operator[](u32 idx)        { return heap[idx]; }
-        u64 operator[](u32 idx) const   { return heap[idx]; }
+        mem_area_array_t        mem_map;
+        u32                     area_by_reg[27];
+        u8                      exited: 1;
+        u8                      pad:    7;
     };
 
     struct compiler_t final {
@@ -464,13 +483,13 @@ namespace basecode::scm {
 
     struct ctx_t final {
         alloc_t*                alloc;
+        mem_area_t*             gc_stack;
+        mem_area_t*             env_stack;
         vm_t                    vm;
         ffi_t                   ffi;
         compiler_t              compiler;
         handlers_t              handlers;
-        obj_stack_t             gc_stack;
         obj_stack_t             cl_stack;
-        obj_stack_t             env_stack;
         proc_array_t            procedures;
         env_array_t             environments;
         ptr_array_t             native_ptrs;

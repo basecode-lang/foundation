@@ -21,19 +21,43 @@
 #include <basecode/core/scm/types.h>
 
 namespace basecode::scm::vm {
+    namespace mem_area {
+        status_t init(mem_area_t& area,
+                      vm_t* vm,
+                      u32 id,
+                      mem_area_type_t type,
+                      reg_t reg,
+                      alloc_t* alloc,
+                      u32 min_capacity,
+                      b8 top);
+
+        u0 free(mem_area_t& area);
+
+        u0 resize(mem_area_t& area, u32 new_size);
+
+        u0 reserve(mem_area_t& area, u32 new_capacity);
+
+        u0 reset(mem_area_t& area, b8 zero_mem = false);
+
+        u0 grow(mem_area_t& area, u32 new_capacity = 16);
+    }
+
     u0 free(vm_t& vm);
 
     u0 reset(vm_t& vm);
 
-    u32 heap_top(vm_t& vm);
+    mem_area_t& add_mem_area(vm_t& vm,
+                             mem_area_type_t type,
+                             reg_t reg,
+                             alloc_t* alloc,
+                             u32 min_capacity,
+                             b8 top = false);
 
-    status_t init(vm_t& vm,
-                  alloc_t* alloc = context::top()->alloc,
-                  u32 heap_size = 8 * 1024 * 1024);
+    mem_area_t* get_mem_area(vm_t& vm, u32 id);
+
+    mem_area_t* get_mem_area_by_reg(vm_t& vm, reg_t reg);
 
     status_t step(vm_t& vm, ctx_t* ctx, s32 cycles = -1);
 
-    const mem_map_entry_t* find_mem_map_entry(const vm_t& vm, u8 reg);
-
-    u0 mem_map(vm_t& vm, mem_area_t area, u8 reg, u32 size, b8 top = false);
+    status_t init(vm_t& vm, alloc_t* alloc = context::top()->alloc);
 }

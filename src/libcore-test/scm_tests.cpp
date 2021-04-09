@@ -29,24 +29,7 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
     auto alloc = memory::system::default_alloc();
 
     auto ctx = (scm::ctx_t*) memory::alloc(alloc, heap_size);
-    auto& vm = ctx->vm;
-
     scm::init(ctx, heap_size, alloc);
-    format::print("Address            Offset             Size    Reg Value               Top\n");
-    format::print("-----------------------------------------------------------------------------\n");
-    for (const auto& entry : vm.mem_map.entries) {
-        if (!entry.valid)
-            continue;
-        format::print("0x{:016X} 0x{:016X} 0x{:05X}",
-                      entry.addr,
-                      entry.offs,
-                      entry.size);
-        format::print(" {:<2}  0x{:016X} {}\n",
-                      scm::register_file::name(entry.reg),
-                      G(entry.reg),
-                      entry.top ? "  X" : "");
-    }
-    format::print("\n");
 
     const auto source = R"(
 (do

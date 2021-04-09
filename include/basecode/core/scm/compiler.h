@@ -26,7 +26,7 @@ namespace basecode::scm::compiler {
 
     u0 reset(compiler_t& comp);
 
-    u0 init(compiler_t& comp, vm_t* vm, u64 addr, alloc_t* alloc);
+    u0 init(compiler_t& comp, vm_t* vm, alloc_t* alloc);
 
     compile_result_t compile(compiler_t& comp, const context_t& c);
 

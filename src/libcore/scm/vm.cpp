@@ -22,9 +22,9 @@
 #define EXEC_NEXT()             SAFE_SCOPE(                                         \
     if (cycles > 0)     --cycles;                                                   \
     if (cycles == 0)    return status;                                              \
-    inst  = (encoded_inst_t*) &H(PC);                                               \
-    data  = inst->data;                                                             \
     flags = (flag_register_t*) &F;                                                  \
+    inst  = (encoded_inst_t*) HU(PC);                                               \
+    data  = inst->data;                                                             \
     opers = (encoded_operand_t*) &data;                                             \
     goto *s_microcode[s_op_decode[inst->type][inst->is_signed][inst->encoding]];)
 
@@ -454,36 +454,119 @@ namespace basecode::scm::vm {
     };
 
     u0 free(vm_t& vm) {
+        for (auto& area : vm.mem_map)
+            mem_area::free(area);
+        array::free(vm.mem_map);
         hashtab::free(vm.traptab);
-        memory::free(vm.alloc, vm.heap);
     }
 
     u0 reset(vm_t& vm) {
-        std::memset(vm.mem_map.reg_to_entry, -1, sizeof(s32) * 32);
-        u64 addr = 0;
-        for (u32 i = 0; i < max_memory_areas; ++i) {
-            auto& area = vm.mem_map.entries[i];
-            if (!area.valid)
-                continue;
-            u64 end_addr = addr + area.size;
-            area.offs  = addr;
-            if (area.top) {
-                area.addr = end_addr;
-            } else {
-                area.addr = addr > 0 ? addr - 1 : addr;
-            }
-            G(area.reg) = area.addr;
-            vm.mem_map.reg_to_entry[area.reg] = i;
-            addr = end_addr;
+        for (auto& area : vm.mem_map) {
+            mem_area::reset(area, true);
+            if (area.reg != register_file::none)
+                G(area.reg) = area.base_addr();
         }
-
-        M  = 0;
-        LR = 0;
-        PC = LP;
     }
 
-    u32 heap_top(vm_t& vm) {
-        return vm.mem_map.heap_size - 1;
+    namespace mem_area {
+        status_t init(mem_area_t& area,
+                      vm_t* vm,
+                      u32 id,
+                      mem_area_type_t type,
+                      reg_t reg,
+                      alloc_t* alloc,
+                      u32 min_capacity,
+                      b8 top) {
+            area.id           = id;
+            area.vm           = vm;
+            area.pad          = {};
+            area.top          = top;
+            area.reg          = reg;
+            area.data         = {};
+            area.null         = {};
+            area.size         = {};
+            area.type         = type;
+            area.alloc        = alloc;
+            area.capacity     = {};
+            area.min_capacity = min_capacity;
+            if (area.min_capacity > 0) {
+                reserve(area, area.min_capacity);
+            }
+            return status_t::ok;
+        }
+
+        u0 free(mem_area_t& area) {
+            memory::free(area.alloc, area.data);
+            area.data         = {};
+            area.size         = {};
+            area.capacity     = {};
+            area.min_capacity = {};
+        }
+
+        u0 reset(mem_area_t& area, b8 zero_mem) {
+            area.size = {};
+            if (zero_mem) {
+                std::memset(area.data, 0, area.capacity * sizeof(u64));
+            }
+        }
+
+        u0 resize(mem_area_t& area, u32 new_size) {
+            new_size = std::max(new_size, area.min_capacity);
+            grow(area, new_size);
+            area.size = new_size;
+        }
+
+        u0 grow(mem_area_t& area, u32 new_capacity) {
+            new_capacity = std::max(std::max(new_capacity, area.capacity),
+                                    area.min_capacity);
+            reserve(area, new_capacity * 2 + 8);
+        }
+
+        u0 reserve(mem_area_t& area, u32 new_capacity) {
+            if (new_capacity == 0) {
+                memory::free(area.alloc, area.data);
+                area.data     = {};
+                area.capacity = area.size = {};
+                return;
+            }
+
+            if (new_capacity == area.capacity)
+                return;
+
+            new_capacity = std::max(std::max(area.size, new_capacity),
+                                    area.min_capacity);
+            area.data = (u64*) memory::realloc(
+                area.alloc,
+                area.data,
+                new_capacity * sizeof(u64),
+                alignof(u64));
+            area.capacity = new_capacity;
+            if (area.reg != register_file::none) {
+                auto& vm = *area.vm;
+                G(area.reg) = area.base_addr();
+            }
+        }
+    }
+
+    mem_area_t& add_mem_area(vm_t& vm,
+                             mem_area_type_t type,
+                             reg_t reg,
+                             alloc_t* alloc,
+                             u32 min_capacity,
+                             b8 top) {
+        auto& area = array::append(vm.mem_map);
+        mem_area::init(area,
+                       &vm,
+                       vm.mem_map.size,
+                       type,
+                       reg,
+                       alloc,
+                       min_capacity,
+                       top);
+        if (area.reg != register_file::none) {
+            vm.area_by_reg[area.reg] = area.id;
+        }
+        return area;
     }
 
     status_t step(vm_t& vm, ctx_t* ctx, s32 cycles) {
@@ -1210,14 +1293,14 @@ namespace basecode::scm::vm {
         }
         mma_imm:
         {
-            auto area = &vm.mem_map.entries[opers->imm.src];
-            G(opers->imm.dst) = area->valid ? area->addr : 0;
+            auto& area = vm.mem_map[opers->imm.src];
+            G(opers->imm.dst) = area.base_addr();
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
         pop_reg2:
         {
-            G(opers->reg2.dst) = H(G(opers->reg2.src));
+            G(opers->reg2.dst) = HU(G(opers->reg2.src));
             G(opers->reg2.src) += s32(opers->reg2.aux);
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
@@ -1262,7 +1345,7 @@ namespace basecode::scm::vm {
         }
         env_reg2:
         {
-            auto curr_env = (obj_t*) H(G(opers->reg2.src));
+            auto curr_env = (obj_t*) HU(G(opers->reg2.src));
             G(opers->reg2.dst) = u64(make_environment(ctx, curr_env));
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
@@ -1288,7 +1371,7 @@ namespace basecode::scm::vm {
             auto lst   = ctx->nil;
             auto gc    = save_gc(ctx);
             for (u32 i = count - 1; i >= 0; --i) {
-                lst = cons(ctx, (obj_t*) H(base + offs), lst);
+                lst = cons(ctx, (obj_t*) HU(base + offs), lst);
                 offs -= sizeof(u64);
             }
             restore_gc(ctx, gc);
@@ -1373,13 +1456,13 @@ namespace basecode::scm::vm {
         }
         gc_reg1:
         {
-            push_gc(ctx, (obj_t*) G(opers->reg1.dst));
+            // FIXME: don't think i need this encoding any longer
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
         gc_reg2:
         {
-            G(opers->reg2.dst) = u64(pop_gc(ctx));
+            // FIXME: don't think i need this encoding any longer
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
@@ -1580,14 +1663,14 @@ namespace basecode::scm::vm {
         }
         ladd_reg2_imm:
         {
-            auto     base = G(opers->reg2_imm.a);
-            auto     size = s32(opers->reg2_imm.imm) / sizeof(u64);
-            auto     offs = 0;
-            flonum_t acc  = to_flonum((obj_t*) H(base + offs));
-            auto gc = save_gc(ctx);
+            auto base = G(opers->reg2_imm.a);
+            auto size = s32(opers->reg2_imm.imm) / sizeof(u64);
+            auto offs = 0;
+            auto acc  = to_flonum((obj_t*) HU(base + offs));
+            auto gc   = save_gc(ctx);
             base += sizeof(u64);
             for (u32 i = 0; i < size - 1; ++i) {
-                acc += to_flonum((obj_t*) H(base + offs));
+                acc += to_flonum((obj_t*) HU(base + offs));
                 offs += sizeof(u64);
             }
             restore_gc(ctx, gc);
@@ -1599,14 +1682,14 @@ namespace basecode::scm::vm {
         }
         lsub_reg2_imm:
         {
-            auto     base = G(opers->reg2_imm.a);
-            auto     size = s32(opers->reg2_imm.imm) / sizeof(u64);
-            auto     offs = 0;
-            flonum_t acc  = to_flonum((obj_t*) H(base + offs));
-            auto gc = save_gc(ctx);
+            auto base = G(opers->reg2_imm.a);
+            auto size = s32(opers->reg2_imm.imm) / sizeof(u64);
+            auto offs = 0;
+            auto acc  = to_flonum((obj_t*) HU(base + offs));
+            auto gc   = save_gc(ctx);
             base += sizeof(u64);
             for (u32 i = 0; i < size - 1; ++i) {
-                acc -= to_flonum((obj_t*) H(base + offs));
+                acc -= to_flonum((obj_t*) HU(base + offs));
                 offs += sizeof(u64);
             }
             restore_gc(ctx, gc);
@@ -1618,14 +1701,14 @@ namespace basecode::scm::vm {
         }
         lmul_reg2_imm:
         {
-            auto     base = G(opers->reg2_imm.a);
-            auto     size = s32(opers->reg2_imm.imm) / sizeof(u64);
-            auto     offs = 0;
-            flonum_t acc  = to_flonum((obj_t*) H(base + offs));
-            auto gc = save_gc(ctx);
+            auto base = G(opers->reg2_imm.a);
+            auto size = s32(opers->reg2_imm.imm) / sizeof(u64);
+            auto offs = 0;
+            auto acc  = to_flonum((obj_t*) HU(base + offs));
+            auto gc   = save_gc(ctx);
             base += sizeof(u64);
             for (u32 i = 0; i < size - 1; ++i) {
-                acc *= to_flonum((obj_t*) H(base + offs));
+                acc *= to_flonum((obj_t*) HU(base + offs));
                 offs += sizeof(u64);
             }
             restore_gc(ctx, gc);
@@ -1637,14 +1720,14 @@ namespace basecode::scm::vm {
         }
         ldiv_reg2_imm:
         {
-            auto     base = G(opers->reg2_imm.a);
-            auto     size = s32(opers->reg2_imm.imm) / sizeof(u64);
-            auto     offs = 0;
-            flonum_t acc  = to_flonum((obj_t*) H(base + offs));
-            auto gc = save_gc(ctx);
+            auto base = G(opers->reg2_imm.a);
+            auto size = s32(opers->reg2_imm.imm) / sizeof(u64);
+            auto offs = 0;
+            auto acc  = to_flonum((obj_t*) HU(base + offs));
+            auto gc   = save_gc(ctx);
             base += sizeof(u64);
             for (u32 i = 0; i < size - 1; ++i) {
-                acc /= to_flonum((obj_t*) H(base + offs));
+                acc /= to_flonum((obj_t*) HU(base + offs));
                 offs += sizeof(u64);
             }
             restore_gc(ctx, gc);
@@ -1656,14 +1739,14 @@ namespace basecode::scm::vm {
         }
         lmod_reg2_imm:
         {
-            auto     base = G(opers->reg2_imm.a);
-            auto     size = s32(opers->reg2_imm.imm) / sizeof(u64);
-            auto     offs = 0;
-            fixnum_t acc  = to_fixnum((obj_t*) H(base + offs));
-            auto gc = save_gc(ctx);
+            auto base = G(opers->reg2_imm.a);
+            auto size = s32(opers->reg2_imm.imm) / sizeof(u64);
+            auto offs = 0;
+            auto acc  = to_fixnum((obj_t*) HU(base + offs));
+            auto gc   = save_gc(ctx);
             base += sizeof(u64);
             for (u32 i = 0; i < size - 1; ++i) {
-                acc %= to_fixnum((obj_t*) H(base + offs));
+                acc %= to_fixnum((obj_t*) HU(base + offs));
                 offs += sizeof(u64);
             }
             restore_gc(ctx, gc);
@@ -1689,14 +1772,14 @@ namespace basecode::scm::vm {
         push_imm:
         {
             G(opers->imm.dst) += s8(opers->imm.aux);
-            H(G(opers->imm.dst)) = opers->imm.src;
+            HU(G(opers->imm.dst)) = opers->imm.src;
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
         push_reg2:
         {
             G(opers->reg2.dst) += s32(opers->reg2.aux);
-            H(G(opers->reg2.dst)) = G(opers->reg2.src);
+            HU(G(opers->reg2.dst)) = G(opers->reg2.src);
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
@@ -1726,7 +1809,7 @@ namespace basecode::scm::vm {
         }
         load_reg2:
         {
-            auto src = H(G(opers->reg2.src));
+            auto src = HU(G(opers->reg2.src));
             G(opers->reg2.dst) = src;
             flags->v = false;
             flags->c = false;
@@ -1737,7 +1820,7 @@ namespace basecode::scm::vm {
         }
         load_offset:
         {
-            auto src = H(G(opers->offset.src) + opers->offset.offs);
+            auto src = HU(G(opers->offset.src) + opers->offset.offs);
             G(opers->offset.dst) = src;
             flags->v = false;
             flags->c = false;
@@ -1748,7 +1831,8 @@ namespace basecode::scm::vm {
         }
         load_indexed:
         {
-            auto src = H(G(opers->indexed.base) + G(opers->indexed.ndx) + opers->offset.offs);
+            const auto ndx_offs = G(opers->indexed.ndx) * sizeof(u64);
+            auto src = HU(G(opers->indexed.base) + ndx_offs + opers->indexed.offs);
             G(opers->indexed.dst) = src;
             flags->v = false;
             flags->c = false;
@@ -1760,7 +1844,7 @@ namespace basecode::scm::vm {
         store_reg2:
         {
             auto src = G(opers->reg2.src);
-            H(G(opers->reg2.dst)) = src;
+            HU(G(opers->reg2.dst)) = src;
             flags->v = false;
             flags->c = false;
             flags->z = src == 0;
@@ -1771,14 +1855,15 @@ namespace basecode::scm::vm {
         store_offset:
         {
             auto src = G(opers->offset.src);
-            H(G(opers->offset.dst) + opers->offset.offs) = src;
+            HU(G(opers->offset.dst) + opers->offset.offs) = src;
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
         store_indexed:
         {
             auto src = G(opers->indexed.dst);
-            H(G(opers->indexed.base) + G(opers->indexed.ndx) + opers->indexed.offs) = src;
+            const auto ndx_offs = G(opers->indexed.ndx) * sizeof(u64);
+            HU(G(opers->indexed.base) + ndx_offs + opers->indexed.offs) = src;
             flags->v = false;
             flags->c = false;
             flags->z = src == 0;
@@ -1826,28 +1911,25 @@ namespace basecode::scm::vm {
         }
     }
 
-    status_t init(vm_t& vm, alloc_t* alloc, u32 heap_size) {
-        vm.alloc             = alloc;
-        vm.heap              = (u64*) memory::alloc(vm.alloc, heap_size, alignof(u64));
-        vm.mem_map           = {};
-        vm.mem_map.heap_size = heap_size / sizeof(u64);
+    status_t init(vm_t& vm, alloc_t* alloc) {
+        vm.alloc = alloc;
+        array::init(vm.mem_map, vm.alloc);
         hashtab::init(vm.traptab, vm.alloc);
+        vm.reg_file = &add_mem_area(vm,
+                                    mem_area_type_t::register_file,
+                                    register_file::none,
+                                    vm.alloc,
+                                    register_file::max);
+        vm.reg_file->size = register_file::max;
         return status_t::ok;
     }
 
-    u0 mem_map(vm_t& vm, mem_area_t area, u8 reg, u32 size, b8 top) {
-        auto entry = &vm.mem_map.entries[u32(area)];
-        entry->offs  = 0;
-        entry->reg   = reg;
-        entry->top   = top;
-        entry->size  = size;
-        entry->valid = true;
+    mem_area_t* get_mem_area(vm_t& vm, u32 id) {
+        return id == 0 || id > vm.mem_map.size ? nullptr : &vm.mem_map[id - 1];
     }
 
-    const mem_map_entry_t* find_mem_map_entry(const vm_t& vm, u8 reg) {
-        s32 idx = vm.mem_map.reg_to_entry[reg];
-        if (idx == -1)
-            return nullptr;
-        return &vm.mem_map.entries[idx];
+    mem_area_t* get_mem_area_by_reg(vm_t& vm, reg_t reg) {
+        const auto id = vm.area_by_reg[reg];
+        return get_mem_area(vm, id);
     }
 }

@@ -125,8 +125,6 @@ TEST_CASE("basecode::config terp eval") {
 )"_ss;
 
     scm::obj_t* obj{};
-    scm::ctx_t* ctx = config::system::context();
-
     config::eval(source, &obj);
     if (!obj)
         REQUIRE(false);
