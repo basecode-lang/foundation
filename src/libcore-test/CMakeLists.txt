@@ -21,6 +21,7 @@ add_executable(
     bst_tests.cpp
     rbt_tests.cpp
     scm_tests.cpp
+    term_tests.cpp
     path_tests.cpp
     list_tests.cpp
     uuid_tests.cpp

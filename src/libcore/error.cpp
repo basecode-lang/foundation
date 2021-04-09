@@ -74,8 +74,8 @@ namespace basecode::error {
 
                 const auto this_line_end = std::min(line.pos + line.len, report.src_info.pos.end);
                 term::colorize_range(str_buf,
-                                     term_color_t::yellow,
-                                     term_color_t::blue,
+                                     term::color_t::yellow,
+                                     term::color_t::blue,
                                      report.buf,
                                      i,
                                      start_pos,
@@ -83,13 +83,13 @@ namespace basecode::error {
                 start_pos += line.len + 1;
 
                 if (line_number > report.src_info.end.line) {
-                    term::emit_color_code(str_buf, term_color_t::red, term_color_t::default_);
+                    term::set_fg(str_buf, term::color_t::red);
                     format::format_to(str_buf,
                                       "\n{:<{}}^ ",
                                       " ",
                                       10 + report.src_info.start.column);
                     fmt::vformat_to(str_buf, fmt_msg, report.args);
-                    term::emit_color_reset(str_buf);
+                    term::reset_all(str_buf);
                 }
             } else {
                 const auto& line = buf::line(*report.buf, i);
