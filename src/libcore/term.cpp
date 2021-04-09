@@ -49,10 +49,14 @@ namespace basecode::term {
             if (GetConsoleMode(hOut, &dwMode)) {
                 dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
                 SetConsoleMode(hOut, dwMode);
-                format::print("ok\n");
                 g_term_sys.redirected = false;
             } else {
-                g_term_sys.redirected = true;
+                if (!isatty(_fileno(stdout))) {
+                    auto term_var = getenv("TERM");
+                    g_term_sys.redirected = term_var && strcmp(term_var, "xterm-256color") != 0;
+                } else {
+                    g_term_sys.redirected = true;
+                }
             }
 #else
             g_term_sys.redirected = isatty(stdout);

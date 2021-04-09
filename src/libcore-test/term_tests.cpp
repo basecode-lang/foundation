@@ -24,7 +24,6 @@ using namespace basecode;
 TEST_CASE("basecode::term basics", "[term]") {
     term_t term{};
     term::init(term);
-    term.enabled = true;
     defer(term::free(term));
 
     str_t str{};
