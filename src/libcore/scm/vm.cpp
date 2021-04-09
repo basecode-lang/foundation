@@ -133,9 +133,9 @@ namespace basecode::scm::vm {
     constexpr u8 op_write_reg2      = 100;
     constexpr u8 op_qt_reg2         = 101;
     constexpr u8 op_qq_reg2         = 102;
-    constexpr u8 op_gc              = 103;
-    constexpr u8 op_gc_reg1         = 104;
-    constexpr u8 op_gc_reg2         = 105;
+    [[maybe_unused]] constexpr u8 op____unused1      = 103;
+    [[maybe_unused]] constexpr u8 op____unused2      = 104;
+    [[maybe_unused]] constexpr u8 op____unused3      = 105;
     constexpr u8 op_apply_reg2      = 106;
     constexpr u8 op_const_reg2      = 107;
     constexpr u8 op_const_imm2      = 108;
@@ -387,12 +387,8 @@ namespace basecode::scm::vm {
             {op_error,      op_error,       op_error,       op_qq_reg2,     op_error,       op_error,       op_error,       op_error,           op_error},
             {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
         },
-        [instruction::type::gc] = {
-            {op_gc,         op_error,       op_gc_reg1,     op_gc_reg2,     op_error,       op_error,       op_error,       op_error,           op_error},
-            {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
-        },
         [instruction::type::apply] = {
-            {op_gc,         op_error,       op_error,       op_apply_reg2,  op_error,       op_error,       op_error,       op_error,           op_error},
+            {op_error,      op_error,       op_error,       op_apply_reg2,  op_error,       op_error,       op_error,       op_error,           op_error},
             {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
         },
         [instruction::type::const_] = {
@@ -452,21 +448,6 @@ namespace basecode::scm::vm {
             {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
         },
     };
-
-    u0 free(vm_t& vm) {
-        for (auto& area : vm.mem_map)
-            mem_area::free(area);
-        array::free(vm.mem_map);
-        hashtab::free(vm.traptab);
-    }
-
-    u0 reset(vm_t& vm) {
-        for (auto& area : vm.mem_map) {
-            mem_area::reset(area, true);
-            if (area.reg != register_file::none)
-                G(area.reg) = area.base_addr();
-        }
-    }
 
     namespace mem_area {
         status_t init(mem_area_t& area,
@@ -545,6 +526,21 @@ namespace basecode::scm::vm {
                 auto& vm = *area.vm;
                 G(area.reg) = area.base_addr();
             }
+        }
+    }
+
+    u0 free(vm_t& vm) {
+        for (auto& area : vm.mem_map)
+            mem_area::free(area);
+        array::free(vm.mem_map);
+        hashtab::free(vm.traptab);
+    }
+
+    u0 reset(vm_t& vm) {
+        for (auto& area : vm.mem_map) {
+            mem_area::reset(area, true);
+            if (area.reg != register_file::none)
+                G(area.reg) = area.base_addr();
         }
     }
 
@@ -675,9 +671,6 @@ namespace basecode::scm::vm {
             [op_write_reg2]         = &&write_reg2,
             [op_qt_reg2]            = &&qt_reg2,
             [op_qq_reg2]            = &&qq_reg2,
-            [op_gc]                 = &&gc,
-            [op_gc_reg1]            = &&gc_reg1,
-            [op_gc_reg2]            = &&gc_reg2,
             [op_apply_reg2]         = &&apply_reg2,
             [op_const_reg2]         = &&const_reg2,
             [op_const_imm2]         = &&const_imm2,
@@ -1300,8 +1293,10 @@ namespace basecode::scm::vm {
         }
         pop_reg2:
         {
+            auto area = get_mem_area_by_reg(vm, opers->imm.dst);
             G(opers->reg2.dst) = HU(G(opers->reg2.src));
             G(opers->reg2.src) += s32(opers->reg2.aux);
+            --area->size;
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
@@ -1445,24 +1440,6 @@ namespace basecode::scm::vm {
             flags->i = false;
             flags->v = false;
             G(opers->reg2.dst) = u64(v);
-            PC += sizeof(encoded_inst_t);
-            EXEC_NEXT();
-        }
-        gc:
-        {
-            collect_garbage(ctx);
-            PC += sizeof(encoded_inst_t);
-            EXEC_NEXT();
-        }
-        gc_reg1:
-        {
-            // FIXME: don't think i need this encoding any longer
-            PC += sizeof(encoded_inst_t);
-            EXEC_NEXT();
-        }
-        gc_reg2:
-        {
-            // FIXME: don't think i need this encoding any longer
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
@@ -1771,16 +1748,24 @@ namespace basecode::scm::vm {
         }
         push_imm:
         {
+            auto area = get_mem_area_by_reg(vm, opers->imm.dst);
+            if (area->size + 1 > area->capacity)
+                mem_area::grow(*area);
             G(opers->imm.dst) += s8(opers->imm.aux);
             HU(G(opers->imm.dst)) = opers->imm.src;
+            ++area->size;
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
         push_reg2:
         {
+            auto area = get_mem_area_by_reg(vm, opers->imm.dst);
+            if (area->size + 1 > area->capacity)
+                mem_area::grow(*area);
             G(opers->reg2.dst) += s32(opers->reg2.aux);
             HU(G(opers->reg2.dst)) = G(opers->reg2.src);
             PC += sizeof(encoded_inst_t);
+            ++area->size;
             EXEC_NEXT();
         }
         lea_imm:
