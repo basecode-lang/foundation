@@ -25,14 +25,13 @@
 #include <basecode/core/format.h>
 #include <basecode/core/memory.h>
 #include <basecode/core/assoc_array.h>
-#include <basecode/core/stable_array.h>
 
 #define GET_NODE(t, id)         ((id == 0 || id > (t).nodes.size) ? nullptr : &((t).nodes[(id) - 1]))
 
 namespace basecode {
     struct symtab_node_t;
 
-    using symtab_node_array_t   = stable_array_t<symtab_node_t>;
+    using symtab_node_array_t   = array_t<symtab_node_t>;
 
     constexpr u8 empty          = 0b00;
     constexpr u8 used           = 0b01;
@@ -49,11 +48,12 @@ namespace basecode {
     template <typename T>
     concept Symbol_Table = requires(const T& t) {
         typename                T::Value_Type;
+        typename                T::Value_Array;
         typename                T::Pair_Array;
 
         {t.alloc}               -> same_as<alloc_t*>;
         {t.nodes}               -> same_as<symtab_node_array_t>;
-        {t.values}              -> same_as<array_t<typename T::Value_Type>>;
+        {t.values}              -> same_as<typename T::Value_Array>;
         {t.size}                -> same_as<u32>;
     };
 
@@ -61,19 +61,18 @@ namespace basecode {
     template <typename V>
     struct symtab_t final {
         using Value_Type        = V;
+        using Value_Array       = array_t<Value_Type>;
         using Pair_Array        = assoc_array_t<std::remove_pointer_t<V>*>;
 
         alloc_t*                alloc;
         symtab_node_array_t     nodes;
-        array_t<V>              values;
+        Value_Array             values;
         u32                     size;
     };
-    static_assert(sizeof(symtab_t<s32>) <= 72, "symtab_t<V> is now larger than 72 bytes!");
+    static_assert(sizeof(symtab_t<s32>) <= 64, "symtab_t<V> is now larger than 64 bytes!");
 
     struct find_level_result_t final {
-        symtab_node_t*          start_node;
-        symtab_node_t*          match_node;
-        symtab_node_t*          avail_node;
+        symtab_node_t*          node;
         u32                     node_id;
     };
 
@@ -132,15 +131,15 @@ namespace basecode {
         template <Symbol_Table T>
         u0 reset(T& table) {
             table.size = {};
+            array::reset(table.nodes);
             array::reset(table.values);
-            stable_array::reset(table.nodes);
             append_node(table, 0, 0, 0, empty);
         }
 
         template <Symbol_Table T>
         u0 clear(T& table) {
+            array::free(table.nodes);
             array::free(table.values);
-            stable_array::free(table.nodes);
             table.size = {};
         }
 
@@ -187,15 +186,15 @@ namespace basecode {
         u0 init(T& table, alloc_t* alloc) {
             table.size  = {};
             table.alloc = alloc;
+            array::init(table.nodes, table.alloc);
             array::init(table.values, table.alloc);
-            stable_array::init(table.nodes, table.alloc);
             append_node(table, 0, 0, 0, empty);
         }
 
         template <Symbol_Table T>
         u0 reserve(T& table, u32 capacity) {
+            array::reserve(table.nodes, capacity);
             array::reserve(table.values, capacity);
-            stable_array::reserve(table.nodes, capacity);
         }
 
         template <Symbol_Table T>
@@ -347,14 +346,14 @@ namespace basecode {
         }
 
         template <Symbol_Table T>
-        b8 find_level_node(const T& table, find_level_result_t& r, u8 sym) {
-            const symtab_node_t* curr_node = r.start_node;
+        b8 find_level_node(T& table, find_level_result_t& r, u8 sym) {
+            symtab_node_t* curr_node = GET_NODE(table, r.node_id);
             auto curr_id = r.node_id;
-            r.avail_node = r.match_node = {};
+            r.node = {};
             while (curr_node) {
                 if (curr_node->sym == sym) {
-                    r.node_id    = curr_id;
-                    r.match_node = const_cast<symtab_node_t*>(curr_node);
+                    r.node_id = curr_id;
+                    r.node    = curr_node;
                     return true;
                 }
                 if (!curr_node->next)
@@ -362,8 +361,8 @@ namespace basecode {
                 curr_id   = curr_node->next;
                 curr_node = GET_NODE(table, curr_id);
             }
-            r.node_id    = curr_id;
-            r.avail_node = const_cast<symtab_node_t*>(curr_node);
+            r.node_id = curr_id;
+            r.node    = curr_node;
             return false;
         }
 
@@ -395,10 +394,9 @@ namespace basecode {
             symtab_node_t* node = GET_NODE(table, next_node_id);
             for (u32 i = 0; i < key.length - 1; ++i) {
                 const auto sym = key[i];
-                r.node_id    = next_node_id;
-                r.start_node = node;
+                r.node_id  = next_node_id;
                 if (!find_level_node(table, r, sym)) {
-                    node = r.avail_node;
+                    node = r.node;
                     if (node->type == empty) {
                         node->sym  = key[i];
                         node->type = used;
@@ -407,23 +405,22 @@ namespace basecode {
                         node         = GET_NODE(table, next_node_id);
                     }
                 } else {
-                    node         = r.match_node;
+                    node         = r.node;
                     next_node_id = r.node_id;
                 }
                 if (!node->child) {
                     auto child_node = append_node(table);
                     node = GET_NODE(table, next_node_id);
-                    node->child    = child_node;
+                    node->child = child_node;
                 }
                 next_node_id = node->child;
                 node         = GET_NODE(table, next_node_id);
             }
             {
                 const auto last_sym = key[key.length - 1];
-                r.node_id    = next_node_id;
-                r.start_node = node;
+                r.node_id = next_node_id;
                 if (!find_level_node(table, r, last_sym)) {
-                    node = r.avail_node;
+                    node = r.node;
                     if (node->type == empty) {
                         node->type = used;
                         node->sym  = last_sym;
@@ -432,7 +429,7 @@ namespace basecode {
                         node       = GET_NODE(table, node->next);
                     }
                 } else {
-                    node = r.match_node;
+                    node = r.node;
                 }
             }
             *leaf_node = node;
@@ -458,7 +455,7 @@ namespace basecode {
 
         template <Symbol_Table T>
         inline u32 append_node(T& table, u8 sym, u32 next, u32 child, u8 type) {
-            auto& node = stable_array::append(table.nodes);
+            auto& node = array::append(table.nodes);
             node.sym   = sym;
             node.type  = type;
             node.next  = next;
