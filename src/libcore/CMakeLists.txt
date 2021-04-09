@@ -182,6 +182,7 @@ set(
     scm/scm.cpp ${CORE_INC_DIR}/scm/scm.h
     scm/compiler.cpp ${CORE_INC_DIR}/scm/compiler.h
     scm/bytecode.cpp ${CORE_INC_DIR}/scm/bytecode.h
+    scm/modules/kernel.cpp ${CORE_INC_DIR}/scm/modules/kernel.h
     scm/modules/config.cpp ${CORE_INC_DIR}/scm/modules/config.h
 
     ${CORE_INC_DIR}/slice.h

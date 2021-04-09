@@ -22,6 +22,7 @@
 #include <basecode/core/filesys.h>
 #include <basecode/core/log/system/spdlog.h>
 #include <basecode/core/log/system/syslog.h>
+#include <basecode/core/scm/modules/kernel.h>
 #include <basecode/core/scm/modules/config.h>
 
 namespace basecode::config {
@@ -468,6 +469,64 @@ namespace basecode::config {
     }
 
     namespace system {
+        namespace exports {
+            using namespace scm::kernel;
+
+            [[maybe_unused]] static type_decl_t s_types[] = {
+                [type_decl::u0_]       = {param_cls_t::void_, param_size_t::none},
+                [type_decl::u32_]      = {param_cls_t::int_, param_size_t::dword},
+                [type_decl::f32_]      = {param_cls_t::float_, param_size_t::dword},
+                [type_decl::list_ptr]  = {param_cls_t::ptr, param_size_t::qword, scm::ffi_type_t::list},
+                [type_decl::obj_ptr]   = {param_cls_t::ptr, param_size_t::qword, scm::ffi_type_t::object},
+                [type_decl::slice_ptr] = {param_cls_t::ptr, param_size_t::qword, scm::ffi_type_t::string},
+                [type_decl::b8_]       = {param_cls_t::int_, param_size_t::byte, scm::ffi_type_t::boolean},
+            };
+
+            [[maybe_unused]] static proc_export_t s_exports[] = {
+                {"cvar_ref"_ss, 1,
+                    {
+                        {(u0*) cvar_ref, "cvar_ref"_ss, type_decl::obj_ptr, 1,
+                            {
+                                {"id"_ss, type_decl::u32_}
+                            }
+                        }
+                    }
+                },
+                {"cvar_set"_ss, 4,
+                    {
+                        {
+                         (u0*) cvar_set_flag, "cvar_set_flag"_ss, type_decl::b8_, 2,
+                            {
+                                {"id"_ss, type_decl::u32_},
+                                {"value"_ss, type_decl::obj_ptr},
+                            }
+                        },
+                        {
+                            (u0*) cvar_set_number, "cvar_set_number"_ss, type_decl::b8_, 2,
+                            {
+                                {"id"_ss, type_decl::u32_},
+                                {"value"_ss, type_decl::f32_},
+                            }
+                        },
+                        {
+                            (u0*) cvar_set_integer, "cvar_set_integer"_ss, type_decl::b8_, 2,
+                            {
+                                {"id"_ss, type_decl::u32_},
+                                {"value"_ss, type_decl::u32_},
+                            }
+                        },
+                        {
+                            (u0*) cvar_set_string, "cvar_set_string"_ss, type_decl::b8_, 2,
+                            {
+                                {"id"_ss, type_decl::u32_},
+                                {"value"_ss, type_decl::slice_ptr},
+                            }
+                        },
+                    }
+                },
+            };
+        }
+
         u0 fini() {
             scm::free(g_cfg_sys.ctx);
             str::free(g_cfg_sys.buf);
