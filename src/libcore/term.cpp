@@ -23,9 +23,15 @@ namespace basecode::term {
     struct system_t final {
         alloc_t*                alloc;
         std::atomic<b8>         enabled;
+        std::atomic<b8>         redirected;
     };
 
     system_t                    g_term_sys{};
+
+    constexpr u32 num_style_bits    = 10;
+    static u32 s_style_bits[] = {
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 21
+    };
 
     namespace system {
         u0 fini() {
@@ -37,19 +43,31 @@ namespace basecode::term {
 
         status_t init(b8 enabled, alloc_t* alloc) {
             g_term_sys.alloc   = alloc;
-            g_term_sys.enabled = enabled;
 #ifdef _WIN32
             HANDLE hOut = GetStdHandle(STD_OUTPUT_HANDLE);
             DWORD dwMode{};
-            GetConsoleMode(hOut, &dwMode);
-            dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-            SetConsoleMode(hOut, dwMode);
+            if (GetConsoleMode(hOut, &dwMode)) {
+                dwMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+                SetConsoleMode(hOut, dwMode);
+                format::print("ok\n");
+                g_term_sys.redirected = false;
+            } else {
+                g_term_sys.redirected = true;
+            }
+#else
+            g_term_sys.redirected = isatty(stdout);
 #endif
+            g_term_sys.enabled = enabled && !g_term_sys.redirected;
             return status_t::ok;
         }
     }
 
-    u0 colorize_range(str_buf_t& str_buf,
+    u0 free(term_t& term) {
+        array::free(term.commands);
+    }
+
+    u0 colorize_range(term_t& term,
+                      str_buf_t& str_buf,
                       color_t fg,
                       color_t bg,
                       buf_t* buf,
@@ -70,13 +88,15 @@ namespace basecode::term {
             str_buf,
             "{}",
             slice::make(buf->data + line.pos, (begin - line.pos) - 1));
-        set_fg(str_buf, fg);
-        set_bg(str_buf, bg);
+        set_fg(term, fg);
+        set_bg(term, bg);
+        refresh(term, str_buf);
         format::format_to(
             str_buf,
             "{}",
             slice::make(buf->data + begin - 1, color_range_len + 1));
-        reset_all(str_buf);
+        reset_all(term);
+        refresh(term, str_buf);
         s32 end_len;
         if (line.pos + line.len < end) {
             end_len = end - (line.pos + line.len);
@@ -88,140 +108,290 @@ namespace basecode::term {
                           slice::make(buf->data + end, end_len));
     }
 
-    u0 reset_all(str_buf_t& str_buf) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[0m");
+    u0 reset_all(term_t& term) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.sgr.mode = 0;
+        cmd.type = term_command_type_t::select_graphic_rendition;
     }
 
-    u0 cursor_up(str_buf_t& str_buf, u32 n) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}A", n);
+    u0 get_cursor_pos(term_t& term) {
     }
 
-    u0 scroll_up(str_buf_t& str_buf, u32 n) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}S", n);
+    u0 cursor_up(term_t& term, u32 n) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.edit.n = n;
+        cmd.type = term_command_type_t::cursor_up;
     }
 
-    u0 scroll_down(str_buf_t& str_buf, u32 n) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}T", n);
+    u0 scroll_up(term_t& term, u32 n) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.edit.n = n;
+        cmd.type = term_command_type_t::scroll_up;
     }
 
-    u0 cursor_back(str_buf_t& str_buf, u32 n) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}D", n);
+    u0 scroll_down(term_t& term, u32 n) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.edit.n = n;
+        cmd.type = term_command_type_t::scroll_down;
     }
 
-    u0 cursor_down(str_buf_t& str_buf, u32 n) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}B", n);
+    u0 cursor_back(term_t& term, u32 n) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.edit.n = n;
+        cmd.type = term_command_type_t::cursor_back;
     }
 
-    u0 set_fg(str_buf_t& str_buf, color_t fg) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}m", u32(fg));
+    u0 cursor_down(term_t& term, u32 n) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.edit.n = n;
+        cmd.type = term_command_type_t::cursor_down;
     }
 
-    u0 set_bg(str_buf_t& str_buf, color_t bg) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}m", u32(bg) + 10);
+    u0 set_fg(term_t& term, color_t fg) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.sgr.mode = u32(fg);
+        cmd.type = term_command_type_t::select_graphic_rendition;
     }
 
-    cursor_pos_t cursor_pos(str_buf_t& str_buf) {
-        cursor_pos_t pos{};
-        return pos;
+    u0 set_bg(term_t& term, color_t bg) {
+        auto& cmd = array::append(term.commands);
+        auto bg_num = u32(bg);
+        if (bg_num < u32(color_t::bg_black))
+            bg_num += 10;
+        cmd.params.sgr.mode = bg_num;
+        cmd.type = term_command_type_t::select_graphic_rendition;
     }
 
-    u0 cursor_forward(str_buf_t& str_buf, u32 n) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}C", n);
+    u0 init(term_t& term, alloc_t* alloc) {
+        term.alloc          = alloc;
+        term.dirty          = false;
+        term.style          = {};
+        term.cursor         = {};
+        term.enabled        = g_term_sys.enabled;
+        term.fg.mode        = color_mode_t::indexed;
+        term.bg.mode        = color_mode_t::indexed;
+        term.fg.value.index = color_t::fg_default;
+        term.bg.value.index = color_t::bg_default;
+        array::init(term.commands, term.alloc);
     }
 
-    u0 cursor_next_line(str_buf_t& str_buf, u32 n) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}E", n);
+    u0 cursor_forward(term_t& term, u32 n) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.edit.n = n;
+        cmd.type = term_command_type_t::cursor_forward;
     }
 
-    u0 cursor_prev_line(str_buf_t& str_buf, u32 n) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}F", n);
-    }
-
-    u0 set_style(str_buf_t& str_buf, style_t style) {
-        if (!g_term_sys.enabled) return;
-        if (!style) {
-            if (!g_term_sys.enabled) return;
-            format::format_to(str_buf, "\033[0m");
+    u0 refresh(term_t& term, str_buf_t& buf) {
+        if (!term.enabled) {
+            array::reset(term.commands);
+            term.dirty = false;
             return;
         }
-        for (u32 bit = 0; bit < 21; ++bit) {
-            if (bit == 9) {
-                bit = 19;
-                continue;
+        for (const auto& cmd : term.commands) {
+            switch (cmd.type) {
+                case term_command_type_t::cursor_up:
+                case term_command_type_t::scroll_up:
+                case term_command_type_t::cursor_down:
+                case term_command_type_t::scroll_down:
+                case term_command_type_t::cursor_back:
+                case term_command_type_t::cursor_forward:
+                case term_command_type_t::cursor_next_line:
+                case term_command_type_t::cursor_prev_line:
+                case term_command_type_t::cursor_horiz_abs:
+                    format::format_to(buf,
+                                      "\033[{}{}",
+                                      cmd.params.edit.n,
+                                      s8(cmd.type));
+                    break;
+                case term_command_type_t::cursor_to:
+                case term_command_type_t::cursor_horiz_vert_pos:
+                    term.cursor = cmd.params.pos;
+                    format::format_to(buf,
+                                      "\033[{};{}H",
+                                      term.cursor.row,
+                                      term.cursor.col);
+                    break;
+                case term_command_type_t::erase_line:
+                case term_command_type_t::erase_display:
+                    format::format_to(buf,
+                                      "\033[{}K",
+                                      u32(cmd.params.clear_mode));
+                    break;
+                case term_command_type_t::select_graphic_rendition: {
+                    auto sgr = &cmd.params.sgr;
+                    switch (cmd.params.sgr.mode) {
+                        case 0:
+                            term.style          = style::none;
+                            term.fg.mode        = color_mode_t::indexed;
+                            term.bg.mode        = color_mode_t::indexed;
+                            term.fg.value.index = color_t::fg_default;
+                            term.bg.value.index = color_t::bg_default;
+                            format::format_to(buf, "\033[m");
+                            break;
+                        case 21:
+                        case 1 ... 9: {
+                            for (u32 i = 0; i < num_style_bits; ++i) {
+                                const auto bit  = s_style_bits[i] - 1;
+                                const auto mask = 1U << bit;
+                                b8 is_set = (term.style & mask) == mask;
+                                if ((sgr->mask & mask) == mask) {
+                                    if (!is_set) {
+                                        format::format_to(
+                                            buf,
+                                            "\033[{}m",
+                                            bit + 1);
+                                        term.style |= mask;
+                                    }
+                                } else {
+                                    if (is_set) {
+                                        auto bit2 = bit + 1;
+                                        if (bit2 == 1)          bit2 = 22;
+                                        else if (bit2 == 6)     bit2 = 25;
+                                        else                    bit2 += 20;
+                                        format::format_to(
+                                            buf,
+                                            "\033[{}m",
+                                            bit2);
+                                        term.style &= ~mask;
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                        case 39:
+                        case 30 ... 37: {
+                            const auto index = color_t(sgr->mode);
+                            if (term.fg.mode != color_mode_t::indexed
+                            ||  index != term.fg.value.index) {
+                                term.fg.mode = color_mode_t::indexed;
+                                term.fg.value.index = index;
+                                format::format_to(buf,
+                                                  "\033[{}m",
+                                                  u32(term.fg.value.index));
+                            }
+                            break;
+                        }
+                        case 38:
+                            if (sgr->fg == term.fg.value.triplet)
+                                break;
+                            term.fg.value.triplet = sgr->fg;
+                            term.fg.mode = color_mode_t(sgr->mask);
+                            if (term.fg.mode == color_mode_t::palette) {
+                                format::format_to(
+                                    buf,
+                                    "\033[ 38;5;{} m",
+                                    term.fg.value.triplet.palette_value());
+                            } else {
+                                format::format_to(
+                                    buf,
+                                    "\033[ 38;2;{};{};{} m",
+                                    term.fg.value.triplet.r,
+                                    term.fg.value.triplet.g,
+                                    term.fg.value.triplet.b);
+                            }
+                            break;
+                        case 49:
+                        case 40 ... 47: {
+                            const auto index = color_t(sgr->mode);
+                            if (term.bg.mode != color_mode_t::indexed
+                            ||  index != term.bg.value.index) {
+                                term.bg.mode = color_mode_t::indexed;
+                                term.bg.value.index = index;
+                                format::format_to(buf,
+                                                  "\033[{}m",
+                                                  u32(term.bg.value.index));
+                            }
+                            break;
+                        }
+                        case 48:
+                            if (sgr->bg == term.bg.value.triplet)
+                                break;
+                            term.bg.value.triplet = sgr->bg;
+                            term.bg.mode = color_mode_t(sgr->mask);
+                            if (term.bg.mode == color_mode_t::palette) {
+                                format::format_to(
+                                    buf,
+                                    "\033[ 48;5;{} m",
+                                    term.bg.value.triplet.palette_value());
+                            } else {
+                                format::format_to(
+                                    buf,
+                                    "\033[ 48;2;{};{};{} m",
+                                    term.bg.value.triplet.r,
+                                    term.bg.value.triplet.g,
+                                    term.bg.value.triplet.b);
+                            }
+                            break;
+                    }
+                    break;
+                }
             }
-            const auto mask = 1U << bit;
-            if ((style & mask) == mask) {
-                format::format_to(str_buf, "\033[{};49m", bit + 1);
-            } else {
-                const auto code = bit + 21;
-                format::format_to(str_buf, "\033[{};49m", code);
-            }
         }
+        array::reset(term.commands);
     }
 
-    u0 cursor_to(str_buf_t& str_buf, cursor_pos_t pos) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{};{}H", pos.row, pos.col);
+    u0 cursor_next_line(term_t& term, u32 n) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.edit.n = n;
+        cmd.type = term_command_type_t::cursor_next_line;
     }
 
-    u0 erase_line(str_buf_t& str_buf, clear_mode_t mode) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}K", u32(mode));
+    u0 cursor_horiz_abs(term_t& term, u32 n) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.edit.n = n;
+        cmd.type = term_command_type_t::cursor_horiz_abs;
     }
 
-    u0 erase_display(str_buf_t& str_buf, clear_mode_t mode) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}J", u32(mode));
+    u0 cursor_prev_line(term_t& term, u32 n) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.edit.n = n;
+        cmd.type = term_command_type_t::cursor_prev_line;
     }
 
-    u0 cursor_horizontal_absolute(str_buf_t& str_buf, u32 n) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{}G", n);
+    u0 set_style(term_t& term, style_t style) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.sgr.mask = style;
+        cmd.params.sgr.mode = 1;
+        cmd.type = term_command_type_t::select_graphic_rendition;
     }
 
-    u0 set_fg(str_buf_t& str_buf, rgb_t color, color_mode_t mode) {
-        if (!g_term_sys.enabled) return;
-        if (mode == color_mode_t::palette) {
-            format::format_to(str_buf,
-                              "\033[ 38;5;{}",
-                              color.palette_value());
-        } else {
-            format::format_to(str_buf,
-                              "\033[ 38;2;{};{};{}",
-                              color.r,
-                              color.g,
-                              color.b);
-        }
+    u0 cursor_to(term_t& term, cursor_pos_t pos) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.pos = pos;
+        cmd.type = term_command_type_t::cursor_to;
     }
 
-    u0 set_bg(str_buf_t& str_buf, rgb_t color, color_mode_t mode) {
-        if (!g_term_sys.enabled) return;
-        if (mode == color_mode_t::palette) {
-            format::format_to(str_buf,
-                              "\033[ 48;5;{}",
-                              color.palette_value());
-        } else {
-            format::format_to(str_buf,
-                              "\033[ 48;2;{};{};{}",
-                              color.r,
-                              color.g,
-                              color.b);
-        }
+    u0 erase_line(term_t& term, clear_mode_t mode) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.clear_mode = mode;
+        cmd.type = term_command_type_t::erase_line;
     }
 
-    u0 cursor_horz_vert_pos(str_buf_t& str_buf, cursor_pos_t pos) {
-        if (!g_term_sys.enabled) return;
-        format::format_to(str_buf, "\033[{};{}f", pos.row, pos.col);
+    u0 erase_display(term_t& term, clear_mode_t mode) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.clear_mode = mode;
+        cmd.type = term_command_type_t::erase_display;
+    }
+
+    u0 set_fg(term_t& term, rgb_t color, color_mode_t mode) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.sgr.mode = 38;
+        cmd.params.sgr.mask = u32(mode);
+        cmd.params.sgr.fg   = color;
+        cmd.type = term_command_type_t::select_graphic_rendition;
+    }
+
+    u0 set_bg(term_t& term, rgb_t color, color_mode_t mode) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.sgr.mode = 48;
+        cmd.params.sgr.mask = u32(mode);
+        cmd.params.sgr.bg   = color;
+        cmd.type = term_command_type_t::select_graphic_rendition;
+    }
+
+    u0 cursor_horz_vert_pos(term_t& term, cursor_pos_t pos) {
+        auto& cmd = array::append(term.commands);
+        cmd.params.pos = pos;
+        cmd.type = term_command_type_t::cursor_horiz_vert_pos;
     }
 }

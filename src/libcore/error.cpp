@@ -33,6 +33,7 @@ namespace basecode::error {
         alloc_t*                error_slab;
         localized_error_map_t   errors;
         error_report_list_t     reports;
+        term_t                  term;
         mutex_t                 lock;
     };
 
@@ -72,8 +73,10 @@ namespace basecode::error {
                 const auto& line = report.buf->lines[i];
                 format::format_to(str_buf, "{:8d}: ", line_number);
 
-                const auto this_line_end = std::min(line.pos + line.len, report.src_info.pos.end);
-                term::colorize_range(str_buf,
+                const auto this_line_end = std::min(line.pos + line.len,
+                                                    report.src_info.pos.end);
+                term::colorize_range(g_err_sys.term,
+                                     str_buf,
                                      term::color_t::yellow,
                                      term::color_t::blue,
                                      report.buf,
@@ -83,13 +86,15 @@ namespace basecode::error {
                 start_pos += line.len + 1;
 
                 if (line_number > report.src_info.end.line) {
-                    term::set_fg(str_buf, term::color_t::red);
+                    term::set_fg(g_err_sys.term, term::color_t::red);
+                    term::refresh(g_err_sys.term, str_buf);
                     format::format_to(str_buf,
                                       "\n{:<{}}^ ",
                                       " ",
                                       10 + report.src_info.start.column);
                     fmt::vformat_to(str_buf, fmt_msg, report.args);
-                    term::reset_all(str_buf);
+                    term::reset_all(g_err_sys.term);
+                    term::refresh(g_err_sys.term, str_buf);
                 }
             } else {
                 const auto& line = buf::line(*report.buf, i);
@@ -108,6 +113,7 @@ namespace basecode::error {
             hashtab::free(g_err_sys.errors);
             memory::system::free(g_err_sys.error_slab);
             mutex::free(g_err_sys.lock);
+            term::free(g_err_sys.term);
         }
 
         status_t init(alloc_t* alloc) {
@@ -121,6 +127,7 @@ namespace basecode::error {
             slab_config.buf_align = alignof(error_def_t);
             slab_config.num_pages = 1;
             g_err_sys.error_slab = memory::system::make(alloc_type_t::slab, &slab_config);
+            term::init(g_err_sys.term, g_err_sys.alloc);
             return status_t::ok;
         }
     }
