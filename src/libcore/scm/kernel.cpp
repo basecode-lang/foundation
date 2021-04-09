@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/scm/modules/kernel.h>
+#include <basecode/core/scm/kernel.h>
 
 namespace basecode::scm::kernel {
     static type_decl_t s_common_types[] = {

@@ -31,6 +31,7 @@
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
 #include <basecode/core/configure.h>
+#include <basecode/core/scm/system.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
@@ -109,13 +110,16 @@ s32 main(s32 argc, const s8** argv) {
     rc = stopwatch::time_block("job::system::init"_ss,         []() -> s32 { return s32(job::system::init());               });
     if (!OK(rc)) return rc;
 
-    rc = stopwatch::time_block("ffi::system::init"_ss,     []() -> s32 { return s32(ffi::system::init());               });
+    rc = stopwatch::time_block("ffi::system::init"_ss,         []() -> s32 { return s32(ffi::system::init());               });
     if (!OK(rc)) return rc;
 
     rc = stopwatch::time_block("filesys::init"_ss,             []() -> s32 { return s32(filesys::init());                   });
     if (!OK(rc)) return rc;
 
     rc = stopwatch::time_block("network::init"_ss,             []() -> s32 { return s32(network::system::init());           });
+    if (!OK(rc)) return rc;
+
+    rc = stopwatch::time_block("scm::system::init"_ss,         []() -> s32 { return s32(scm::system::init());               });
     if (!OK(rc)) return rc;
 
     rc = stopwatch::time_block("config::system::init"_ss,  []() -> s32 {
@@ -170,6 +174,7 @@ s32 main(s32 argc, const s8** argv) {
     stopwatch::time_block("job::system::fini"_ss,      []() -> s32 { job::system::fini();          return 0; });
     stopwatch::time_block("thread::system::fini"_ss,   []() -> s32 { thread::system::fini();       return 0; });
     stopwatch::time_block("config::system::fini"_ss,   []() -> s32 { config::system::fini();       return 0; });
+    stopwatch::time_block("scm::system::fini"_ss,      []() -> s32 { scm::system::fini();          return 0; });
     stopwatch::time_block("string::system::fini"_ss,   []() -> s32 { string::system::fini();       return 0; });
     stopwatch::time_block("error::system::fini"_ss,    []() -> s32 { error::system::fini();        return 0; });
     stopwatch::time_block("buf_pool::system::fini"_ss, []() -> s32 { buf_pool::system::fini();     return 0; });

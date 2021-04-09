@@ -20,9 +20,9 @@
 #include <basecode/core/error.h>
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
+#include <basecode/core/scm/kernel.h>
 #include <basecode/core/log/system/spdlog.h>
 #include <basecode/core/log/system/syslog.h>
-#include <basecode/core/scm/modules/kernel.h>
 #include <basecode/core/scm/modules/config.h>
 
 namespace basecode::config {
@@ -739,7 +739,6 @@ namespace basecode::config {
             g_cfg_sys.current_logger       = scm::nil(g_cfg_sys.ctx);
             g_cfg_sys.current_command_line = scm::nil(g_cfg_sys.ctx);
 
-            scm::kernel::create_common_types();
             scm::kernel::create_exports(g_cfg_sys.ctx, exports::s_exports, 22);
 
             std::memset(g_cfg_sys.vars, 0, sizeof(cvar_t) * max_cvar_size);
