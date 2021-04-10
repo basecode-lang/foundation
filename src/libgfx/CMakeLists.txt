@@ -134,6 +134,7 @@ set(
 
         ${GFX_INC_DIR}/clip/clip.h
         ${GFX_INC_DIR}/clip/clip_common.h
+        ${GFX_INC_DIR}/clip/clip_win_wic.h
         ${GFX_INC_DIR}/clip/clip_lock_impl.h
 
         clip/clip.cpp
