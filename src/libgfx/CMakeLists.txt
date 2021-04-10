@@ -29,6 +29,7 @@ add_subdirectory(glfw EXCLUDE_FROM_ALL)
 
 target_compile_options(
     glfw PRIVATE
+
     -Wno-documentation
     -Wno-reserved-id-macro
     -Wno-extra-semi-stmt
@@ -36,13 +37,18 @@ target_compile_options(
     -Wno-sign-conversion
     -Wno-undef
     -Wno-shadow
+    -Wno-implicit-int-conversion
     -Wno-implicit-int-float-conversion
     -Wno-cast-qual
     -Wno-bad-function-cast
     -Wno-unused-parameter
     -Wno-missing-field-initializers
     -Wno-pedantic
+    -Wno-format-nonliteral
     -Wno-double-promotion
+    -Wno-unused-function
+    -Wno-missing-variable-declarations
+    -Wno-float-equal
 )
 
 # libpng
