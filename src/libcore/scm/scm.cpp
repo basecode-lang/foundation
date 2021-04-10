@@ -613,15 +613,20 @@ namespace basecode::scm {
                                            ctx->alloc,
                                            1024,
                                            true);
+        vm::reset(vm);
+
         compiler::init(ctx->compiler, &vm, ctx->alloc);
+
+        array::init(ctx->procedures, ctx->alloc);
+        array::init(ctx->environments, ctx->alloc);
         array::init(ctx->native_ptrs, ctx->alloc);
         array::reserve(ctx->native_ptrs, 256);
+
         stack::init(ctx->cl_stack, ctx->alloc);
         stack::reserve(ctx->cl_stack, 1024);
+
         hashtab::init(ctx->strtab, ctx->alloc);
         hashtab::init(ctx->symtab, ctx->alloc);
-        array::init(ctx->environments, ctx->alloc);
-        array::init(ctx->procedures, ctx->alloc);
 
         // init objects
         ctx->nil       = &ctx->objects[ctx->object_used++];

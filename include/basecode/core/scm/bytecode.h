@@ -153,6 +153,8 @@ namespace basecode::scm {
             constexpr op_code_t truep   = 70;
             constexpr op_code_t falsep  = 71;
             constexpr op_code_t lcmp    = 72;
+            constexpr op_code_t clc     = 73;
+            constexpr op_code_t sec     = 74;
 
             str::slice_t name(op_code_t op);
         }
@@ -230,6 +232,8 @@ namespace basecode::scm {
             }
 
             u32 assembled_size_bytes(emitter_t& e, bb_t& start_block);
+
+            inst_t* make_instruction(emitter_t& e, bb_t& bb, u8 encoding);
 
             status_t assemble(emitter_t& e, bb_t& start_block, u64* heap);
 

@@ -121,6 +121,8 @@ namespace basecode::scm {
                 [truep]     = "TRUEP"_ss,
                 [falsep]    = "FALSEP"_ss,
                 [lcmp]      = "LCMP"_ss,
+                [clc]       = "CLC"_ss,
+                [sec]       = "SEC"_ss,
             };
 
             str::slice_t name(reg_t op) {
@@ -202,121 +204,64 @@ namespace basecode::scm {
             }
 
             imm1_builder_t& bb_builder_t::imm1() {
-                _inst = &array::append(_em->insts);
-                _inst->id       = _em->insts.size;
-                _inst->block_id = _bb->id;
-                _inst->encoding = instruction::encoding::imm;
-                if (_bb->insts.eidx == 0) {
-                    _bb->insts.sidx = _em->insts.size - 1;
-                    _bb->insts.eidx = _bb->insts.sidx + 1;
-                } else {
-                    _bb->insts.eidx = _em->insts.size;
-                }
+                _inst = emitter::make_instruction(*_em,
+                                                  *_bb,
+                                                  instruction::encoding::imm);
                 _imm1.reset();
                 return _imm1;
             }
 
             imm2_builder_t& bb_builder_t::imm2() {
-                _inst = &array::append(_em->insts);
-                _inst->id       = _em->insts.size;
-                _inst->block_id = _bb->id;
-                _inst->encoding = instruction::encoding::imm;
-                if (_bb->insts.eidx == 0) {
-                    _bb->insts.sidx = _em->insts.size - 1;
-                    _bb->insts.eidx = _bb->insts.sidx + 1;
-                } else {
-                    _bb->insts.eidx = _em->insts.size;
-                }
+                _inst = emitter::make_instruction(*_em,
+                                                  *_bb,
+                                                  instruction::encoding::imm);
                 _imm2.reset();
                 return _imm2;
             }
 
             reg1_builder_t& bb_builder_t::reg1() {
-                _inst = &array::append(_em->insts);
-                _inst->id       = _em->insts.size;
-                _inst->block_id = _bb->id;
-                _inst->encoding = instruction::encoding::reg1;
-                if (_bb->insts.eidx == 0) {
-                    _bb->insts.sidx = _em->insts.size - 1;
-                    _bb->insts.eidx = _bb->insts.sidx + 1;
-                } else {
-                    _bb->insts.eidx = _em->insts.size;
-                }
+                _inst = emitter::make_instruction(*_em,
+                                                  *_bb,
+                                                  instruction::encoding::reg1);
                 _reg1.reset();
                 return _reg1;
             }
 
             reg2_builder_t& bb_builder_t::reg2() {
-                _inst = &array::append(_em->insts);
-                _inst->id       = _em->insts.size;
-                _inst->block_id = _bb->id;
-                _inst->encoding = instruction::encoding::reg2;
-                if (_bb->insts.eidx == 0) {
-                    _bb->insts.sidx = _em->insts.size - 1;
-                    _bb->insts.eidx = _bb->insts.sidx + 1;
-                } else {
-                    _bb->insts.eidx = _em->insts.size;
-                }
+                _inst = emitter::make_instruction(*_em,
+                                                  *_bb,
+                                                  instruction::encoding::reg2);
                 _reg2.reset();
                 return _reg2;
             }
 
             none_builder_t& bb_builder_t::none() {
-                _inst = &array::append(_em->insts);
-                _inst->id       = _em->insts.size;
-                _inst->block_id = _bb->id;
-                _inst->encoding = instruction::encoding::none;
-                if (_bb->insts.eidx == 0) {
-                    _bb->insts.sidx = _em->insts.size - 1;
-                    _bb->insts.eidx = _bb->insts.sidx + 1;
-                } else {
-                    _bb->insts.eidx = _em->insts.size;
-                }
+                _inst = emitter::make_instruction(*_em,
+                                                  *_bb,
+                                                  instruction::encoding::none);
                 _none.reset();
                 return _none;
             }
 
             reg3_builder_t& bb_builder_t::reg3() {
-                _inst = &array::append(_em->insts);
-                _inst->id       = _em->insts.size;
-                _inst->block_id = _bb->id;
-                _inst->encoding = instruction::encoding::reg3;
-                if (_bb->insts.eidx == 0) {
-                    _bb->insts.sidx = _em->insts.size - 1;
-                    _bb->insts.eidx = _bb->insts.sidx + 1;
-                } else {
-                    _bb->insts.eidx = _em->insts.size;
-                }
+                _inst = emitter::make_instruction(*_em,
+                                                  *_bb,
+                                                  instruction::encoding::reg3);
                 _reg3.reset();
                 return _reg3;
             }
 
             offs_builder_t& bb_builder_t::offs() {
-                _inst = &array::append(_em->insts);
-                _inst->id       = _em->insts.size;
-                _inst->block_id = _bb->id;
-                _inst->encoding = instruction::encoding::offset;
-                if (_bb->insts.eidx == 0) {
-                    _bb->insts.sidx = _em->insts.size - 1;
-                    _bb->insts.eidx = _bb->insts.sidx + 1;
-                } else {
-                    _bb->insts.eidx = _em->insts.size;
-                }
-                _offs.reset();
+                _inst = emitter::make_instruction(*_em,
+                                                  *_bb,
+                                                  instruction::encoding::offset);
                 return _offs;
             }
 
             reg2_imm_builder_t& bb_builder_t::reg2_imm() {
-                _inst = &array::append(_em->insts);
-                _inst->id       = _em->insts.size;
-                _inst->block_id = _bb->id;
-                _inst->encoding = instruction::encoding::reg2_imm;
-                if (_bb->insts.eidx == 0) {
-                    _bb->insts.sidx = _em->insts.size - 1;
-                    _bb->insts.eidx = _bb->insts.sidx + 1;
-                } else {
-                    _bb->insts.eidx = _em->insts.size;
-                }
+                _inst = emitter::make_instruction(*_em,
+                                                  *_bb,
+                                                  instruction::encoding::reg2_imm);
                 _reg2_imm.reset();
                 return _reg2_imm;
             }
@@ -1202,6 +1147,24 @@ namespace basecode::scm {
                 return status_t::ok;
             }
 
+            inst_t* make_instruction(emitter_t& e, bb_t& bb, u8 encoding) {
+                auto inst = &array::append(e.insts);
+                inst->id        = e.insts.size;
+                inst->aux       = 0;
+                inst->pad       = 0;
+                inst->mode      = false;
+                inst->block_id  = bb.id;
+                inst->encoding  = encoding;
+                inst->is_signed = false;
+                if (bb.insts.eidx == 0) {
+                    bb.insts.sidx = e.insts.size - 1;
+                    bb.insts.eidx = bb.insts.sidx + 1;
+                } else {
+                    bb.insts.eidx = e.insts.size;
+                }
+                return inst;
+            }
+
             status_t encode_inst(emitter_t& e, const inst_t& inst, u64* heap) {
                 u64 buf{};
                 u64 data{};
@@ -1222,12 +1185,16 @@ namespace basecode::scm {
                         auto& src = inst.operands[0];
                         auto& dst = inst.operands[1];
                         ENCODE_IMM(src, opers->imm.src);
-                        ENCODE_REG(dst, opers->imm.dst);
-                        auto area = get_mem_area_by_reg(vm, opers->imm.dst);
-                        if (area) {
-                            opers->imm.aux = area->top ? -1 : 1;
+                        if (dst.type == operand_type_t::reg) {
+                            ENCODE_REG(dst, opers->imm.dst);
+                            auto area = get_mem_area_by_reg(vm, opers->imm.dst);
+                            if (area) {
+                                opers->imm.aux = area->top ? -sizeof(u64) : sizeof(u64);
+                            } else {
+                                opers->imm.aux = 0;
+                            }
                         } else {
-                            opers->imm.aux = 0;
+                            opers->imm.dst = 0;
                         }
                         break;
                     }
@@ -1271,7 +1238,7 @@ namespace basecode::scm {
                         ENCODE_REG(dst, opers->reg2.dst);
                         auto area = get_mem_area_by_reg(vm, opers->reg2.src);
                         if (area && !inst.aux) {
-                            opers->reg2.aux = area->top ? -1 : 1;
+                            opers->reg2.aux = area->top ? -sizeof(u64) : sizeof(u64);
                         } else {
                             opers->reg2.aux = inst.aux;
                         }
@@ -2156,7 +2123,7 @@ namespace basecode::scm {
                 basic_block::encode(c.bb)
                     .comment(format::format("literal: {}",
                                             to_string(c.ctx, args)),
-                             c.bb->insts.size() - 1);
+                             c.bb->insts.size());
                 return {c.bb, res};
             }
 

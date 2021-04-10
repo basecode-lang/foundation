@@ -356,8 +356,8 @@ namespace basecode::scm {
         s32                     aux;
         u32                     block_id;
         op_code_t               type;
-        u8                      mode:       1;
         u8                      encoding:   4;
+        u8                      mode:       1;
         u8                      is_signed:  1;
         u8                      pad:        2;
     };
@@ -390,7 +390,7 @@ namespace basecode::scm {
             u32                 sidx;
             u32                 eidx;
             inline u32 size() const {
-                return (eidx - sidx) + 1;
+                return (eidx - sidx);
             }
         }                       insts;
         bb_type_t               type;
@@ -424,10 +424,8 @@ namespace basecode::scm {
         u8                      pad:    7;
 
         u64& operator[](u32 idx) {
-            if (top)
-                return idx < capacity ? data[idx] : null;
-            else
-                return idx < size ? data[idx] : null;
+            return top ? (idx < capacity ? data[idx] : null) :
+                   (idx < size ? data[idx] : null);
         }
 
         inline u64 base_addr() const {
@@ -436,10 +434,8 @@ namespace basecode::scm {
         }
 
         u64 operator[](u32 idx) const {
-            if (top)
-                return idx < capacity ? data[idx] : null;
-            else
-                return idx < size ? data[idx] : null;
+            return top ? (idx < capacity ? data[idx] : null) :
+                   (idx < size ? data[idx] : null);
         }
    };
 

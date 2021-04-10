@@ -49,11 +49,6 @@ namespace basecode {
 
     u64 next_power_of_two(u64 n);
 
-    template <typename T>
-    b8 is_sign_bit_set(T value) {
-        return (value & (T(1) << ((sizeof(T) * CHAR_BIT) - 1))) != 0;
-    }
-
     b8 is_platform_little_endian();
 
     u64 align(u64 size, u64 align);
@@ -77,4 +72,9 @@ namespace basecode {
     u8 lnybble(u8 original, u8 value);
 
     u8 unybble(u8 original, u8 value);
+
+    template <typename T>
+    inline b8 is_sign_bit_set(T value) {
+        return (value & (T(1) << ((sizeof(T) * CHAR_BIT) - 1))) != 0;
+    }
 }
