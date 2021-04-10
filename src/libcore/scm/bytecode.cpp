@@ -106,7 +106,7 @@ namespace basecode::scm {
                 [write]     = "WRITE"_ss,
                 [qt]        = "QT"_ss,
                 [qq]        = "QQ"_ss,
-                [gc]        = "GC"_ss,
+                [collect]   = "COLLECT"_ss,
                 [apply]     = "APPLY"_ss,
                 [const_]    = "CONST"_ss,
                 [ladd]      = "LADD"_ss,
@@ -123,6 +123,8 @@ namespace basecode::scm {
                 [lcmp]      = "LCMP"_ss,
                 [clc]       = "CLC"_ss,
                 [sec]       = "SEC"_ss,
+                [read]      = "READ"_ss,
+                [define]    = "DEFINE"_ss,
             };
 
             str::slice_t name(reg_t op) {
@@ -1568,12 +1570,10 @@ namespace basecode::scm {
                     case prim_type_t::mul:              return arith_op(comp, c, op::lmul, args);
                     case prim_type_t::div:              return arith_op(comp, c, op::ldiv, args);
                     case prim_type_t::mod:              return arith_op(comp, c, op::lmod, args);
-                    case prim_type_t::let:
-                    case prim_type_t::set:              return let_set(comp, c, args);
+                    case prim_type_t::set:              return set(comp, c, args);
                     case prim_type_t::fn:
                     case prim_type_t::mac:              return fn(comp, c, c.ctx->nil, form, args);
                     case prim_type_t::if_:              return if_(comp, c, args);
-                    case prim_type_t::do_:              return do_(comp, c, args);
                     case prim_type_t::or_:              return or_(comp, c, args);
                     case prim_type_t::and_:             return and_(comp, c, args);
                     case prim_type_t::not_:             return not_(comp, c, args);
@@ -1583,13 +1583,15 @@ namespace basecode::scm {
                     case prim_type_t::atom:             return atom(comp, c, args);
                     case prim_type_t::eval:             return eval(comp, c, args);
                     case prim_type_t::list:             return list(comp, c, args);
+                    case prim_type_t::quote:            return qt(comp, c, args);
+                    case prim_type_t::begin:            return begin(comp, c, args);
+                    case prim_type_t::error:            return error(comp, c, args);
+                    case prim_type_t::print:            return print(comp, c, args);
+                    case prim_type_t::define:           return define(comp, c, args);
                     case prim_type_t::while_:           return while_(comp, c, args);
                     case prim_type_t::setcar:           return set_car(comp, c, args);
                     case prim_type_t::setcdr:           return set_cdr(comp, c, args);
-                    case prim_type_t::error:            return error(comp, c, args);
-                    case prim_type_t::print:            return print(comp, c, args);
                     case prim_type_t::format:           return format(comp, c, args);
-                    case prim_type_t::quote:            return qt(comp, c, args);
                     case prim_type_t::unquote:          return uq(comp, c, args);
                     case prim_type_t::quasiquote:       return qq(comp, c, args);
                     case prim_type_t::unquote_splicing: return uqs(comp, c, args);
@@ -1891,22 +1893,37 @@ namespace basecode::scm {
                 return {&exit_bb, res};
             }
 
-            compile_result_t do_(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto dc = c;
-                while (!IS_NIL(args)) {
-                    dc.obj   = CAR(args);
-                    auto res = compiler::compile(comp, dc);
-                    dc.bb = res.bb;
-                    args = CDR(args);
-                }
-                return {dc.bb, 0};
-            }
-
             compile_result_t uqs(compiler_t& comp, const context_t& c, obj_t* args) {
                 UNUSED(args);
                 scm::error(c.ctx, "unquote-splicing is not valid in this context.");
                 return {c.bb, 0};
+            }
+
+            compile_result_t set(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto key  = CAR(args);
+                u32  idx  = OBJ_IDX(key);
+                auto name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
+                auto res  = emitter::virtual_var::get(comp.emit, name);
+                auto vc   = c;
+                vc.obj = CADR(args);
+                auto comp_res = compiler::compile(comp, vc);
+                basic_block::encode(comp_res.bb)
+                    .comment(format::format(
+                        "symbol: {}",
+                        printable_t{c.ctx, key, true}))
+                    .imm2()
+                        .op(op::set)
+                        .src(u32(idx))
+                        .dst(&comp_res.var)
+                        .mode(true)
+                        .build()
+                    .reg2()
+                        .op(op::move)
+                        .src(&comp_res.var)
+                        .dst(&res)
+                        .build();
+                return {comp_res.bb, res};
             }
 
             compile_result_t if_(compiler_t& comp, const context_t& c, obj_t* args) {
@@ -2102,6 +2119,19 @@ namespace basecode::scm {
                 return {comp_res.bb, res};
             }
 
+            compile_result_t begin(compiler_t& comp, const context_t& c, obj_t* args) {
+                auto ctx = c.ctx;
+                auto dc = c;
+                compile_result_t comp_res;
+                while (!IS_NIL(args)) {
+                    dc.obj   = CAR(args);
+                    comp_res = compiler::compile(comp, dc);
+                    dc.bb = comp_res.bb;
+                    args = CDR(args);
+                }
+                return {dc.bb, comp_res.var};
+            }
+
             compile_result_t error(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
                 auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
@@ -2139,25 +2169,19 @@ namespace basecode::scm {
                 return compile_result_t();
             }
 
-            compile_result_t while_(compiler_t& comp, const context_t& c, obj_t* args) {
-                UNUSED(comp);
-                UNUSED(args);
-                return {c.bb, 0};
-            }
-
-            compile_result_t let_set(compiler_t& comp, const context_t& c, obj_t* args) {
+            compile_result_t define(compiler_t& comp, const context_t& c, obj_t* args) {
                 auto ctx = c.ctx;
                 auto& vm = *comp.vm;
-                auto key      = CAR(args);
-                u32  idx      = OBJ_IDX(key);
-                auto key_name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
-                auto res      = emitter::virtual_var::declare(comp.emit, key_name);
-                auto vc       = c;
+                auto key  = CAR(args);
+                u32  idx  = OBJ_IDX(key);
+                auto name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
+                auto res  = emitter::virtual_var::declare(comp.emit, name);
+                auto vc = c;
                 vc.obj = CADR(args);
                 auto comp_res = compiler::compile(comp, vc);
                 if (c.top_level) {
                     auto value = OBJ_AT(G(rf::m));  // FIXME: this is a temporary hack
-                    set(ctx, key, value);
+                    scm::define(ctx, key, value);
                     if (TYPE(value) == obj_type_t::func
                     ||  TYPE(value) == obj_type_t::macro) {
                         auto proc = PROC(value);
@@ -2174,7 +2198,7 @@ namespace basecode::scm {
                         "symbol: {}",
                         printable_t{c.ctx, key, true}))
                     .imm2()
-                        .op(op::set)
+                        .op(op::define)
                         .src(u32(idx))
                         .dst(&comp_res.var)
                         .mode(true)
@@ -2185,6 +2209,12 @@ namespace basecode::scm {
                         .dst(&res)
                         .build();
                 return {comp_res.bb, res};
+            }
+
+            compile_result_t while_(compiler_t& comp, const context_t& c, obj_t* args) {
+                UNUSED(comp);
+                UNUSED(args);
+                return {c.bb, nullptr};
             }
 
             compile_result_t set_cdr(compiler_t& comp, const context_t& c, obj_t* args) {

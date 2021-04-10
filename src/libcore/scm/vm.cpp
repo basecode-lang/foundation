@@ -135,7 +135,7 @@ namespace basecode::scm::vm {
     constexpr u8 op_qq_reg2         = 102;
     constexpr u8 op_clc             = 103;
     constexpr u8 op_sec             = 104;
-    [[maybe_unused]] constexpr u8 op____unused3      = 105;
+    constexpr u8 op_collect         = 105;
     constexpr u8 op_apply_reg2      = 106;
     constexpr u8 op_const_reg2      = 107;
     constexpr u8 op_const_imm2      = 108;
@@ -155,6 +155,9 @@ namespace basecode::scm::vm {
     constexpr u8 op_lnot_reg1       = 123;
     constexpr u8 op_get_imm         = 124;
     constexpr u8 op_set_imm         = 125;
+    constexpr u8 op_read_reg2       = 126;
+    constexpr u8 op_define_imm      = 127;
+    constexpr u8 op_define_reg2     = 128;
     constexpr u8 op_error           = 255;
 
     static u8 s_op_decode[][2][9] = {
@@ -455,6 +458,18 @@ namespace basecode::scm::vm {
             {op_sec,        op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
         },
+        [instruction::type::collect] = {
+            {op_collect,    op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+        },
+        [instruction::type::read] = {
+            {op_error,      op_error,       op_error,       op_read_reg2,   op_error,       op_error,       op_error,       op_error,           op_error},
+            {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+        },
+        [instruction::type::define] = {
+            {op_error,      op_define_imm,  op_error,       op_define_reg2, op_error,       op_error,       op_error,       op_error,           op_error},
+            {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+        },
     };
 
     namespace mem_area {
@@ -495,7 +510,9 @@ namespace basecode::scm::vm {
         u0 reset(mem_area_t& area, b8 zero_mem) {
             area.size = {};
             if (zero_mem) {
-                std::memset(area.data, 0, area.capacity * sizeof(u64));
+                std::memset(area.data,
+                            0,
+                            area.capacity * sizeof(u64));
             }
         }
 
@@ -706,6 +723,10 @@ namespace basecode::scm::vm {
             [op_set_imm]            = &&set_imm,
             [op_clc]                = &&clc,
             [op_sec]                = &&sec,
+            [op_collect]            = &&collect,
+            [op_read_reg2]          = &&read_reg2,
+            [op_define_imm]         = &&define_imm,
+            [op_define_reg2]        = &&define_reg2,
             [op_error]              = &&error,
         };
 
@@ -741,6 +762,12 @@ namespace basecode::scm::vm {
         sec:
         {
             flags->c = true;
+            PC += sizeof(encoded_inst_t);
+            EXEC_NEXT();
+        }
+        collect:
+        {
+            collect_garbage(ctx);
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
@@ -1425,6 +1452,12 @@ namespace basecode::scm::vm {
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
+        read_reg2:
+        {
+            // XXX: FIXME
+            PC += sizeof(encoded_inst_t);
+            EXEC_NEXT();
+        }
         write_imm2:
         {
             auto m = G(opers->imm.src);
@@ -1567,6 +1600,18 @@ namespace basecode::scm::vm {
             flags->i = false;
             flags->v = false;
             G(opers->reg2.dst) = u64(v);
+            PC += sizeof(encoded_inst_t);
+            EXEC_NEXT();
+        }
+        define_imm:
+        {
+            define(ctx, (obj_t*) G(opers->imm.dst), OBJ_AT(G(opers->imm.src)));
+            PC += sizeof(encoded_inst_t);
+            EXEC_NEXT();
+        }
+        define_reg2:
+        {
+            define(ctx, (obj_t*) G(opers->reg2.dst), (obj_t*) G(opers->reg2.src));
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }

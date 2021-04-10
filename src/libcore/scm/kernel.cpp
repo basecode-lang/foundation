@@ -70,9 +70,9 @@ namespace basecode::scm::kernel {
                 }
                 ffi::proto::append(proto, ol);
             }
-            scm::set(ctx,
-                     scm::make_symbol(ctx, proto->name),
-                     scm::make_ffi(ctx, proto));
+            scm::define(ctx,
+                        scm::make_symbol(ctx, proto->name),
+                        scm::make_ffi(ctx, proto));
             ++i;
         }
     }

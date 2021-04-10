@@ -820,7 +820,7 @@ namespace basecode::config {
         static u0 add_binding(cvar_t* cvar) {
             auto sym_name = format::format("*{}*", cvar->name);
             auto symbol = scm::make_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
-            scm::set(g_cfg_sys.ctx, symbol, scm::make_fixnum(g_cfg_sys.ctx, cvar->id));
+            scm::define(g_cfg_sys.ctx, symbol, scm::make_fixnum(g_cfg_sys.ctx, cvar->id));
         }
 
         static u0 remove_binding(cvar_t* cvar) {

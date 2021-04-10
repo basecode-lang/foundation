@@ -137,7 +137,7 @@ namespace basecode::scm {
             constexpr op_code_t write   = 54;
             constexpr op_code_t qt      = 55;
             constexpr op_code_t qq      = 56;
-            constexpr op_code_t gc      = 57;
+            constexpr op_code_t collect = 57;
             constexpr op_code_t apply   = 58;
             constexpr op_code_t const_  = 59;
             constexpr op_code_t ladd    = 60;
@@ -155,6 +155,8 @@ namespace basecode::scm {
             constexpr op_code_t lcmp    = 72;
             constexpr op_code_t clc     = 73;
             constexpr op_code_t sec     = 74;
+            constexpr op_code_t read    = 75;
+            constexpr op_code_t define  = 76;
 
             str::slice_t name(op_code_t op);
         }
@@ -452,9 +454,9 @@ namespace basecode::scm {
 
             compile_result_t or_(compiler_t& comp, const context_t& c, obj_t* args);
 
-            compile_result_t do_(compiler_t& comp, const context_t& c, obj_t* args);
-
             compile_result_t if_(compiler_t& comp, const context_t& c, obj_t* args);
+
+            compile_result_t set(compiler_t& comp, const context_t& c, obj_t* args);
 
             compile_result_t atom(compiler_t& comp, const context_t& c, obj_t* args);
 
@@ -468,6 +470,8 @@ namespace basecode::scm {
 
             compile_result_t not_(compiler_t& comp, const context_t& c, obj_t* args);
 
+            compile_result_t begin(compiler_t& comp, const context_t& c, obj_t* args);
+
             compile_result_t error(compiler_t& comp, const context_t& c, obj_t* args);
 
             compile_result_t print(compiler_t& comp, const context_t& c, obj_t* args);
@@ -476,11 +480,11 @@ namespace basecode::scm {
 
             compile_result_t while_(compiler_t& comp, const context_t& c, obj_t* args);
 
+            compile_result_t define(compiler_t& comp, const context_t& c, obj_t* args);
+
             compile_result_t set_car(compiler_t& comp, const context_t& c, obj_t* args);
 
             compile_result_t set_cdr(compiler_t& comp, const context_t& c, obj_t* args);
-
-            compile_result_t let_set(compiler_t& comp, const context_t& c, obj_t* args);
         }
 
         namespace basic_block {

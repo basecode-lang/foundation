@@ -64,22 +64,23 @@ namespace basecode::scm {
     };
 
     enum class obj_type_t : u32 {
+        nil,
+        ffi,
+        ptr,
         pair,
         free,
-        nil,
+        func,
+        prim,
+        port,
+        macro,
+        cfunc,
+        error,
         fixnum,
         flonum,
         symbol,
         string,
-        func,
-        macro,
-        prim,
-        cfunc,
-        ptr,
         boolean,
         keyword,
-        ffi,
-        error,
         environment,
     };
 
@@ -147,7 +148,7 @@ namespace basecode::scm {
 
     obj_t* next_arg(ctx_t* ctx, obj_t** arg);
 
-    u0 set(ctx_t* ctx, obj_t* sym, obj_t* v);
+    b8 set(ctx_t* ctx, obj_t* sym, obj_t* v);
 
     obj_t* eval_list(ctx_t* ctx, obj_t* lst);
 
@@ -163,6 +164,8 @@ namespace basecode::scm {
 
     obj_t* make_flonum(ctx_t* ctx, flonum_t n);
 
+    u0 define(ctx_t* ctx, obj_t* sym, obj_t* v);
+
     obj_t* make_ffi(ctx_t* ctx, proto_t* proto);
 
     u0 write(FILE* file, ctx_t* ctx, obj_t* obj);
@@ -176,8 +179,6 @@ namespace basecode::scm {
     u0 write(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj);
 
     u0 print(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj);
-
-    u0 set_upvalue(ctx_t* ctx, obj_t* sym, obj_t* v);
 
     obj_t* make_environment(ctx_t* ctx, obj_t* parent);
 

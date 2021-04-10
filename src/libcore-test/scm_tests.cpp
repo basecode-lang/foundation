@@ -168,7 +168,7 @@ TEST_CASE("basecode::scm::vm instructions") {
             REQUIRE(R(2) == u32(-42));
         }
 
-        /* add */ {
+        /* add, adds */ {
             scm::vm::emitter::reset(emit);
             auto& bb = scm::vm::emitter::make_basic_block(emit,
                                                           "test"_ss,
@@ -208,6 +208,81 @@ TEST_CASE("basecode::scm::vm instructions") {
                                        false);
             REQUIRE(R(1) == 126);
         }
+
+        /* mul */ {
+        }
+
+        /* div */ {
+        }
+
+        /* pow */ {
+        }
+
+        /* mod */ {
+        }
+
+        /* neg */ {
+        }
+
+        /* not */ {
+        }
+
+        /* shl */ {
+        }
+
+        /* shr */ {
+        }
+
+        /* or */ {
+        }
+
+        /* and */ {
+        }
+
+        /* xor */ {
+        }
+
+        /* push, pop */ {
+        }
+
+        /* load */ {
+        }
+
+        /* store */ {
+        }
+
+        /* lea */ {
+        }
+
+        /* trap */ {
+        }
+
+        /* unconditional branches: br, bra */ {
+        }
+
+        /* subroutine branch: blr, ret */ {
+        }
+
+        /* conditional branches: cmp, beq, bne, bl, ble, bg, bge */ {
+        }
+
+        /* conditional set: cmp, seq, sne, sl, sle, sg, sge */ {
+        }
+
+        /* fix, flo */ {
+        }
+
+        /* cons, car, cdr, setcar, setcdr */ {
+        }
+
+        /* const */ {
+        }
+
+        /* env, error */ {
+        }
+
+        /* collect */ {
+        }
     );
 }
 
@@ -219,15 +294,15 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
     scm::init(ctx, heap_size, alloc);
 
     const auto source = R"(
-(do
-    (= length (fn (ls)
+(begin
+    (define length (fn (ls)
         (if (not ls)
             0
             (if (not (atom ls))
                 (+ 1 (length (cdr ls)))
                 (error "invalid argument to length")))))
 
-    (let nums (list 1 2 3 4 5 6))
+    (define nums (list 1 2 3 4 5 6))
     (length nums))
 )"_ss;
 

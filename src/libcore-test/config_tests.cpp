@@ -120,8 +120,8 @@ TEST_CASE("basecode::config terp eval") {
     TIME_BLOCK(
         "scm test program"_ss,
     const auto source = R"(
-(do
-    (let result 50)
+(begin
+    (define result 50)
     result)
 )"_ss;
 

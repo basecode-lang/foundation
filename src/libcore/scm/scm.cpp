@@ -46,62 +46,63 @@
 #include <basecode/core/scm/compiler.h>
 
 namespace basecode::scm {
-    static const s8* s_prim_names[] = {
-        "eval",
-        "let",
-        "=",
-        "if",
-        "fn",
-        "mac",
-        "while",
+    static const s8* s_type_names[] = {
+        "nil",
+        "ffi",
+        "ptr",
+        "pair",
+        "free",
+        "func",
+        "prim",
+        "port",
+        "macro",
+        "cfunc",
         "error",
-        "quote",
-        "unquote",
-        "quasiquote",
-        "unquote-splicing",
-        "and",
-        "or",
-        "do",
-        "cons",
-        "car",
-        "cdr",
-        "setcar",
-        "setcdr",
-        "list",
-        "not",
+        "fixnum",
+        "flonum",
+        "symbol",
+        "string",
+        "boolean",
+        "keyword",
+        "environment",
+    };
+
+    static const s8* s_prim_names[] = {
         "is",
-        "atom",
-        "print",
-        "format",
         ">",
-        ">=",
         "<",
+        "fn",
+        ">=",
         "<=",
         "+",
         "-",
         "*",
         "/",
-        "mod"
-    };
-
-    static const s8* s_type_names[] = {
-        "pair",
-        "free",
-        "nil",
-        "fixnum",
-        "flonum",
-        "symbol",
-        "string",
-        "func",
-        "macro",
-        "prim",
-        "cfunc",
-        "ptr",
-        "boolean",
-        "keyword",
-        "ffi",
+        "mod",
+        "set!",
+        "mac",
+        "if",
+        "or",
+        "car",
+        "cdr",
+        "and",
+        "not",
+        "cons",
+        "eval",
+        "list",
+        "atom",
+        "begin",
         "error",
-        "environment",
+        "quote",
+        "print",
+        "while",
+        "format",
+        "setcar",
+        "setcdr",
+        "define",
+        "unquote",
+        "quasiquote",
+        "unquote-splicing",
     };
 
     static const s8* s_delims   = " \n\t\r()[];";
@@ -173,26 +174,6 @@ namespace basecode::scm {
         return tos;
     }
 
-    obj_t* top_env(ctx_t* ctx) {
-        auto& vm = ctx->vm;
-        return ctx->env_stack->size == 0 ? ctx->nil : (obj_t*) HU(EP);
-    }
-
-    obj_t* pop_env(ctx_t* ctx) {
-        auto& vm = ctx->vm;
-        obj_t* tos = ctx->nil;
-        if (ctx->env_stack->size > 0) {
-            tos = (obj_t*) HU(EP);
-            EP += sizeof(u64);
-            --ctx->env_stack->size;
-        }
-        return tos;
-    }
-
-    obj_type_t type(obj_t* obj) {
-        return TYPE(obj);
-    }
-
     obj_t* make_proc(ctx_t* ctx,
                      obj_t* sym,
                      obj_t* params,
@@ -215,6 +196,26 @@ namespace basecode::scm {
         SET_TYPE(obj, macro ? obj_type_t::macro : obj_type_t::func);
         SET_FIXNUM(obj, ctx->native_ptrs.size);
         return obj;
+    }
+
+    obj_t* top_env(ctx_t* ctx) {
+        auto& vm = ctx->vm;
+        return ctx->env_stack->size == 0 ? ctx->nil : (obj_t*) HU(EP);
+    }
+
+    obj_t* pop_env(ctx_t* ctx) {
+        auto& vm = ctx->vm;
+        obj_t* tos = ctx->nil;
+        if (ctx->env_stack->size > 0) {
+            tos = (obj_t*) HU(EP);
+            EP += sizeof(u64);
+            --ctx->env_stack->size;
+        }
+        return tos;
+    }
+
+    obj_type_t type(obj_t* obj) {
+        return TYPE(obj);
     }
 
     u0 collect_garbage(ctx_t* ctx) {
@@ -652,30 +653,30 @@ namespace basecode::scm {
             ctx->true_ = make_object(ctx);
             SET_TYPE(ctx->true_, obj_type_t::boolean);
             SET_FIXNUM(ctx->true_, 1);
-            set(ctx, make_symbol(ctx, "#t", 2), ctx->true_);
+            define(ctx, make_symbol(ctx, "#t", 2), ctx->true_);
         }
 
         /* false */ {
             ctx->false_ = make_object(ctx);
             SET_TYPE(ctx->false_, obj_type_t::boolean);
             SET_FIXNUM(ctx->false_, 0);
-            set(ctx, make_symbol(ctx, "#f", 2), ctx->false_);
+            define(ctx, make_symbol(ctx, "#f", 2), ctx->false_);
         }
 
         ctx->rbrac  = SYM("]");
         ctx->rparen = SYM(")");
         ctx->dot    = SYM(".");
-        set(ctx, ctx->dot, ctx->dot);
-        set(ctx, ctx->rbrac, ctx->rbrac);
-        set(ctx, SYM("nil"), ctx->nil);
-        set(ctx, ctx->rparen, ctx->rparen);
+        define(ctx, ctx->dot, ctx->dot);
+        define(ctx, ctx->rbrac, ctx->rbrac);
+        define(ctx, SYM("nil"), ctx->nil);
+        define(ctx, ctx->rparen, ctx->rparen);
 
         // register built in primitives
         for (u32 i = 0; i < u32(prim_type_t::max); i++) {
             obj_t* v = make_object(ctx);
             SET_TYPE(v, obj_type_t::prim);
             SET_PRIM(v, i);
-            set(ctx, make_symbol(ctx, s_prim_names[i]), v);
+            define(ctx, make_symbol(ctx, s_prim_names[i]), v);
         }
 
         ffi::init(ctx->ffi);
@@ -864,14 +865,10 @@ namespace basecode::scm {
                     case prim_type_t::eval:
                         return eval(ctx, EVAL_ARG());
 
-                    case prim_type_t::let:
-                        va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
-                        set(ctx, va, EVAL_ARG());
-                        return ctx->nil;
-
                     case prim_type_t::set:
                         va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
-                        set_upvalue(ctx, va, EVAL_ARG());
+                        if (!set(ctx, va, EVAL_ARG()))
+                            error(ctx, "set! undefined variable: {}", printable_t{ctx, va});
                         return ctx->nil;
 
                     case prim_type_t::if_: {
@@ -915,6 +912,14 @@ namespace basecode::scm {
                         return res;
                     }
 
+                    case prim_type_t::define:
+                        va = check_type(ctx,
+                                        next_arg(ctx, &arg),
+                                        obj_type_t::symbol);
+                        vb = EVAL_ARG();
+                        define(ctx, va, vb);
+                        return vb;
+
                     case prim_type_t::quote:
                         return next_arg(ctx, &arg);
 
@@ -937,7 +942,7 @@ namespace basecode::scm {
                         while (!IS_NIL(arg) && IS_NIL(res = EVAL_ARG()));
                         return res;
 
-                    case prim_type_t::do_: {
+                    case prim_type_t::begin: {
                         auto save = save_gc(ctx);
                         while (!IS_NIL(arg)) {
                             restore_gc(ctx, save);
@@ -1260,13 +1265,17 @@ namespace basecode::scm {
         return res;
     }
 
-    u0 set(ctx_t* ctx, obj_t* sym, obj_t* v) {
+    b8 set(ctx_t* ctx, obj_t* sym, obj_t* v) {
         auto env = top_env(ctx);
-        check_type(ctx, env, obj_type_t::environment);
         const auto str_id = FIXNUM(sym);
-        auto e = ENV(env);
-        if (!hashtab::set(e->bindings, str_id, v))
-            hashtab::insert(e->bindings, str_id, v);
+        while (!IS_NIL(env)) {
+            check_type(ctx, env, obj_type_t::environment);
+            auto e = ENV(env);
+            if (hashtab::set(e->bindings, str_id, v))
+                return true;
+            env = e->parent;
+        }
+        return false;
     }
 
     obj_t* eval_list(ctx_t* ctx, obj_t* lst) {
@@ -1306,28 +1315,21 @@ namespace basecode::scm {
         return make_list(ctx, t1, 3);
     }
 
+    u0 define(ctx_t* ctx, obj_t* sym, obj_t* v) {
+        auto env = top_env(ctx);
+        check_type(ctx, env, obj_type_t::environment);
+        const auto str_id = FIXNUM(sym);
+        auto e = ENV(env);
+        if (!hashtab::set(e->bindings, str_id, v))
+            hashtab::insert(e->bindings, str_id, v);
+    }
+
     u0 print(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj) {
         format::format_to(buf, "{}\n", printable_t{ctx, obj});
     }
 
     u0 write(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj) {
         format::format_to(buf, "{}", printable_t{ctx, obj});
-    }
-
-    u0 set_upvalue(ctx_t* ctx, obj_t* sym, obj_t* v) {
-        auto env = top_env(ctx);
-        const auto str_id = FIXNUM(sym);
-        while (!IS_NIL(env)) {
-            check_type(ctx, env, obj_type_t::environment);
-            auto e = ENV(env);
-            if (hashtab::set(e->bindings, str_id, v))
-                return;
-            if (IS_NIL(e->parent)) {
-                hashtab::insert(e->bindings, str_id, v);
-                break;
-            }
-            env = e->parent;
-        }
     }
 
     str_t to_string(ctx_t* ctx, obj_t* obj, b8 quote) {
@@ -1749,12 +1751,12 @@ namespace basecode::scm {
     static u0 args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg) {
         while (!IS_NIL(prm)) {
             if (TYPE(prm) != obj_type_t::pair) {
-                set(ctx, prm, arg);
+                define(ctx, prm, arg);
                 break;
             }
             auto k = CAR(prm);
             auto v = CAR(arg);
-            set(ctx, k, v);
+            define(ctx, k, v);
             prm = CDR(prm);
             arg = CDR(arg);
         }
