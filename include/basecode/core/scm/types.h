@@ -160,6 +160,7 @@ namespace basecode::scm {
         error,
         quote,
         print,
+        expand,
         while_,
         format,
         setcar,

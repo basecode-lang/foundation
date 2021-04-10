@@ -1587,6 +1587,7 @@ namespace basecode::scm {
                     case prim_type_t::begin:            return begin(comp, c, args);
                     case prim_type_t::error:            return error(comp, c, args);
                     case prim_type_t::print:            return print(comp, c, args);
+                    case prim_type_t::expand:           return expand(comp, c, args);
                     case prim_type_t::define:           return define(comp, c, args);
                     case prim_type_t::while_:           return while_(comp, c, args);
                     case prim_type_t::setcar:           return set_car(comp, c, args);
@@ -2209,6 +2210,10 @@ namespace basecode::scm {
                         .dst(&res)
                         .build();
                 return {comp_res.bb, res};
+            }
+
+            compile_result_t expand(compiler_t& comp, const context_t& c, obj_t* args) {
+                return {c.bb, nullptr};
             }
 
             compile_result_t while_(compiler_t& comp, const context_t& c, obj_t* args) {

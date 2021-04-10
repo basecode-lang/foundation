@@ -95,6 +95,7 @@ namespace basecode::scm {
         "error",
         "quote",
         "print",
+        "expand",
         "while",
         "format",
         "setcar",
@@ -909,6 +910,29 @@ namespace basecode::scm {
                             }
                             restore_gc(ctx, gs);
                         }
+                        return res;
+                    }
+
+                    case prim_type_t::expand: {
+                        va = next_arg(ctx, &arg);
+                        arg = CDR(va);
+                        va = CAR(va);
+                        if (TYPE(va) == obj_type_t::symbol)
+                            va = get(ctx, va);
+                        check_type(ctx, va, obj_type_t::macro);
+                        auto proc = PROC(va);
+                        push_env(ctx, make_environment(ctx, top_env(ctx)));
+                        args_to_env(ctx, proc->params, arg);
+                        auto body = proc->body;
+                        auto save = save_gc(ctx);
+                        while (!IS_NIL(body)) {
+                            restore_gc(ctx, save);
+                            push_gc(ctx, body);
+                            push_gc(ctx, top_env(ctx));
+                            res = eval(ctx, CAR(body));
+                            body = CDR(body);
+                        }
+                        finalize_environment(ctx, pop_env(ctx));
                         return res;
                     }
 

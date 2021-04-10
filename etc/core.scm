@@ -67,6 +67,12 @@
     (loop '() first rest)))
 (define list* cons*)
 
+(define let (mac (args . body)
+    `(begin
+        (define proc (fn ,(map (fn (p) (car p)) args)
+                         ,@body))
+        (proc ,@(map (fn (p) (car (cdr p))) args)))))
+
 (define cond (mac args
     (if (not args)
         ''()
