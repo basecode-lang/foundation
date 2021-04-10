@@ -18,10 +18,11 @@
 
 #include <basecode/binfmt/io.h>
 #include <basecode/core/error.h>
-#include <basecode/core/config.h>
 #include <basecode/core/filesys.h>
 #include <basecode/binfmt/binfmt.h>
+#include <basecode/core/scm/system.h>
 #include <basecode/core/stable_array.h>
+#include <basecode/core/scm/modules/config.h>
 
 namespace basecode::binfmt {
     using module_map_t          = hashtab_t<module_id, module_t*>;
@@ -73,7 +74,7 @@ namespace basecode::binfmt {
             }
             scm::obj_t* result{};
             {
-                auto status = config::eval(config_path, &result);
+                auto status = scm::system::eval(config_path, &result);
                 if (!OK(status))
                     return status_t::config_eval_error;
             }

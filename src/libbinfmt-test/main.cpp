@@ -25,7 +25,6 @@
 #include <basecode/core/event.h>
 #include <basecode/core/error.h>
 #include <basecode/core/locale.h>
-#include <basecode/core/config.h>
 #include <basecode/core/thread.h>
 #include <basecode/core/memory.h>
 #include <basecode/core/string.h>
@@ -34,12 +33,17 @@
 #include <basecode/binfmt/binfmt.h>
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
+#include <basecode/core/scm/system.h>
+#include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
 
 using namespace basecode;
 
 s32 main(s32 argc, const s8** argv) {
+    if (!OK(profiler::init()))
+        return 1;
+
     {
         auto status = memory::system::init(alloc_type_t::dlmalloc);
         if (!OK(status)) {
@@ -48,6 +52,11 @@ s32 main(s32 argc, const s8** argv) {
             return (s32) status;
         }
     }
+    auto ctx = context::make(argc,
+                             argv,
+                             memory::system::default_alloc());
+    context::push(&ctx);
+
     {
         default_config_t dft_config{};
         dft_config.file = stderr;
@@ -60,22 +69,27 @@ s32 main(s32 argc, const s8** argv) {
             format::print(stderr, "log::system::init error: {}\n",
                           log::status_name(status));
         }
+
+        context::top()->logger = log::system::default_logger();
     }
 
-    auto ctx = context::make(argc,
-                             argv,
-                             memory::system::default_alloc(),
-                             log::system::default_logger());
-    context::push(&ctx);
-
-    if (!OK(term::system::init(true)))  return 1;
-    if (!OK(locale::system::init()))    return 1;
-    if (!OK(buf_pool::system::init()))  return 1;
-    if (!OK(string::system::init()))    return 1;
-    if (!OK(error::system::init()))     return 1;
+    if (!OK(term::system::init(true)))      return 1;
+    if (!OK(locale::system::init()))        return 1;
+    if (!OK(buf_pool::system::init()))      return 1;
+    if (!OK(error::system::init()))         return 1;
+    if (!OK(string::system::init()))        return 1;
+    if (!OK(memory::proxy::init()))         return 1;
+    if (!OK(event::system::init()))         return 1;
+    if (!OK(thread::system::init()))        return 1;
+    if (!OK(job::system::init()))           return 1;
+    if (!OK(ffi::system::init()))           return 1;
+    if (!OK(filesys::init()))               return 1;
+    if (!OK(network::system::init()))       return 1;
+    if (!OK(scm::system::init(256 * 1024))) return 1;
 
     {
         config_settings_t settings{};
+        settings.ctx           = scm::system::global_ctx();
         settings.product_name  = string::interned::fold(BINFMT_PRODUCT_NAME);
         settings.build_type    = string::interned::fold(BINFMT_BUILD_TYPE);
         settings.version.major = BINFMT_VERSION_MAJOR;
@@ -86,22 +100,16 @@ s32 main(s32 argc, const s8** argv) {
             format::print(stderr, "config::system::init error\n");
             return 1;
         }
+
+        auto core_config_path = "../etc/core.scm"_path;
+        path_t config_path{};
+        filesys::bin_rel_path(config_path, core_config_path);
+        scm::obj_t* result{};
+        if (!OK(scm::system::eval(config_path, &result))) return 1;
+
+        path::free(config_path);
+        path::free(core_config_path);
     }
-
-    auto core_config_path = "../etc/core.scm"_path;
-    path_t config_path{};
-    filesys::bin_rel_path(config_path, core_config_path);
-    scm::obj_t* result{};
-    if (!OK(config::eval(config_path, &result))) return 1;
-
-    if (!OK(profiler::init()))          return 1;
-    if (!OK(memory::proxy::init()))     return 1;
-    if (!OK(event::system::init()))     return 1;
-    if (!OK(thread::system::init()))    return 1;
-    if (!OK(job::system::init()))       return 1;
-    if (!OK(ffi::system::init()))       return 1;
-    if (!OK(filesys::init()))           return 1;
-    if (!OK(network::system::init()))   return 1;
 
     {
         auto status = binfmt::system::init();
@@ -114,17 +122,14 @@ s32 main(s32 argc, const s8** argv) {
 
     auto rc = Catch::Session().run(argc, argv);
 
-    path::free(config_path);
-    path::free(core_config_path);
-
     binfmt::system::fini();
     network::system::fini();
     filesys::fini();
     ffi::system::fini();
-    profiler::fini();
     job::system::fini();
     thread::system::fini();
     config::system::fini();
+    scm::system::fini();
     string::system::fini();
     error::system::fini();
     buf_pool::system::fini();
@@ -135,6 +140,7 @@ s32 main(s32 argc, const s8** argv) {
     memory::proxy::fini();
     memory::system::fini();
     context::pop();
+    profiler::fini();
 
     return rc;
 }

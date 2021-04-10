@@ -104,7 +104,7 @@ s32 main(s32 argc, const s8** argv) {
                                []() -> s32 { return s32(error::system::init()); });
     if (!OK(rc)) return rc;
 
-    rc = stopwatch::time_block("memory::system::init"_ss,
+    rc = stopwatch::time_block("memory::proxy::init"_ss,
                                []() -> s32 { return s32(memory::proxy::init()); });
     if (!OK(rc)) return rc;
 
