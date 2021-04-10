@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/binfmt/io.h>
 #include <basecode/core/error.h>
 #include <basecode/binfmt/binfmt.h>

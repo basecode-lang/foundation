@@ -60,7 +60,7 @@ target_include_directories(
     ${PROJECT_NAME}
 
     PRIVATE ${PROJECT_SOURCE_DIR}
-            ${PROJECT_DIR_BASE}/ext/catch2-2.8.0/single_include
+            ${PROJECT_DIR_BASE}/ext/catch2-2.13.4
 )
 add_custom_command(
     TARGET ${PROJECT_NAME} POST_BUILD

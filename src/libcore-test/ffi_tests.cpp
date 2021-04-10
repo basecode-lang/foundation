@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/ffi.h>
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>

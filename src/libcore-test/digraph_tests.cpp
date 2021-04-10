@@ -17,7 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <random>
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/defer.h>
 #include <basecode/core/format.h>
 #include <basecode/core/digraph.h>

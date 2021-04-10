@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/buf.h>
 #include <basecode/core/format.h>
 #include <basecode/core/symtab.h>

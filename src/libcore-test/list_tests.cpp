@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/list.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/slice.h>

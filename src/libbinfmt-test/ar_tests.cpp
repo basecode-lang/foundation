@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/binfmt/io.h>
 #include <basecode/binfmt/ar.h>
 #include <basecode/core/stopwatch.h>

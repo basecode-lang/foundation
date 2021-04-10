@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/str.h>
 #include <basecode/core/error.h>
 #include <basecode/core/format.h>

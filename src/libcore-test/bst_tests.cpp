@@ -17,7 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <random>
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/set.h>
 #include <basecode/core/bst.h>
 #include <basecode/core/stopwatch.h>

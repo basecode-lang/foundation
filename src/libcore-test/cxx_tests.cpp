@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/log.h>
 #include <basecode/core/cxx/cxx.h>
 #include <basecode/core/stopwatch.h>
