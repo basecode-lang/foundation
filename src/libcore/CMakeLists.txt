@@ -29,8 +29,24 @@ configure_file(
     "${CMAKE_BINARY_DIR}/include/basecode/core/configure.h"
 )
 configure_file(
+    ${PROJECT_DIR_BASE}/etc/first.scm
+    ${CMAKE_BINARY_DIR}/etc/first.scm COPYONLY
+)
+configure_file(
+    ${PROJECT_DIR_BASE}/etc/basic.scm
+    ${CMAKE_BINARY_DIR}/etc/basic.scm COPYONLY
+)
+configure_file(
     ${PROJECT_DIR_BASE}/etc/core.scm
     ${CMAKE_BINARY_DIR}/etc/core.scm COPYONLY
+)
+configure_file(
+    ${PROJECT_DIR_BASE}/etc/core-tests.scm
+    ${CMAKE_BINARY_DIR}/etc/core-tests.scm COPYONLY
+)
+configure_file(
+    ${PROJECT_DIR_BASE}/etc/core-localization.scm
+    ${CMAKE_BINARY_DIR}/etc/core-localization.scm COPYONLY
 )
 
 # -----------------------------------------------------------------------------
@@ -185,6 +201,7 @@ set(
     scm/compiler.cpp ${CORE_INC_DIR}/scm/compiler.h
     scm/bytecode.cpp ${CORE_INC_DIR}/scm/bytecode.h
     scm/modules/cxx.cpp ${CORE_INC_DIR}/scm/modules/cxx.h
+    scm/modules/basic.cpp ${CORE_INC_DIR}/scm/modules/basic.h
     scm/modules/config.cpp ${CORE_INC_DIR}/scm/modules/config.h
 
     ${CORE_INC_DIR}/slice.h

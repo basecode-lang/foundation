@@ -101,14 +101,14 @@ s32 main(s32 argc, const s8** argv) {
             return 1;
         }
 
-        auto core_config_path = "../etc/core.scm"_path;
+        auto   load_path = "../etc/first.scm"_path;
         path_t config_path{};
-        filesys::bin_rel_path(config_path, core_config_path);
+        filesys::bin_rel_path(config_path, load_path);
         scm::obj_t* result{};
         if (!OK(scm::system::eval(config_path, &result))) return 1;
 
         path::free(config_path);
-        path::free(core_config_path);
+        path::free(load_path);
     }
 
     {

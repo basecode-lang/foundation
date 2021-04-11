@@ -19,9 +19,12 @@
 #include <basecode/core/scm/system.h>
 
 namespace basecode::scm::system {
+    using path_stack_t          = stack_t<const path_t*>;
+
     struct system_t final {
         alloc_t*                alloc;
         ctx_t*                  ctx;
+        path_stack_t            path_stack;
         u32                     heap_size;
     };
 
@@ -30,10 +33,15 @@ namespace basecode::scm::system {
     u0 fini() {
         scm::free(g_scm_sys.ctx);
         memory::free(g_scm_sys.alloc, g_scm_sys.ctx);
+        stack::free(g_scm_sys.path_stack);
     }
 
     ctx_t* global_ctx() {
         return g_scm_sys.ctx;
+    }
+
+    const path_t* current_eval_path() {
+        return stack::top(g_scm_sys.path_stack);
     }
 
     status_t init(u32 heap_size, alloc_t* alloc) {
@@ -42,11 +50,13 @@ namespace basecode::scm::system {
         g_scm_sys.ctx       = (scm::ctx_t*) memory::alloc(g_scm_sys.alloc,
                                                           g_scm_sys.heap_size);
         scm::init(g_scm_sys.ctx, g_scm_sys.heap_size, g_scm_sys.alloc);
+        stack::init(g_scm_sys.path_stack, g_scm_sys.alloc);
         kernel::create_common_types();
         return status_t::ok;
     }
 
     status_t eval(const path_t& path, obj_t** obj) {
+        stack::push(g_scm_sys.path_stack, &path);
         buf_t buf{};
         buf::init(buf, g_scm_sys.alloc);
         auto status = buf::map_existing(buf, path);
@@ -57,7 +67,7 @@ namespace basecode::scm::system {
         defer(
             buf::cursor::free(crsr);
             buf::free(buf);
-             );
+            stack::pop(g_scm_sys.path_stack));
         auto gc = save_gc(g_scm_sys.ctx);
         while (true) {
             auto expr = read(g_scm_sys.ctx, crsr);

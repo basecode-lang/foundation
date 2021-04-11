@@ -58,35 +58,26 @@ namespace basecode::scm::module::cxx {
         {nullptr, cxx_core::integral_size_t::zero},
     };
 
-    cxx_core::revision_t find_revision(const s8* name) {
-        for (u32 i = 0; s_revisions[i].name; ++i) {
-            if (strcmp(s_revisions[i].name, name) == 0)
-                return s_revisions[i].rev;
-        }
-        return cxx_core::revision_t::cpp20;
-    }
+    cxx_core::revision_t find_revision(const s8* name);
 
-    cxx_core::position_type_t find_position_type(const s8* name) {
-        if (strcmp(name, "prefix") == 0) {
-            return cxx_core::position_type_t::prefix;
-        } else if (strcmp(name, "postfix") == 0) {
-            return cxx_core::position_type_t::postfix;
-        }
-        return cxx_core::position_type_t::none;
-    }
+    cxx_core::integral_size_t find_integral_size(const s8* name);
 
-    cxx_core::integral_size_t find_integral_size(const s8* name) {
-        for (u32 i = 0; s_sizes[i].name; ++i) {
-            if (strcmp(s_sizes[i].name, name) == 0)
-                return s_sizes[i].size;
-        }
-        return cxx_core::integral_size_t::zero;
-    }
+    cxx_core::position_type_t find_position_type(const s8* name);
 
     obj_t* make_program() {
         auto pgm = obj_pool::make<cxx_core::program_t>(g_cxx_sys.storage);
         cxx_core::program::init(*pgm, g_cxx_sys.alloc);
         return make_user_ptr(g_cxx_sys.ctx, pgm);
+    }
+
+    u0 pop_scope(obj_t* scope_usr) {
+        auto scope = (cxx_core::scope_t*) to_user_ptr(g_cxx_sys.ctx, scope_usr);
+        cxx_core::scope::pop(*scope);
+    }
+
+    u32 push_scope(obj_t* scope_usr) {
+        auto scope = (cxx_core::scope_t*) to_user_ptr(g_cxx_sys.ctx, scope_usr);
+        return cxx_core::scope::push(*scope);
     }
 
     u32 size_in_bits(str::slice_t* name) {
@@ -97,6 +88,25 @@ namespace basecode::scm::module::cxx {
     u32 size_in_bytes(str::slice_t* name) {
         return cxx_core::program::integral_size_in_bytes(
             find_integral_size((const s8*)name->data));
+    }
+
+    obj_t* add_module(obj_t* pgm_usr,
+                      str::slice_t* file_name,
+                      str::slice_t* revision) {
+        auto pgm = (cxx_core::program_t*) to_user_ptr(g_cxx_sys.ctx, pgm_usr);
+        auto& module = cxx_core::program::add_module(
+            *pgm,
+            *file_name,
+            find_revision((const s8*) revision->data));
+        return make_user_ptr(g_cxx_sys.ctx, &module);
+    }
+
+    cxx_core::revision_t find_revision(const s8* name) {
+        for (u32 i = 0; s_revisions[i].name; ++i) {
+            if (strcmp(s_revisions[i].name, name) == 0)
+                return s_revisions[i].rev;
+        }
+        return cxx_core::revision_t::cpp20;
     }
 
     obj_t* get_scope(obj_t* mod_usr, u32 id) {
@@ -111,23 +121,21 @@ namespace basecode::scm::module::cxx {
         return make_user_ptr(g_cxx_sys.ctx, &module);
     }
 
-    obj_t* add_module(obj_t* pgm_usr, str::slice_t* file_name, str::slice_t* revision) {
-        auto pgm = (cxx_core::program_t*) to_user_ptr(g_cxx_sys.ctx, pgm_usr);
-        auto& module = cxx_core::program::add_module(
-            *pgm,
-            *file_name,
-            find_revision((const s8*) revision->data));
-        return make_user_ptr(g_cxx_sys.ctx, &module);
+    cxx_core::integral_size_t find_integral_size(const s8* name) {
+        for (u32 i = 0; s_sizes[i].name; ++i) {
+            if (strcmp(s_sizes[i].name, name) == 0)
+                return s_sizes[i].size;
+        }
+        return cxx_core::integral_size_t::zero;
     }
 
-    u0 pop_scope(obj_t* scope_usr) {
-        auto scope = (cxx_core::scope_t*) to_user_ptr(g_cxx_sys.ctx, scope_usr);
-        cxx_core::scope::pop(*scope);
-    }
-
-    u32 push_scope(obj_t* scope_usr) {
-        auto scope = (cxx_core::scope_t*) to_user_ptr(g_cxx_sys.ctx, scope_usr);
-        return cxx_core::scope::push(*scope);
+    cxx_core::position_type_t find_position_type(const s8* name) {
+        if (strcmp(name, "prefix") == 0) {
+            return cxx_core::position_type_t::prefix;
+        } else if (strcmp(name, "postfix") == 0) {
+            return cxx_core::position_type_t::postfix;
+        }
+        return cxx_core::position_type_t::none;
     }
 
     u32 unary_not(obj_t* scope_usr, u32 expr_id) {
@@ -181,33 +189,17 @@ namespace basecode::scm::module::cxx {
             find_position_type((const s8*) placement->data));
     }
 
-    // XXX: move this to another module
-    obj_t* intern_get(u32 id) {
-        auto s = string::interned::get_slice(id);
-        return s ? make_string(g_cxx_sys.ctx, *s) : nil(g_cxx_sys.ctx);
-    }
-
     namespace system {
         namespace exports {
             using namespace scm::kernel;
 
             static proc_export_t s_exports[] = {
-                // XXX: move this to another module
-                {"intern/get"_ss, 1,
-                    {
-                        {(u0*) intern_get, "intern_get"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
                 {"cxx/make-program"_ss, 1,
                     {
                         {(u0*) make_program, "make_program"_ss, type_decl::obj_ptr, 0}
                     }
                 },
+
                 {"cxx/size-in-bits"_ss, 1,
                     {
                         {(u0*) size_in_bits, "size_in_bits"_ss, type_decl::u32_, 1,
@@ -217,6 +209,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/size-in-bytes"_ss, 1,
                     {
                         {(u0*) size_in_bytes, "size_in_bytes"_ss, type_decl::u32_, 1,
@@ -226,6 +219,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/get-scope"_ss, 1,
                     {
                         {(u0*) get_scope, "get_scope"_ss, type_decl::obj_ptr, 2,
@@ -236,6 +230,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/get-module"_ss, 1,
                     {
                         {(u0*) get_module, "get_module"_ss, type_decl::obj_ptr, 2,
@@ -246,6 +241,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/add-module"_ss, 1,
                     {
                         {(u0*) add_module, "add_module"_ss, type_decl::obj_ptr, 3,
@@ -257,6 +253,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/pop-scope"_ss, 1,
                     {
                         {(u0*) pop_scope, "pop_scope"_ss, type_decl::u0_, 1,
@@ -266,6 +263,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/push-scope"_ss, 1,
                     {
                         {(u0*) push_scope, "push_scope"_ss, type_decl::u32_, 1,
@@ -275,6 +273,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/make-label"_ss, 1,
                     {
                         {(u0*) make_label, "make-label"_ss, type_decl::u32_, 2,
@@ -285,6 +284,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/unary/!"_ss, 1,
                     {
                         {(u0*) unary_not, "unary_not"_ss, type_decl::u32_, 2,
@@ -295,6 +295,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/unary/~"_ss, 1,
                     {
                         {(u0*) unary_binary_not, "unary_binary_not"_ss, type_decl::u32_, 2,
@@ -305,6 +306,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/unary/*"_ss, 1,
                     {
                         {(u0*) unary_deref, "unary_deref"_ss, type_decl::u32_, 2,
@@ -315,6 +317,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/unary/-"_ss, 1,
                     {
                         {(u0*) unary_negate, "unary_negate"_ss, type_decl::u32_, 2,
@@ -325,6 +328,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/unary/&"_ss, 1,
                     {
                         {(u0*) unary_address_of, "unary_address_of"_ss, type_decl::u32_, 2,
@@ -335,6 +339,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/unary/&&"_ss, 1,
                     {
                         {(u0*) unary_address_of_label, "unary_address_of_label"_ss, type_decl::u32_, 2,
@@ -345,6 +350,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/unary/++"_ss, 1,
                     {
                         {(u0*) unary_increment, "unary_increment"_ss, type_decl::u32_, 3,
@@ -356,6 +362,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {"cxx/unary/--"_ss, 1,
                     {
                         {(u0*) unary_decrement, "unary_decrement"_ss, type_decl::u32_, 3,
@@ -367,6 +374,7 @@ namespace basecode::scm::module::cxx {
                         }
                     }
                 },
+
                 {str::slice_t{}},
            };
         }

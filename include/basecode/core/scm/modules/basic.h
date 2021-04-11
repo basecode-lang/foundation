@@ -16,31 +16,21 @@
 //
 // ----------------------------------------------------------------------------
 
-#pragma once
-
-#include <basecode/core/scm/scm.h>
+#include <basecode/core/log.h>
+#include <basecode/core/error.h>
+#include <basecode/core/string.h>
+#include <basecode/core/cxx/cxx.h>
 #include <basecode/core/scm/kernel.h>
 
-namespace basecode::scm::system {
+namespace basecode::scm::module::basic {
     enum class status_t : u32 {
         ok,
-        error,
-        bad_input,
+        error
     };
 
-    u0 fini();
+    namespace system {
+        u0 fini();
 
-    ctx_t* global_ctx();
-
-    const path_t* current_eval_path();
-
-    status_t eval(const path_t& path, obj_t** obj);
-
-    status_t eval(const u8* source, u32 len, obj_t** obj);
-
-    status_t eval(const String_Concept auto& source, obj_t** obj) {
-        return eval(source.data, source.length, obj);
+        status_t init(scm::ctx_t* ctx, alloc_t* alloc = context::top()->alloc);
     }
-
-    status_t init(u32 heap_size, alloc_t* alloc = context::top()->alloc);
 }

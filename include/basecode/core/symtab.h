@@ -401,7 +401,8 @@ namespace basecode {
                         node->sym  = key[i];
                         node->type = used;
                     } else {
-                        next_node_id = node->next = append_node(table, sym, 0, 0, used);
+                        node->next   = table.nodes.size + 1;
+                        next_node_id = append_node(table, sym, 0, 0, used);
                         node         = GET_NODE(table, next_node_id);
                     }
                 } else {

@@ -188,6 +188,8 @@ namespace basecode::scm {
 
     str_t to_string(ctx_t* ctx, obj_t* obj, b8 quote = false);
 
+    obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type);
+
     obj_t* make_string(ctx_t* ctx, const s8* str, s32 len = -1);
 
     obj_t* make_symbol(ctx_t* ctx, const s8* name, s32 len = -1);

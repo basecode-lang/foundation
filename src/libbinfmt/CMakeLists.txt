@@ -28,6 +28,14 @@ configure_file(
     ${PROJECT_DIR_BASE}/etc/binfmt.scm
     ${CMAKE_BINARY_DIR}/etc/binfmt.scm COPYONLY
 )
+configure_file(
+    ${PROJECT_DIR_BASE}/etc/binfmt-tests.scm
+    ${CMAKE_BINARY_DIR}/etc/binfmt-tests.scm COPYONLY
+)
+configure_file(
+    ${PROJECT_DIR_BASE}/etc/binfmt-localization.scm
+    ${CMAKE_BINARY_DIR}/etc/binfmt-localization.scm COPYONLY
+)
 
 # -----------------------------------------------------------------------------
 #

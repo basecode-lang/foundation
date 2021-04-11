@@ -33,6 +33,7 @@
 #include <basecode/core/configure.h>
 #include <basecode/core/scm/system.h>
 #include <basecode/core/scm/modules/cxx.h>
+#include <basecode/core/scm/modules/basic.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
@@ -136,6 +137,19 @@ s32 main(s32 argc, const s8** argv) {
                                []() -> s32 { return s32(scm::system::init(256 * 1024)); });
     if (!OK(rc)) return rc;
 
+    rc = stopwatch::time_block("scm::module::basic::init"_ss, []() -> s32 {
+        scm::module::basic::system::init(scm::system::global_ctx());
+        return 0;
+    });
+    if (!OK(rc)) return rc;
+
+    rc = stopwatch::time_block("scm::module::cxx::init"_ss, []() -> s32 {
+        scm::module::cxx::system::init(scm::system::global_ctx());
+        return 0;
+    });
+    if (!OK(rc)) return rc;
+
+
     rc = stopwatch::time_block("config::system::init"_ss,  []() -> s32 {
         config_settings_t settings{};
         settings.ctx           = scm::system::global_ctx();
@@ -163,22 +177,16 @@ s32 main(s32 argc, const s8** argv) {
         config::cvar::get(3, &cvar);
         cvar->value.real = 47.314f;
 
-        auto core_config_path = "../etc/core.scm"_path;
+        auto   load_path = "../etc/first.scm"_path;
         path_t config_path{};
-        filesys::bin_rel_path(config_path, core_config_path);
+        filesys::bin_rel_path(config_path, load_path);
         scm::obj_t* result{};
         if (!OK(scm::system::eval(config_path, &result)))
             return 1;
 
         path::free(config_path);
-        path::free(core_config_path);
+        path::free(load_path);
 
-        return 0;
-    });
-    if (!OK(rc)) return rc;
-
-    rc = stopwatch::time_block("scm::module::cxx::init"_ss, []() -> s32 {
-        scm::module::cxx::system::init(scm::system::global_ctx());
         return 0;
     });
     if (!OK(rc)) return rc;
@@ -204,11 +212,14 @@ s32 main(s32 argc, const s8** argv) {
     stopwatch::time_block("thread::system::fini"_ss,
                           []() -> s32 { thread::system::fini(); return 0; });
 
+    stopwatch::time_block("config::system::fini"_ss,
+                          []() -> s32 { config::system::fini(); return 0; });
+
     stopwatch::time_block("scm::module::cxx::system::fini"_ss,
                           []() -> s32 { scm::module::cxx::system::fini(); return 0; });
 
-    stopwatch::time_block("config::system::fini"_ss,
-                          []() -> s32 { config::system::fini(); return 0; });
+    stopwatch::time_block("scm::module::basic::system::fini"_ss,
+                          []() -> s32 { scm::module::basic::system::fini(); return 0; });
 
     stopwatch::time_block("scm::system::fini"_ss,
                           []() -> s32 { scm::system::fini(); return 0; });

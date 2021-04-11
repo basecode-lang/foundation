@@ -3,15 +3,25 @@ HIGH
 - memory: fucking proxy allocator needs a solid review and clean up
             there are still situations where other allocators backed by
             a proxy aren't aligned with total_allocated
-- symtab: just ran into a pointer stability issue.  i swapped in
-          stable_array_t easily enough, but now i want do a full review
-          and see if the stable array is really needed.
-- scm: adjust print primitive to not add spaces and line feeds
+- cxx kernel: finish wrapping
+- scm: build intervals of liveliness for virtual variables
+- scm: first pass register allocator
+- scm: write, display, print, ports
+    * should these all be kernel functions?  the number of built-in
+      primitives continues to grow.
 
 MEDIUM
 ---------
 - rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
     * add ca_hashtab_t and ca_set_t using chaining via linked list?
+- review and improve symtab_t if possible
+- filesys: implement glob function, which will also touch the init and fini functions for the
+            filesys module.
+- filesys: need to open and read the xdg config file (if found) and put into a symtab_t or hashtab_t.
+            also, need to read applicable env vars once at module init and put them into the
+            same symtab_t/hashtab_t.
+- filesys: once meta data is done (previous task), implement the remaining places::* functions
+- libgfx: create test bed application within foundation project
 
 LOW
 ---------
@@ -24,18 +34,17 @@ LOW
         this would replace passing num_pages into these up front and makes the interface (perhaps) more consistent
         with other mechanisms in the library.
 
-- filesys: implement glob function, which will also touch the init and fini functions for the
-            filesys module.
-- filesys: need to open and read the xdg config file (if found) and put into a symtab_t or hashtab_t.
-            also, need to read applicable env vars once at module init and put them into the
-            same symtab_t/hashtab_t.
-- filesys: once meta data is done (previous task), implement the remaining places::* functions
-
 - libgfx: pull in nfd or rewrite based on nfd_extended
-- libgfx: create test bed application within foundation project
 
 DONE
 ----
+- scm: added basic kernel module
+- scm: load kernel function
+- symtab: just ran into a pointer stability issue.  i swapped in
+          stable_array_t easily enough, but now i want do a full review
+          and see if the stable array is really needed.
+    * i swapped back to standard array_t.  the issue appeared to be
+      me being too aggressive in removing the range check in GET_NODE.
 - config: rework kernel funcs to take advantage of ffi based
           callback mechanism.
 - config: review and clean up

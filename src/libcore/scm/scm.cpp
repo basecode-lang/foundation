@@ -717,16 +717,11 @@ namespace basecode::scm {
         if (TYPE(a) != TYPE(b))         return false;
         switch (TYPE(a)) {
             case obj_type_t::pair: {
-                while (!IS_NIL(a)) {
-                    if (IS_NIL(b))  return false;
-                    if (!equal(ctx, CAR(a), CAR(b))
-                    ||  !equal(ctx, CDR(a), CDR(b))) {
-                        return false;
-                    }
-                    next_arg(ctx, &a);
-                    next_arg(ctx, &b);
-                }
-                return true;
+                auto ka = CAR(a);
+                auto kd = CDR(a);
+                auto ja = CAR(b);
+                auto jd = CDR(b);
+                return equal(ctx, ka, ja) && equal(ctx, kd, jd);
             }
             case obj_type_t::prim:      return PRIM(a) == PRIM(b);
             case obj_type_t::ptr:
@@ -1786,20 +1781,20 @@ namespace basecode::scm {
         }
     }
 
-    obj_t* make_error(ctx_t* ctx, obj_t* args, obj_t* call_stack) {
-        obj_t* obj = make_object(ctx);
-        SET_TYPE(obj, obj_type_t::error);
-        SET_CDR(obj, cons(ctx, args, cons(ctx, call_stack, ctx->nil)));
-        return obj;
-    }
-
-    static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type) {
+    obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type) {
         if (TYPE(obj) != type) {
             error(ctx,
                   "expected {}, got {}",
                   s_type_names[u32(type)],
                   s_type_names[u32(TYPE(obj))]);
         }
+        return obj;
+    }
+
+    obj_t* make_error(ctx_t* ctx, obj_t* args, obj_t* call_stack) {
+        obj_t* obj = make_object(ctx);
+        SET_TYPE(obj, obj_type_t::error);
+        SET_CDR(obj, cons(ctx, args, cons(ctx, call_stack, ctx->nil)));
         return obj;
     }
 
