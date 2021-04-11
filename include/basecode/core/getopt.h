@@ -136,6 +136,10 @@ namespace basecode {
 
         option_builder_t make_option(getopt_t& opt);
 
+        arg_t* find_arg(getopt_t& opt, s8 short_name);
+
+        arg_t* find_arg(getopt_t& opt, str::slice_t long_name);
+
         u0 program_description(getopt_t& opt, str::slice_t description);
     }
 }

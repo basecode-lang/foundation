@@ -33,9 +33,25 @@ namespace basecode::scm::module::basic {
 
     b8 adjust_load_path(path_t& path, str::slice_t file_name);
 
+    u32 length(obj_t* obj) {
+        return scm::length(g_basic_sys.ctx, obj);
+    }
+
     obj_t* intern_get(u32 id) {
         auto s = string::interned::get_slice(id);
         return s ? make_string(g_basic_sys.ctx, *s) : nil(g_basic_sys.ctx);
+    }
+
+    obj_t* reverse(obj_t* lst) {
+        auto ctx = g_basic_sys.ctx;
+        obj_t* res;
+        for (res = ctx->nil; !IS_NIL(lst); lst = CDR(lst))
+            res = cons(ctx, CAR(lst), res);
+        return res;
+    }
+
+    obj_t* current_environment() {
+        return g_basic_sys.ctx->env;
     }
 
     obj_t* load(rest_array_t* rest) {
@@ -58,6 +74,46 @@ namespace basecode::scm::module::basic {
             }
         }
         return obj;
+    }
+
+    obj_t* append(rest_array_t* rest) {
+        auto ctx = g_basic_sys.ctx;
+        obj_t* head = ctx->nil;
+        obj_t* tail = head;
+        for (auto lst : *rest) {
+            if (IS_NIL(lst))
+                continue;
+            if (is_list(ctx, lst)) {
+                while (!IS_NIL(lst)) {
+                    auto r = CONS1(CAR(lst));
+                    if (IS_NIL(tail)) {
+                        head = r;
+                        tail = head;
+                    } else {
+                        SET_CDR(tail, r);
+                        tail = r;
+                    }
+                    lst = CDR(lst);
+                }
+            } else {
+                auto r = CONS1(lst);
+                if (IS_NIL(tail)) {
+                    head = r;
+                    tail = head;
+                } else {
+                    SET_CDR(tail, r);
+                    tail = r;
+                }
+            }
+        }
+        return head;
+    }
+
+    obj_t* parent_environment(obj_t* env) {
+        auto ctx = g_basic_sys.ctx;
+        check_type(ctx, env, obj_type_t::environment);
+        auto e = ENV(env);
+        return e->parent;
     }
 
     b8 adjust_load_path(path_t& path, str::slice_t file_name) {
@@ -99,11 +155,57 @@ namespace basecode::scm::module::basic {
                     }
                 },
 
+                {"append"_ss, 1,
+                    {
+                        {(u0*) append, "append"_ss, type_decl::obj_ptr, 1,
+                            {
+                                {"rest"_ss, type_decl::obj_ptr, .is_rest = true},
+                            }
+                        }
+                    }
+                },
+
+                {"length"_ss, 1,
+                    {
+                        {(u0*) length, "length"_ss, type_decl::u32_, 1,
+                            {
+                                {"obj"_ss, type_decl::obj_ptr},
+                            }
+                        }
+                    }
+                },
+
+                {"reverse"_ss, 1,
+                    {
+                        {(u0*) reverse, "reverse"_ss, type_decl::obj_ptr, 1,
+                            {
+                                {"lst"_ss, type_decl::list_ptr},
+                            }
+                        }
+                    }
+                },
+
                 {"intern/get"_ss, 1,
                     {
                         {(u0*) intern_get, "intern_get"_ss, type_decl::obj_ptr, 1,
                             {
                                 {"id"_ss, type_decl::u32_},
+                            }
+                        }
+                    }
+                },
+
+                {"current-environment"_ss, 1,
+                    {
+                        {(u0*) current_environment, "current_environment"_ss, type_decl::obj_ptr, 0}
+                    }
+                },
+
+                {"parent-environment"_ss, 1,
+                    {
+                        {(u0*) parent_environment, "parent_environment"_ss, type_decl::obj_ptr, 1,
+                            {
+                                {"env"_ss, type_decl::obj_ptr},
                             }
                         }
                     }

@@ -414,6 +414,22 @@ namespace basecode::getopt {
         return option_builder_t(&opt);
     }
 
+    arg_t* find_arg(getopt_t& opt, s8 short_name) {
+        for (auto& arg : opt.args) {
+            if (arg.option && arg.option->short_name == short_name)
+                return &arg;
+        }
+        return nullptr;
+    }
+
+    arg_t* find_arg(getopt_t& opt, str::slice_t long_name) {
+        for (auto& arg : opt.args) {
+            if (arg.option && arg.option->long_name == long_name)
+                return &arg;
+        }
+        return nullptr;
+    }
+
     option_builder_t& option_builder_t::type(arg_type_t type) {
         _type = type;
         return *this;

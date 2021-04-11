@@ -122,20 +122,18 @@ namespace basecode::scm {
 
     static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b);
 
-    static u32 make_ffi_signature(ctx_t* ctx,
-                                  obj_t* args,
-                                  u8* buf,
-                                  keyword_table_t& keywords);
-
     static num_type_t get_numtype(const s8* buf, s32 len);
 
     static obj_t* read_expr(ctx_t* ctx, buf_crsr_t& crsr);
 
     static u0 finalize_environment(ctx_t* ctx, obj_t* env);
 
-    static u0 args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg);
+    static u32 make_ffi_signature(ctx_t* ctx,
+                                  obj_t* args,
+                                  u8* buf,
+                                  keyword_table_t& keywords);
 
-    [[maybe_unused]] static obj_t* reverse(ctx_t* ctx, obj_t* obj);
+    static u0 args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg);
 
     static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type);
 
@@ -152,6 +150,8 @@ namespace basecode::scm {
         array::free(ctx->environments);
         array::free(ctx->procedures);
         ffi::free(ctx->ffi);
+        array::free(ctx->rest);
+        hashtab::free(ctx->keywords);
         compiler::free(ctx->compiler);
         vm::free(ctx->vm);
     }
@@ -621,6 +621,8 @@ namespace basecode::scm {
 
         array::init(ctx->procedures, ctx->alloc);
         array::init(ctx->environments, ctx->alloc);
+        array::init(ctx->rest, ctx->alloc);
+
         array::init(ctx->native_ptrs, ctx->alloc);
         array::reserve(ctx->native_ptrs, 256);
 
@@ -629,6 +631,7 @@ namespace basecode::scm {
 
         hashtab::init(ctx->strtab, ctx->alloc);
         hashtab::init(ctx->symtab, ctx->alloc);
+        hashtab::init(ctx->keywords, ctx->alloc);
 
         // init objects
         ctx->nil       = &ctx->objects[ctx->object_used++];
@@ -683,13 +686,6 @@ namespace basecode::scm {
         ffi::init(ctx->ffi);
 
         return ctx;
-    }
-
-    static obj_t* reverse(ctx_t* ctx, obj_t* obj) {
-        obj_t* res;
-        for (res = ctx->nil; !IS_NIL(obj); obj = CDR(obj))
-            res = cons(ctx, CAR(obj), res);
-        return res;
     }
 
     static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b) {
@@ -830,7 +826,6 @@ namespace basecode::scm {
         obj_t* vb   {};
         obj_t* cl   {};
         u32    gc   {save_gc(ctx)};
-        u8          buf[16]{};
 
         defer(
             restore_gc(ctx, gc);
@@ -1085,21 +1080,19 @@ namespace basecode::scm {
 
             case obj_type_t::ffi: {
                 auto proto = PROTO(fn);
-                keyword_table_t keywords{};
-                hashtab::init(keywords, ctx->alloc);
+                hashtab::reset(ctx->keywords);
                 auto ol = ffi::proto::match_signature(
                     proto,
-                    buf,
-                    make_ffi_signature(ctx, arg, buf, keywords));
+                    ctx->sig_buf,
+                    make_ffi_signature(ctx, arg, ctx->sig_buf, ctx->keywords));
                 if (!ol) {
                     error(ctx,
                           "ffi: no matching overload for function: {}",
                           proto->name);
                 }
                 u32 n = 0;
-                rest_array_t rest{};
-                array::init(rest, ctx->alloc);
                 ffi::reset(ctx->ffi);
+                array::reset(ctx->rest);
                 while (!IS_NIL(arg)) {
                     if (n >= ol->params.size) {
                         error(ctx,
@@ -1109,12 +1102,12 @@ namespace basecode::scm {
                     }
                     auto& param = ol->params[n];
                     if (n >= ol->req_count) {
-                        if (param->has_dft && keywords.size > 0) {
-                            va = hashtab::find(keywords, param->name);
+                        if (param->has_dft && ctx->keywords.size > 0) {
+                            va = hashtab::find(ctx->keywords, param->name);
                             if (!va)
                                 va = EVAL(CAR(arg));
                         } else if (ol->has_rest) {
-                            array::append(rest, EVAL(CAR(arg)));
+                            array::append(ctx->rest, EVAL(CAR(arg)));
                             if (n < ol->params.size - 1)
                                 ++n;
                             arg = CDR(arg);
@@ -1131,7 +1124,16 @@ namespace basecode::scm {
                     }
                     switch (TYPE(va)) {
                         case obj_type_t::nil:
-                            ffi::push(ctx->ffi, (u0*) nullptr);
+                            switch (ffi_type_t(param->value.type.user)) {
+                                case ffi_type_t::list:
+                                case ffi_type_t::object:
+                                case ffi_type_t::context:
+                                    ffi::push(ctx->ffi, ctx->nil);
+                                    break;
+                                default:
+                                    ffi::push(ctx->ffi, (u0*) nullptr);
+                                    break;
+                            }
                             break;
                         case obj_type_t::ptr:
                             switch (ffi_type_t(param->value.type.user)) {
@@ -1149,7 +1151,8 @@ namespace basecode::scm {
                         case obj_type_t::pair:
                             switch (ffi_type_t(param->value.type.user)) {
                                 case ffi_type_t::list:
-                                    ffi::push(ctx->ffi, EVAL(CAR(arg)));
+                                case ffi_type_t::object:
+                                    ffi::push(ctx->ffi, va);
                                     break;
                                 default:
                                     error(ctx, "ffi: invalid pair argument");
@@ -1207,15 +1210,13 @@ namespace basecode::scm {
                     ++n;
                 }
                 if (ol->has_rest) {
-                    ffi::push(ctx->ffi, &rest);
+                    ffi::push(ctx->ffi, &ctx->rest);
                 } else if (ol->has_dft) {
                     for (u32 i = n; i < ol->params.size; ++i)
                         ffi::push(ctx->ffi, ol->params[i]->value);
                 }
                 param_alias_t ret{};
                 auto status = ffi::call(ctx->ffi, ol, ret);
-                array::free(rest);
-                hashtab::free(keywords);
                 if (!OK(status))
                     error(ctx, "ffi: call failed: {}", ol->name);
                 switch (ol->ret_type.cls) {
@@ -1656,16 +1657,27 @@ namespace basecode::scm {
 
     u0 format_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args) {
         obj_t* cl = ctx->call_list;
-        if (cl && ctx->handlers.error)
-            ctx->handlers.error(ctx, fmt_msg.data(), cl);
-        format::print(stderr, "error: ");
-        format::vprint(ctx->alloc, stderr, fmt_msg, args);
-        if (cl) {
-            format::print(stderr, "\n");
-            for (; !IS_NIL(cl); cl = CDR(cl))
-                format::print(stderr, "=> {}\n", printable_t{ctx, CAR(cl)});
+        str_t str{};
+        str::init(str, ctx->alloc);
+        {
+            str_buf_t buf(&str);
+            format::format_to(buf, "error: ");
+            fmt::vformat_to(buf, fmt_msg, args);
+            if (cl) {
+                format::format_to(buf, "\n");
+                for (; !IS_NIL(cl); cl = CDR(cl)) {
+                    format::format_to(buf,
+                                      "=> {}\n",
+                                      printable_t{ctx, CAR(cl)});
+                }
+            }
+            ctx->call_list = ctx->nil;
         }
-        ctx->call_list = ctx->nil;
+        if (ctx->handlers.error) {
+            ctx->handlers.error(ctx, str::c_str(str), cl);
+        } else {
+            format::print(stderr, "{}", str);
+        }
         exit(EXIT_FAILURE);
     }
 
@@ -1808,21 +1820,34 @@ namespace basecode::scm {
                 fmt::format_to(o, "nil");
                 break;
 
-            case obj_type_t::pair:
-            case obj_type_t::func:
-            case obj_type_t::macro: {
+            case obj_type_t::pair: {
                 obj_t* p = obj;
                 fmt::format_to(o, "(");
                 for (;;) {
-                    fmt::format_to(o, "{}", printable_t{ctx, CAR(p), true});
+                    fmt::format_to(o,
+                                   "{}",
+                                   printable_t{ctx, CAR(p), true});
                     p = CDR(p);
                     if (TYPE(p) != obj_type_t::pair)
                         break;
                     fmt::format_to(o, " ");
                 }
                 if (!IS_NIL(p))
-                    fmt::format_to(o, " . {}", printable_t{ctx, p, true});
+                    fmt::format_to(o,
+                                   " . {}",
+                                   printable_t{ctx, p, true});
                 fmt::format_to(o, ")");
+                break;
+            }
+
+            case obj_type_t::func:
+            case obj_type_t::macro: {
+                auto proc = PROC(obj);
+                fmt::format_to(o,
+                               "({} {}\n    {})",
+                               proc->is_macro ? "mac" : "fn",
+                               printable_t{ctx, proc->params, true},
+                               printable_t{ctx, proc->body, true});
                 break;
             }
 
@@ -1841,25 +1866,37 @@ namespace basecode::scm {
                 fmt::format_to(o, "error: ");
                 for (; !IS_NIL(args); args = CDR(args)) {
                     auto expr = eval(ctx, CAR(args));
-                    fmt::format_to(o, "{} ", printable_t{ctx, expr});
+                    fmt::format_to(o,
+                                   "{} ",
+                                   printable_t{ctx, expr});
                 }
                 fmt::format_to(o, "\n");
-                for (; !IS_NIL(call_stack); call_stack = CDR(call_stack))
-                    fmt::format_to(o, "=> {}\n", printable_t{ctx, CAR(call_stack)});
+                for (; !IS_NIL(call_stack); call_stack = CDR(call_stack)) {
+                    fmt::format_to(o,
+                                   "=> {}\n",
+                                   printable_t{ctx, CAR(call_stack)});
+                }
                 break;
             }
 
             case obj_type_t::keyword:
                 fmt::format_to(o, "#:");
             case obj_type_t::symbol:
-                fmt::format_to(o, "{}", *string::interned::get_slice(STRING_ID(obj)));
+                fmt::format_to(o,
+                               "{}",
+                               *string::interned::get_slice(STRING_ID(obj)));
                 break;
 
             case obj_type_t::string:
-                if (printable.quote)
-                    fmt::format_to(o, "\"{}\"", *string::interned::get_slice(STRING_ID(obj)));
-                else
-                    fmt::format_to(o, "{}", *string::interned::get_slice(STRING_ID(obj)));
+                if (printable.quote) {
+                    fmt::format_to(o,
+                                   "\"{}\"",
+                                   *string::interned::get_slice(STRING_ID(obj)));
+                } else {
+                    fmt::format_to(o,
+                                   "{}",
+                                   *string::interned::get_slice(STRING_ID(obj)));
+                }
                 break;
 
             case obj_type_t::boolean:
@@ -1871,7 +1908,7 @@ namespace basecode::scm {
                 break;
 
             default:
-                fmt::format_to(o, "[{} {}]", type_name(obj), (u0*) obj);
+                fmt::format_to(o, "[{:<8} {}]", type_name(obj), (u0*) obj);
                 break;
         }
     }
@@ -1886,13 +1923,13 @@ namespace basecode::scm {
                 continue;
             if (first) {
                 fmt::format_to(fmt_ctx.out(),
-                               "({:<16} . {})\n",
+                               "({:<32} . {})\n",
                                *s,
                                printable_t{ctx, pair.value, true});
                 first = false;
             } else {
                 fmt::format_to(fmt_ctx.out(),
-                               "{:<{}}({:<16} . {})\n",
+                               "{:<{}}({:<32} . {})\n",
                                " ",
                                indent,
                                *s,

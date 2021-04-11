@@ -85,13 +85,6 @@
         (set! a (+ a step)))
     (reverse lst)))
 
-(define length (fn (ls)
-    (define count 0)
-    (while ls
-        (set! count (add1 count))
-        (set! ls (cdr ls)))
-    count))
-
 (define list-tail (fn (ls k)
     (while (> k 0)
         (set! ls (cdr ls))
@@ -100,32 +93,4 @@
 
 (define list-ref (fn (ls k)
     (car (list-tail ls k))))
-
-(define reverse (fn (lst)
-    (define res nil)
-    (while lst
-        (set! res (cons (car lst) res))
-        (set! lst (cdr lst)))
-    res))
-
-(define append (fn (a b)
-    (define a1 (reverse a))
-    (define b1 b)
-    (while a1
-        (set! b1 (cons (car a1) b1))
-        (set! a1 (cdr a1)))
-    b1))
-
-(define append-reverse (fn (rev tail)
-    (if (not rev)
-        tail
-        (append-reverse (cdr rev) (cons (car rev) tail)))))
-
-(define cons* (fn (first . rest)
-    (define loop (fn (rev next rest)
-        (if (not rest)
-            (append-reverse rev next)
-            (loop (cons next rev) (car rest) (cdr rest)))))
-    (loop '() first rest)))
-(define list* cons*)
 
