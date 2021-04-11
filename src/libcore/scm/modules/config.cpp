@@ -35,6 +35,7 @@ namespace basecode::config {
         scm::obj_t*             current_alloc;
         scm::obj_t*             current_logger;
         scm::obj_t*             current_command_line;
+        scm::chained_handler_t  handlers;
         cvar_t                  vars[max_cvar_size];
         str_t                   buf;
         u32                     heap_size;
@@ -737,6 +738,9 @@ namespace basecode::config {
             g_cfg_sys.current_command_line = scm::nil(g_cfg_sys.ctx);
 
             scm::kernel::create_exports(g_cfg_sys.ctx, exports::s_exports);
+            g_cfg_sys.handlers = {};
+            scm::set_next_handler(g_cfg_sys.ctx, &g_cfg_sys.handlers);
+
             std::memset(g_cfg_sys.vars, 0, sizeof(cvar_t) * max_cvar_size);
 
             cvar_t* cvar{};

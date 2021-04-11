@@ -115,7 +115,7 @@ static s32 repl(scm::ctx_t* ctx, s32 argc, const s8** argv) {
     }
 
     FILE* fp = stdin;
-    scm::handlers(ctx)->error = on_error;
+    scm::set_error_handler(ctx, on_error);
 
     auto gc = scm::save_gc(ctx);
 

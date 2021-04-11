@@ -244,10 +244,15 @@ namespace basecode::scm {
                 continue;
             if (!IS_GC_MARKED(obj)) {
                 switch (TYPE(obj)) {
-                    case obj_type_t::ptr:
-                        if (ctx->handlers.gc)
-                            ctx->handlers.gc(ctx, obj);
+                    case obj_type_t::ptr: {
+                        auto chain = ctx->handlers.chain;
+                        while (chain) {
+                            if (chain->gc_enabled && chain->gc)
+                                chain->gc(ctx, obj);
+                            chain = chain->next;
+                        }
                         break;
+                    }
 
                     case obj_type_t::environment: {
                         auto e = ENV(obj);
@@ -303,18 +308,19 @@ namespace basecode::scm {
                 obj = CDR(obj);
                 goto begin;
 
-            case obj_type_t::ptr:
-                if (ctx->handlers.mark)
-                    ctx->handlers.mark(ctx, obj);
+            case obj_type_t::ptr: {
+                auto chain = ctx->handlers.chain;
+                while (chain) {
+                    if (chain->mark_enabled && chain->mark)
+                        chain->mark(ctx, obj);
+                    chain = chain->next;
+                }
                 break;
+            }
 
             default:
                 break;
         }
-    }
-
-    handlers_t* handlers(ctx_t* ctx) {
-        return &ctx->handlers;
     }
 
     b8 is_nil(ctx_t* ctx, obj_t* obj) {
@@ -386,6 +392,15 @@ namespace basecode::scm {
     obj_t* get(ctx_t* ctx, obj_t* sym) {
         auto env = top_env(ctx);
         const auto str_id = FIXNUM(sym);
+        auto chain = ctx->handlers.chain;
+        while (chain) {
+            if (chain->get_enabled && chain->get) {
+                auto res = chain->get(ctx, str_id);
+                if (res)
+                    return res;
+            }
+            chain = chain->next;
+        }
         while (!IS_NIL(env)) {
             check_type(ctx, env, obj_type_t::environment);
             auto e = ENV(env);
@@ -1288,6 +1303,14 @@ namespace basecode::scm {
     b8 set(ctx_t* ctx, obj_t* sym, obj_t* v) {
         auto env = top_env(ctx);
         const auto str_id = FIXNUM(sym);
+        auto chain = ctx->handlers.chain;
+        while (chain) {
+            if (chain->set_enabled && chain->set) {
+                if (chain->set(ctx, str_id, v, env))
+                    return true;
+            }
+            chain = chain->next;
+        }
         while (!IS_NIL(env)) {
             check_type(ctx, env, obj_type_t::environment);
             auto e = ENV(env);
@@ -1337,8 +1360,15 @@ namespace basecode::scm {
 
     u0 define(ctx_t* ctx, obj_t* sym, obj_t* v) {
         auto env = top_env(ctx);
-        check_type(ctx, env, obj_type_t::environment);
         const auto str_id = FIXNUM(sym);
+        auto chain = ctx->handlers.chain;
+        while (chain) {
+            if (chain->define_enabled && chain->define) {
+                if (chain->define(ctx, str_id, v, env))
+                    return;
+            }
+            chain = chain->next;
+        }
         auto e = ENV(env);
         if (!hashtab::set(e->bindings, str_id, v))
             hashtab::insert(e->bindings, str_id, v);
@@ -1412,6 +1442,10 @@ namespace basecode::scm {
         SET_TYPE(obj, obj_type_t::environment);
         SET_FIXNUM(obj, env->native_ptr_idx);
         return obj;
+    }
+
+    u0 set_error_handler(ctx_t* ctx, error_func_t func) {
+        ctx->handlers.error = func;
     }
 
     obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size) {
@@ -1801,6 +1835,15 @@ namespace basecode::scm {
                   s_type_names[u32(TYPE(obj))]);
         }
         return obj;
+    }
+
+    u0 set_next_handler(ctx_t* ctx, chained_handler_t* handler) {
+        if (!ctx->handlers.chain) {
+            ctx->handlers.chain = handler;
+        } else {
+            handler->next = ctx->handlers.chain;
+            ctx->handlers.chain = handler;
+        }
     }
 
     obj_t* make_error(ctx_t* ctx, obj_t* args, obj_t* call_stack) {

@@ -37,14 +37,31 @@ namespace basecode::scm {
     using fixnum_t              = u32;
     using flonum_t              = f32;
 
+    using get_func_t            = obj_t* (*)(ctx_t*, u32);
+    using set_func_t            = b8 (*)(ctx_t*, u32, obj_t*, obj_t*);
     using rest_array_t          = array_t<obj_t*>;
     using error_func_t          = u0 (*)(ctx_t*, const s8*, obj_t*);
+    using define_func_t         = b8 (*)(ctx_t*, u32, obj_t*, obj_t*);
     using native_func_t         = obj_t* (*)(ctx_t*, obj_t*);
 
-    struct handlers_t final {
-        error_func_t            error;
-        native_func_t           mark;
+    struct chained_handler_t final {
         native_func_t           gc;
+        get_func_t              get;
+        set_func_t              set;
+        chained_handler_t*      next;
+        native_func_t           mark;
+        define_func_t           define;
+        u8                      gc_enabled:     1;
+        u8                      get_enabled:    1;
+        u8                      set_enabled:    1;
+        u8                      mark_enabled:   1;
+        u8                      define_enabled: 1;
+        u8                      pad:            3;
+    };
+
+    struct handlers_t final {
+        chained_handler_t*      chain;
+        error_func_t            error;
     };
 
     struct printable_t final {
@@ -107,8 +124,6 @@ namespace basecode::scm {
     const s8* type_name(obj_t* obj);
 
     u0 mark(ctx_t* ctx, obj_t* obj);
-
-    handlers_t* handlers(ctx_t* ctx);
 
     b8 is_nil(ctx_t* ctx, obj_t* obj);
 
@@ -182,6 +197,8 @@ namespace basecode::scm {
 
     obj_t* make_environment(ctx_t* ctx, obj_t* parent);
 
+    u0 set_error_handler(ctx_t* ctx, error_func_t func);
+
     obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size);
 
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn);
@@ -210,6 +227,8 @@ namespace basecode::scm {
     obj_t* make_keyword(ctx_t* ctx, const T& str) {
         return make_keyword(ctx, (const s8*) str.data, str.length);
     }
+
+    u0 set_next_handler(ctx_t* ctx, chained_handler_t* handler);
 
     obj_t* make_error(ctx_t* ctx, obj_t* args, obj_t* call_stack);
 
