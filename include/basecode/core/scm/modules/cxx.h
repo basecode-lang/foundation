@@ -28,10 +28,6 @@ namespace basecode::scm::module::cxx {
     };
 
     //
-    // string module integration:
-    //  (intern/get id)                             -> string
-    //
-    //
     // top-level api:
     // (cxx/make-program)                           -> program_t*
     // (cxx/add-module pgm file_name 'cpp20)        -> module_t*
@@ -57,18 +53,21 @@ namespace basecode::scm::module::cxx {
     // (cxx/unary/&&        scope expr_id)               -> u32
     // (cxx/unary/++        scope expr_id [#:prefix #t]) -> u32
     // (cxx/unary/--        scope expr_id [#:prefix #t]) -> u32
+    //
     // (cxx/init/=          scope expr_id)               -> u32
     // (cxx/init/{}         scope . expr_ids)            -> u32
-    // (cxx/binary/+=       scope lhs_id rhs_id)         -> u32
-    // (cxx/binary/<<=      scope lhs_id rhs_id)         -> u32
-    // (cxx/binary/>>=      scope lhs_id rhs_id)         -> u32
-    // (cxx/binary/|=       scope lhs_id rhs_id)         -> u32
-    // (cxx/binary/^=       scope lhs_id rhs_id)         -> u32
-    // (cxx/binary/-=       scope lhs_id rhs_id)         -> u32
-    // (cxx/binary/*=       scope lhs_id rhs_id)         -> u32
-    // (cxx/binary//=       scope lhs_id rhs_id)         -> u32
-    // (cxx/binary/%=       scope lhs_id rhs_id)         -> u32
-    // (cxx/binary/=        scope lhs_id rhs_id)         -> u32
+    //
+    // (cxx/assign/+=       scope lhs_id rhs_id)         -> u32
+    // (cxx/assign/<<=      scope lhs_id rhs_id)         -> u32
+    // (cxx/assign/>>=      scope lhs_id rhs_id)         -> u32
+    // (cxx/assign/|=       scope lhs_id rhs_id)         -> u32
+    // (cxx/assign/^=       scope lhs_id rhs_id)         -> u32
+    // (cxx/assign/-=       scope lhs_id rhs_id)         -> u32
+    // (cxx/assign/*=       scope lhs_id rhs_id)         -> u32
+    // (cxx/assign//=       scope lhs_id rhs_id)         -> u32
+    // (cxx/assign/%=       scope lhs_id rhs_id)         -> u32
+    // (cxx/assign/=        scope lhs_id rhs_id)         -> u32
+    //
     // (cxx/binary/==       scope lhs_id rhs_id)         -> u32
     // (cxx/binary/<        scope lhs_id rhs_id)         -> u32
     // (cxx/binary/*        scope lhs_id rhs_id)         -> u32

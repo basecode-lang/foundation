@@ -454,6 +454,8 @@ namespace basecode::cxx {
         namespace type {
             u32 ptr(scope_t& scope, u32 type_id);
 
+            u32 ref(scope_t& scope, u32 type_id);
+
             u32 u0_(scope_t& scope, u32 ident_id);
 
             u32 s8_(scope_t& scope, u32 ident_id);
@@ -461,8 +463,6 @@ namespace basecode::cxx {
             u32 u8_(scope_t& scope, u32 ident_id);
 
             u32 b8_(scope_t& scope, u32 ident_id);
-
-            u32 ref(scope_t& scope, u32 ident_id);
 
             u32 f32_(scope_t& scope, u32 ident_id);
 

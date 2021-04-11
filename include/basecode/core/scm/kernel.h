@@ -54,12 +54,13 @@ namespace basecode::scm::kernel {
 
     namespace type_decl {
         constexpr u32 b8_       = 0;
-        constexpr u32 u0_       = 1;
-        constexpr u32 u32_      = 2;
-        constexpr u32 f32_      = 3;
-        constexpr u32 obj_ptr   = 4;
-        constexpr u32 list_ptr  = 5;
-        constexpr u32 slice_ptr = 6;
+        constexpr u32 u8_       = 1;
+        constexpr u32 u0_       = 2;
+        constexpr u32 u32_      = 3;
+        constexpr u32 f32_      = 4;
+        constexpr u32 obj_ptr   = 5;
+        constexpr u32 list_ptr  = 6;
+        constexpr u32 slice_ptr = 7;
     }
 
     u0 create_common_types();

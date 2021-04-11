@@ -3,7 +3,6 @@ HIGH
 - memory: fucking proxy allocator needs a solid review and clean up
             there are still situations where other allocators backed by
             a proxy aren't aligned with total_allocated
-- cxx kernel: finish wrapping
 - scm: build intervals of liveliness for virtual variables
 - scm: first pass register allocator
 - scm: write, display, print, ports
@@ -38,6 +37,7 @@ LOW
 
 DONE
 ----
+- cxx kernel: finish wrapping
 - scm: added basic kernel module
 - scm: load kernel function
 - symtab: just ran into a pointer stability issue.  i swapped in
