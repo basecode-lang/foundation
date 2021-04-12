@@ -28,12 +28,13 @@ namespace basecode::scm::kernel {
         [type_decl::slice_ptr] = {param_cls_t::ptr, param_size_t::qword, scm::ffi_type_t::string},
         [type_decl::u8_]       = {param_cls_t::int_, param_size_t::byte},
         [type_decl::b8_]       = {param_cls_t::int_, param_size_t::byte, scm::ffi_type_t::boolean},
+        [type_decl::u16_]      = {param_cls_t::int_, param_size_t::word},
     };
 
-    static param_type_t s_types[32] = {};
+    static param_type_t s_types[type_decl::max] = {};
 
     u0 create_common_types() {
-        scm::kernel::create_types(s_common_types, 8);
+        scm::kernel::create_types(s_common_types, type_decl::max);
     }
 
     u0 create_types(type_decl_t* decls, u32 size) {

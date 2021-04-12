@@ -61,6 +61,8 @@ namespace basecode::scm::kernel {
         constexpr u32 obj_ptr   = 5;
         constexpr u32 list_ptr  = 6;
         constexpr u32 slice_ptr = 7;
+        constexpr u32 u16_      = 8;
+        constexpr u32 max       = 9;
     }
 
     u0 create_common_types();

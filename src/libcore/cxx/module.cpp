@@ -20,27 +20,11 @@
 #include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::cxx::module {
-    u0 free(module_t& module) {
-        module.root_scope_idx = {};
-        for (auto& scope : module.scopes)
-            scope::free(scope);
-        array::free(module.scopes);
-    }
-
-    status_t finalize(module_t& module) {
-        for (auto& scope : module.scopes) {
-            auto status = scope::finalize(scope);
-            if (!OK(status))
-                return status;
-        }
-        return status_t::ok;
-    }
-
-    scope_t& get_scope(module_t& module, u32 scope_idx) {
-        return module.scopes[scope_idx];
-    }
-
-    u0 init(module_t& module, program_t& pgm, str::slice_t& filename, cxx::revision_t rev, alloc_t* alloc) {
+    u0 init(module_t& module,
+            program_t& pgm,
+            str::slice_t& filename,
+            cxx::revision_t rev,
+            alloc_t* alloc) {
         module.program = &pgm;
         module.revision = rev;
 
@@ -62,5 +46,25 @@ namespace basecode::cxx::module {
         module.filename_id = scope::lit::str(root, filename);
         bass::write_field(cursor, element::field::lit, module.filename_id);
         bass::write_field(cursor, element::field::child, root.id);
+    }
+
+    u0 free(module_t& module) {
+        module.root_scope_idx = {};
+        for (auto& scope : module.scopes)
+            scope::free(scope);
+        array::free(module.scopes);
+    }
+
+    status_t finalize(module_t& module) {
+        for (auto& scope : module.scopes) {
+            auto status = scope::finalize(scope);
+            if (!OK(status))
+                return status;
+        }
+        return status_t::ok;
+    }
+
+    scope_t& get_scope(module_t& module, u32 scope_idx) {
+        return module.scopes[scope_idx];
     }
 }

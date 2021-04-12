@@ -20,7 +20,11 @@
 #include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::cxx::program {
-    static b8 format_record(format_type_t type, cursor_t& c, fmt_buf_t& buf, u0* ctx) {
+    static b8 format_record(format_type_t type,
+                            cursor_t& c,
+                            fmt_buf_t& buf,
+                            u0* ctx) {
+        UNUSED(ctx);
         if (type == format_type_t::field) {
             auto value = c.field->value;
             format::format_to(
@@ -72,23 +76,26 @@ namespace basecode::cxx::program {
                                     break;
                                 }
                                 case expression_type_t::initializer: {
-                                    sub_type_name = cxx::scope::expr::init::name((initializer_type_t) sub_type);
+                                    sub_type_name = scope::expr::init::name((initializer_type_t) sub_type);
                                     break;
                                 }
                                 case expression_type_t::assignment: {
-                                    sub_type_name = cxx::scope::expr::assign::name((assignment_type_t) sub_type);
+                                    sub_type_name = scope::expr::assign::name((assignment_type_t) sub_type);
                                     break;
                                 }
                                 case expression_type_t::binary: {
-                                    sub_type_name = cxx::scope::expr::binary::name((binary_op_type_t) sub_type);
+                                    sub_type_name = scope::expr::binary::name((binary_op_type_t) sub_type);
                                     break;
                                 }
                                 case expression_type_t::unary: {
-                                    sub_type_name = cxx::scope::expr::unary::name((unary_op_type_t) sub_type);
+                                    sub_type_name = scope::expr::unary::name((unary_op_type_t) sub_type);
                                     break;
                                 }
                             }
-                            format::format_to(buf, "\n\t{:<16} = '{}'", " .sub_type", sub_type_name);
+                            format::format_to(buf,
+                                              "\n\t{:<16} = '{}'",
+                                              " .sub_type",
+                                              sub_type_name);
                             break;
                         }
                         default: {
@@ -99,7 +106,10 @@ namespace basecode::cxx::program {
                 }
                 case element::field::intern: {
                     auto rc = string::interned::get(value);
-                    format::format_to(buf, "\n\t{:<16} = '{}'", " .slice", rc.slice);
+                    format::format_to(buf,
+                                      "\n\t{:<16} = '{}'",
+                                      " .slice",
+                                      rc.slice);
                     break;
                 }
                 default: {
@@ -129,7 +139,9 @@ namespace basecode::cxx::program {
     status_t finalize(program_t& pgm) {
         cursor_t list_cursor{};
         bass::seek_current(pgm.storage, list_cursor);
-        bass::new_record(list_cursor, element::header::list, pgm.modules.size + 1);
+        bass::new_record(list_cursor,
+                         element::header::list,
+                         pgm.modules.size + 1);
         bass::write_field(list_cursor, element::field::parent, pgm.id);
         for (const auto& module : pgm.modules)
             bass::write_field(list_cursor, element::field::child, module.id);
@@ -150,12 +162,25 @@ namespace basecode::cxx::program {
         return status_t::ok;
     }
 
+    module_t& add_module(program_t& pgm,
+                         str::slice_t filename,
+                         cxx::revision_t rev) {
+        auto& mod = array::append(pgm.modules);
+        mod.idx = pgm.modules.size - 1;
+        module::init(mod, pgm, filename, rev, pgm.alloc);
+        return mod;
+    }
+
     u0 debug_dump(program_t& pgm, fmt_buf_t& buf) {
         cursor_t cursor{};
         if (!bass::seek_first(pgm.storage, cursor))
             return;
         do {
-            bass::format_record(pgm.storage, buf, cursor.id, format_record, &pgm);
+            bass::format_record(pgm.storage,
+                                buf,
+                                cursor.id,
+                                format_record,
+                                &pgm);
             format::format_to(buf, "}}\n");
         } while (bass::next_record(cursor));
     }
@@ -176,12 +201,5 @@ namespace basecode::cxx::program {
         bass::write_field(cursor, element::field::list, 0);
         pgm.id = cursor.id;
         pgm.alloc = alloc;
-    }
-
-    module_t& add_module(program_t& pgm, str::slice_t filename, cxx::revision_t rev) {
-        auto& mod = array::append(pgm.modules);
-        mod.idx = pgm.modules.size - 1;
-        module::init(mod, pgm, filename, rev, pgm.alloc);
-        return mod;
     }
 }

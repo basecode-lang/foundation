@@ -10,6 +10,9 @@
 (define sub1 (mac (e)
     `(- ,e 1)))
 
+(define ok? (mac (s)
+    `(is s 0)))
+
 (define let (mac (args . body)
     `(begin
         (define proc (fn ,(map (fn (p) (car p)) args)

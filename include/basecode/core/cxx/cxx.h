@@ -333,6 +333,14 @@ namespace basecode::cxx {
     namespace scope {
         namespace expr {
             namespace unary {
+                u32 inc(scope_t& scope,
+                        u32 expr_id,
+                        position_type_t pos = position_type_t::prefix);
+
+                u32 dec(scope_t& scope,
+                        u32 expr_id,
+                        position_type_t pos = position_type_t::prefix);
+
                 u32 neg(scope_t& scope, u32 expr_id);
 
                 u32 bnot(scope_t& scope, u32 expr_id);
@@ -348,10 +356,6 @@ namespace basecode::cxx {
                 u32 addrof_label(scope_t& scope, u32 expr_id);
 
                 str::slice_t position_name(position_type_t type);
-
-                u32 inc(scope_t& scope, u32 expr_id, position_type_t pos = position_type_t::prefix);
-
-                u32 dec(scope_t& scope, u32 expr_id, position_type_t pos = position_type_t::prefix);
             }
 
             namespace init {
@@ -440,6 +444,12 @@ namespace basecode::cxx {
                 u32 subscript(scope_t& scope, u32 lhs_id, u32 rhs_id);
             }
 
+            u32 var(scope_t& scope,
+                    u32 type_id,
+                    u32 ident_id,
+                    u32 init_expr_id = 0,
+                    u8 flags = var::none);
+
             str::slice_t name(expression_type_t type);
 
             u32 raw(scope_t& scope, str::slice_t source);
@@ -447,11 +457,40 @@ namespace basecode::cxx {
             u32 ident(scope_t& scope, str::slice_t name);
 
             u32 list(scope_t& scope, u32 id_list[], u32 size);
-
-            u32 var(scope_t& scope, u32 type_id, u32 ident_id, u32 init_expr_id = 0, u8 flags = var::none);
         }
 
         namespace type {
+            u32 enum_(scope_t& scope,
+                      u32 block_id,
+                      u32 ident_id = 0,
+                      u8 flags = 0);
+
+            u32 class_(scope_t& scope,
+                       u32 block_id,
+                       u32 ident_id = 0,
+                       u8 flags = 0);
+
+            u32 union_(scope_t& scope,
+                       u32 block_id,
+                       u32 ident_id = 0,
+                       u8 flags = 0);
+
+            u32 struct_(scope_t& scope,
+                        u32 block_id,
+                        u32 ident_id = 0,
+                        u8 flags = 0);
+
+            u32 enum_class_(scope_t& scope,
+                            u32 block_id,
+                            u32 ident_id = 0,
+                            u8 flags = 0);
+
+            u32 func(scope_t& scope,
+                     u32 block_id,
+                     u32 return_type_id,
+                     u32 ident_id,
+                     u32 params_list_id = 0);
+
             u32 ptr(scope_t& scope, u32 type_id);
 
             u32 ref(scope_t& scope, u32 type_id);
@@ -489,30 +528,24 @@ namespace basecode::cxx {
             u32 array(scope_t& scope, u32 type_id, u32 size = 0);
 
             str::slice_t integral_size_name(integral_size_t size);
-
-            u32 enum_(scope_t& scope, u32 block_id, u32 ident_id = 0, u8 flags = 0);
-
-            u32 class_(scope_t& scope, u32 block_id, u32 ident_id = 0, u8 flags = 0);
-
-            u32 union_(scope_t& scope, u32 block_id, u32 ident_id = 0, u8 flags = 0);
-
-            u32 struct_(scope_t& scope, u32 block_id, u32 ident_id = 0, u8 flags = 0);
-
-            u32 enum_class_(scope_t& scope, u32 block_id, u32 ident_id = 0, u8 flags = 0);
-
-            u32 func(scope_t& scope, u32 block_id, u32 return_type_id, u32 ident_id, u32 params_list_id = 0);
         }
 
         namespace lit {
+            u32 signed_(scope_t& scope,
+                        u64 value,
+                        integral_size_t size,
+                        u32 radix = 10);
+
+            u32 unsigned_(scope_t& scope,
+                          u64 value,
+                          integral_size_t size,
+                          u32 radix = 10);
+
             u32 chr(scope_t& scope, s8 value);
 
             u32 str(scope_t& scope, str::slice_t value);
 
             u32 float_(scope_t& scope, f64 value, integral_size_t size);
-
-            u32 signed_(scope_t& scope, u64 value, integral_size_t size, u32 radix = 10);
-
-            u32 unsigned_(scope_t& scope, u64 value, integral_size_t size, u32 radix = 10);
         }
 
         namespace stmt {
@@ -547,9 +580,29 @@ namespace basecode::cxx {
                 u32 post_expr_id = 0,
                 u32 label_id = 0);
 
+            u32 do_(scope_t& scope,
+                    u32 predicate_id,
+                    u32 expr_id,
+                    u32 label_id = 0);
+
+            u32 case_(scope_t& scope,
+                      u32 predicate_id,
+                      u32 expr_id,
+                      u32 label_id = 0);
+
             u32 public_(scope_t& scope);
 
+            u32 while_(scope_t& scope,
+                       u32 predicate_id,
+                       u32 expr_id,
+                       u32 label_id = 0);
+
             u32 private_(scope_t& scope);
+
+            u32 switch_(scope_t& scope,
+                        u32 predicate_id,
+                        u32 expr_id,
+                        u32 label_id = 0);
 
             u32 protected_(scope_t& scope);
 
@@ -578,15 +631,13 @@ namespace basecode::cxx {
             u32 return_(scope_t& scope, u32 expr_id = 0, u32 label_id = 0);
 
             u32 default_(scope_t& scope, u32 expr_id = 0, u32 label_id = 0);
-
-            u32 do_(scope_t& scope, u32 predicate_id, u32 expr_id, u32 label_id = 0);
-
-            u32 case_(scope_t& scope, u32 predicate_id, u32 expr_id, u32 label_id = 0);
-
-            u32 while_(scope_t& scope, u32 predicate_id, u32 expr_id, u32 label_id = 0);
-
-            u32 switch_(scope_t& scope, u32 predicate_id, u32 expr_id, u32 label_id = 0);
         }
+
+        u0 init(program_t* pgm,
+                module_t* module,
+                scope_t& scope,
+                scope_t* parent,
+                alloc_t* alloc = context::top()->alloc);
 
         u0 pop(scope_t& scope);
 
@@ -597,8 +648,6 @@ namespace basecode::cxx {
         status_t finalize(scope_t& scope);
 
         u32 label(scope_t& scope, str::slice_t name);
-
-        u0 init(program_t* pgm, module_t* module, scope_t& scope, scope_t* parent, alloc_t* alloc = context::top()->alloc);
     }
 
     namespace module {
@@ -619,11 +668,17 @@ namespace basecode::cxx {
     namespace program {
         u0 free(program_t& pgm);
 
+        u0 init(program_t& pgm,
+                alloc_t* alloc = context::top()->alloc,
+                u32 num_modules = 16);
+
         status_t finalize(program_t& pgm);
 
-        str::slice_t revision_name(revision_t rev);
+        module_t& add_module(program_t& pgm,
+                             str::slice_t filename,
+                             cxx::revision_t rev);
 
-        u0 debug_dump(program_t& pgm, fmt_buf_t& buf);
+        str::slice_t revision_name(revision_t rev);
 
         u32 integral_size_in_bits(integral_size_t size);
 
@@ -631,19 +686,23 @@ namespace basecode::cxx {
 
         module_t& get_module(program_t& pgm, u32 module_idx);
 
-        module_t& add_module(program_t& pgm, str::slice_t filename, cxx::revision_t rev);
-
-        u0 init(program_t& pgm, alloc_t* alloc = context::top()->alloc, u32 num_modules = 16);
+        [[maybe_unused]] u0 debug_dump(program_t& pgm, fmt_buf_t& buf);
     }
 
     namespace serializer {
         u0 free(serializer_t& s);
 
+        u0 init(serializer_t& s,
+                program_t& pgm,
+                alloc_t* alloc = context::top()->alloc,
+                u16 margin = 160,
+                u16 tab_width = 4);
+
         status_t serialize(serializer_t& s);
 
-        status_t expand_type(bass_t& storage, u32 type_id, type_info_t& type_info);
-
-        u0 init(serializer_t& s, program_t& pgm, alloc_t* alloc = context::top()->alloc, u16 margin = 160, u16 tab_width = 4);
+        status_t expand_type(bass_t& storage,
+                             u32 type_id,
+                             type_info_t& type_info);
     }
 }
 

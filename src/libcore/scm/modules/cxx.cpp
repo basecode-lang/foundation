@@ -38,6 +38,7 @@ namespace basecode::scm::module::cxx {
         scm::ctx_t*             ctx;
         obj_pool_t              storage;
         basecode::obj_type_t*   program_type;
+        basecode::obj_type_t*   serializer_type;
     };
 
     system_t                    g_cxx_sys;
@@ -131,6 +132,11 @@ namespace basecode::scm::module::cxx {
         return cxx_core::scope::expr::var(*scope, type, ident, init, flags);
     }
 
+    u32 serialize(obj_t* ser_usr) {
+        auto ser = (cxx_core::serializer_t*) to_user_ptr(g_cxx_sys.ctx, ser_usr);
+        return u32(cxx_core::serializer::serialize(*ser));
+    }
+
     u0 pop_scope(obj_t* scope_usr) {
         auto scope = (cxx_core::scope_t*) to_user_ptr(g_cxx_sys.ctx, scope_usr);
         cxx_core::scope::pop(*scope);
@@ -165,7 +171,16 @@ namespace basecode::scm::module::cxx {
                   u32 ident,
                   u32 params_list = 0) {
         auto scope = (cxx_core::scope_t*) to_user_ptr(g_cxx_sys.ctx, scope_usr);
-        return cxx_core::scope::type::func(*scope, block, return_type, ident, params_list);
+        return cxx_core::scope::type::func(*scope,
+                                           block,
+                                           return_type,
+                                           ident,
+                                           params_list);
+    }
+
+    u32 finalize_program(obj_t* pgm_usr) {
+        auto pgm = (cxx_core::program_t*) to_user_ptr(g_cxx_sys.ctx, pgm_usr);
+        return u32(cxx_core::program::finalize(*pgm));
     }
 
     u32 stmt_protected(obj_t* scope_usr) {
@@ -684,6 +699,17 @@ namespace basecode::scm::module::cxx {
             find_position_type((const s8*) placement->data));
     }
 
+    obj_t* make_serializer(obj_t* pgm_usr, u16 margin = 160, u16 tab_width = 4) {
+        auto pgm = (cxx_core::program_t*) to_user_ptr(g_cxx_sys.ctx, pgm_usr);
+        auto ser = obj_pool::make<cxx_core::serializer_t>(g_cxx_sys.storage);
+        cxx_core::serializer::init(*ser,
+                                   *pgm,
+                                   g_cxx_sys.alloc,
+                                   margin,
+                                   tab_width);
+        return make_user_ptr(g_cxx_sys.ctx, ser);
+    }
+
     u32 unary_decrement(obj_t* scope_usr, u32 expr_id, str::slice_t* placement) {
         auto scope = (cxx_core::scope_t*) to_user_ptr(g_cxx_sys.ctx, scope_usr);
         return cxx_core::scope::expr::unary::dec(
@@ -716,6 +742,38 @@ namespace basecode::scm::module::cxx {
                 {"cxx/make-program"_ss, 1,
                     {
                         {(u0*) make_program, "make_program"_ss, type_decl::obj_ptr, 0}
+                    }
+                },
+
+                {"cxx/serialize"_ss, 1,
+                    {
+                        {(u0*) serialize, "serialize"_ss, type_decl::u32_, 1,
+                            {
+                                {"ser_usr"_ss, type_decl::obj_ptr},
+                            }
+                        }
+                    }
+                },
+
+                {"cxx/finalize-program"_ss, 1,
+                    {
+                        {(u0*) finalize_program, "finalize_program"_ss, type_decl::obj_ptr, 1,
+                            {
+                                {"pgm_usr"_ss, type_decl::obj_ptr},
+                            }
+                        }
+                    }
+                },
+
+                {"cxx/make-serializer"_ss, 1,
+                    {
+                        {(u0*) make_serializer, "make_serializer"_ss, type_decl::obj_ptr, 3,
+                            {
+                                {"pgm_usr"_ss, type_decl::obj_ptr},
+                                {"width"_ss, type_decl::u16_, .default_value.w = 160, .has_default = true},
+                                {"tab-width"_ss, type_decl::u16_, .default_value.w = 4, .has_default = true},
+                            }
+                        }
                     }
                 },
 
@@ -1982,9 +2040,10 @@ namespace basecode::scm::module::cxx {
         }
 
         u0 fini() {
-            for (auto obj : g_cxx_sys.program_type->objects) {
+            for (auto obj : g_cxx_sys.serializer_type->objects)
+                cxx_core::serializer::free(*((cxx_core::serializer_t*) obj));
+            for (auto obj : g_cxx_sys.program_type->objects)
                 cxx_core::program::free(*((cxx_core::program_t*) obj));
-            }
             obj_pool::free(g_cxx_sys.storage);
         }
 
@@ -1994,6 +2053,7 @@ namespace basecode::scm::module::cxx {
             obj_pool::init(g_cxx_sys.storage, g_cxx_sys.alloc);
             kernel::create_exports(g_cxx_sys.ctx, exports::s_exports);
             g_cxx_sys.program_type = obj_pool::register_type<cxx_core::program_t>(g_cxx_sys.storage);
+            g_cxx_sys.serializer_type = obj_pool::register_type<cxx_core::serializer_t>(g_cxx_sys.storage);
             return status_t::ok;
         }
     }
