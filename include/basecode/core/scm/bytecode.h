@@ -474,13 +474,7 @@ namespace basecode::scm {
 
             compile_result_t error(compiler_t& comp, const context_t& c, obj_t* args);
 
-            compile_result_t print(compiler_t& comp, const context_t& c, obj_t* args);
-
-            compile_result_t format(compiler_t& comp, const context_t& c, obj_t* args);
-
             compile_result_t while_(compiler_t& comp, const context_t& c, obj_t* args);
-
-            compile_result_t expand(compiler_t& comp, const context_t& c, obj_t* args);
 
             compile_result_t define(compiler_t& comp, const context_t& c, obj_t* args);
 

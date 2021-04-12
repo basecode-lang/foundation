@@ -159,10 +159,7 @@ namespace basecode::scm {
         begin,
         error,
         quote,
-        print,
-        expand,
         while_,
-        format,
         setcar,
         setcdr,
         define,
@@ -483,7 +480,6 @@ namespace basecode::scm {
         mem_area_t*             gc_stack;
         mem_area_t*             env_stack;
         vm_t                    vm;
-        ffi_t                   ffi;
         compiler_t              compiler;
         handlers_t              handlers;
         obj_stack_t             cl_stack;
@@ -492,9 +488,6 @@ namespace basecode::scm {
         ptr_array_t             native_ptrs;
         string_table_t          strtab;
         symbol_table_t          symtab;
-        keyword_table_t         keywords;
-        rest_array_t            rest;
-        u8                      sig_buf[32];
         obj_t*                  objects;
         obj_t*                  env;
         obj_t*                  nil;

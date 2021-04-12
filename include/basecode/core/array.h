@@ -206,6 +206,21 @@ namespace basecode {
             array.data[array.size++] = value;
         }
 
+        template <Array_Concept T,
+                  typename Value_Type = typename T::Value_Type>
+        u0 erase(T& array, u32 start_idx, u32 end_idx) {
+            const s32 erase_diff = end_idx - start_idx;
+            const s32 move_diff  = array.size - end_idx;
+            if (erase_diff <= 0 || move_diff <= 0)
+                return;
+            auto dest = array.data + start_idx;
+            auto src  = array.data + end_idx;
+            std::memcpy(dest,
+                        src,
+                        move_diff * sizeof(Value_Type));
+            array.size -= erase_diff;
+        }
+
         template <Array_Concept Dst,
                   Array_Concept Src,
                   b8 Dst_Is_Static = Dst::Is_Static::value,

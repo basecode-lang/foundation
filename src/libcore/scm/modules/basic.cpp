@@ -42,6 +42,31 @@ namespace basecode::scm::module::basic {
         return s ? make_string(g_basic_sys.ctx, *s) : nil(g_basic_sys.ctx);
     }
 
+    obj_t* expand(obj_t* obj) {
+        auto ctx = g_basic_sys.ctx;
+        auto fn = CAR(obj);
+        if (TYPE(fn) == obj_type_t::symbol)
+            fn = get(ctx, fn);
+        if (TYPE(fn) != obj_type_t::macro)
+            return ctx->nil;
+        auto args = CDR(obj);
+        auto proc = PROC(fn);
+        push_env(ctx, make_environment(ctx, top_env(ctx)));
+        args_to_env(ctx, proc->params, args);
+        auto res  = ctx->nil;
+        auto body = proc->body;
+        auto save = save_gc(ctx);
+        while (!IS_NIL(body)) {
+            restore_gc(ctx, save);
+            push_gc(ctx, body);
+            push_gc(ctx, top_env(ctx));
+            res = eval(ctx, CAR(body));
+            body = CDR(body);
+        }
+        finalize_environment(ctx, pop_env(ctx));
+        return res;
+    }
+
     obj_t* reverse(obj_t* lst) {
         auto ctx = g_basic_sys.ctx;
         obj_t* res;
@@ -52,6 +77,17 @@ namespace basecode::scm::module::basic {
 
     obj_t* current_environment() {
         return g_basic_sys.ctx->env;
+    }
+
+    u0 print(rest_array_t* rest) {
+        auto ctx = g_basic_sys.ctx;
+        const auto& lst = *rest;
+        for (u32 i = 0; i < lst.size; ++i) {
+            if (i > 0 && i < lst.size - 1)
+                format::print(" ");
+            format::print("{}", printable_t{ctx, lst[i]});
+        }
+        format::print("\n");
     }
 
     obj_t* load(rest_array_t* rest) {
@@ -140,6 +176,87 @@ namespace basecode::scm::module::basic {
         return true;
     }
 
+    obj_t* format(str::slice_t* fmt_str, b8 quote, rest_array_t* rest) {
+        auto ctx = g_basic_sys.ctx;
+        str_t buf{};
+        str::init(buf, ctx->alloc);  {
+            str_buf_t str_buf{&buf};
+            fmt::dynamic_format_arg_store<fmt::format_context> fmt_args{};
+            for (auto arg : *rest) {
+                auto va = EVAL(arg);
+                switch (TYPE(va)) {
+                    case obj_type_t::pair:
+                        fmt_args.push_back(scm::printable_t{ctx, va, quote});
+                        break;
+                    case obj_type_t::nil:
+                        fmt_args.push_back("nil");
+                        break;
+                    case obj_type_t::fixnum:
+                        fmt_args.push_back(FIXNUM(va));
+                        break;
+                    case obj_type_t::flonum:
+                        fmt_args.push_back(FLONUM(va));
+                        break;
+                    case obj_type_t::keyword:
+                        fmt_args.push_back(format::format(
+                            "#:{}",
+                            *string::interned::get_slice(STRING_ID(va))));
+                        break;
+                    case obj_type_t::symbol:
+                        fmt_args.push_back(*string::interned::get_slice(STRING_ID(va)));
+                        break;
+                    case obj_type_t::string:
+                        if (quote) {
+                            fmt_args.push_back(format::format(
+                                "\"{}\"",
+                                *string::interned::get_slice(STRING_ID(va))));
+                        } else {
+                            fmt_args.push_back(*string::interned::get_slice(STRING_ID(va)));
+                        }
+                        break;
+                    case obj_type_t::ffi: {
+                        auto proto = PROTO(va);
+                        fmt_args.push_back(format::format(
+                            "[ffi: {}/{} overloads]",
+                            proto->name,
+                            proto->overloads.size));
+                        break;
+                    }
+                    case obj_type_t::prim:
+                        fmt_args.push_back(format::format(
+                            "[prim: {}]",
+                            scm::prim_name(va)));
+                        break;
+                    case obj_type_t::func:
+                        fmt_args.push_back(format::format(
+                            "[cfunc: {}]",
+                            (u0*) NATIVE_PTR(va)));
+                        break;
+                    case obj_type_t::macro:
+                        break;
+                    case obj_type_t::cfunc:
+                        break;
+                    case obj_type_t::ptr:
+                        fmt_args.push_back(format::format(
+                            "[user ptr: {}]",
+                            (u0*) NATIVE_PTR(va)));
+                        break;
+                    case obj_type_t::boolean:
+                        fmt_args.push_back(IS_TRUE(va) ? true : false);
+                        break;
+                    case obj_type_t::error:
+                        break;
+                    case obj_type_t::environment:
+                        break;
+                    default:
+                        break;
+                }
+            }
+            fmt::vformat_to(str_buf, (std::string_view) *fmt_str, fmt_args);
+        }
+        return make_string(ctx, (const s8*) buf.data, buf.length);
+    }
+
     namespace system {
         namespace exports {
             using namespace scm::kernel;
@@ -149,6 +266,37 @@ namespace basecode::scm::module::basic {
                     {
                         {(u0*) load, "load"_ss, type_decl::obj_ptr, 1,
                             {
+                                {"rest"_ss, type_decl::obj_ptr, .is_rest = true},
+                            }
+                        }
+                    }
+                },
+
+                {"expand"_ss, 1,
+                    {
+                        {(u0*) expand, "expand"_ss, type_decl::obj_ptr, 1,
+                            {
+                                {"obj"_ss, type_decl::obj_ptr},
+                            }
+                        }
+                    }
+                },
+                {"print"_ss, 1,
+                    {
+                        {(u0*) print, "print"_ss, type_decl::u0_, 1,
+                            {
+                                {"rest"_ss, type_decl::obj_ptr, .is_rest = true},
+                            }
+                        }
+                    }
+                },
+
+                {"format"_ss, 1,
+                    {
+                        {(u0*) format, "format"_ss, type_decl::obj_ptr, 3,
+                            {
+                                {"fmt_str"_ss, type_decl::slice_ptr},
+                                {"quote"_ss, type_decl::b8_, .default_value.b = false, .has_default = true},
                                 {"rest"_ss, type_decl::obj_ptr, .is_rest = true},
                             }
                         }

@@ -35,7 +35,7 @@ namespace basecode::scm::kernel {
         param_alias_t           default_value       {};
         u8                      is_rest:        1   {};
         u8                      has_default:    1   {};
-        u8                      pad:            7   {};
+        u8                      pad:            6   {};
     };
 
     struct proc_overload_t final {

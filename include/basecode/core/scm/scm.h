@@ -123,6 +123,8 @@ namespace basecode::scm {
 
     const s8* type_name(obj_t* obj);
 
+    const s8* prim_name(obj_t* obj);
+
     u0 mark(ctx_t* ctx, obj_t* obj);
 
     b8 is_nil(ctx_t* ctx, obj_t* obj);
@@ -191,9 +193,13 @@ namespace basecode::scm {
 
     obj_t* cons(ctx_t* ctx, obj_t* car, obj_t* cdr);
 
+    u0 finalize_environment(ctx_t* ctx, obj_t* env);
+
     u0 write(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj);
 
     u0 print(fmt_buf_t& buf, ctx_t* ctx, obj_t* obj);
+
+    u0 args_to_env(ctx_t* ctx, obj_t* prm, obj_t* arg);
 
     obj_t* make_environment(ctx_t* ctx, obj_t* parent);
 
@@ -201,7 +207,11 @@ namespace basecode::scm {
 
     obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size);
 
+    obj_t* ffi_apply(ctx_t* ctx, obj_t* fn, obj_t* args);
+
     obj_t* make_native_func(ctx_t* ctx, native_func_t fn);
+
+    obj_t* cfunc_apply(ctx_t* ctx, obj_t* fn, obj_t* args);
 
     str_t to_string(ctx_t* ctx, obj_t* obj, b8 quote = false);
 
@@ -242,8 +252,6 @@ namespace basecode::scm {
     u0 format_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args);
 
     ctx_t* init(u0* ptr, u32 size, alloc_t* alloc = context::top()->alloc);
-
-    str_t format(ctx_t* ctx, obj_t* fmt_str, obj_t* args, b8 quote = false);
 }
 
 FORMAT_TYPE(basecode::scm::printable_t, basecode::scm::format_object(data, ctx));
