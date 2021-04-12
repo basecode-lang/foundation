@@ -65,5 +65,5 @@ TEST_CASE("basecode::memory::buddy basics") {
 
     REQUIRE(buddy_alloc->total_allocated == buddy_alloc->subclass.buddy.metadata_size);
 
-    memory::system::free(buddy_alloc, true);
+    memory::system::free(buddy_alloc);
 }

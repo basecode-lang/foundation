@@ -43,18 +43,12 @@ namespace basecode::memory::bump {
     }
 
     static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
-        u32 temp_size{};
-        auto sc  = &alloc->subclass.bump;
+        auto sc = &alloc->subclass.bump;
         if (!sc->buf || sc->offset + (size + align) > sc->end_offset) {
-            if (alloc->backing) {
-                const auto r = alloc->backing->system->alloc(alloc->backing, size, align);
-                sc->buf = r.mem;
-            } else {
-                // XXX:
-                assert(false);
-            }
+            auto r = memory::internal::alloc(alloc->backing, size, align);
+            sc->buf        = r.mem;
             sc->offset     = {};
-            sc->end_offset = temp_size;
+            sc->end_offset = r.size;
         }
         u32  align_adjust{};
         auto mem = memory::system::align_forward((u8*) sc->buf + sc->offset,

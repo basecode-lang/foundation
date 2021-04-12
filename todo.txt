@@ -1,8 +1,5 @@
 HIGH
 ---------
-- memory: fucking proxy allocator needs a solid review and clean up
-            there are still situations where other allocators backed by
-            a proxy aren't aligned with total_allocated
 - scm: build intervals of liveliness for virtual variables
 - scm: first pass register allocator
 - scm: write, display, print, ports
@@ -37,6 +34,17 @@ LOW
 
 DONE
 ----
+- memory: ok, i see the issue now and it goes like this...
+    1. the public api of the memory sub-system works the way one would expect based on
+        malloc/free/realloc.
+    2. internally, the api uses mem_result_t to return the pointer and the allocated size.
+    3. the internal allocation systems aren't going through the public api because they need
+        the additional metadata.
+    4. the majority of the implementation in the public api (memory.cpp) is actually doing
+       internal work.  the final bit is returning the pointer to the public caller.
+    5. the memory.cpp module needs to split the details of the public api into an internal:: namespace
+        that the allocation systems can utilize to get the same allocation behavior (proxy, tracking total_allocated, etc.)
+        but also get access to the metadata.
 - cxx kernel: finish wrapping
 - scm: added basic kernel module
 - scm: load kernel function

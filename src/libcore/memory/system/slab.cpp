@@ -70,9 +70,11 @@ namespace basecode::memory::slab {
     }
 
     static std::tuple<slab_t*, u32> grow(alloc_t* alloc) {
-        auto       sc  = &alloc->subclass.slab;
-        const auto r   = alloc->backing->system->alloc(alloc->backing, sc->page_size, 8);
-        auto       mem = (u8*) r.mem;
+        auto       sc = &alloc->subclass.slab;
+        const auto r  = memory::internal::alloc(alloc->backing,
+                                                sc->page_size,
+                                                sizeof(u64));
+        auto mem = (u8*) r.mem;
         sc->count++;
 
         u32  align_adjust{};
@@ -97,7 +99,7 @@ namespace basecode::memory::slab {
         auto curr = sc->head;
         u32 total_freed{};
         while (curr) {
-            total_freed += memory::free(alloc->backing, curr->page);
+            total_freed += memory::internal::free(alloc->backing, curr->page);
             curr = curr->next;
         }
         return total_freed;
@@ -150,7 +152,7 @@ namespace basecode::memory::slab {
         u32 freed_size{};
         if (slab->buf_count == 0) {
             remove(alloc, slab);
-            freed_size = memory::free(alloc->backing, slab->page);
+            freed_size = memory::internal::free(alloc->backing, slab->page);
         }
 
         if (slab->buf_count == sc->buf_max_count - 1)

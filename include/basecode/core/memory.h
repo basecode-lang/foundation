@@ -20,7 +20,7 @@
 
 #include <basecode/core/slice.h>
 
-#define IS_PROXY(a)     ((a)->system && (a)->system->type == alloc_type_t::proxy)
+#define IS_PROXY(a)                 ((a)->system && (a)->system->type == alloc_type_t::proxy)
 
 namespace basecode {
     using mspace                    = u0*;
@@ -147,11 +147,11 @@ namespace basecode {
 
             alloc_t* default_alloc();
 
+            u32 free(alloc_t* alloc);
+
             usize os_alloc_granularity();
 
             b8 set_page_executable(u0* ptr, usize size);
-
-            u32 free(alloc_t* alloc, b8 enforce = true);
 
             inline u0* align_forward(u0* p, u32 align, u32& adjust) {
                 const auto pi = uintptr_t(p);
@@ -165,25 +165,49 @@ namespace basecode {
             status_t init(alloc_type_t type, u32 heap_size = 32 * 1024 * 1024, u0* base = {});
         }
 
-        u0* alloc(alloc_t* alloc);
+        namespace internal {
+            u32 fini(alloc_t* alloc);
+
+            u32 size(alloc_t* alloc, u0* mem);
+
+            u32 free(alloc_t* alloc, u0* mem);
+
+            mem_result_t alloc(alloc_t* alloc, u32 size, u32 align);
+
+            mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align);
+        }
 
         alloc_t* unwrap(alloc_t* alloc);
 
-        u32 size(alloc_t* alloc, u0* mem);
+        inline u32 fini(alloc_t* alloc) {
+            return internal::fini(alloc);
+        }
 
-        u32 free(alloc_t* alloc, u0* mem);
+        inline u0* alloc(alloc_t* alloc) {
+            return internal::alloc(alloc, 0, 0).mem;
+        }
 
         str::slice_t type_name(alloc_type_t type);
 
         str::slice_t status_name(status_t status);
 
-        u32 fini(alloc_t* alloc, b8 enforce = true);
+        inline u32 size(alloc_t* alloc, u0* mem) {
+            return internal::size(alloc, mem);
+        }
 
-        u0* alloc(alloc_t* alloc, u32 size, u32 align = sizeof(u64));
+        inline u32 free(alloc_t* alloc, u0* mem) {
+            return internal::free(alloc, mem);
+        }
 
-        u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align = sizeof(u64));
+        inline u0* alloc(alloc_t* alloc, u32 size, u32 align = sizeof(u64)) {
+            return internal::alloc(alloc, size, align).mem;
+        }
 
         status_t init(alloc_t* alloc, alloc_type_t type, alloc_config_t* config = {});
+
+        inline u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align = sizeof(u64)) {
+            return internal::realloc(alloc, mem, size, align).mem;
+        }
     }
 }
 

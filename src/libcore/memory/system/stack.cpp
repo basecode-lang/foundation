@@ -22,7 +22,7 @@ namespace basecode::memory::stack {
     static u32 fini(alloc_t* alloc) {
         auto sc = &alloc->subclass.stack;
         const auto size = uintptr_t(sc->free) - uintptr_t(sc->buf);
-        memory::free(alloc->backing, sc->buf);
+        memory::internal::free(alloc->backing, sc->buf);
         sc->buf  = sc->free = {};
         return size;
     }
@@ -37,10 +37,14 @@ namespace basecode::memory::stack {
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto sc  = &alloc->subclass.stack;
         auto cfg = (stack_config_t*) config;
-        alloc->backing = cfg->backing;
         sc->max_size   = cfg->max_size;
-        sc->buf        = memory::alloc(alloc->backing, sc->max_size, 8);
-        sc->free       = sc->buf;
+        alloc->backing = cfg->backing;
+
+        auto r = memory::internal::alloc(alloc->backing,
+                                         sc->max_size,
+                                         alignof(u64));
+        sc->buf  = r.mem;
+        sc->free = sc->buf;
     }
 
     static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
@@ -48,7 +52,9 @@ namespace basecode::memory::stack {
         assert(size < sc->max_size);
         mem_result_t r{};
         u32 align_adjust{};
-        r.mem    = memory::system::align_forward(sc->free, align, align_adjust);
+        r.mem    = memory::system::align_forward(sc->free,
+                                                 align,
+                                                 align_adjust);
         r.size   = size + align_adjust;
         sc->free = (u8*) sc->free + r.size;
         return r;
@@ -65,7 +71,9 @@ namespace basecode::memory::stack {
             sc->free = (u8*) mem + size;
         } else {
             u32 align_adjust{};
-            r.mem    = memory::system::align_forward(sc->free, align, align_adjust);
+            r.mem    = memory::system::align_forward(sc->free,
+                                                     align,
+                                                     align_adjust);
             r.size   = size + align_adjust;
             sc->free = (u8*) sc->free + size;
         }

@@ -21,13 +21,12 @@
 
 namespace basecode::memory::page {
     static u32 fini(alloc_t* alloc) {
-        auto backing   = alloc->backing->system;
         auto sc        = &alloc->subclass.page;
         auto curr_page = sc->head;
         u32 total_freed{};
         while (curr_page) {
             auto prev_page = curr_page->prev;
-            total_freed += backing->free(alloc->backing, curr_page);
+            total_freed += memory::internal::free(alloc->backing, curr_page);
             curr_page = prev_page;
         }
         return total_freed;
@@ -46,7 +45,7 @@ namespace basecode::memory::page {
         if (page->prev) page->prev->next = page->next;
         if (sc->head == mem) sc->head    = page->next;
         if (sc->tail == mem) sc->tail    = page->prev;
-        return alloc->backing->system->free(alloc->backing, mem);
+        return memory::internal::free(alloc->backing, mem);
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
@@ -55,7 +54,7 @@ namespace basecode::memory::page {
         sc->count      = {};
         alloc->backing = cfg->backing;
         sc->cursor     = sc->tail = sc->head = {};
-        auto page_size = memory::system::os_page_size();
+        auto page_size = memory::system::os_alloc_granularity();
         sc->page_size  = (page_size * std::max<u8>(1, cfg->num_pages)) - sizeof(page_header_t);
         assert(alloc->backing);
     }
@@ -69,10 +68,11 @@ namespace basecode::memory::page {
             page = sc->cursor;
             sc->cursor = sc->cursor->next;
         }
+        mem_result_t r{};
         if (!page) {
-            const auto r = backing->system->alloc(backing,
-                                                  sc->page_size,
-                                                  alignof(page_header_t));
+            r = memory::internal::alloc(backing,
+                                        sc->page_size,
+                                        alignof(page_header_t));
             page = (page_header_t*) r.mem;
             sc->count++;
             if (!sc->tail) {
@@ -86,7 +86,7 @@ namespace basecode::memory::page {
             }
             sc->head = page;
         }
-        return mem_result_t{++page, s32(sc->page_size)};
+        return mem_result_t{++page, r.size};
     }
 
     alloc_system_t g_system{

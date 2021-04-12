@@ -25,6 +25,7 @@
 #include <sys/mman.h>
 #include <basecode/core/array.h>
 #include <basecode/core/format.h>
+#include <basecode/core/memory.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/core/memory/system/dl.h>
 #include <basecode/core/memory/system/page.h>
@@ -69,13 +70,13 @@ namespace basecode::memory {
     namespace system {
         u0 fini() {
             for (auto alloc : t_system.allocators) {
-                memory::fini(alloc);
-                memory::free(&t_system.slab_alloc, alloc);
+                memory::internal::fini(alloc);
+                memory::internal::free(&t_system.slab_alloc, alloc);
             }
             array::free(t_system.allocators);
-            memory::fini(&t_system.slab_alloc);
+            memory::internal::fini(&t_system.slab_alloc);
             meta::fini();
-            memory::fini(&t_system.default_alloc);
+            memory::internal::fini(&t_system.default_alloc);
         }
 
         usize os_page_size() {
@@ -96,6 +97,16 @@ namespace basecode::memory {
             return &t_system.default_alloc;
         }
 
+        u32 free(alloc_t* alloc) {
+            if (!array::erase(t_system.allocators, alloc))
+                return {};
+            const auto all_freed = memory::internal::fini(alloc);
+            if (IS_PROXY(alloc))
+                memory::proxy::remove(alloc);
+            memory::internal::free(&t_system.slab_alloc, alloc);
+            return all_freed;
+        }
+
         usize os_alloc_granularity() {
             return t_system.os_alloc_granularity;
         }
@@ -112,17 +123,9 @@ namespace basecode::memory {
                 PROT_READ | PROT_WRITE | PROT_EXEC) == 0;
         }
 
-        u32 free(alloc_t* alloc, b8 enforce) {
-            if (!array::erase(t_system.allocators, alloc))
-                return {};
-            const auto all_freed = memory::fini(alloc, enforce);
-            if (IS_PROXY(alloc))
-                memory::proxy::remove(alloc);
-            return memory::free(&t_system.slab_alloc, alloc) + all_freed;
-        }
-
         alloc_t* make(alloc_type_t type, alloc_config_t* config) {
-            auto alloc = (alloc_t*) memory::alloc(&t_system.slab_alloc);
+            auto r = memory::internal::alloc(&t_system.slab_alloc, 0, 0);
+            auto alloc = (alloc_t*) r.mem;
             memory::init(alloc, type, config);
             array::append(t_system.allocators, alloc);
             return alloc;
@@ -166,8 +169,8 @@ namespace basecode::memory {
             array::init(t_system.allocators, &t_system.default_alloc);
 
             slab_config_t slab_config{};
-            slab_config.backing = &t_system.default_alloc;
-            slab_config.buf_size = sizeof(alloc_t);
+            slab_config.backing   = &t_system.default_alloc;
+            slab_config.buf_size  = sizeof(alloc_t);
             slab_config.buf_align = alignof(alloc_t);
             memory::init(&t_system.slab_alloc, alloc_type_t::slab, &slab_config);
 
@@ -175,46 +178,71 @@ namespace basecode::memory {
         }
     }
 
-    u0* alloc(alloc_t* alloc) {
-        if (!alloc->system || !alloc->system->alloc)
-            return {};
-        const auto r = alloc->system->alloc(alloc, 0, 0);
-        alloc->total_allocated += r.size;
-        return r.mem;
+    namespace internal {
+        u32 fini(alloc_t* alloc) {
+            assert(alloc);
+            auto sys = alloc->system;
+            if (!sys || !sys->fini)
+                return 0;
+            const auto size_freed = sys->fini(alloc);
+            if (size_freed > alloc->total_allocated) {
+                format::print(stderr, "fini of {} allocator freed {} bytes vs {} in total_allocated!\n",
+                              type_name(alloc->system->type),
+                              size_freed,
+                              alloc->total_allocated);
+            } else {
+                alloc->total_allocated -= size_freed;
+                assert(alloc->total_allocated == 0);
+            }
+            meta::untrack(alloc);
+            alloc->backing = {};
+            return size_freed;
+        }
+
+        u32 size(alloc_t* alloc, u0* mem) {
+            assert(alloc && mem);
+            auto sys = alloc->system;
+            if (!sys || !sys->size)
+                return 0;
+            return sys->size(alloc, mem);
+        }
+
+        u32 free(alloc_t* alloc, u0* mem) {
+            if (!alloc)
+                return 0;
+            auto sys = alloc->system;
+            if (!mem || !sys || !sys->free)
+                return 0;
+            const auto size_freed = sys->free(alloc, mem);
+            alloc->total_allocated -= size_freed;
+            return size_freed;
+        }
+
+        mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
+            assert(alloc);
+            auto sys = alloc->system;
+            if (!sys || !sys->alloc)
+                return {};
+            const auto r = sys->alloc(alloc, size, align);
+            alloc->total_allocated += r.size;
+            return r;
+        }
+
+        mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
+            assert(alloc);
+            auto sys = alloc->system;
+            if (!sys || !sys->realloc)
+                return {};
+            const auto r = sys->realloc(alloc, mem, size, align);
+            alloc->total_allocated += r.size;
+            return r;
+        }
     }
 
     alloc_t* unwrap(alloc_t* alloc) {
-        while (alloc->system->type == alloc_type_t::proxy)
+        while (alloc && IS_PROXY(alloc))
             alloc = alloc->backing;
         return alloc;
-    }
-
-    u32 size(alloc_t* alloc, u0* mem) {
-        if (!mem || !alloc || !alloc->system || !alloc->system->size)
-            return {};
-        return alloc->system->size(alloc, mem);
-    }
-
-    u32 free(alloc_t* alloc, u0* mem) {
-        if (!mem || !alloc->system || !alloc->system->free)
-            return {};
-        const auto size_freed = alloc->system->free(alloc, mem);
-        if (alloc->total_allocated >= size_freed)
-            alloc->total_allocated -= size_freed;
-        return size_freed;
-    }
-
-    u32 fini(alloc_t* alloc, b8 enforce) {
-        if (!alloc->system || !alloc->system->fini)
-            return {};
-        const auto size_freed = alloc->system->fini(alloc);
-        if (alloc->total_allocated >= size_freed)
-            alloc->total_allocated -= size_freed;
-        if (enforce)
-            assert(alloc->total_allocated == 0);
-        meta::untrack(alloc);
-        alloc->backing = {};
-        return size_freed;
     }
 
     str::slice_t type_name(alloc_type_t type) {
@@ -223,22 +251,6 @@ namespace basecode::memory {
 
     str::slice_t status_name(status_t status) {
         return s_status_names[(u32) status];
-    }
-
-    u0* alloc(alloc_t* alloc, u32 size, u32 align) {
-        if (!size || !alloc->system || !alloc->system->alloc)
-            return {};
-        const auto r = alloc->system->alloc(alloc, size, align);
-        alloc->total_allocated += r.size;
-        return r.mem;
-    }
-
-    u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
-        if (!alloc->system || !alloc->system->realloc)
-            return {};
-        const auto r = alloc->system->realloc(alloc, mem, size, align);
-        alloc->total_allocated += r.size;
-        return r.mem;
     }
 
     status_t init(alloc_t* alloc, alloc_type_t type, alloc_config_t* config) {

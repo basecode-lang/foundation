@@ -23,22 +23,18 @@
 namespace basecode::memory::proxy {
     static u32 fini(alloc_t* alloc) {
         auto sc = &alloc->subclass.proxy;
-        return sc->owner ? system::free(alloc->backing) : 0;
+        if (sc->owner) {
+            system::free(alloc->backing);
+        }
+        return alloc->total_allocated;
     }
 
     static u32 free(alloc_t* alloc, u0* mem) {
-        auto sys = alloc->backing->system;
-        auto freed_size = sys->free(alloc->backing, mem);
-        if (freed_size < alloc->total_allocated)
-            alloc->total_allocated -= freed_size;
-        else
-            alloc->total_allocated = 0;
-        return freed_size;
+        return memory::internal::free(alloc->backing, mem);
     }
 
     static u32 size(alloc_t* alloc, u0* mem) {
-        auto sys = alloc->backing->system;
-        return sys->size ? sys->size(alloc->backing, mem) : 0;
+        return memory::internal::size(alloc->backing, mem);
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
@@ -50,17 +46,11 @@ namespace basecode::memory::proxy {
     }
 
     static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
-        auto sys = alloc->backing->system;
-        auto r = sys->alloc(alloc->backing, size, align);
-        alloc->total_allocated += r.size;
-        return r;
+        return memory::internal::alloc(alloc->backing, size, align);
     }
 
     static mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
-        auto sys = alloc->backing->system;
-        auto r = sys->realloc(alloc->backing, mem, size, align);
-        alloc->total_allocated += r.size;
-        return r;
+        return memory::internal::realloc(alloc->backing, mem, size, align);
     }
 
     struct system_t final {
@@ -92,13 +82,18 @@ namespace basecode::memory::proxy {
         t_proxy_system.count = {};
     }
 
-    u0 reset(b8 enforce) {
+    u0 reset() {
         for (auto pair : t_proxy_system.pairs)
-            system::free(pair->alloc, enforce);
+            system::free(pair->alloc);
         symtab::reset(t_proxy_system.proxies);
         str_array::reset(t_proxy_system.names);
         stable_array::reset(t_proxy_system.pairs);
         t_proxy_system.count = {};
+    }
+
+    u0 free(alloc_t* proxy) {
+        if (remove(proxy))
+            system::free(proxy);
     }
 
     alloc_system_t* system() {
@@ -144,11 +139,6 @@ namespace basecode::memory::proxy {
         return t_proxy_system.names[alloc->subclass.proxy.pair->name_id - 1];
     }
 
-    u0 free(alloc_t* proxy, b8 enforce) {
-        if (remove(proxy))
-            system::free(proxy, enforce);
-    }
-
     alloc_t* make(alloc_t* backing, str::slice_t name, b8 owner) {
         ++t_proxy_system.count;
 
@@ -158,21 +148,25 @@ namespace basecode::memory::proxy {
         defer(str::free(temp_name));
         {
             str_buf_t buf(&temp_name);
-            format::format_to(buf, "[proxy:{:04x}] {}", t_proxy_system.count, name);
+            format::format_to(buf,
+                              "[proxy:{:04x}] {}",
+                              t_proxy_system.count,
+                              name);
         }
 
         str_array::append(t_proxy_system.names, temp_name);
         auto unique_name = t_proxy_system.names[t_proxy_system.names.size - 1];
 
         proxy_config_t config{};
-        config.owner               = owner;
-        config.backing             = backing;
-        auto proxy                 = system::make(alloc_type_t::proxy, &config);
-        auto new_pair              = &stable_array::append(t_proxy_system.pairs);
-        new_pair->alloc            = proxy;
-        new_pair->name_id          = t_proxy_system.names.size;
-        new_pair->pair_id          = t_proxy_system.pairs.size;
-        proxy->subclass.proxy.pair = new_pair;
+        config.owner   = owner;
+        config.backing = backing;
+        auto proxy    = system::make(alloc_type_t::proxy, &config);
+        auto psc      = &proxy->subclass.proxy;
+        auto new_pair = &stable_array::append(t_proxy_system.pairs);
+        new_pair->alloc   = proxy;
+        new_pair->name_id = t_proxy_system.names.size;
+        new_pair->pair_id = t_proxy_system.pairs.size;
+        psc->pair         = new_pair;
         if (!symtab::insert(t_proxy_system.proxies, unique_name, new_pair))
             return nullptr;
         return proxy;

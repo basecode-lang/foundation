@@ -23,6 +23,11 @@
 #define DICTV(d, k)             ((d).values[(k)])
 #define RECORD_BYTE_SIZE(n)     ((n) * sizeof(field_t))
 #define RECORD_FIELD_COUNT(n)   (((n) / sizeof(field_t)) - 1)
+#ifdef _WIN32
+#   define  DEFAULT_NUM_PAGES 1
+#else
+#   define  DEFAULT_NUM_PAGES 16
+#endif
 
 namespace basecode {
     namespace kind {
@@ -80,7 +85,10 @@ namespace basecode {
         field
     };
 
-    using format_record_callback_t = b8 (*)(format_type_t type, cursor_t&, fmt_buf_t& buf, u0*);
+    using format_record_callback_t = b8 (*)(format_type_t,
+                                            cursor_t&,
+                                            fmt_buf_t&,
+                                            u0*);
 
     namespace bass {
         namespace dict {
@@ -92,6 +100,16 @@ namespace basecode {
         }
 
         u0 free(bass_t& storage);
+
+        u0 init(bass_t& storage,
+                alloc_t* alloc = context::top()->alloc,
+                u8 num_pages = DEFAULT_NUM_PAGES);
+
+        b8 format_record(bass_t& ast,
+                         fmt_buf_t& buf,
+                         u32 id,
+                         format_record_callback_t record_cb,
+                         u0* ctx = {});
 
         b8 next_record(cursor_t& cursor);
 
@@ -110,10 +128,6 @@ namespace basecode {
         b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor);
 
         b8 new_record(cursor_t& cursor, u8 type, u32 num_fields, u32 id = {});
-
-        u0 init(bass_t& storage, alloc_t* alloc = context::top()->alloc, u8 num_pages = 16);
-
-        b8 format_record(bass_t& ast, fmt_buf_t& buf, u32 id, format_record_callback_t record_cb, u0* ctx = {});
     }
 }
 

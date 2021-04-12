@@ -44,19 +44,19 @@ namespace basecode {
 
         u0 fini();
 
+        u0 reset();
+
+        u0 free(alloc_t* proxy);
+
         alloc_system_t* system();
 
         b8 remove(alloc_t* proxy);
-
-        u0 reset(b8 enforce = true);
 
         u0 active(proxy_array_t& list);
 
         alloc_t* find(str::slice_t name);
 
         str::slice_t name(alloc_t* alloc);
-
-        u0 free(alloc_t* proxy, b8 enforce = true);
 
         status_t init(alloc_t* alloc = context::top()->alloc);
 
@@ -66,7 +66,7 @@ namespace basecode {
 
 FORMAT_TYPE(basecode::proxy_pair_t,
             format_to(ctx.out(),
-                      "[alloc: {}, name_id: {}, paid_id: {}]",
+                      "[alloc: {}, name_id: {}, pair_id: {}]",
                       (basecode::u0*) data.alloc,
                       data.name_id,
                       data.pair_id));
