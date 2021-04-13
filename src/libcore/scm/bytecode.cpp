@@ -728,7 +728,10 @@ namespace basecode::scm {
                     switch (type) {
                         case comment_type_t::note:
                         case comment_type_t::line: {
-                            format::format_to(buf, "${:08X}: ; {}\n", addr, str);
+                            format::format_to(buf,
+                                              "${:08X}: ; {}\n",
+                                              addr,
+                                              str);
                             ++j;
                             break;
                         }
@@ -761,23 +764,35 @@ namespace basecode::scm {
                 array::init(nodes, block->emit->alloc);
                 defer(array::free(nodes));
 
-                digraph::incoming_nodes(block->emit->bb_graph, block->node, nodes);
+                digraph::incoming_nodes(block->emit->bb_graph,
+                                        block->node,
+                                        nodes);
                 if (nodes.size > 0) {
-                    format::format_to(buf, "${:08X}:    .preds      ", addr);
+                    format::format_to(buf,
+                                      "${:08X}:    .preds      ",
+                                      addr);
                     for (u32 i = 0; i < nodes.size; ++i) {
                         if (i > 0) format::format_to(buf, ", ");
-                        format::format_to(buf, "{}", *(nodes[i]->value));
+                        format::format_to(buf,
+                                          "{}",
+                                          *(nodes[i]->value));
                     }
                     format::format_to(buf, "\n");
                 }
 
                 array::reset(nodes);
-                digraph::outgoing_nodes(block->emit->bb_graph, block->node, nodes);
+                digraph::outgoing_nodes(block->emit->bb_graph,
+                                        block->node,
+                                        nodes);
                 if (nodes.size > 0) {
-                    format::format_to(buf, "${:08X}:    .succs      ", addr);
+                    format::format_to(buf,
+                                      "${:08X}:    .succs      ",
+                                      addr);
                     for (u32 i = 0; i < nodes.size; ++i) {
                         if (i > 0) format::format_to(buf, ", ");
-                        format::format_to(buf, "{}", *(nodes[i]->value));
+                        format::format_to(buf,
+                                          "{}",
+                                          *(nodes[i]->value));
                     }
                     format::format_to(buf, "\n");
                 }
@@ -798,7 +813,10 @@ namespace basecode::scm {
                                     curr->notes.eidx,
                                     -1,
                                     addr);
-                    format::format_to(buf, "${:08X}: {}:\n", addr, *curr);
+                    format::format_to(buf,
+                                      "${:08X}: {}:\n",
+                                      addr,
+                                      *curr);
                     format_edges(buf, curr, addr);
                     for (s32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
                         const auto& inst = e.insts[i];
@@ -1313,6 +1331,31 @@ namespace basecode::scm {
                 return exit_block;
             }
 
+            compile_result_t qt(compiler_t& comp,
+                                const context_t& c,
+                                obj_t* args) {
+                auto ctx = c.ctx;
+                auto tmp = emitter::virtual_var::get(comp.emit,
+                                                     "_"_ss);
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                basic_block::encode(c.bb)
+                    .comment(format::format(
+                        "literal: {}",
+                        scm::to_string(c.ctx, c.obj)))
+                    .imm2()
+                    .op(op::const_)
+                    .src(u32(OBJ_IDX(CAR(args))))
+                    .dst(&tmp)
+                    .build()
+                    .reg2()
+                    .op(op::qt)
+                    .src(&tmp)
+                    .dst(&res)
+                    .build();
+                return {c.bb, res};
+            }
+
             compile_result_t fn(compiler_t& comp,
                                 const context_t& c,
                                 obj_t* sym,
@@ -1321,13 +1364,18 @@ namespace basecode::scm {
                 auto& vm = *comp.vm;
                 auto ctx        = c.ctx;
                 b8   is_mac     = PRIM(form) == prim_type_t::mac;
-                auto proc       = make_proc(c.ctx, sym, CAR(args), CDR(args), is_mac);
+                auto proc       = make_proc(c.ctx,
+                                            sym,
+                                            CAR(args),
+                                            CDR(args),
+                                            is_mac);
                 auto idx        = OBJ_IDX(proc);
                 auto target_reg = rf::m;       //FIXME
                 G(target_reg) = idx;
                 if (!c.top_level) {
                     basic_block::encode(c.bb)
-                        .comment(format::format("literal: {}", scm::to_string(c.ctx, c.obj)))
+                        .comment(format::format("literal: {}",
+                                                scm::to_string(c.ctx, c.obj)))
                         .imm2()
                             .op(op::const_)
                             .src(u32(idx))
@@ -1337,9 +1385,219 @@ namespace basecode::scm {
                 return {c.bb, 0};
             }
 
+            compile_result_t qq(compiler_t& comp,
+                                const context_t& c,
+                                obj_t* args) {
+                auto ctx = c.ctx;
+                auto tmp = emitter::virtual_var::get(comp.emit,
+                                                     "_"_ss);
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                basic_block::encode(c.bb)
+                    .comment(format::format(
+                        "literal: {}",
+                        scm::to_string(c.ctx, c.obj)))
+                    .imm2()
+                    .op(op::const_)
+                    .src(u32(OBJ_IDX(CAR(args))))
+                    .dst(&tmp)
+                    .build()
+                    .reg2()
+                    .op(op::qq)
+                    .src(&tmp)
+                    .dst(&res)
+                    .build();
+                return {c.bb, res};
+            }
+
+            compile_result_t uq(compiler_t& comp,
+                                const context_t& c,
+                                obj_t* args) {
+                UNUSED(args);
+                scm::error(c.ctx, "unquote is not valid in this context.");
+                return {c.bb, 0};
+            }
+
+            compile_result_t car(compiler_t& comp,
+                                 const context_t& c,
+                                 obj_t* args) {
+                auto ctx = c.ctx;
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                auto cc  = c;
+                cc.obj = CAR(args);
+                auto comp_res = compiler::compile_expr(comp, cc);
+                basic_block::encode(comp_res.bb)
+                    .reg2()
+                    .op(op::car)
+                    .src(&comp_res.var)
+                    .dst(&res)
+                    .build();
+                return {comp_res.bb, res};
+            }
+
+            compile_result_t cdr(compiler_t& comp,
+                                 const context_t& c,
+                                 obj_t* args) {
+                auto ctx = c.ctx;
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                auto cc  = c;
+                cc.obj = CAR(args);
+                auto comp_res = compiler::compile_expr(comp, cc);
+                basic_block::encode(comp_res.bb)
+                    .reg2()
+                    .op(op::cdr)
+                    .src(&comp_res.var)
+                    .dst(&res)
+                    .build();
+                return {comp_res.bb, res};
+            }
+
+            compile_result_t or_(compiler_t& comp,
+                                 const context_t& c,
+                                 obj_t* args) {
+                auto ctx = c.ctx;
+                auto& exit_bb = emitter::make_basic_block(comp.emit,
+                                                          "or_exit"_ss,
+                                                          c.bb);
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                auto tmp = emitter::virtual_var::get(comp.emit,
+                                                     "_"_ss);
+                auto oc  = c;
+                while (!IS_NIL(args)) {
+                    oc.obj        = CAR(args);
+                    auto comp_res = compiler::compile_expr(comp, oc);
+                    oc.bb = comp_res.bb;
+                    basic_block::encode(oc.bb)
+                        .reg2()
+                        .op(op::truep)
+                        .src(&comp_res.var)
+                        .dst(&tmp)
+                        .build()
+                        .imm1()
+                        .op(op::beq)
+                        .value(&exit_bb)
+                        .build();
+                    args = CDR(args);
+                }
+                basic_block::encode(oc.bb)
+                    .imm1()
+                    .op(op::br)
+                    .value(&exit_bb)
+                    .build();
+                return {&exit_bb, res};
+            }
+
+            compile_result_t uqs(compiler_t& comp,
+                                 const context_t& c,
+                                 obj_t* args) {
+                UNUSED(args);
+                scm::error(c.ctx, "unquote-splicing is not valid in this context.");
+                return {c.bb, 0};
+            }
+
+            compile_result_t set(compiler_t& comp,
+                                 const context_t& c,
+                                 obj_t* args) {
+                auto ctx = c.ctx;
+                auto key  = CAR(args);
+                u32  idx  = OBJ_IDX(key);
+                auto name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
+                auto res  = emitter::virtual_var::get(comp.emit, name);
+                auto vc   = c;
+                vc.obj = CADR(args);
+                auto comp_res = compiler::compile_expr(comp, vc);
+                basic_block::encode(comp_res.bb)
+                    .comment(format::format(
+                        "symbol: {}",
+                        printable_t{c.ctx, key, true}))
+                    .imm2()
+                    .op(op::set)
+                    .src(u32(idx))
+                    .dst(&comp_res.var)
+                    .mode(true)
+                    .build()
+                    .reg2()
+                    .op(op::move)
+                    .src(&comp_res.var)
+                    .dst(&res)
+                    .build();
+                return {comp_res.bb, res};
+            }
+
+            compile_result_t if_(compiler_t& comp,
+                                 const context_t& c,
+                                 obj_t* args) {
+                auto ctx = c.ctx;
+
+                auto& true_bb  = emitter::make_basic_block(*c.bb->emit,
+                                                           "if_true"_ss,
+                                                           c.bb);
+                auto& false_bb = emitter::make_basic_block(*c.bb->emit,
+                                                           "if_false"_ss,
+                                                           &true_bb);
+                auto& exit_bb  = emitter::make_basic_block(*c.bb->emit,
+                                                           "if_exit"_ss,
+                                                           &false_bb);
+
+                auto tmp = emitter::virtual_var::get(comp.emit,
+                                                     "_"_ss);
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+
+                auto ic = c;
+                ic.obj = CAR(args);
+                auto pred_res = compiler::compile_expr(comp, ic);
+                basic_block::encode(c.bb)
+                    .next(true_bb)
+                    .reg2()
+                    .op(op::truep)
+                    .src(&pred_res.var)
+                    .dst(&tmp)
+                    .build()
+                    .imm1()
+                    .op(op::bne)
+                    .value(&false_bb)
+                    .build();
+
+                ic.bb  = &true_bb;
+                ic.obj = CADR(args);
+                auto true_res = compiler::compile_expr(comp, ic);
+                basic_block::encode(true_res.bb)
+                    .next(false_bb)
+                    .reg2()
+                    .op(op::move)
+                    .src(&true_res.var)
+                    .dst(&res)
+                    .build()
+                    .imm1()
+                    .op(op::br)
+                    .value(&exit_bb)
+                    .build();
+
+                ic.bb  = &false_bb;
+                ic.obj = CADDR(args);
+                auto false_res = compiler::compile_expr(comp, ic);
+                basic_block::encode(false_res.bb)
+                    .next(exit_bb)
+                    .reg2()
+                    .op(op::move)
+                    .src(&false_res.var)
+                    .dst(&res)
+                    .build();
+
+                return {&exit_bb, res};
+            }
+
             bb_t& enter(bb_t& bb, u32 locals) {
-                auto& entry_block = emitter::make_basic_block(*bb.emit, "proc_prologue"_ss, &bb);
-                auto& exit_block  = emitter::make_basic_block(*bb.emit, "proc_begin"_ss, &entry_block);
+                auto& entry_block = emitter::make_basic_block(*bb.emit,
+                                                              "proc_prologue"_ss,
+                                                              &bb);
+                auto& exit_block  = emitter::make_basic_block(*bb.emit,
+                                                              "proc_begin"_ss,
+                                                              &entry_block);
                 basic_block::encode(bb)
                     .imm1()
                         .op(op::br)
@@ -1392,12 +1650,209 @@ namespace basecode::scm {
                         .build();
             }
 
+            compile_result_t cons(compiler_t& comp,
+                                  const context_t& c,
+                                  obj_t* args) {
+                auto ctx = c.ctx;
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                auto cc  = c;
+                cc.obj = CAR(args);
+                auto lhs_res = compiler::compile_expr(comp, cc);
+                cc.bb  = lhs_res.bb;
+                cc.obj = CADR(args);
+                auto rhs_res = compiler::compile_expr(comp, cc);
+                basic_block::encode(rhs_res.bb)
+                    .reg3()
+                    .op(op::cons)
+                    .a(&lhs_res.var)
+                    .b(&rhs_res.var)
+                    .c(&res)
+                    .build();
+                return {rhs_res.bb, res};
+            }
+
+            compile_result_t atom(compiler_t& comp,
+                                  const context_t& c,
+                                  obj_t* args) {
+                auto ctx = c.ctx;
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                auto ac  = c;
+                ac.obj = CAR(args);
+                auto comp_res = compiler::compile_expr(comp, ac);
+                basic_block::encode(comp_res.bb)
+                    .reg2()
+                    .op(op::atomp)
+                    .src(&comp_res.var)
+                    .dst(&res)
+                    .build();
+                return {comp_res.bb, res};
+            }
+
+            compile_result_t eval(compiler_t& comp,
+                                  const context_t& c,
+                                  obj_t* args) {
+                auto ctx = c.ctx;
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                auto ec  = c;
+                ec.obj = CAR(args);
+                auto comp_res = compiler::compile_expr(comp, ec);
+                basic_block::encode(comp_res.bb)
+                    .reg2()
+                    .op(op::eval)
+                    .src(&comp_res.var)
+                    .dst(&res)
+                    .build();
+                return {comp_res.bb, res};
+            }
+
+            compile_result_t list(compiler_t& comp,
+                                  const context_t& c,
+                                  obj_t* args) {
+                auto ctx       = c.ctx;
+                u32  size      = length(ctx, args);
+                auto base_addr = emitter::virtual_var::get(comp.emit,
+                                                           "base"_ss);
+                alloc_stack(*c.bb, size, &base_addr);
+                s32  offs = 0;
+                auto lc   = c;
+                while (!IS_NIL(args)) {
+                    lc.obj   = CAR(args);
+                    auto res = compiler::compile_expr(comp, lc);
+                    lc.bb = res.bb;
+                    basic_block::encode(res.bb)
+                        .offs()
+                        .op(op::store)
+                        .offset(offs)
+                        .src(&res.var)
+                        .dst(&base_addr)
+                        .mode(true)
+                        .build();
+                    args = CDR(args);
+                    offs += 8;
+                }
+                auto res  = emitter::virtual_var::get(comp.emit,
+                                                      "res"_ss);
+                auto& list_bb = emitter::make_basic_block(*c.bb->emit,
+                                                          "make_list"_ss,
+                                                          lc.bb);
+                basic_block::encode(list_bb)
+                    .reg2_imm()
+                    .op(op::list)
+                    .src(&base_addr)
+                    .dst(&res)
+                    .value(size * 8)
+                    .build();
+                free_stack(list_bb, size);
+                return {&list_bb, res};
+            }
+
+            compile_result_t not_(compiler_t& comp,
+                                  const context_t& c,
+                                  obj_t* args) {
+                auto ctx = c.ctx;
+                auto nc  = c;
+                nc.obj = CAR(args);
+                auto res      = emitter::virtual_var::get(comp.emit,
+                                                          "res"_ss);
+                auto comp_res = compiler::compile_expr(comp, nc);
+                basic_block::encode(comp_res.bb)
+                    .reg2()
+                    .op(op::lnot)
+                    .src(&comp_res.var)
+                    .dst(&res)
+                    .build();
+                return {comp_res.bb, res};
+            }
+
+            compile_result_t and_(compiler_t& comp,
+                                  const context_t& c,
+                                  obj_t* args) {
+                auto ctx = c.ctx;
+                auto& exit_bb = emitter::make_basic_block(comp.emit,
+                                                          "and_exit"_ss,
+                                                          c.bb);
+                auto tmp = emitter::virtual_var::get(comp.emit,
+                                                     "_"_ss);
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                auto oc  = c;
+                while (!IS_NIL(args)) {
+                    oc.obj        = CAR(args);
+                    auto comp_res = compiler::compile_expr(comp, oc);
+                    oc.bb = comp_res.bb;
+                    basic_block::encode(oc.bb)
+                        .reg2()
+                        .op(op::move)
+                        .src(&comp_res.var)
+                        .dst(&res)
+                        .build()
+                        .reg2()
+                        .op(op::truep)
+                        .src(&res)
+                        .dst(&tmp)
+                        .build()
+                        .imm1()
+                        .op(op::bne)
+                        .value(&exit_bb)
+                        .build();
+                    args = CDR(args);
+                }
+                return {&exit_bb, res};
+            }
+
             u0 todo(bb_t& bb, str::slice_t msg) {
                 basic_block::encode(bb)
                     .comment(msg)
                     .none()
                         .op(op::nop)
                         .build();
+            }
+
+            compile_result_t begin(compiler_t& comp,
+                                   const context_t& c,
+                                   obj_t* args) {
+                auto ctx = c.ctx;
+                auto dc = c;
+                compile_result_t comp_res;
+                while (!IS_NIL(args)) {
+                    dc.obj   = CAR(args);
+                    comp_res = compiler::compile_expr(comp, dc);
+                    dc.bb = comp_res.bb;
+                    args = CDR(args);
+                }
+                return {dc.bb, comp_res.var};
+            }
+
+            compile_result_t error(compiler_t& comp,
+                                   const context_t& c,
+                                   obj_t* args) {
+                auto ctx = c.ctx;
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                auto tmp = emitter::virtual_var::get(comp.emit,
+                                                     "_"_ss);
+                basic_block::encode(c.bb)
+                    .comment(format::format(
+                        "literal: {}",
+                        scm::to_string(c.ctx, c.obj)))
+                    .imm2()
+                    .op(op::const_)
+                    .src(u32(OBJ_IDX(args)))
+                    .dst(&tmp)
+                    .build()
+                    .reg2()
+                    .op(op::error)
+                    .src(&tmp)
+                    .dst(&res)
+                    .build();
+                basic_block::encode(c.bb)
+                    .comment(format::format("literal: {}",
+                                            to_string(c.ctx, args)),
+                             c.bb->insts.size());
+                return {c.bb, res};
             }
 
             compile_result_t apply(compiler_t& comp,
@@ -1407,9 +1862,13 @@ namespace basecode::scm {
                                    obj_t* args) {
                 auto ctx  = c.ctx;
                 auto proc = PROC(form);
-                auto tmp       = emitter::virtual_var::get(comp.emit, "_"_ss);
-                auto base_addr = emitter::virtual_var::get(comp.emit, "base"_ss);
-                auto& apply_bb = emitter::make_basic_block(comp.emit, "apply"_ss, c.bb);
+                auto tmp       = emitter::virtual_var::get(comp.emit,
+                                                           "_"_ss);
+                auto base_addr = emitter::virtual_var::get(comp.emit,
+                                                           "base"_ss);
+                auto& apply_bb = emitter::make_basic_block(comp.emit,
+                                                           "apply"_ss,
+                                                           c.bb);
                 basic_block::encode(apply_bb)
                     .reg2()
                         .op(op::env)
@@ -1431,10 +1890,11 @@ namespace basecode::scm {
                     auto name = *string::interned::get_slice(STRING_ID(key));
                     if (TYPE(keys) != obj_type_t::pair) {
                         vc.obj = vals;
-                        auto comp_res = compiler::compile(comp, vc);
+                        auto comp_res = compiler::compile_expr(comp, vc);
                         vc.bb = comp_res.bb;
                         basic_block::encode(vc.bb)
-                            .comment(format::format("symbol: {}", name))
+                            .comment(format::format("symbol: {}",
+                                                    name))
                             .imm2()
                                 .src(u32(OBJ_IDX(keys)))
                                 .op(op::set)
@@ -1444,10 +1904,11 @@ namespace basecode::scm {
                         break;
                     } else {
                         vc.obj = CAR(vals);
-                        auto comp_res = compiler::compile(comp, vc);
+                        auto comp_res = compiler::compile_expr(comp, vc);
                         vc.bb = comp_res.bb;
                         basic_block::encode(vc.bb)
-                            .comment(format::format("symbol: {}", name))
+                            .comment(format::format("symbol: {}",
+                                                    name))
                             .imm2()
                                 .src(u32(OBJ_IDX(key)))
                                 .op(op::set)
@@ -1468,7 +1929,8 @@ namespace basecode::scm {
                         .value(proc->addr.bb)
                         .build();
 
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
                 auto& cleanup_bb = emitter::make_basic_block(comp.emit,
                                                              "apply_cleanup"_ss,
                                                              vc.bb);
@@ -1491,6 +1953,150 @@ namespace basecode::scm {
                 return {&cleanup_bb, res};
             }
 
+            compile_result_t while_(compiler_t& comp,
+                                    const context_t& c,
+                                    obj_t* args) {
+                UNUSED(comp);
+                UNUSED(args);
+                return {c.bb, nullptr};
+            }
+
+            compile_result_t define(compiler_t& comp,
+                                    const context_t& c,
+                                    obj_t* args) {
+                auto ctx = c.ctx;
+                auto& vm = *comp.vm;
+                auto key  = CAR(args);
+                u32  idx  = OBJ_IDX(key);
+                auto name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
+                auto res  = emitter::virtual_var::declare(comp.emit, name);
+                auto vc = c;
+                vc.obj = CADR(args);
+                auto comp_res = compiler::compile_expr(comp, vc);
+                if (c.top_level) {
+                    auto value = OBJ_AT(G(rf::m));  // FIXME: this is a temporary hack
+                    scm::define(ctx, key, value);
+                    if (TYPE(value) == obj_type_t::func
+                        ||  TYPE(value) == obj_type_t::macro) {
+                        auto proc = PROC(value);
+                        if (!proc->is_compiled) {
+                            auto pc = c;
+                            pc.top_level = false;
+                            proc->sym    = key;
+                            return comp_proc(comp, pc, proc);
+                        }
+                    }
+                }
+                basic_block::encode(comp_res.bb)
+                    .comment(format::format(
+                        "symbol: {}",
+                        printable_t{c.ctx, key, true}))
+                    .imm2()
+                    .op(op::define)
+                    .src(u32(idx))
+                    .dst(&comp_res.var)
+                    .mode(true)
+                    .build()
+                    .reg2()
+                    .op(op::move)
+                    .src(&comp_res.var)
+                    .dst(&res)
+                    .build();
+                return {comp_res.bb, res};
+            }
+
+            compile_result_t cmp_op(compiler_t& comp,
+                                    const context_t& c,
+                                    prim_type_t type,
+                                    obj_t* args) {
+                auto ctx  = c.ctx;
+                auto oc = c;
+                oc.obj = CAR(args);
+                auto lhs_res = compiler::compile_expr(comp, oc);
+                oc.bb  = lhs_res.bb;
+                oc.obj = CADR(args);
+                auto rhs_res = compiler::compile_expr(comp, oc);
+                auto res     = emitter::virtual_var::get(comp.emit,
+                                                         "res"_ss);
+
+                switch (type) {
+                    case prim_type_t::is:
+                        basic_block::encode(rhs_res.bb)
+                            .comment("prim: is"_ss)
+                            .reg2()
+                            .op(op::lcmp)
+                            .src(&lhs_res.var)
+                            .dst(&rhs_res.var)
+                            .build()
+                            .reg1()
+                            .op(op::seq)
+                            .dst(&res)
+                            .build();
+                        break;
+
+                    case prim_type_t::lt:
+                        basic_block::encode(rhs_res.bb)
+                            .comment("prim: lt"_ss)
+                            .reg2()
+                            .op(op::lcmp)
+                            .src(&lhs_res.var)
+                            .dst(&rhs_res.var)
+                            .build()
+                            .reg1()
+                            .op(op::sl)
+                            .dst(&res)
+                            .build();
+                        break;
+
+                    case prim_type_t::gt:
+                        basic_block::encode(rhs_res.bb)
+                            .comment("prim: gt"_ss)
+                            .reg2()
+                            .op(op::lcmp)
+                            .src(&lhs_res.var)
+                            .dst(&rhs_res.var)
+                            .build()
+                            .reg1()
+                            .op(op::sg)
+                            .dst(&res)
+                            .build();
+                        break;
+
+                    case prim_type_t::lte:
+                        basic_block::encode(rhs_res.bb)
+                            .comment("prim: lte"_ss)
+                            .reg2()
+                            .op(op::lcmp)
+                            .src(&lhs_res.var)
+                            .dst(&rhs_res.var)
+                            .build()
+                            .reg1()
+                            .op(op::sle)
+                            .dst(&res)
+                            .build();
+                        break;
+
+                    case prim_type_t::gte:
+                        basic_block::encode(rhs_res.bb)
+                            .comment("prim: gte"_ss)
+                            .reg2()
+                            .op(op::lcmp)
+                            .src(&lhs_res.var)
+                            .dst(&rhs_res.var)
+                            .build()
+                            .reg1()
+                            .op(op::sge)
+                            .dst(&res)
+                            .build();
+                        break;
+
+                    default:
+                        error(ctx, "unknown compare prim");
+                }
+
+                return {c.bb, res};
+            }
+
             compile_result_t inline_(compiler_t& comp,
                                      const context_t& c,
                                      obj_t* sym,
@@ -1503,54 +2109,81 @@ namespace basecode::scm {
                 return {c.bb, 0};
             }
 
-            compile_result_t comp_proc(compiler_t& comp,
-                                       const context_t& c,
-                                       proc_t* proc) {
+            compile_result_t set_car(compiler_t& comp,
+                                     const context_t& c,
+                                     obj_t* args) {
                 auto ctx = c.ctx;
-                auto& e = *c.bb->emit;
+                auto sc  = c;
+                sc.obj = CADR(args);
+                auto rhs_res = compiler::compile_expr(comp, sc);
+                sc.bb  = rhs_res.bb;
+                sc.obj = CAR(args);
+                auto lhs_res = compiler::compile_expr(comp, sc);
+                basic_block::encode(lhs_res.bb)
+                    .reg2()
+                    .op(op::setcar)
+                    .src(&lhs_res.var)
+                    .dst(&rhs_res.var)
+                    .build();
+                return {lhs_res.bb, {}};
+            }
 
-                auto params = proc->params;
-                while (!IS_NIL(params)) {
-                    auto name = *string::interned::get_slice(STRING_ID(CAR(params)));
-                    emitter::virtual_var::declare(e, name);
-                    params = CDR(params);
-                }
+            compile_result_t set_cdr(compiler_t& comp,
+                                     const context_t& c,
+                                     obj_t* args) {
+                auto ctx = c.ctx;
+                auto sc  = c;
+                sc.obj = CADR(args);
+                auto rhs_res = compiler::compile_expr(comp, sc);
+                sc.bb  = rhs_res.bb;
+                sc.obj = CAR(args);
+                auto lhs_res = compiler::compile_expr(comp, sc);
+                basic_block::encode(lhs_res.bb)
+                    .reg2()
+                    .op(op::setcdr)
+                    .src(&lhs_res.var)
+                    .dst(&rhs_res.var)
+                    .build();
+                return {lhs_res.bb, {}};
+            }
 
-                auto name = *string::interned::get_slice(STRING_ID(proc->sym));
-                auto& proc_bb = emitter::make_basic_block(*c.bb->emit, name, c.bb);
-                proc->addr.bb = &proc_bb;
-
-                basic_block::encode(proc_bb)
-                    .note("-------------------------------------------------------------------"_ss)
-                    .note(format::format("procedure: {}", name))
-                    .note(format::format("(fn {} {})",
-                                         printable_t{c.ctx, proc->params, true},
-                                         printable_t{c.ctx, CAR(proc->body), true}))
-                    .note("-------------------------------------------------------------------"_ss);
-
-                auto body = proc->body;
-                auto bc   = c;
-                bc.bb = &enter(proc_bb, 0);
-                while (!IS_NIL(body)) {
-                    bc.obj = CAR(body);
-                    auto comp_res = compiler::compile(comp, bc);
-                    bc.bb = comp_res.bb;
-                    body = CDR(body);
-                }
-
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto base = emitter::virtual_var::get(comp.emit, "base"_ss);
-                basic_block::encode(bc.bb)
-                    .offs()
+            compile_result_t arith_op(compiler_t& comp,
+                                      const context_t& c,
+                                      op_code_t op_code,
+                                      obj_t* args) {
+                auto ctx       = c.ctx;
+                u32  size      = length(ctx, args);
+                auto res       = emitter::virtual_var::get(comp.emit,
+                                                           "res"_ss);
+                auto base_addr = emitter::virtual_var::get(comp.emit,
+                                                           "base"_ss);
+                alloc_stack(*c.bb, size, &base_addr);
+                s32  offs = 0;
+                auto ac   = c;
+                while (!IS_NIL(args)) {
+                    ac.obj = CAR(args);
+                    auto comp_res = compiler::compile_expr(comp, ac);
+                    ac.bb = comp_res.bb;
+                    basic_block::encode(ac.bb)
+                        .offs()
                         .op(op::store)
-                        .src(&res)
-                        .dst(&base)
-                        .offset(0)
+                        .offset(offs)
+                        .src(&comp_res.var)
+                        .dst(&base_addr)
                         .mode(true)
                         .build();
-
-                proc->is_compiled = true;
-                return {&leave(*bc.bb), res};
+                    args = CDR(args);
+                    offs += 8;
+                }
+                basic_block::encode(*ac.bb)
+                    .reg2_imm()
+                    .op(op_code)
+                    .src(&base_addr)
+                    .dst(&res)
+                    .value(size * 8)
+                    .build();
+                free_stack(*ac.bb, size);
+                return {ac.bb, res};
             }
 
             compile_result_t prim(compiler_t& comp,
@@ -1597,134 +2230,6 @@ namespace basecode::scm {
                 }
             }
 
-            compile_result_t cmp_op(compiler_t& comp,
-                                    const context_t& c,
-                                    prim_type_t type,
-                                    obj_t* args) {
-                auto ctx  = c.ctx;
-                auto oc = c;
-                oc.obj = CAR(args);
-                auto lhs_res = compiler::compile(comp, oc);
-                oc.bb  = lhs_res.bb;
-                oc.obj = CADR(args);
-                auto rhs_res = compiler::compile(comp, oc);
-                auto res     = emitter::virtual_var::get(comp.emit, "res"_ss);
-
-                switch (type) {
-                    case prim_type_t::is:
-                        basic_block::encode(rhs_res.bb)
-                            .comment("prim: is"_ss)
-                            .reg2()
-                                .op(op::lcmp)
-                                .src(&lhs_res.var)
-                                .dst(&rhs_res.var)
-                                .build()
-                            .reg1()
-                                .op(op::seq)
-                                .dst(&res)
-                                .build();
-                        break;
-
-                    case prim_type_t::lt:
-                        basic_block::encode(rhs_res.bb)
-                            .comment("prim: lt"_ss)
-                            .reg2()
-                                .op(op::lcmp)
-                                .src(&lhs_res.var)
-                                .dst(&rhs_res.var)
-                                .build()
-                            .reg1()
-                                .op(op::sl)
-                                .dst(&res)
-                                .build();
-                        break;
-
-                    case prim_type_t::gt:
-                        basic_block::encode(rhs_res.bb)
-                            .comment("prim: gt"_ss)
-                            .reg2()
-                                .op(op::lcmp)
-                                .src(&lhs_res.var)
-                                .dst(&rhs_res.var)
-                                .build()
-                            .reg1()
-                                .op(op::sg)
-                                .dst(&res)
-                                .build();
-                        break;
-
-                    case prim_type_t::lte:
-                        basic_block::encode(rhs_res.bb)
-                            .comment("prim: lte"_ss)
-                            .reg2()
-                                .op(op::lcmp)
-                                .src(&lhs_res.var)
-                                .dst(&rhs_res.var)
-                                .build()
-                            .reg1()
-                                .op(op::sle)
-                                .dst(&res)
-                                .build();
-                        break;
-
-                    case prim_type_t::gte:
-                        basic_block::encode(rhs_res.bb)
-                            .comment("prim: gte"_ss)
-                            .reg2()
-                                .op(op::lcmp)
-                                .src(&lhs_res.var)
-                                .dst(&rhs_res.var)
-                                .build()
-                            .reg1()
-                                .op(op::sge)
-                                .dst(&res)
-                                .build();
-                        break;
-
-                    default:
-                        error(ctx, "unknown compare prim");
-                }
-
-                return {c.bb, res};
-            }
-
-            compile_result_t arith_op(compiler_t& comp,
-                                      const context_t& c,
-                                      op_code_t op_code,
-                                      obj_t* args) {
-                auto ctx       = c.ctx;
-                u32  size      = length(ctx, args);
-                auto res       = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto base_addr = emitter::virtual_var::get(comp.emit, "base"_ss);
-                alloc_stack(*c.bb, size, &base_addr);
-                s32  offs = 0;
-                auto ac   = c;
-                while (!IS_NIL(args)) {
-                    ac.obj = CAR(args);
-                    auto comp_res = compiler::compile(comp, ac);
-                    ac.bb = comp_res.bb;
-                    basic_block::encode(ac.bb)
-                        .offs()
-                            .op(op::store)
-                            .offset(offs)
-                            .src(&comp_res.var)
-                            .dst(&base_addr)
-                            .mode(true)
-                            .build();
-                    args = CDR(args);
-                    offs += 8;
-                }
-                basic_block::encode(*ac.bb)
-                    .reg2_imm()
-                        .op(op_code)
-                        .src(&base_addr)
-                        .dst(&res)
-                        .value(size * 8)
-                        .build();
-                free_stack(*ac.bb, size);
-                return {ac.bb, res};
-            }
-
             compile_result_t call_back(compiler_t& comp,
                                        const context_t& c,
                                        obj_t* sym,
@@ -1735,6 +2240,60 @@ namespace basecode::scm {
                 UNUSED(args);
                 todo(*c.bb, "XXX: cfunc call"_ss);
                 return {c.bb, 0};
+            }
+
+            compile_result_t comp_proc(compiler_t& comp,
+                                       const context_t& c,
+                                       proc_t* proc) {
+                auto ctx = c.ctx;
+                auto& e = *c.bb->emit;
+
+                auto params = proc->params;
+                while (!IS_NIL(params)) {
+                    auto name = *string::interned::get_slice(STRING_ID(CAR(params)));
+                    emitter::virtual_var::declare(e, name);
+                    params = CDR(params);
+                }
+
+                auto name = *string::interned::get_slice(STRING_ID(proc->sym));
+                auto& proc_bb = emitter::make_basic_block(*c.bb->emit,
+                                                          name,
+                                                          c.bb);
+                proc->addr.bb = &proc_bb;
+
+                basic_block::encode(proc_bb)
+                    .note("-------------------------------------------------------------------"_ss)
+                    .note(format::format("procedure: {}", name))
+                    .note(format::format("(fn {} {})",
+                                         printable_t{c.ctx, proc->params, true},
+                                         printable_t{c.ctx, CAR(proc->body), true}))
+                    .note("-------------------------------------------------------------------"_ss);
+
+                auto body = proc->body;
+                auto bc   = c;
+                bc.bb = &enter(proc_bb, 0);
+                while (!IS_NIL(body)) {
+                    bc.obj = CAR(body);
+                    auto comp_res = compiler::compile_expr(comp, bc);
+                    bc.bb = comp_res.bb;
+                    body = CDR(body);
+                }
+
+                auto res = emitter::virtual_var::get(comp.emit,
+                                                     "res"_ss);
+                auto base = emitter::virtual_var::get(comp.emit,
+                                                      "base"_ss);
+                basic_block::encode(bc.bb)
+                    .offs()
+                        .op(op::store)
+                        .src(&res)
+                        .dst(&base)
+                        .offset(0)
+                        .mode(true)
+                        .build();
+
+                proc->is_compiled = true;
+                return {&leave(*bc.bb), res};
             }
 
             u0 alloc_stack(bb_t& bb, u32 words, var_t** base_addr) {
@@ -1768,7 +2327,8 @@ namespace basecode::scm {
 
             compile_result_t self_eval(compiler_t& comp, const context_t& c) {
                 auto ctx = c.ctx;
-                auto lit = emitter::virtual_var::get(comp.emit, "lit"_ss);
+                auto lit = emitter::virtual_var::get(comp.emit,
+                                                     "lit"_ss);
                 basic_block::encode(c.bb)
                     .comment(format::format(
                         "literal: {}",
@@ -1779,462 +2339,6 @@ namespace basecode::scm {
                         .dst(&lit)
                         .build();
                 return {c.bb, lit};
-            }
-
-            compile_result_t qt(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                basic_block::encode(c.bb)
-                    .comment(format::format(
-                        "literal: {}",
-                        scm::to_string(c.ctx, c.obj)))
-                    .imm2()
-                        .op(op::const_)
-                        .src(u32(OBJ_IDX(CAR(args))))
-                        .dst(&tmp)
-                        .build()
-                    .reg2()
-                        .op(op::qt)
-                        .src(&tmp)
-                        .dst(&res)
-                        .build();
-                return {c.bb, res};
-            }
-
-            compile_result_t qq(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                basic_block::encode(c.bb)
-                    .comment(format::format(
-                        "literal: {}",
-                        scm::to_string(c.ctx, c.obj)))
-                    .imm2()
-                        .op(op::const_)
-                        .src(u32(OBJ_IDX(CAR(args))))
-                        .dst(&tmp)
-                        .build()
-                    .reg2()
-                        .op(op::qq)
-                        .src(&tmp)
-                        .dst(&res)
-                        .build();
-                return {c.bb, res};
-            }
-
-            compile_result_t uq(compiler_t& comp, const context_t& c, obj_t* args) {
-                UNUSED(args);
-                scm::error(c.ctx, "unquote is not valid in this context.");
-                return {c.bb, 0};
-            }
-
-            compile_result_t car(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto cc  = c;
-                cc.obj = CAR(args);
-                auto comp_res = compiler::compile(comp, cc);
-                basic_block::encode(comp_res.bb)
-                    .reg2()
-                        .op(op::car)
-                        .src(&comp_res.var)
-                        .dst(&res)
-                        .build();
-                return {comp_res.bb, res};
-            }
-
-            compile_result_t cdr(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto cc  = c;
-                cc.obj = CAR(args);
-                auto comp_res = compiler::compile(comp, cc);
-                basic_block::encode(comp_res.bb)
-                    .reg2()
-                        .op(op::cdr)
-                        .src(&comp_res.var)
-                        .dst(&res)
-                        .build();
-                return {comp_res.bb, res};
-            }
-
-            compile_result_t or_(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto& exit_bb = emitter::make_basic_block(comp.emit,
-                                                          "or_exit"_ss,
-                                                          c.bb);
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
-                auto oc  = c;
-                while (!IS_NIL(args)) {
-                    oc.obj        = CAR(args);
-                    auto comp_res = compiler::compile(comp, oc);
-                    oc.bb = comp_res.bb;
-                    basic_block::encode(oc.bb)
-                        .reg2()
-                            .op(op::truep)
-                            .src(&comp_res.var)
-                            .dst(&tmp)
-                            .build()
-                        .imm1()
-                            .op(op::beq)
-                            .value(&exit_bb)
-                            .build();
-                    args = CDR(args);
-                }
-                basic_block::encode(oc.bb)
-                    .imm1()
-                        .op(op::br)
-                        .value(&exit_bb)
-                        .build();
-                return {&exit_bb, res};
-            }
-
-            compile_result_t uqs(compiler_t& comp, const context_t& c, obj_t* args) {
-                UNUSED(args);
-                scm::error(c.ctx, "unquote-splicing is not valid in this context.");
-                return {c.bb, 0};
-            }
-
-            compile_result_t set(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto key  = CAR(args);
-                u32  idx  = OBJ_IDX(key);
-                auto name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
-                auto res  = emitter::virtual_var::get(comp.emit, name);
-                auto vc   = c;
-                vc.obj = CADR(args);
-                auto comp_res = compiler::compile(comp, vc);
-                basic_block::encode(comp_res.bb)
-                    .comment(format::format(
-                        "symbol: {}",
-                        printable_t{c.ctx, key, true}))
-                    .imm2()
-                        .op(op::set)
-                        .src(u32(idx))
-                        .dst(&comp_res.var)
-                        .mode(true)
-                        .build()
-                    .reg2()
-                        .op(op::move)
-                        .src(&comp_res.var)
-                        .dst(&res)
-                        .build();
-                return {comp_res.bb, res};
-            }
-
-            compile_result_t if_(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-
-                auto& true_bb  = emitter::make_basic_block(*c.bb->emit,
-                                                           "if_true"_ss,
-                                                           c.bb);
-                auto& false_bb = emitter::make_basic_block(*c.bb->emit,
-                                                           "if_false"_ss,
-                                                           &true_bb);
-                auto& exit_bb  = emitter::make_basic_block(*c.bb->emit,
-                                                           "if_exit"_ss,
-                                                           &false_bb);
-
-                auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-
-                auto ic = c;
-                ic.obj = CAR(args);
-                auto pred_res = compiler::compile(comp, ic);
-                basic_block::encode(c.bb)
-                    .next(true_bb)
-                    .reg2()
-                        .op(op::truep)
-                        .src(&pred_res.var)
-                        .dst(&tmp)
-                        .build()
-                    .imm1()
-                        .op(op::bne)
-                        .value(&false_bb)
-                        .build();
-
-                ic.bb  = &true_bb;
-                ic.obj = CADR(args);
-                auto true_res = compiler::compile(comp, ic);
-                basic_block::encode(true_res.bb)
-                    .next(false_bb)
-                    .reg2()
-                        .op(op::move)
-                        .src(&true_res.var)
-                        .dst(&res)
-                        .build()
-                    .imm1()
-                        .op(op::br)
-                        .value(&exit_bb)
-                        .build();
-
-                ic.bb  = &false_bb;
-                ic.obj = CADDR(args);
-                auto false_res = compiler::compile(comp, ic);
-                basic_block::encode(false_res.bb)
-                    .next(exit_bb)
-                    .reg2()
-                        .op(op::move)
-                        .src(&false_res.var)
-                        .dst(&res)
-                        .build();
-
-                return {&exit_bb, res};
-            }
-
-            compile_result_t cons(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto cc  = c;
-                cc.obj = CAR(args);
-                auto lhs_res = compiler::compile(comp, cc);
-                cc.bb  = lhs_res.bb;
-                cc.obj = CADR(args);
-                auto rhs_res = compiler::compile(comp, cc);
-                basic_block::encode(rhs_res.bb)
-                    .reg3()
-                        .op(op::cons)
-                        .a(&lhs_res.var)
-                        .b(&rhs_res.var)
-                        .c(&res)
-                        .build();
-                return {rhs_res.bb, res};
-            }
-
-            compile_result_t atom(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto ac  = c;
-                ac.obj = CAR(args);
-                auto comp_res = compiler::compile(comp, ac);
-                basic_block::encode(comp_res.bb)
-                    .reg2()
-                        .op(op::atomp)
-                        .src(&comp_res.var)
-                        .dst(&res)
-                        .build();
-                return {comp_res.bb, res};
-            }
-
-            compile_result_t eval(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto ec  = c;
-                ec.obj = CAR(args);
-                auto comp_res = compiler::compile(comp, ec);
-                basic_block::encode(comp_res.bb)
-                    .reg2()
-                        .op(op::eval)
-                        .src(&comp_res.var)
-                        .dst(&res)
-                        .build();
-                return {comp_res.bb, res};
-            }
-
-            compile_result_t list(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx       = c.ctx;
-                u32  size      = length(ctx, args);
-                auto base_addr = emitter::virtual_var::get(comp.emit, "base"_ss);
-                alloc_stack(*c.bb, size, &base_addr);
-                s32  offs = 0;
-                auto lc   = c;
-                while (!IS_NIL(args)) {
-                    lc.obj   = CAR(args);
-                    auto res = compiler::compile(comp, lc);
-                    lc.bb = res.bb;
-                    basic_block::encode(res.bb)
-                        .offs()
-                            .op(op::store)
-                            .offset(offs)
-                            .src(&res.var)
-                            .dst(&base_addr)
-                            .mode(true)
-                            .build();
-                    args = CDR(args);
-                    offs += 8;
-                }
-                auto res  = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto& list_bb = emitter::make_basic_block(*c.bb->emit,
-                                                          "make_list"_ss,
-                                                          lc.bb);
-                basic_block::encode(list_bb)
-                    .reg2_imm()
-                        .op(op::list)
-                        .src(&base_addr)
-                        .dst(&res)
-                        .value(size * 8)
-                        .build();
-                free_stack(list_bb, size);
-                return {&list_bb, res};
-            }
-
-            compile_result_t and_(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto& exit_bb = emitter::make_basic_block(comp.emit,
-                                                          "and_exit"_ss,
-                                                          c.bb);
-                auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto oc  = c;
-                while (!IS_NIL(args)) {
-                    oc.obj        = CAR(args);
-                    auto comp_res = compiler::compile(comp, oc);
-                    oc.bb = comp_res.bb;
-                    basic_block::encode(oc.bb)
-                        .reg2()
-                            .op(op::move)
-                            .src(&comp_res.var)
-                            .dst(&res)
-                            .build()
-                        .reg2()
-                            .op(op::truep)
-                            .src(&res)
-                            .dst(&tmp)
-                            .build()
-                        .imm1()
-                            .op(op::bne)
-                            .value(&exit_bb)
-                            .build();
-                    args = CDR(args);
-                }
-                return {&exit_bb, res};
-            }
-
-            compile_result_t not_(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto nc  = c;
-                nc.obj = CAR(args);
-                auto res      = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto comp_res = compiler::compile(comp, nc);
-                basic_block::encode(comp_res.bb)
-                    .reg2()
-                        .op(op::lnot)
-                        .src(&comp_res.var)
-                        .dst(&res)
-                        .build();
-                return {comp_res.bb, res};
-            }
-
-            compile_result_t begin(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto dc = c;
-                compile_result_t comp_res;
-                while (!IS_NIL(args)) {
-                    dc.obj   = CAR(args);
-                    comp_res = compiler::compile(comp, dc);
-                    dc.bb = comp_res.bb;
-                    args = CDR(args);
-                }
-                return {dc.bb, comp_res.var};
-            }
-
-            compile_result_t error(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-                auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
-                basic_block::encode(c.bb)
-                    .comment(format::format(
-                        "literal: {}",
-                        scm::to_string(c.ctx, c.obj)))
-                    .imm2()
-                        .op(op::const_)
-                        .src(u32(OBJ_IDX(args)))
-                        .dst(&tmp)
-                        .build()
-                    .reg2()
-                        .op(op::error)
-                        .src(&tmp)
-                        .dst(&res)
-                        .build();
-                basic_block::encode(c.bb)
-                    .comment(format::format("literal: {}",
-                                            to_string(c.ctx, args)),
-                             c.bb->insts.size());
-                return {c.bb, res};
-            }
-
-            compile_result_t define(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto& vm = *comp.vm;
-                auto key  = CAR(args);
-                u32  idx  = OBJ_IDX(key);
-                auto name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
-                auto res  = emitter::virtual_var::declare(comp.emit, name);
-                auto vc = c;
-                vc.obj = CADR(args);
-                auto comp_res = compiler::compile(comp, vc);
-                if (c.top_level) {
-                    auto value = OBJ_AT(G(rf::m));  // FIXME: this is a temporary hack
-                    scm::define(ctx, key, value);
-                    if (TYPE(value) == obj_type_t::func
-                    ||  TYPE(value) == obj_type_t::macro) {
-                        auto proc = PROC(value);
-                        if (!proc->is_compiled) {
-                            auto pc = c;
-                            pc.top_level = false;
-                            proc->sym    = key;
-                            return comp_proc(comp, pc, proc);
-                        }
-                    }
-                }
-                basic_block::encode(comp_res.bb)
-                    .comment(format::format(
-                        "symbol: {}",
-                        printable_t{c.ctx, key, true}))
-                    .imm2()
-                        .op(op::define)
-                        .src(u32(idx))
-                        .dst(&comp_res.var)
-                        .mode(true)
-                        .build()
-                    .reg2()
-                        .op(op::move)
-                        .src(&comp_res.var)
-                        .dst(&res)
-                        .build();
-                return {comp_res.bb, res};
-            }
-
-            compile_result_t while_(compiler_t& comp, const context_t& c, obj_t* args) {
-                UNUSED(comp);
-                UNUSED(args);
-                return {c.bb, nullptr};
-            }
-
-            compile_result_t set_cdr(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto sc  = c;
-                sc.obj = CADR(args);
-                auto rhs_res = compiler::compile(comp, sc);
-                sc.bb  = rhs_res.bb;
-                sc.obj = CAR(args);
-                auto lhs_res = compiler::compile(comp, sc);
-                basic_block::encode(lhs_res.bb)
-                    .reg2()
-                        .op(op::setcdr)
-                        .src(&lhs_res.var)
-                        .dst(&rhs_res.var)
-                        .build();
-                return {lhs_res.bb, {}};
-            }
-
-            compile_result_t set_car(compiler_t& comp, const context_t& c, obj_t* args) {
-                auto ctx = c.ctx;
-                auto sc  = c;
-                sc.obj = CADR(args);
-                auto rhs_res = compiler::compile(comp, sc);
-                sc.bb  = rhs_res.bb;
-                sc.obj = CAR(args);
-                auto lhs_res = compiler::compile(comp, sc);
-                basic_block::encode(lhs_res.bb)
-                    .reg2()
-                        .op(op::setcar)
-                        .src(&lhs_res.var)
-                        .dst(&rhs_res.var)
-                        .build();
-                return {lhs_res.bb, {}};
             }
         }
     }

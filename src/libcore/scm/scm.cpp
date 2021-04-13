@@ -415,39 +415,8 @@ namespace basecode::scm {
     }
 
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
-        compiler::reset(ctx->compiler);
-
-        auto& bb = vm::emitter::make_basic_block(ctx->compiler.emit, "eval2"_ss, {});
-        vm::emitter::virtual_var::declare(ctx->compiler.emit, "_"_ss);
-        vm::emitter::virtual_var::declare(ctx->compiler.emit, "res"_ss);
-        vm::emitter::virtual_var::declare(ctx->compiler.emit, "lit"_ss);
-        vm::emitter::virtual_var::declare(ctx->compiler.emit, "base"_ss);
-
-        TIME_BLOCK(
-            "compile expr"_ss,
-            auto tc = compiler::make_context(bb, ctx, obj, top_env(ctx), true);
-            auto comp_result = compiler::compile(ctx->compiler, tc);
-            vm::basic_block::encode(comp_result.bb)
-                .imm1()
-                    .op(instruction::type::exit)
-                    .value(1)
-                    .build();
-            );
-
-        str_t str{};
-        str::init(str, ctx->alloc);
-        {
-            str_buf_t buf{&str};
-            vm::emitter::disassemble(ctx->compiler.emit, bb, buf);
-        }
-        format::print("{}\n", str);
-
-        auto dot_file = "eval2.dot"_path;
-        if (!OK(vm::emitter::create_dot(ctx->compiler.emit, dot_file))) {
-            format::print("error writing dot file.\n");
-        }
-        path::free(dot_file);
-
+        auto comp_result = compiler::compile(ctx->compiler, ctx, obj);
+        UNUSED(comp_result);
         return ctx->nil;
     }
 

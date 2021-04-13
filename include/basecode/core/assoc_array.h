@@ -181,7 +181,7 @@ namespace basecode {
         }
 
         template <typename V,
-            typename Value_Type = std::remove_pointer_t<V>>
+                  typename Value_Type = std::remove_pointer_t<V>>
         Value_Type* find(const assoc_array_t<V>& array, const String_Concept auto& key) {
             for (u32 i = 0; i < array.size; ++i) {
                 const auto& idx = array.index[i];

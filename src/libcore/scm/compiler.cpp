@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/scm/scm.h>
+#include <basecode/core/stopwatch.h>
 #include <basecode/core/scm/compiler.h>
 
 namespace basecode::scm::compiler {
@@ -33,7 +34,51 @@ namespace basecode::scm::compiler {
         vm::emitter::init(comp.emit, vm, alloc);
     }
 
-    compile_result_t compile(compiler_t& comp, const context_t& c) {
+    compile_result_t compile(compiler_t& comp, ctx_t* ctx, obj_t* obj) {
+        compiler::reset(comp);
+
+        auto& bb = vm::emitter::make_basic_block(comp.emit,
+                                                 "eval2"_ss,
+                                                 {});
+        vm::emitter::virtual_var::declare(comp.emit, "_"_ss);
+        vm::emitter::virtual_var::declare(comp.emit, "res"_ss);
+        vm::emitter::virtual_var::declare(comp.emit, "lit"_ss);
+        vm::emitter::virtual_var::declare(comp.emit, "base"_ss);
+
+        TIME_BLOCK(
+            "compile expr"_ss,
+            auto tc = compiler::make_context(bb,
+                                             ctx,
+                                             obj,
+                                             top_env(ctx),
+                                             true);
+            auto comp_result = compiler::compile_expr(comp, tc);
+            vm::basic_block::encode(comp_result.bb)
+                .imm1()
+                    .op(instruction::type::exit)
+                    .value(1)
+                    .build();
+        );
+
+        str_t str{};
+        str::init(str, ctx->alloc);
+        {
+            str_buf_t buf{&str};
+            vm::emitter::disassemble(comp.emit, bb, buf);
+        }
+        format::print("{}\n", str);
+
+        auto dot_file = "eval2.dot"_path;
+        if (!OK(vm::emitter::create_dot(ctx->compiler.emit, dot_file))) {
+            format::print("error writing dot file.\n");
+        }
+        path::free(dot_file);
+
+        return {&bb,
+                vm::emitter::virtual_var::get(comp.emit, "res"_ss)};
+    }
+
+    compile_result_t compile_expr(compiler_t& comp, const context_t& c) {
         switch (TYPE(c.obj)) {
             case obj_type_t::pair: {
                 auto ctx = c.ctx;

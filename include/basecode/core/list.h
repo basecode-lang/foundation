@@ -33,9 +33,12 @@ namespace basecode {
     template <typename T>
     concept Linked_List = requires(const T& t) {
         typename                T::Value_Type;
+        typename                T::Node_Array;
+        typename                T::Value_Array;
+
         {t.alloc}               -> same_as<alloc_t*>;
-        {t.nodes}               -> same_as<array_t<list_node_t>>;
-        {t.values}              -> same_as<array_t<typename T::Value_Type>>;
+        {t.nodes}               -> same_as<typename T::Node_Array>;
+        {t.values}              -> same_as<typename T::Value_Array>;
         {t.head}                -> same_as<u32>;
         {t.tail}                -> same_as<u32>;
         {t.free}                -> same_as<u32>;
@@ -45,10 +48,12 @@ namespace basecode {
     template <typename T>
     struct list_t final {
         using Value_Type        = T;
+        using Node_Array        = array_t<list_node_t>;
+        using Value_Array       = array_t<Value_Type>;
 
         alloc_t*                alloc;
-        array_t<list_node_t>    nodes;
-        array_t<T>              values;
+        Node_Array              nodes;
+        Value_Array             values;
         u32                     head;
         u32                     tail;
         u32                     free;
@@ -81,39 +86,47 @@ namespace basecode {
     };
 
     namespace list {
+        template <Linked_List T>
+        u32 alloc_node(T& list, list_node_t** new_node = {});
+
         inline list_node_t* get_node(Linked_List auto& list, u32 id);
 
-        u32 alloc_node(Linked_List auto& list, list_node_t** new_node = {});
-
-        u0 free(Linked_List auto& list) {
+        template <Linked_List T>
+        u0 free(T& list) {
             array::free(list.nodes);
             array::free(list.values);
             list.head = list.tail = list.size = {};
         }
 
-        u0 clear(Linked_List auto& list) {
+        template <Linked_List T>
+        u0 clear(T& list) {
             free(list);
         }
 
-        u0 reset(Linked_List auto& list) {
+        template <Linked_List T>
+        u0 reset(T& list) {
             list.head = list.tail = list.size = {};
             array::reset(list.nodes);
             array::reset(list.values);
         }
 
-        inline b8 empty(const Linked_List auto& list) {
+        template <Linked_List T>
+        inline b8 empty(const T& list) {
             return list.size == 0;
         }
 
-        inline list_node_t* head(Linked_List auto& list) {
+        template <Linked_List T>
+        inline list_node_t* head(T& list) {
             return get_node(list, list.head);
         }
 
-        inline list_node_t* tail(Linked_List auto& list) {
+        template <Linked_List T>
+        inline list_node_t* tail(T& list) {
             return get_node(list, list.tail);
         }
 
-        b8 remove(Linked_List auto& list, list_node_t* node) {
+        template <Linked_List T>
+        b8 remove(T& list, list_node_t* node) {
             if (!node || list.size == 0) return false;
             auto head = get_node(list, list.head);
             auto tail = get_node(list, list.tail);
@@ -137,18 +150,21 @@ namespace basecode {
             return true;
         }
 
-        u0 reserve(Linked_List auto& list, u32 new_capacity) {
+        template <Linked_List T>
+        u0 reserve(T& list, u32 new_capacity) {
             array::reserve(list.nodes, new_capacity);
             array::reserve(list.values, new_capacity);
         }
 
-        template <typename T> requires Linked_List<T>
-        inline typename T::Value_Type& value(T& list, list_node_t* node) {
+        template <Linked_List T,
+                  typename Value_Type = std::remove_reference_t<typename T::Value_Type>>
+        inline Value_Type& value(T& list, list_node_t* node) {
             return list.values[node->value - 1];
         }
 
-        template <typename T> requires Linked_List<T>
-        list_node_t* append(T& list, const typename T::Value_Type& value) {
+        template <Linked_List T,
+                  typename Value_Type = std::remove_reference_t<typename T::Value_Type>>
+        list_node_t* append(T& list, const Value_Type& value) {
             auto tail = get_node(list, list.tail);
             if (!tail) {
                 list.head = list.tail = alloc_node(list, &tail);
@@ -178,11 +194,13 @@ namespace basecode {
             return tail;
         }
 
-        inline list_node_t* get_node(Linked_List auto& list, u32 id) {
+        template <Linked_List T>
+        inline list_node_t* get_node(T& list, u32 id) {
             return id == 0 || id > list.nodes.size ? nullptr : &list.nodes[id - 1];
         }
 
-        u32 alloc_node(Linked_List auto& list, list_node_t** new_node) {
+        template <Linked_List T>
+        u32 alloc_node(T& list, list_node_t** new_node) {
             if (list.free) {
                 for (u32 i = list.free - 1; i < list.nodes.size; ++i) {
                     auto& node = list.nodes[i];
@@ -199,15 +217,18 @@ namespace basecode {
             return list.nodes.size;
         }
 
-        inline list_node_t* prev(Linked_List auto& list, list_node_t* node) {
+        template <Linked_List T>
+        inline list_node_t* prev(T& list, list_node_t* node) {
             return get_node(list, node->prev);
         }
 
-        inline list_node_t* next(Linked_List auto& list, list_node_t* node) {
+        template <Linked_List T>
+        inline list_node_t* next(T& list, list_node_t* node) {
             return get_node(list, node->next);
         }
 
-        u0 init(Linked_List auto& list, alloc_t* alloc = context::top()->alloc) {
+        template <Linked_List T>
+        u0 init(T& list, alloc_t* alloc = context::top()->alloc) {
             list.alloc = alloc;
             list.head  = list.tail = list.size = {};
             array::init(list.nodes, list.alloc);

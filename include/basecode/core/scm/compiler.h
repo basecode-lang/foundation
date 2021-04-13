@@ -26,9 +26,15 @@ namespace basecode::scm::compiler {
 
     u0 reset(compiler_t& comp);
 
+    context_t make_context(bb_t& bb,
+                           ctx_t* ctx,
+                           obj_t* obj,
+                           obj_t* env,
+                           b8 top_level = false);
+
     u0 init(compiler_t& comp, vm_t* vm, alloc_t* alloc);
 
-    compile_result_t compile(compiler_t& comp, const context_t& c);
+    compile_result_t compile(compiler_t& comp, ctx_t* ctx, obj_t* obj);
 
-    context_t make_context(bb_t& bb, ctx_t* ctx, obj_t* obj, obj_t* env, b8 top_level = false);
+    compile_result_t compile_expr(compiler_t& comp, const context_t& c);
 }
