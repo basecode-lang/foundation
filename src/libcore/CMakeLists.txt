@@ -99,6 +99,8 @@ set(
     cxx/serializer.cpp
     cxx/cxx.cpp ${CORE_INC_DIR}/cxx/cxx.h
 
+    decimal.cpp ${CORE_INC_DIR}/decimal.h
+
     ${CORE_INC_DIR}/digraph.h
 
     eav.cpp ${CORE_INC_DIR}/eav.h
@@ -130,6 +132,8 @@ set(
     hash/symbol.cpp ${CORE_INC_DIR}/hash/symbol.h
 
     ${CORE_INC_DIR}/hashtab.h
+
+    integer.cpp ${CORE_INC_DIR}/integer.h
 
     intern.cpp ${CORE_INC_DIR}/intern.h
 
