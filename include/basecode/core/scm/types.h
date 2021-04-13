@@ -426,11 +426,6 @@ namespace basecode::scm {
                    (idx < size ? data[idx] : null);
         }
 
-        inline u64 base_addr() const {
-            return top ? u64(data) + ((capacity - size) * sizeof(u64)) :
-                   u64(data) + (size * sizeof(u64));
-        }
-
         u64 operator[](u32 idx) const {
             return top ? (idx < capacity ? data[idx] : null) :
                    (idx < size ? data[idx] : null);

@@ -156,14 +156,7 @@ namespace basecode::scm {
     }
 
     obj_t* pop_gc(ctx_t* ctx) {
-        auto& vm = ctx->vm;
-        obj_t* tos = ctx->nil;
-        if (ctx->gc_stack->size > 0) {
-            tos = (obj_t*) HU(GP);
-            GP += sizeof(u64);
-            --ctx->gc_stack->size;
-        }
-        return tos;
+        return vm::mem_area::pop<obj_t*>(*ctx->gc_stack);
     }
 
     obj_t* make_proc(ctx_t* ctx,
@@ -191,19 +184,12 @@ namespace basecode::scm {
     }
 
     obj_t* top_env(ctx_t* ctx) {
-        auto& vm = ctx->vm;
-        return ctx->env_stack->size == 0 ? ctx->nil : (obj_t*) HU(EP);
+        return vm::mem_area::top<obj_t*>(*ctx->env_stack);
     }
 
     obj_t* pop_env(ctx_t* ctx) {
-        auto& vm = ctx->vm;
-        obj_t* tos = ctx->nil;
-        if (ctx->env_stack->size > 0) {
-            tos = (obj_t*) HU(EP);
-            EP += sizeof(u64);
-            --ctx->env_stack->size;
-        }
-        return tos;
+        obj_t* tos = vm::mem_area::pop<obj_t*>(*ctx->env_stack);
+        return !tos ? ctx->nil : tos;
     }
 
     obj_type_t type(obj_t* obj) {
@@ -366,12 +352,7 @@ namespace basecode::scm {
     u0 push_gc(ctx_t* ctx, obj_t* obj) {
         if (obj < ctx->objects || obj >= ctx->objects + ctx->object_count)
             error(ctx, "fatal: obj address outside of heap range! {}", (u0*) obj);
-        auto& vm = ctx->vm;
-        if (ctx->gc_stack->size + 1 > ctx->gc_stack->capacity)
-            vm::mem_area::grow(*ctx->gc_stack);
-        GP -= sizeof(u64);
-        HU(GP) = u64(obj);
-        ++ctx->gc_stack->size;
+        vm::mem_area::push(*ctx->gc_stack, obj);
     }
 
     obj_t* car(ctx_t* ctx, obj_t* obj) {
@@ -409,9 +390,7 @@ namespace basecode::scm {
     }
 
     u0 restore_gc(ctx_t* ctx, u32 idx) {
-        auto& vm = ctx->vm;
-        ctx->gc_stack->size = idx;
-        GP = ctx->gc_stack->base_addr();
+        vm::mem_area::shrink_to_size(*ctx->gc_stack, idx);
     }
 
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
@@ -440,12 +419,7 @@ namespace basecode::scm {
 
     obj_t* push_env(ctx_t* ctx, obj_t* obj) {
         check_type(ctx, obj, obj_type_t::environment);
-        auto& vm = ctx->vm;
-        if (ctx->env_stack->size + 1 > ctx->env_stack->capacity)
-            vm::mem_area::grow(*ctx->env_stack);
-        EP -= sizeof(u64);
-        HU(EP) = u64(obj);
-        ++ctx->env_stack->size;
+        vm::mem_area::push(*ctx->env_stack, obj);
         return obj;
     }
 

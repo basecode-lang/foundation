@@ -549,8 +549,14 @@ namespace basecode::scm::vm {
             area.capacity = new_capacity;
             if (area.reg != register_file::none) {
                 auto& vm = *area.vm;
-                G(area.reg) = area.base_addr();
+                G(area.reg) = mem_area::base_addr(area);
             }
+        }
+
+        u0 shrink_to_size(mem_area_t& area, u32 new_size) {
+            auto& vm = *area.vm;
+            area.size = new_size;
+            G(area.reg) = base_addr(area);
         }
     }
 
@@ -565,10 +571,8 @@ namespace basecode::scm::vm {
         for (auto& area : vm.mem_map) {
             if (area.type != mem_area_type_t::register_file)
                 mem_area::reset(area, true);
-            if (area.reg != register_file::none) {
-                const auto addr = area.base_addr();
-                G(area.reg) = addr;
-            }
+            if (area.reg != register_file::none)
+                G(area.reg) = mem_area::base_addr(area);
         }
         F  = 0;
         M  = 0;
@@ -1356,16 +1360,14 @@ namespace basecode::scm::vm {
         mma_imm:
         {
             auto& area = vm.mem_map[opers->imm.src];
-            G(opers->imm.dst) = area.base_addr();
+            G(opers->imm.dst) = mem_area::base_addr(area);
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
         pop_reg2:
         {
-            auto area = get_mem_area_by_reg(vm, opers->imm.dst);
-            G(opers->reg2.dst) = HU(G(opers->reg2.src));
-            G(opers->reg2.src) += s32(opers->reg2.aux);
-            --area->size;
+            auto area = get_mem_area_by_reg(vm, opers->reg2.src);
+            G(opers->reg2.dst) = mem_area::pop<u64>(*area);
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
@@ -1836,23 +1838,15 @@ namespace basecode::scm::vm {
         push_imm:
         {
             auto area = get_mem_area_by_reg(vm, opers->imm.dst);
-            if (area->size + 1 > area->capacity)
-                mem_area::grow(*area);
-            G(opers->imm.dst) += s8(opers->imm.aux);
-            HU(G(opers->imm.dst)) = opers->imm.src;
-            ++area->size;
+            mem_area::push(*area, opers->imm.src);
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
         push_reg2:
         {
-            auto area = get_mem_area_by_reg(vm, opers->imm.dst);
-            if (area->size + 1 > area->capacity)
-                mem_area::grow(*area);
-            G(opers->reg2.dst) += s32(opers->reg2.aux);
-            HU(G(opers->reg2.dst)) = G(opers->reg2.src);
+            auto area = get_mem_area_by_reg(vm, opers->reg2.dst);
+            mem_area::push(*area, G(opers->reg2.src));
             PC += sizeof(encoded_inst_t);
-            ++area->size;
             EXEC_NEXT();
         }
         lea_imm:
