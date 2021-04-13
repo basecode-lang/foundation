@@ -299,7 +299,7 @@ namespace basecode::scm {
 
         switch (TYPE(obj)) {
             case obj_type_t::pair:
-                mark(ctx, car);         /* fall through */
+                mark(ctx, car);
                 obj = CDR(obj);
                 goto begin;
 
@@ -387,10 +387,11 @@ namespace basecode::scm {
     obj_t* get(ctx_t* ctx, obj_t* sym) {
         auto env = top_env(ctx);
         const auto str_id = FIXNUM(sym);
+        const auto name = *string::interned::get_slice(str_id);
         auto chain = ctx->handlers.chain;
         while (chain) {
             if (chain->get_enabled && chain->get) {
-                auto res = chain->get(ctx, str_id);
+                auto res = chain->get(ctx, name, env);
                 if (res)
                     return res;
             }
@@ -1104,10 +1105,11 @@ namespace basecode::scm {
     b8 set(ctx_t* ctx, obj_t* sym, obj_t* v) {
         auto env = top_env(ctx);
         const auto str_id = FIXNUM(sym);
+        const auto name = *string::interned::get_slice(str_id);
         auto chain = ctx->handlers.chain;
         while (chain) {
             if (chain->set_enabled && chain->set) {
-                if (chain->set(ctx, str_id, v, env))
+                if (chain->set(ctx, name, v, env))
                     return true;
             }
             chain = chain->next;
@@ -1162,10 +1164,11 @@ namespace basecode::scm {
     u0 define(ctx_t* ctx, obj_t* sym, obj_t* v) {
         auto env = top_env(ctx);
         const auto str_id = FIXNUM(sym);
+        const auto name = *string::interned::get_slice(str_id);
         auto chain = ctx->handlers.chain;
         while (chain) {
             if (chain->define_enabled && chain->define) {
-                if (chain->define(ctx, str_id, v, env))
+                if (chain->define(ctx, name, v, env))
                     return;
             }
             chain = chain->next;

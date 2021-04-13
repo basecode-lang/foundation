@@ -50,7 +50,7 @@ namespace basecode {
         u32                     id;
         cvar_type_t             type;
         union {
-            const u8*           ptr;
+            u0*                 ptr;
             f64                 real;
             u64                 integer;
             b8                  flag;
@@ -59,16 +59,6 @@ namespace basecode {
     static_assert(sizeof(cvar_t) <= 32, "cvar_t is now larger than 32 bytes!");
 
     namespace config {
-        enum var_t : u8 {
-            platform            = 10,
-            build_type,
-            test_runner,
-            product_name,
-            version_major,
-            version_minor,
-            version_revision,
-        };
-
         enum class status_t : u8 {
             ok                  = 0,
             bad_input,
@@ -89,14 +79,43 @@ namespace basecode {
         namespace cvar {
             u0 clear();
 
-            status_t remove(u32 id);
+            status_t remove(str::slice_t name);
 
-            status_t get(u32 id, cvar_t** var);
+            inline u0 set(cvar_t* var, b8 value) {
+                var->value.flag = value;
+            }
 
-            status_t add(u32 id, const s8* name, cvar_type_t type, s32 len = -1);
+            u0 set(cvar_t* var, scm::obj_t* value);
 
-            status_t add(u32 id, const String_Concept auto& name, cvar_type_t type) {
-                return add(id, (const s8*) name.data, type, name.length);
+            inline u0 set(cvar_t* var, u64 value) {
+                var->value.integer = value;
+            }
+
+            inline u0 set(cvar_t* var, u32 value) {
+                var->value.integer = value;
+            }
+
+            inline u0 set(cvar_t* var, f32 value) {
+                var->value.real = value;
+            }
+
+            inline u0 set(cvar_t* var, f64 value) {
+                var->value.real = value;
+            }
+
+            status_t get(str::slice_t name, cvar_t** var);
+
+            inline u0 set(cvar_t* var, str::slice_t value) {
+                auto rc = string::interned::fold_for_result(value);
+                var->value.integer = rc.id;
+            }
+
+            status_t add(str::slice_t name, cvar_type_t type, cvar_t** var);
+
+            status_t add(const String_Concept auto& name,
+                         cvar_type_t type,
+                         cvar_t** var) {
+                return add(slice::make(name), type, var);
             }
         }
     }

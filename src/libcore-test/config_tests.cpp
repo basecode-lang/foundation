@@ -25,56 +25,19 @@
 
 using namespace basecode;
 
-static u0 validate_cvar(scm::ctx_t* ctx, const s8* name, u32 id, b8 expected) {
-    auto binding = scm::get(ctx, scm::make_symbol(ctx, name));
-    auto cvar_value = scm::cdr(ctx, binding);
-    if (expected) {
-        if (scm::type(cvar_value) != scm::obj_type_t::fixnum)
-            REQUIRE(false);
-        auto native_value = scm::to_fixnum(cvar_value);
-        if (native_value != id)
-            REQUIRE(false);
-    } else {
-        if (cvar_value != scm::nil(ctx))
-            REQUIRE(false);
-    }
-
-    auto source = format::format("(if (is {} {}) #t #f)", id, name);
-    scm::obj_t* obj{};
-    scm::system::eval(source, &obj);
-    if (!obj)
-        REQUIRE(false);
-
-    auto buf = scm::to_string(ctx, obj);
-    if (expected) {
-        if (buf != "#t"_ss) REQUIRE(false);
-    } else {
-        if (buf != "#f"_ss) REQUIRE(false);
-    }
-}
-
 TEST_CASE("basecode::config cvar add & remove", "[!hide]") {
-    const auto cvar_id                       = 20;
-    const auto enable_console_color          = "enable-console-color"_ss;
-    const auto internal_enable_console_color = "*enable-console-color*";
-
-    if (!OK(config::cvar::add(cvar_id, enable_console_color, cvar_type_t::flag)))
-        REQUIRE(false);
-    scm::ctx_t* ctx = config::system::context();
-    validate_cvar(ctx, internal_enable_console_color, cvar_id, true);
+    const auto enable_console_color = "*enable-console-color*"_ss;
 
     cvar_t* cvar{};
-    if (!OK(config::cvar::get(cvar_id, &cvar)))
-        REQUIRE(false);
-    if (cvar == nullptr)
+    if (!OK(config::cvar::add(enable_console_color, cvar_type_t::flag, &cvar)))
         REQUIRE(false);
 
-    if (!OK(config::cvar::remove(cvar_id)))
+    if (!OK(config::cvar::remove(enable_console_color)))
         REQUIRE(false);
-    validate_cvar(ctx, internal_enable_console_color, cvar_id, false);
 
-    if (config::cvar::get(cvar_id, &cvar) != config::status_t::cvar_not_found)
+    if (config::cvar::get(enable_console_color, &cvar) != config::status_t::cvar_not_found)
         REQUIRE(false);
+
     if (cvar)
         REQUIRE(false);
 }

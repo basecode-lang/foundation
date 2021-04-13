@@ -37,11 +37,11 @@ namespace basecode::scm {
     using fixnum_t              = u32;
     using flonum_t              = f32;
 
-    using get_func_t            = obj_t* (*)(ctx_t*, u32);
-    using set_func_t            = b8 (*)(ctx_t*, u32, obj_t*, obj_t*);
+    using get_func_t            = obj_t* (*)(ctx_t*, str::slice_t, obj_t*);
+    using set_func_t            = b8 (*)(ctx_t*, str::slice_t, obj_t*, obj_t*);
     using rest_array_t          = array_t<obj_t*>;
     using error_func_t          = u0 (*)(ctx_t*, const s8*, obj_t*);
-    using define_func_t         = b8 (*)(ctx_t*, u32, obj_t*, obj_t*);
+    using define_func_t         = b8 (*)(ctx_t*, str::slice_t, obj_t*, obj_t*);
     using native_func_t         = obj_t* (*)(ctx_t*, obj_t*);
 
     struct chained_handler_t final {

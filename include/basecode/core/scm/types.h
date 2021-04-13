@@ -40,7 +40,7 @@
 #define SET_CAR(x, o)           ((x)->pair.car_idx = OBJ_IDX(o))
 #define SET_CDR(x, o)           ((x)->pair.cdr_idx = OBJ_IDX(o))
 #define IS_NIL(x)               ((x) == ctx->nil)
-#define TYPE(x)                 (obj_type_t((x)->hdr.type))
+#define TYPE(x)                 (scm::obj_type_t((x)->hdr.type))
 #define IS_TRUE(x)              (!IS_NIL(x) && (x) == ctx->true_)
 #define IS_FALSE(x)             (IS_NIL(x)  || (x) == ctx->false_)
 #define IS_GC_MARKED(x)         ((x)->hdr.gc_mark)

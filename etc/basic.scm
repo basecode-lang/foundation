@@ -55,9 +55,16 @@
 
         (define results (list ,@body))
         (for expr results
-            (if expr
-                (set! pass-count (+ 1 pass-count))
-                (set! fail-count (+ 1 fail-count))))
+            (define pass? (cdr (car expr)))
+            (define test  (car (cdr expr)))
+            (if (is pass? 1)
+                (begin
+                    (sys-print "   P           " test)
+                    (set! pass-count (add1 pass-count))))
+            (if (is pass? 2)
+                (begin
+                    (sys-print "          F    " test)
+                    (set! fail-count (add1 fail-count)))))
 
         (sys-print "====================================================")
         (sys-print "PASS:" pass-count " FAIL:" fail-count)
@@ -67,12 +74,8 @@
     `(begin
         (define result (eval ,expr))
         (if result
-            (begin
-                (print (list " P          " ,expr))
-                #t)
-            (begin
-                (print (list "        F   " ,expr))
-                #f)))))
+            (list (cons 'assert 1) ,expr)
+            (list (cons 'assert 2) ,expr)))))
 
 (define map (fn (proc lst)
     (define res nil)

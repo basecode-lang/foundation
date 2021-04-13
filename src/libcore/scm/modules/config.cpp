@@ -20,13 +20,15 @@
 #include <basecode/core/error.h>
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
+#include <basecode/core/hashtab.h>
+#include <basecode/core/scm/types.h>
 #include <basecode/core/scm/system.h>
 #include <basecode/core/log/system/spdlog.h>
 #include <basecode/core/log/system/syslog.h>
 #include <basecode/core/scm/modules/config.h>
 
 namespace basecode::config {
-    constexpr u32 max_cvar_size = 256;
+    using var_table_t           = hashtab_t<str::slice_t, cvar_t>;
 
     struct system_t final {
         alloc_t*                alloc;
@@ -35,9 +37,10 @@ namespace basecode::config {
         scm::obj_t*             current_alloc;
         scm::obj_t*             current_logger;
         scm::obj_t*             current_command_line;
+        var_table_t             vartab;
         scm::chained_handler_t  handlers;
-        cvar_t                  vars[max_cvar_size];
         str_t                   buf;
+        u32                     var_id;
         u32                     heap_size;
     };
 
@@ -107,37 +110,6 @@ namespace basecode::config {
         return g_cfg_sys.current_logger;
     }
 
-    static scm::obj_t* cvar_ref(u32 id) {
-        cvar_t* cvar{};
-        if (!OK(cvar::get(id, &cvar)))
-            scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
-
-        switch (cvar->type) {
-            case cvar_type_t::flag:
-                return scm::make_bool(g_cfg_sys.ctx, cvar->value.flag);
-            case cvar_type_t::real:
-                return scm::make_flonum(g_cfg_sys.ctx, cvar->value.real);
-            case cvar_type_t::integer:
-                return scm::make_fixnum(g_cfg_sys.ctx, cvar->value.integer);
-            case cvar_type_t::string:
-                return scm::make_string(g_cfg_sys.ctx, (const s8*) cvar->value.ptr);
-            case cvar_type_t::pointer:
-                return scm::make_user_ptr(g_cfg_sys.ctx, (u0*) cvar->value.ptr);
-            default:
-                scm::error(g_cfg_sys.ctx, "invalid cvar type");
-        }
-
-        return scm::nil(g_cfg_sys.ctx);
-    }
-
-    static b8 cvar_set_flag(u32 id, b8 value) {
-        cvar_t* cvar{};
-        if (!OK(cvar::get(id, &cvar)))
-            scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
-        cvar->value.flag = value;
-        return true;
-    }
-
     static scm::obj_t* current_command_line() {
         if (scm::is_nil(g_cfg_sys.ctx, g_cfg_sys.current_command_line)) {
             const auto argc = context::top()->argc;
@@ -158,36 +130,12 @@ namespace basecode::config {
         return -1;
     }
 
-    static b8 cvar_set_number(u32 id, f32 value) {
-        cvar_t* cvar{};
-        if (!OK(cvar::get(id, &cvar)))
-            scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
-        cvar->value.real = value;
-        return true;
-    }
-
-    static b8 cvar_set_integer(u32 id, u32 value) {
-        cvar_t* cvar{};
-        if (!OK(cvar::get(id, &cvar)))
-            scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
-        cvar->value.integer = value;
-        return true;
-    }
-
     static s32 find_syslog_opt_value(str::slice_t name) {
         for (u32 i = 0; s_syslog_opts[i].name != nullptr; ++i) {
             if (strncmp((const s8*) name.data, s_syslog_opts[i].name, name.length) == 0)
                 return s_syslog_opts[i].value;
         }
         return -1;
-    }
-
-    static b8 cvar_set_string(u32 id, str::slice_t* value) {
-        cvar_t* cvar{};
-        if (!OK(cvar::get(id, &cvar)))
-            scm::error(g_cfg_sys.ctx, "XXX: unable to find cvar");
-        cvar->value.ptr = value->data;
-        return true;
     }
 
     static s32 find_syslog_facility_value(str::slice_t name) {
@@ -474,47 +422,6 @@ namespace basecode::config {
             using namespace scm::kernel;
 
             [[maybe_unused]] static proc_export_t s_exports[] = {
-                {"cvar-ref"_ss, 1,
-                    {
-                        {(u0*) cvar_ref, "cvar_ref"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"id"_ss, type_decl::u32_}
-                            }
-                        }
-                    }
-                },
-                {"cvar-set!"_ss, 4,
-                    {
-                        {
-                         (u0*) cvar_set_flag, "cvar_set_flag"_ss, type_decl::b8_, 2,
-                            {
-                                {"id"_ss, type_decl::u32_},
-                                {"value"_ss, type_decl::b8_},
-                            }
-                        },
-                        {
-                            (u0*) cvar_set_number, "cvar_set_number"_ss, type_decl::b8_, 2,
-                            {
-                                {"id"_ss, type_decl::u32_},
-                                {"value"_ss, type_decl::f32_},
-                            }
-                        },
-                        {
-                            (u0*) cvar_set_integer, "cvar_set_integer"_ss, type_decl::b8_, 2,
-                            {
-                                {"id"_ss, type_decl::u32_},
-                                {"value"_ss, type_decl::u32_},
-                            }
-                        },
-                        {
-                            (u0*) cvar_set_string, "cvar_set_string"_ss, type_decl::b8_, 2,
-                            {
-                                {"id"_ss, type_decl::u32_},
-                                {"value"_ss, type_decl::slice_ptr},
-                            }
-                        },
-                    }
-                },
                 {"localized-string"_ss, 1,
                     {
                         {(u0*) localized_string, "localized_string"_ss, type_decl::u32_, 3,
@@ -526,6 +433,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"localized-error"_ss, 1,
                     {
                         {(u0*) localized_error, "localized_error"_ss, type_decl::u32_, 4,
@@ -538,6 +446,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-info"_ss, 1,
                     {
                         {(u0*) log_info, "log_info"_ss, type_decl::u0_, 2,
@@ -548,6 +457,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-warn"_ss, 1,
                     {
                         {(u0*) log_warn, "log_warn"_ss, type_decl::u0_, 2,
@@ -558,6 +468,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-error"_ss, 1,
                     {
                         {(u0*) log_error, "log_error"_ss, type_decl::u0_, 2,
@@ -568,6 +479,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-alert"_ss, 1,
                     {
                         {(u0*) log_alert, "log_alert"_ss, type_decl::u0_, 2,
@@ -578,6 +490,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-debug"_ss, 1,
                     {
                         {(u0*) log_debug, "log_debug"_ss, type_decl::u0_, 2,
@@ -588,6 +501,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-notice"_ss, 1,
                     {
                         {(u0*) log_notice, "log_notice"_ss, type_decl::u0_, 2,
@@ -598,6 +512,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-critical"_ss, 1,
                     {
                         {(u0*) log_critical, "log_critical"_ss, type_decl::u0_, 2,
@@ -608,6 +523,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-emergency"_ss, 1,
                     {
                         {(u0*) log_emergency, "log_emergency"_ss, type_decl::u0_, 2,
@@ -618,26 +534,31 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"current-user"_ss, 1,
                     {
                         {(u0*) current_user, "current_user"_ss, type_decl::obj_ptr, 0}
                     }
                 },
+
                 {"current-alloc"_ss, 1,
                     {
                         {(u0*) current_alloc, "current_alloc"_ss, type_decl::obj_ptr, 0}
                     }
                 },
+
                 {"current-logger"_ss, 1,
                     {
                         {(u0*) current_logger, "current_logger"_ss, type_decl::obj_ptr, 0}
                     }
                 },
+
                 {"current-command-line"_ss, 1,
                     {
                         {(u0*) current_command_line, "current_command_line"_ss, type_decl::obj_ptr, 0}
                     }
                 },
+
                 {"log-create-basic-file"_ss, 1,
                     {
                         {(u0*) log_create_basic_file, "log_create_basic_file"_ss, type_decl::obj_ptr, 4,
@@ -650,6 +571,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-create-daily-file"_ss, 1,
                     {
                         {(u0*) log_create_daily_file, "log_create_daily_file"_ss, type_decl::obj_ptr, 6,
@@ -664,6 +586,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-create-color"_ss, 1,
                     {
                         {(u0*) log_create_color, "log_create_color"_ss, type_decl::obj_ptr, 4,
@@ -676,6 +599,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"log-create-rotating-file"_ss, 1,
                     {
                         {(u0*) log_create_rotating_file, "log_create_rotating_file"_ss, type_decl::obj_ptr, 6,
@@ -690,6 +614,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"syslog-create"_ss, 1,
                     {
                         {(u0*) syslog_create, "syslog_create"_ss, type_decl::obj_ptr, 5,
@@ -703,6 +628,7 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {"logger-append-child"_ss, 1,
                     {
                         {(u0*) logger_append_child, "logger_append_child"_ss, type_decl::obj_ptr, 2,
@@ -713,16 +639,146 @@ namespace basecode::config {
                         }
                     }
                 },
+
                 {str::slice_t{}},
             };
         }
 
         u0 fini() {
             str::free(g_cfg_sys.buf);
+            hashtab::free(g_cfg_sys.vartab);
         }
 
         scm::ctx_t* context() {
             return g_cfg_sys.ctx;
+        }
+
+        static b8 set_cvar(scm::ctx_t* ctx,
+                           str::slice_t name,
+                           scm::obj_t* value,
+                           scm::obj_t* env) {
+            UNUSED(env);
+
+            if (name.length < 3
+            ||  name[0] != '*'
+            ||  name[name.length - 1] != '*') {
+                return false;
+            }
+
+            cvar_t* var{};
+            if (!OK(cvar::get(name, &var))) {
+                scm::error(ctx,
+                           "[config] cvar '{}' is undefined",
+                           name);
+            }
+
+            cvar::set(var, value);
+
+            return true;
+        }
+
+        static b8 define_cvar(scm::ctx_t* ctx,
+                              str::slice_t name,
+                              scm::obj_t* value,
+                              scm::obj_t* env) {
+            UNUSED(env);
+
+            if (name.length < 3
+            ||  name[0] != '*'
+            ||  name[name.length - 1] != '*') {
+                return false;
+            }
+
+            cvar_t* var{};
+            if (OK(cvar::get(name, &var))) {
+                scm::error(ctx,
+                           "[config] cvar '{}' is already defined",
+                           name);
+            }
+
+            cvar_type_t type{};
+
+            switch (TYPE(value)) {
+                case scm::obj_type_t::nil:
+                case scm::obj_type_t::free:
+                    scm::error(ctx,
+                               "[config] cannot define cvar '{}' with nil object",
+                               name);
+                case scm::obj_type_t::ffi:
+                case scm::obj_type_t::ptr:
+                case scm::obj_type_t::pair:
+                case scm::obj_type_t::func:
+                case scm::obj_type_t::prim:
+                case scm::obj_type_t::port:
+                case scm::obj_type_t::macro:
+                case scm::obj_type_t::cfunc:
+                case scm::obj_type_t::error:
+                case scm::obj_type_t::environment:
+                    type = cvar_type_t::pointer;
+                    break;
+                case scm::obj_type_t::fixnum:
+                    type = cvar_type_t::integer;
+                    break;
+                case scm::obj_type_t::flonum:
+                    type = cvar_type_t::real;
+                    break;
+                case scm::obj_type_t::symbol:
+                case scm::obj_type_t::string:
+                case scm::obj_type_t::keyword:
+                    type = cvar_type_t::string;
+                    break;
+                case scm::obj_type_t::boolean:
+                    type = cvar_type_t::flag;
+                    break;
+            }
+
+            if (!OK(cvar::add(name, type, &var))) {
+                scm::error(ctx,
+                           "[config] unable to define cvar '{}'",
+                           name);
+            }
+
+            cvar::set(var, value);
+
+            return true;
+        }
+
+        static scm::obj_t* get_cvar(scm::ctx_t* ctx,
+                                    str::slice_t name,
+                                    scm::obj_t* env) {
+            UNUSED(env);
+
+            if (name.length < 3
+            ||  name[0] != '*'
+            ||  name[name.length - 1] != '*') {
+                return nullptr;
+            }
+
+            cvar_t* var{};
+            if (!OK(cvar::get(name, &var))) {
+                scm::error(ctx,
+                           "[config] unable to find cvar '{}'",
+                           name);
+            }
+
+            switch (var->type) {
+                case cvar_type_t::flag:
+                    return scm::make_bool(ctx, var->value.flag);
+                case cvar_type_t::real:
+                    return scm::make_flonum(ctx, var->value.real);
+                case cvar_type_t::integer:
+                    return scm::make_fixnum(ctx, var->value.integer);
+                case cvar_type_t::string: {
+                    auto s = string::interned::get_slice(var->value.integer);
+                    return scm::make_string(ctx, *s);
+                }
+                case cvar_type_t::pointer:
+                    return scm::make_user_ptr(ctx, (u0*) var->value.ptr);
+                default:
+                    scm::error(ctx, "[config] invalid cvar type");
+            }
+
+            return ctx->nil;
         }
 
         status_t init(const config_settings_t& settings, alloc_t* alloc) {
@@ -738,34 +794,39 @@ namespace basecode::config {
             g_cfg_sys.current_command_line = scm::nil(g_cfg_sys.ctx);
 
             scm::kernel::create_exports(g_cfg_sys.ctx, exports::s_exports);
-            g_cfg_sys.handlers = {};
+            g_cfg_sys.handlers = {
+                .get = get_cvar,
+                .set = set_cvar,
+                .define = define_cvar,
+                .get_enabled = true,
+                .set_enabled = true,
+                .define_enabled = true,
+            };
             scm::set_next_handler(g_cfg_sys.ctx, &g_cfg_sys.handlers);
 
-            std::memset(g_cfg_sys.vars, 0, sizeof(cvar_t) * max_cvar_size);
+            hashtab::init(g_cfg_sys.vartab, g_cfg_sys.alloc);
+            g_cfg_sys.var_id = 1;
 
-            cvar_t* cvar{};
-            auto status = config::cvar::add(var_t::test_runner,
-                                            "test-runner",
-                                            cvar_type_t::flag);
+            cvar_t* var{};
+            auto status = config::cvar::add("*test-runner*"_ss,
+                                            cvar_type_t::flag,
+                                            &var);
             if (!OK(status))
                 return status;
-            config::cvar::get(var_t::test_runner, &cvar);
-            cvar->value.flag = settings.test_runner;
+            cvar::set(var, settings.test_runner);
 
-            status = config::cvar::add(var_t::build_type,
-                                       "build-type",
-                                       cvar_type_t::string);
+            status = config::cvar::add("*build-type*"_ss,
+                                       cvar_type_t::string,
+                                       &var);
             if (!OK(status))
                 return status;
-            config::cvar::get(var_t::build_type, &cvar);
-            cvar->value.ptr = (u8*) settings.build_type.data;
+            cvar::set(var, settings.build_type);
 
-            status = config::cvar::add(var_t::platform,
-                                       "platform",
-                                       cvar_type_t::string);
+            status = config::cvar::add("*platform*"_ss,
+                                       cvar_type_t::string,
+                                       &var);
             if (!OK(status))
                 return status;
-            config::cvar::get(var_t::platform, &cvar);
             str::slice_t platform;
 #ifdef _WIN32
             platform = "Windows"_ss;
@@ -782,101 +843,87 @@ namespace basecode::config {
 #else
             platform = "unknown"_ss;
 #endif
-            cvar->value.ptr = string::interned::fold(platform).data;
+            cvar::set(var, platform);
 
-            status = config::cvar::add(var_t::product_name,
-                                       "product-name",
-                                       cvar_type_t::string);
+            status = config::cvar::add("*product-name*"_ss,
+                                       cvar_type_t::string,
+                                       &var);
             if (!OK(status))
                 return status;
-            config::cvar::get(var_t::product_name, &cvar);
-            cvar->value.ptr = settings.product_name.data;
+            cvar::set(var, settings.product_name);
 
-            status = config::cvar::add(var_t::version_major,
-                                       "version-major",
-                                       cvar_type_t::integer);
+            status = config::cvar::add("*version-major*"_ss,
+                                       cvar_type_t::integer,
+                                       &var);
             if (!OK(status))
                 return status;
-            config::cvar::get(var_t::version_major, &cvar);
-            cvar->value.integer = settings.version.major;
+            cvar::set(var, settings.version.major);
 
-            status = config::cvar::add(var_t::version_minor,
-                                       "version-minor",
-                                       cvar_type_t::integer);
+            status = config::cvar::add("*version-minor*"_ss,
+                                       cvar_type_t::integer,
+                                       &var);
             if (!OK(status))
                 return status;
-            config::cvar::get(var_t::version_minor, &cvar);
-            cvar->value.integer = settings.version.minor;
+            cvar::set(var, settings.version.minor);
 
-            status = config::cvar::add(var_t::version_revision,
-                                       "version-revision",
-                                       cvar_type_t::integer);
+            status = config::cvar::add("*version-revision*"_ss,
+                                       cvar_type_t::integer,
+                                       &var);
             if (!OK(status))
                 return status;
-            config::cvar::get(var_t::version_revision, &cvar);
-            cvar->value.integer = settings.version.revision;
+            cvar::set(var, settings.version.revision);
 
             return config::status_t::ok;
         }
     }
 
     namespace cvar {
-        static u0 add_binding(cvar_t* cvar) {
-            auto sym_name = format::format("*{}*", cvar->name);
-            auto symbol = scm::make_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
-            scm::define(g_cfg_sys.ctx, symbol, scm::make_fixnum(g_cfg_sys.ctx, cvar->id));
-        }
-
-        static u0 remove_binding(cvar_t* cvar) {
-            auto sym_name = format::format("*{}*", cvar->name);
-            auto symbol = scm::make_symbol(g_cfg_sys.ctx, str::c_str(sym_name));
-            scm::set(g_cfg_sys.ctx, symbol, scm::nil(g_cfg_sys.ctx));
-        }
-
         u0 clear() {
-            for (auto& cvar : g_cfg_sys.vars) {
-                if (cvar.type == cvar_type_t::none)
-                    continue;
-                remove_binding(&cvar);
-                cvar.type = cvar_type_t::none;
+            scm::collect_garbage(g_cfg_sys.ctx);
+        }
+
+        status_t remove(str::slice_t name) {
+            hashtab::remove(g_cfg_sys.vartab, name);
+            return status_t::ok;
+        }
+
+        u0 set(cvar_t* var, scm::obj_t* value) {
+            auto ctx = g_cfg_sys.ctx;
+            switch (var->type) {
+                case cvar_type_t::flag:
+                    var->value.flag = IS_TRUE(value);
+                    break;
+                case cvar_type_t::real:
+                    var->value.real = FLONUM(value);
+                    break;
+                case cvar_type_t::integer:
+                    var->value.integer = FIXNUM(value);
+                    break;
+                case cvar_type_t::string:
+                    var->value.integer = STRING_ID(value);
+                    break;
+                case cvar_type_t::pointer:
+                    var->value.ptr = (u0*) value;
+                    break;
+                default:
+                    scm::error(ctx, "[config] invalid cvar type");
             }
-            scm::collect_garbage(g_cfg_sys.ctx);
         }
 
-        status_t remove(u32 id) {
-            if (id > (max_cvar_size - 1))
-                return status_t::cvar_id_out_of_range;
-            auto cvar = &g_cfg_sys.vars[id];
-            if (cvar->type == cvar_type_t::none)
+        status_t get(str::slice_t name, cvar_t** var) {
+            *var = hashtab::find(g_cfg_sys.vartab, name);
+            if (!*var)
                 return status_t::cvar_not_found;
-            remove_binding(cvar);
-            cvar->type = cvar_type_t::none;
-            scm::collect_garbage(g_cfg_sys.ctx);
             return status_t::ok;
         }
 
-        status_t get(u32 id, cvar_t** var) {
-            *var = nullptr;
-            if (id > (max_cvar_size - 1))
-                return status_t::cvar_id_out_of_range;
-            auto cvar = &g_cfg_sys.vars[id];
-            if (cvar->type == cvar_type_t::none)
-                return status_t::cvar_not_found;
+        status_t add(str::slice_t name, cvar_type_t type, cvar_t** var) {
+            auto cvar = hashtab::emplace(g_cfg_sys.vartab, name);
+            cvar->id        = g_cfg_sys.var_id++;
+            cvar->name      = string::interned::fold(name);
+            cvar->type      = type;
+            cvar->value.ptr = {};
             *var = cvar;
-            return status_t::ok;
-        }
-
-        status_t add(u32 id, const s8* name, cvar_type_t type, s32 len) {
-            if (id > (max_cvar_size - 1))
-                return status_t::cvar_id_out_of_range;
-            auto cvar = &g_cfg_sys.vars[id];
-            if (cvar->type != cvar_type_t::none)
-                return status_t::duplicate_cvar;
-            cvar->name          = string::interned::fold(name, len);
-            cvar->id            = id;
-            cvar->type          = type;
-            cvar->value.integer = 0;
-            add_binding(cvar);
             return status_t::ok;
         }
     }

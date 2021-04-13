@@ -52,34 +52,34 @@
                             0)))
 
     (test-suite "scheme + config module integration"
-        (assert '(is "Basecode Foundation Core Library" (cvar-ref *product-name*)))
-        (assert '(is 0 (cvar-ref *version-major*)))
-        (assert '(is 1 (cvar-ref *version-minor*)))
-        (assert '(is 0 (cvar-ref *version-revision*)))
+        (assert '(is "Basecode Foundation Core Library" *product-name*))
+        (assert '(is 0 *version-major*))
+        (assert '(is 1 *version-minor*))
+        (assert '(is 0 *version-revision*))
         (assert '(begin
-                    (define build-type (cvar-ref *build-type*))
+                    (define build-type *build-type*)
                     (or (is "Debug"             build-type)
                         (is "RelWithDebInfo"    build-type)
                         (is "Release"           build-type))))
         (assert '(begin
-                    (define platform (cvar-ref *platform*))
+                    (define platform *platform*)
                     (or (is "Windows" platform)
                         (is "Linux" platform))))
-        (assert '(is #t (cvar-ref *test-runner*)))
+        (assert '(is #t *test-runner*))
 
         ; N.B. these initial values come from libcore-test's main.cpp
         ;       when it sets up the test runner.
-        (assert '(is #t (cvar-ref *enable-console-color*)))
-        (assert '(is "/var/log" (cvar-ref *log-path*)))
-        (assert '(is 47.314 (cvar-ref *magick-weight*)))
+        (assert '(is #t *enable-console-color*))
+        (assert '(is "/var/log" *log-path*))
+        (assert '(is 47.314 *magick-weight*))
 
-        (cvar-set! *enable-console-color*   #f)
-        (cvar-set! *log-path*               "/var/log/basecode")
-        (cvar-set! *magick-weight*          12.6566)
+        (set! *enable-console-color*   #f)
+        (set! *log-path*               "/var/log/basecode")
+        (set! *magick-weight*          12.6566)
 
-        (assert '(is #f (cvar-ref *enable-console-color*)))
-        (assert '(is "/var/log/basecode" (cvar-ref *log-path*)))
-        (assert '(is 12.6566 (cvar-ref *magick-weight*)))
+        (assert '(is #f *enable-console-color*))
+        (assert '(is "/var/log/basecode" *log-path*))
+        (assert '(is 12.6566 *magick-weight*))
         (assert '(is #t (begin
                             (localized-string 5000 'en_US "US: test localized string: 0={} 1={} 2={}")
                             (localized-string 5001 'en_US "duplicate cvar")

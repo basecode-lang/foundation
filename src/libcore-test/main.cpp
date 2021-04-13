@@ -164,18 +164,21 @@ s32 main(s32 argc, const s8** argv) {
             return 1;
         }
 
-        cvar_t* cvar{};
-        config::cvar::add(1, "enable-console-color", cvar_type_t::flag);
-        config::cvar::get(1, &cvar);
-        cvar->value.flag = true;
+        cvar_t* var{};
+        config::cvar::add("*enable-console-color*"_ss,
+                          cvar_type_t::flag,
+                          &var);
+        config::cvar::set(var, true);
 
-        config::cvar::add(2, "log-path", cvar_type_t::string);
-        config::cvar::get(2, &cvar);
-        cvar->value.ptr = (u8*) string::interned::fold("/var/log"_ss).data;
+        config::cvar::add("*log-path*"_ss,
+                          cvar_type_t::string,
+                          &var);
+        config::cvar::set(var, "/var/log"_ss);
 
-        config::cvar::add(3, "magick-weight", cvar_type_t::real);
-        config::cvar::get(3, &cvar);
-        cvar->value.real = 47.314f;
+        config::cvar::add("*magick-weight*"_ss,
+                          cvar_type_t::real,
+                          &var);
+        config::cvar::set(var, 47.314f);
 
         auto   load_path = "../etc/first.scm"_path;
         path_t config_path{};
