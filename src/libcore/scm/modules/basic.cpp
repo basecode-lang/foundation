@@ -26,6 +26,10 @@ namespace basecode::scm::module::basic {
     struct system_t final {
         scm::ctx_t*             ctx;
         alloc_t*                alloc;
+        obj_t*                  current_user;
+        obj_t*                  current_alloc;
+        obj_t*                  current_logger;
+        obj_t*                  current_command_line;
         obj_pool_t              storage;
     };
 
@@ -75,8 +79,28 @@ namespace basecode::scm::module::basic {
         return res;
     }
 
+    scm::obj_t* current_user() {
+        auto ctx = g_basic_sys.ctx;
+        if (IS_NIL(g_basic_sys.current_user)) {
+            g_basic_sys.current_user = scm::make_user_ptr(
+                ctx,
+                context::top()->user);
+        }
+        return g_basic_sys.current_user;
+    }
+
     obj_t* current_environment() {
         return g_basic_sys.ctx->env;
+    }
+
+    scm::obj_t* current_alloc() {
+        auto ctx = g_basic_sys.ctx;
+        if (IS_NIL(g_basic_sys.current_alloc)) {
+            g_basic_sys.current_alloc = scm::make_user_ptr(
+                ctx,
+                context::top()->alloc);
+        }
+        return g_basic_sys.current_alloc;
     }
 
     u0 print(rest_array_t* rest) {
@@ -88,6 +112,16 @@ namespace basecode::scm::module::basic {
             format::print("{}", printable_t{ctx, lst[i]});
         }
         format::print("\n");
+    }
+
+    scm::obj_t* current_logger() {
+        auto ctx = g_basic_sys.ctx;
+        if (scm::is_nil(ctx, g_basic_sys.current_logger)) {
+            g_basic_sys.current_logger = scm::make_user_ptr(
+                ctx,
+                context::top()->logger);
+        }
+        return g_basic_sys.current_logger;
     }
 
     obj_t* load(rest_array_t* rest) {
@@ -143,6 +177,21 @@ namespace basecode::scm::module::basic {
             }
         }
         return head;
+    }
+
+    scm::obj_t* current_command_line() {
+        auto ctx = g_basic_sys.ctx;
+        if (IS_NIL(g_basic_sys.current_command_line)) {
+            const auto argc = context::top()->argc;
+            const auto argv = context::top()->argv;
+            scm::obj_t* objs[argc];
+            for (u32 i = 0; i < argc; ++i)
+                objs[i] = scm::make_string(ctx, argv[i]);
+            g_basic_sys.current_command_line = scm::make_list(ctx,
+                                                              &objs[0],
+                                                              argc);
+        }
+        return g_basic_sys.current_command_line;
     }
 
     obj_t* parent_environment(obj_t* env) {
@@ -359,6 +408,30 @@ namespace basecode::scm::module::basic {
                     }
                 },
 
+                {"current-user"_ss, 1,
+                    {
+                        {(u0*) current_user, "current_user"_ss, type_decl::obj_ptr, 0}
+                    }
+                },
+
+                {"current-alloc"_ss, 1,
+                    {
+                        {(u0*) current_alloc, "current_alloc"_ss, type_decl::obj_ptr, 0}
+                    }
+                },
+
+                {"current-logger"_ss, 1,
+                    {
+                        {(u0*) current_logger, "current_logger"_ss, type_decl::obj_ptr, 0}
+                    }
+                },
+
+                {"current-command-line"_ss, 1,
+                    {
+                        {(u0*) current_command_line, "current_command_line"_ss, type_decl::obj_ptr, 0}
+                    }
+                },
+
                 {str::slice_t{}},
             };
         }
@@ -370,8 +443,15 @@ namespace basecode::scm::module::basic {
         status_t init(scm::ctx_t* ctx, alloc_t* alloc) {
             g_basic_sys.ctx   = ctx;
             g_basic_sys.alloc = alloc;
+
+            g_basic_sys.current_user         = scm::nil(g_basic_sys.ctx);
+            g_basic_sys.current_alloc        = scm::nil(g_basic_sys.ctx);
+            g_basic_sys.current_logger       = scm::nil(g_basic_sys.ctx);
+            g_basic_sys.current_command_line = scm::nil(g_basic_sys.ctx);
+
             obj_pool::init(g_basic_sys.storage, g_basic_sys.alloc);
             kernel::create_exports(g_basic_sys.ctx, exports::s_exports);
+
             return status_t::ok;
         }
     }

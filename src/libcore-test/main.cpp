@@ -33,6 +33,7 @@
 #include <basecode/core/configure.h>
 #include <basecode/core/scm/system.h>
 #include <basecode/core/scm/modules/cxx.h>
+#include <basecode/core/scm/modules/log.h>
 #include <basecode/core/scm/modules/basic.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
@@ -143,6 +144,12 @@ s32 main(s32 argc, const s8** argv) {
     });
     if (!OK(rc)) return rc;
 
+    rc = stopwatch::time_block("scm::module::log::init"_ss, []() -> s32 {
+        scm::module::log::system::init(scm::system::global_ctx());
+        return 0;
+    });
+    if (!OK(rc)) return rc;
+
     rc = stopwatch::time_block("scm::module::cxx::init"_ss, []() -> s32 {
         scm::module::cxx::system::init(scm::system::global_ctx());
         return 0;
@@ -220,6 +227,9 @@ s32 main(s32 argc, const s8** argv) {
 
     stopwatch::time_block("scm::module::cxx::system::fini"_ss,
                           []() -> s32 { scm::module::cxx::system::fini(); return 0; });
+
+    stopwatch::time_block("scm::module::log::system::fini"_ss,
+                          []() -> s32 { scm::module::log::system::fini(); return 0; });
 
     stopwatch::time_block("scm::module::basic::system::fini"_ss,
                           []() -> s32 { scm::module::basic::system::fini(); return 0; });

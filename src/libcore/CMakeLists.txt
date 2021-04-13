@@ -201,6 +201,7 @@ set(
     scm/compiler.cpp ${CORE_INC_DIR}/scm/compiler.h
     scm/bytecode.cpp ${CORE_INC_DIR}/scm/bytecode.h
     scm/modules/cxx.cpp ${CORE_INC_DIR}/scm/modules/cxx.h
+    scm/modules/log.cpp ${CORE_INC_DIR}/scm/modules/log.h
     scm/modules/basic.cpp ${CORE_INC_DIR}/scm/modules/basic.h
     scm/modules/config.cpp ${CORE_INC_DIR}/scm/modules/config.h
 

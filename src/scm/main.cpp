@@ -33,6 +33,7 @@
 #include <basecode/scm/configure.h>
 #include <basecode/core/scm/system.h>
 #include <basecode/core/scm/modules/cxx.h>
+#include <basecode/core/scm/modules/log.h>
 #include <basecode/core/scm/modules/basic.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
@@ -249,6 +250,8 @@ s32 main(s32 argc, const s8** argv) {
         return 1;
     if (!OK(scm::module::basic::system::init(scm::system::global_ctx())))
         return 1;
+    if (!OK(scm::module::log::system::init(scm::system::global_ctx())))
+        return 1;
     if (!OK(scm::module::cxx::system::init(scm::system::global_ctx())))
         return 1;
 
@@ -286,6 +289,7 @@ s32 main(s32 argc, const s8** argv) {
     thread::system::fini();
     config::system::fini();
     scm::module::cxx::system::fini();
+    scm::module::log::system::fini();
     scm::module::basic::system::fini();
     scm::system::fini();
     string::system::fini();

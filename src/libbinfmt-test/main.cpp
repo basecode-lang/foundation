@@ -22,11 +22,9 @@
 #include <basecode/core/ffi.h>
 #include <basecode/core/job.h>
 #include <basecode/core/term.h>
-#include <basecode/core/event.h>
 #include <basecode/core/error.h>
 #include <basecode/core/locale.h>
 #include <basecode/core/thread.h>
-#include <basecode/core/memory.h>
 #include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/network.h>
@@ -34,6 +32,8 @@
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/profiler.h>
 #include <basecode/core/scm/system.h>
+#include <basecode/core/scm/modules/log.h>
+#include <basecode/core/scm/modules/basic.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
@@ -86,6 +86,10 @@ s32 main(s32 argc, const s8** argv) {
     if (!OK(filesys::init()))               return 1;
     if (!OK(network::system::init()))       return 1;
     if (!OK(scm::system::init(256 * 1024))) return 1;
+    if (!OK(scm::module::basic::system::init(scm::system::global_ctx())))
+        return 1;
+    if (!OK(scm::module::log::system::init(scm::system::global_ctx())))
+        return 1;
 
     {
         config_settings_t settings{};
@@ -129,6 +133,8 @@ s32 main(s32 argc, const s8** argv) {
     job::system::fini();
     thread::system::fini();
     config::system::fini();
+    scm::module::log::system::fini();
+    scm::module::basic::system::fini();
     scm::system::fini();
     string::system::fini();
     error::system::fini();
