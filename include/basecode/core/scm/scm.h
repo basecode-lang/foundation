@@ -86,12 +86,12 @@ namespace basecode::scm {
         ptr,
         pair,
         free,
-        func,
         prim,
         port,
-        macro,
+        proc,
         cfunc,
         error,
+        lambda,
         fixnum,
         flonum,
         symbol,
@@ -160,6 +160,8 @@ namespace basecode::scm {
     obj_t* push_env(ctx_t* ctx, obj_t* obj);
 
     u0* to_user_ptr(ctx_t* ctx, obj_t* obj);
+
+    b8 equal(ctx_t* ctx, obj_t* a, obj_t* b);
 
     obj_t* make_bool(ctx_t* ctx, obj_t* obj);
 

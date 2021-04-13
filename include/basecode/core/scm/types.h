@@ -136,7 +136,6 @@ namespace basecode::scm {
         is,
         gt,
         lt,
-        fn,
         gte,
         lte,
         add,
@@ -145,7 +144,6 @@ namespace basecode::scm {
         div,
         mod,
         set,
-        mac,
         if_,
         or_,
         car,
@@ -160,11 +158,13 @@ namespace basecode::scm {
         error,
         quote,
         while_,
+        lambda,
         setcar,
         setcdr,
         define,
         unquote,
         quasiquote,
+        define_macro,
         unquote_splicing,
         max,
     };
@@ -462,6 +462,8 @@ namespace basecode::scm {
         ctx_t*                  ctx;
         obj_t*                  obj;
         obj_t*                  env;
+        obj_t*                  sym;
+        b8                      is_macro;
         b8                      top_level;
     };
 
@@ -474,6 +476,7 @@ namespace basecode::scm {
         alloc_t*                alloc;
         mem_area_t*             gc_stack;
         mem_area_t*             env_stack;
+        mem_area_t*             data_stack;
         vm_t                    vm;
         compiler_t              compiler;
         handlers_t              handlers;

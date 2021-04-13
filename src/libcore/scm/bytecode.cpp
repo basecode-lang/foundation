@@ -1356,35 +1356,6 @@ namespace basecode::scm {
                 return {c.bb, res};
             }
 
-            compile_result_t fn(compiler_t& comp,
-                                const context_t& c,
-                                obj_t* sym,
-                                obj_t* form,
-                                obj_t* args) {
-                auto& vm = *comp.vm;
-                auto ctx        = c.ctx;
-                b8   is_mac     = PRIM(form) == prim_type_t::mac;
-                auto proc       = make_proc(c.ctx,
-                                            sym,
-                                            CAR(args),
-                                            CDR(args),
-                                            is_mac);
-                auto idx        = OBJ_IDX(proc);
-                auto target_reg = rf::m;       //FIXME
-                G(target_reg) = idx;
-                if (!c.top_level) {
-                    basic_block::encode(c.bb)
-                        .comment(format::format("literal: {}",
-                                                scm::to_string(c.ctx, c.obj)))
-                        .imm2()
-                            .op(op::const_)
-                            .src(u32(idx))
-                            .dst(target_reg)
-                            .build();
-                }
-                return {c.bb, 0};
-            }
-
             compile_result_t qq(compiler_t& comp,
                                 const context_t& c,
                                 obj_t* args) {
@@ -1953,6 +1924,34 @@ namespace basecode::scm {
                 return {&cleanup_bb, res};
             }
 
+            compile_result_t lambda(compiler_t& comp,
+                                    const context_t& c,
+                                    obj_t* form,
+                                    obj_t* args) {
+                auto& vm = *comp.vm;
+                auto ctx    = c.ctx;
+                b8   is_mac = scm::equal(ctx, c.sym, SYM("define-macro"));
+                auto proc   = make_proc(c.ctx,
+                                        c.sym,
+                                        CAR(args),
+                                        CDR(args),
+                                        is_mac);
+                auto idx    = OBJ_IDX(proc);
+                auto reg    = rf::m;       //FIXME
+                G(reg) = idx;
+                if (!c.top_level) {
+                    basic_block::encode(c.bb)
+                        .comment(format::format("literal: {}",
+                                                scm::to_string(c.ctx, c.obj)))
+                        .imm2()
+                            .op(op::const_)
+                            .src(u32(idx))
+                            .dst(reg)
+                            .build();
+                }
+                return {c.bb, 0};
+            }
+
             compile_result_t while_(compiler_t& comp,
                                     const context_t& c,
                                     obj_t* args) {
@@ -1971,13 +1970,14 @@ namespace basecode::scm {
                 auto name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
                 auto res  = emitter::virtual_var::declare(comp.emit, name);
                 auto vc = c;
-                vc.obj = CADR(args);
+                vc.sym      = key;
+                vc.obj      = CADR(args);
+                vc.is_macro = false;
                 auto comp_res = compiler::compile_expr(comp, vc);
                 if (c.top_level) {
                     auto value = OBJ_AT(G(rf::m));  // FIXME: this is a temporary hack
                     scm::define(ctx, key, value);
-                    if (TYPE(value) == obj_type_t::func
-                        ||  TYPE(value) == obj_type_t::macro) {
+                    if (TYPE(value) == obj_type_t::proc) {
                         auto proc = PROC(value);
                         if (!proc->is_compiled) {
                             auto pc = c;
@@ -1992,16 +1992,16 @@ namespace basecode::scm {
                         "symbol: {}",
                         printable_t{c.ctx, key, true}))
                     .imm2()
-                    .op(op::define)
-                    .src(u32(idx))
-                    .dst(&comp_res.var)
-                    .mode(true)
-                    .build()
+                        .op(op::define)
+                        .src(u32(idx))
+                        .dst(&comp_res.var)
+                        .mode(true)
+                        .build()
                     .reg2()
-                    .op(op::move)
-                    .src(&comp_res.var)
-                    .dst(&res)
-                    .build();
+                        .op(op::move)
+                        .src(&comp_res.var)
+                        .dst(&res)
+                        .build();
                 return {comp_res.bb, res};
             }
 
@@ -2204,8 +2204,6 @@ namespace basecode::scm {
                     case prim_type_t::div:              return arith_op(comp, c, op::ldiv, args);
                     case prim_type_t::mod:              return arith_op(comp, c, op::lmod, args);
                     case prim_type_t::set:              return set(comp, c, args);
-                    case prim_type_t::fn:
-                    case prim_type_t::mac:              return fn(comp, c, c.ctx->nil, form, args);
                     case prim_type_t::if_:              return if_(comp, c, args);
                     case prim_type_t::or_:              return or_(comp, c, args);
                     case prim_type_t::and_:             return and_(comp, c, args);
@@ -2219,12 +2217,17 @@ namespace basecode::scm {
                     case prim_type_t::quote:            return qt(comp, c, args);
                     case prim_type_t::begin:            return begin(comp, c, args);
                     case prim_type_t::error:            return error(comp, c, args);
+                    case prim_type_t::lambda:           return lambda(comp,
+                                                                      c,
+                                                                      form,
+                                                                      args);
                     case prim_type_t::define:           return define(comp, c, args);
                     case prim_type_t::while_:           return while_(comp, c, args);
                     case prim_type_t::setcar:           return set_car(comp, c, args);
                     case prim_type_t::setcdr:           return set_cdr(comp, c, args);
                     case prim_type_t::unquote:          return uq(comp, c, args);
                     case prim_type_t::quasiquote:       return qq(comp, c, args);
+                    case prim_type_t::define_macro:     return define_macro(comp, c, args);
                     case prim_type_t::unquote_splicing: return uqs(comp, c, args);
                     default:                            return {c.bb, 0};
                 }
@@ -2294,6 +2297,50 @@ namespace basecode::scm {
 
                 proc->is_compiled = true;
                 return {&leave(*bc.bb), res};
+            }
+
+            compile_result_t define_macro(compiler_t& comp,
+                                          const context_t& c,
+                                          obj_t* args) {
+                auto ctx = c.ctx;
+                auto& vm = *comp.vm;
+                auto key  = CAR(args);
+                u32  idx  = OBJ_IDX(key);
+                auto name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
+                auto res  = emitter::virtual_var::declare(comp.emit, name);
+                auto vc = c;
+                vc.sym      = key;
+                vc.obj      = CADR(args);
+                vc.is_macro = true;
+                auto comp_res = compiler::compile_expr(comp, vc);
+                if (c.top_level) {
+                    auto value = OBJ_AT(G(rf::m));  // FIXME: this is a temporary hack
+                    scm::check_type(ctx, value, obj_type_t::proc);
+                    scm::define(ctx, key, value);
+                    auto proc = PROC(value);
+                    if (!proc->is_compiled) {
+                        auto pc = c;
+                        pc.top_level = false;
+                        proc->sym    = key;
+                        return comp_proc(comp, pc, proc);
+                    }
+                }
+                basic_block::encode(comp_res.bb)
+                    .comment(format::format(
+                        "symbol: {}",
+                        printable_t{c.ctx, key, true}))
+                    .imm2()
+                        .op(op::define)
+                        .src(u32(idx))
+                        .dst(&comp_res.var)
+                        .mode(true)
+                        .build()
+                    .reg2()
+                        .op(op::move)
+                        .src(&comp_res.var)
+                        .dst(&res)
+                        .build();
+                return {comp_res.bb, res};
             }
 
             u0 alloc_stack(bb_t& bb, u32 words, var_t** base_addr) {

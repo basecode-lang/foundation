@@ -41,7 +41,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/scm/scm.h>
-#include <basecode/core/stopwatch.h>
 #include <basecode/core/scm/types.h>
 #include <basecode/core/scm/compiler.h>
 
@@ -52,12 +51,12 @@ namespace basecode::scm {
         "ptr",
         "pair",
         "free",
-        "func",
         "prim",
         "port",
-        "macro",
+        "proc",
         "cfunc",
         "error",
+        "lambda",
         "fixnum",
         "flonum",
         "symbol",
@@ -71,7 +70,6 @@ namespace basecode::scm {
         "is",
         ">",
         "<",
-        "fn",
         ">=",
         "<=",
         "+",
@@ -80,7 +78,6 @@ namespace basecode::scm {
         "/",
         "mod",
         "set!",
-        "mac",
         "if",
         "or",
         "car",
@@ -95,11 +92,13 @@ namespace basecode::scm {
         "error",
         "quote",
         "while",
+        "lambda",
         "setcar",
         "setcdr",
         "define",
         "unquote",
         "quasiquote",
+        "define-macro",
         "unquote-splicing",
     };
 
@@ -116,8 +115,6 @@ namespace basecode::scm {
     };
 
     static obj_t* make_object(ctx_t* ctx);
-
-    static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b);
 
     static num_type_t get_numtype(const s8* buf, s32 len);
 
@@ -178,7 +175,7 @@ namespace basecode::scm {
         proc->is_assembled = false;
         array::append(ctx->native_ptrs, proc);
         auto obj = make_object(ctx);
-        SET_TYPE(obj, macro ? obj_type_t::macro : obj_type_t::func);
+        SET_TYPE(obj, obj_type_t::proc);
         SET_FIXNUM(obj, ctx->native_ptrs.size);
         return obj;
     }
@@ -474,6 +471,46 @@ namespace basecode::scm {
         return CAR(a);
     }
 
+    b8 equal(ctx_t* ctx, obj_t* a, obj_t* b) {
+        if (a == b)
+            return true;
+        if ((TYPE(a) == obj_type_t::fixnum || TYPE(a) == obj_type_t::flonum)
+        &&  (TYPE(b) == obj_type_t::fixnum || TYPE(b) == obj_type_t::flonum)) {
+            switch (TYPE(a)) {
+                case obj_type_t::fixnum: {
+                    auto fa = to_fixnum(a);
+                    auto fb = to_fixnum(b);
+                    return fa == fb;
+                }
+                case obj_type_t::flonum: {
+                    const auto e = std::numeric_limits<flonum_t>::epsilon();
+                    auto x = fabs(to_flonum(a));
+                    auto y = fabs(to_flonum(b));
+                    auto largest = (y > x) ? y : x;
+                    auto diff = x - y;
+                    return diff <= largest * e;
+                }
+                default:                return false;
+            }
+        }
+        if (TYPE(a) != TYPE(b))         return false;
+        switch (TYPE(a)) {
+            case obj_type_t::pair: {
+                auto ka = CAR(a);
+                auto kd = CDR(a);
+                auto ja = CAR(b);
+                auto jd = CDR(b);
+                return equal(ctx, ka, ja) && equal(ctx, kd, jd);
+            }
+            case obj_type_t::prim:      return PRIM(a) == PRIM(b);
+            case obj_type_t::ptr:
+            case obj_type_t::cfunc:
+            case obj_type_t::lambda:    return NATIVE_PTR(a) == NATIVE_PTR(b);
+            default:                    break;
+        }
+        return false;
+    }
+
     obj_t* make_user_ptr(ctx_t* ctx, u0* ptr) {
         obj_t* obj = make_object(ctx);
         array::append(ctx->native_ptrs, ptr);
@@ -561,6 +598,12 @@ namespace basecode::scm {
                          ctx->alloc,
                          1024,
                          true);
+        ctx->data_stack = &vm::add_mem_area(vm,
+                                           scm::mem_area_type_t::data_stack,
+                                           register_file::dp,
+                                           ctx->alloc,
+                                           1024,
+                                           true);
         ctx->gc_stack = &vm::add_mem_area(vm,
                                            scm::mem_area_type_t::gc_stack,
                                            register_file::gp,
@@ -642,47 +685,6 @@ namespace basecode::scm {
         return ctx;
     }
 
-    static b8 equal(ctx_t* ctx, obj_t* a, obj_t* b) {
-        if (a == b)
-            return true;
-        if ((TYPE(a) == obj_type_t::fixnum || TYPE(a) == obj_type_t::flonum)
-        &&  (TYPE(b) == obj_type_t::fixnum || TYPE(b) == obj_type_t::flonum)) {
-            switch (TYPE(a)) {
-                case obj_type_t::fixnum: {
-                    auto fa = to_fixnum(a);
-                    auto fb = to_fixnum(b);
-                    return fa == fb;
-                }
-                case obj_type_t::flonum: {
-                    const auto e = std::numeric_limits<flonum_t>::epsilon();
-                    auto x = fabs(to_flonum(a));
-                    auto y = fabs(to_flonum(b));
-                    auto largest = (y > x) ? y : x;
-                    auto diff = x - y;
-                    return diff <= largest * e;
-                }
-                default:                return false;
-            }
-        }
-        if (TYPE(a) != TYPE(b))         return false;
-        switch (TYPE(a)) {
-            case obj_type_t::pair: {
-                auto ka = CAR(a);
-                auto kd = CDR(a);
-                auto ja = CAR(b);
-                auto jd = CDR(b);
-                return equal(ctx, ka, ja) && equal(ctx, kd, jd);
-            }
-            case obj_type_t::prim:      return PRIM(a) == PRIM(b);
-            case obj_type_t::ptr:
-            case obj_type_t::func:
-            case obj_type_t::cfunc:
-            case obj_type_t::macro:     return NATIVE_PTR(a) == NATIVE_PTR(b);
-            default:                    break;
-        }
-        return false;
-    }
-
     obj_t* cons(ctx_t* ctx, obj_t* car, obj_t* cdr) {
         obj_t* obj = make_object(ctx);
         SET_TYPE(obj, obj_type_t::pair);
@@ -726,8 +728,7 @@ namespace basecode::scm {
             return 1;
         }
 
-        if ((lt == obj_type_t::func || lt == obj_type_t::macro)
-        &&  (rt == obj_type_t::func || rt == obj_type_t::macro)) {
+        if (lt == obj_type_t::proc && rt == obj_type_t::proc) {
             auto a = PROC(lhs);
             auto b = PROC(rhs);
             if (a < b) return -1;
@@ -768,8 +769,8 @@ namespace basecode::scm {
 
     obj_t* eval(ctx_t* ctx, obj_t* obj) {
         if (ctx->env_stack->size == 0) {
-            error(ctx, "environment stack is empty: push an environment before "
-                       "calling eval");
+            error(ctx, "environment stack is empty: push an "
+                       "environment before calling eval");
         }
 
         obj_t* fn   {};
@@ -811,9 +812,14 @@ namespace basecode::scm {
                         return eval(ctx, EVAL_ARG());
 
                     case prim_type_t::set:
-                        va = check_type(ctx, next_arg(ctx, &arg), obj_type_t::symbol);
-                        if (!set(ctx, va, EVAL_ARG()))
-                            error(ctx, "set! undefined variable: {}", printable_t{ctx, va});
+                        va = check_type(ctx,
+                                        next_arg(ctx, &arg),
+                                        obj_type_t::symbol);
+                        if (!set(ctx, va, EVAL_ARG())) {
+                            error(ctx,
+                                  "set! undefined variable: {}",
+                                  printable_t{ctx, va});
+                        }
                         return ctx->nil;
 
                     case prim_type_t::if_: {
@@ -823,15 +829,20 @@ namespace basecode::scm {
                         return eval(ctx, flag ? true_br : false_br);
                     }
 
-                    case prim_type_t::fn:
-                    case prim_type_t::mac: {
+                    case prim_type_t::lambda: {
                         obj_t* params = CAR(arg);
                         obj_t* body   = CDR(arg);
+                        obj_t* type   = vm::mem_area::pop<obj_t*>(*ctx->data_stack);
+                        b8 is_macro{};
+                        if (type) {
+                            kar      = vm::mem_area::pop<obj_t*>(*ctx->data_stack);
+                            is_macro = equal(ctx, type, SYM("define-macro"));
+                        }
                         return make_proc(ctx,
                                          kar,
                                          params,
                                          body,
-                                         PRIM(fn) == prim_type_t::mac);
+                                         is_macro);
                     }
 
                     case prim_type_t::error:
@@ -857,13 +868,32 @@ namespace basecode::scm {
                         return res;
                     }
 
-                    case prim_type_t::define:
+                    case prim_type_t::define: {
                         va = check_type(ctx,
                                         next_arg(ctx, &arg),
                                         obj_type_t::symbol);
+                        auto ds_save = ctx->data_stack->size;
+                        vm::mem_area::push(*ctx->data_stack, va);
+                        vm::mem_area::push(*ctx->data_stack, kar);
                         vb = EVAL_ARG();
                         define(ctx, va, vb);
+                        vm::mem_area::shrink_to_size(*ctx->data_stack, ds_save);
                         return vb;
+                    }
+
+                    case prim_type_t::define_macro: {
+                        va = check_type(ctx,
+                                        next_arg(ctx, &arg),
+                                        obj_type_t::symbol);
+                        auto ds_save = ctx->data_stack->size;
+                        vm::mem_area::push(*ctx->data_stack, va);
+                        vm::mem_area::push(*ctx->data_stack, kar);
+                        vb = EVAL_ARG();
+                        check_type(ctx, vb, obj_type_t::proc);
+                        define(ctx, va, vb);
+                        vm::mem_area::shrink_to_size(*ctx->data_stack, ds_save);
+                        return vb;
+                    }
 
                     case prim_type_t::quote:
                         return next_arg(ctx, &arg);
@@ -1001,9 +1031,10 @@ namespace basecode::scm {
             case obj_type_t::cfunc:
                 return cfunc_apply(ctx, fn, arg);
 
-            case obj_type_t::func: {
-                arg = eval_list(ctx, arg);
+            case obj_type_t::proc: {
                 auto proc = PROC(fn);
+                if (!proc->is_macro)
+                    arg = eval_list(ctx, arg);
                 push_env(ctx, make_environment(ctx, top_env(ctx)));
                 args_to_env(ctx, proc->params, arg);
                 auto body = proc->body;
@@ -1015,31 +1046,19 @@ namespace basecode::scm {
                     res = eval(ctx, CAR(body));
                     body = CDR(body);
                 }
-                finalize_environment(ctx, pop_env(ctx));
-                return res;
-            }
-
-            case obj_type_t::macro: {
-                auto proc = PROC(fn);
-                push_env(ctx, make_environment(ctx, top_env(ctx)));
-                args_to_env(ctx, proc->params, arg);
-                auto body = proc->body;
-                auto save = save_gc(ctx);
-                while (!IS_NIL(body)) {
-                    restore_gc(ctx, save);
-                    push_gc(ctx, body);
-                    push_gc(ctx, top_env(ctx));
-                    res = eval(ctx, CAR(body));
-                    body = CDR(body);
+                if (proc->is_macro) {
+                    *obj = *res;
+                    res = eval(ctx, obj);
                 }
-                *obj = *res;
-                res = eval(ctx, obj);
                 finalize_environment(ctx, pop_env(ctx));
                 return res;
             }
 
-            default:
-                error(ctx, "tried to call non-callable value");
+            default: {
+                error(ctx,
+                      "tried to call non-callable value '{}'",
+                      s_type_names[u32(TYPE(fn))]);
+            }
         }
 
         return res;
@@ -1728,12 +1747,10 @@ namespace basecode::scm {
                 break;
             }
 
-            case obj_type_t::func:
-            case obj_type_t::macro: {
+            case obj_type_t::lambda: {
                 auto proc = PROC(obj);
                 fmt::format_to(o,
-                               "({} {}\n    {})",
-                               proc->is_macro ? "mac" : "fn",
+                               "(lambda {}\n    {})",
                                printable_t{ctx, proc->params, true},
                                printable_t{ctx, proc->body, true});
                 break;

@@ -295,7 +295,7 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
 
     const auto source = R"(
 (begin
-    (define length (fn (ls)
+    (define length (lambda (ls)
         (if (not ls)
             0
             (if (not (atom ls))

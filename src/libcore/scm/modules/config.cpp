@@ -147,12 +147,12 @@ namespace basecode::config {
                 case scm::obj_type_t::ffi:
                 case scm::obj_type_t::ptr:
                 case scm::obj_type_t::pair:
-                case scm::obj_type_t::func:
                 case scm::obj_type_t::prim:
                 case scm::obj_type_t::port:
-                case scm::obj_type_t::macro:
+                case scm::obj_type_t::proc:
                 case scm::obj_type_t::cfunc:
                 case scm::obj_type_t::error:
+                case scm::obj_type_t::lambda:
                 case scm::obj_type_t::environment:
                     type = cvar_type_t::pointer;
                     break;

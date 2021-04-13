@@ -1,4 +1,4 @@
-(define fizz-buzz-test (fn ()
+(define fizz-buzz-test (lambda ()
     (define fizz-buzz  0)
     (define fizz       0)
     (define buzz       0)
@@ -11,7 +11,7 @@
             [else                   (set! numbers   (add1 numbers))]))
     `((fizz-buzz . ,fizz-buzz) (fizz . ,fizz) (buzz . ,buzz) (numbers . ,numbers))))
 
-(define core-tests (fn ()
+(define core-tests (lambda ()
     ; basic assertions around scheme terp
     (test-suite "scheme terp basic assertions"
         (assert '(is    '((fizz-buzz . 3) (fizz . 13) (buzz . 7) (numbers . 27)) (fizz-buzz-test)))

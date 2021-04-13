@@ -51,10 +51,12 @@ namespace basecode::scm::module::basic {
         auto fn = CAR(obj);
         if (TYPE(fn) == obj_type_t::symbol)
             fn = get(ctx, fn);
-        if (TYPE(fn) != obj_type_t::macro)
+        if (TYPE(fn) != obj_type_t::proc)
             return ctx->nil;
         auto args = CDR(obj);
         auto proc = PROC(fn);
+        if (!proc->is_macro)
+            return ctx->nil;
         push_env(ctx, make_environment(ctx, top_env(ctx)));
         args_to_env(ctx, proc->params, args);
         auto res  = ctx->nil;
@@ -276,14 +278,18 @@ namespace basecode::scm::module::basic {
                             "[prim: {}]",
                             scm::prim_name(va)));
                         break;
-                    case obj_type_t::func:
+                    case obj_type_t::proc: {
+                        auto proc = PROC(va);
+                        fmt_args.push_back(format::format(
+                            "(lambda {}\n    {})",
+                            printable_t{ctx, proc->params, true},
+                            printable_t{ctx, proc->body, true}));
+                        break;
+                    }
+                    case obj_type_t::cfunc:
                         fmt_args.push_back(format::format(
                             "[cfunc: {}]",
                             (u0*) NATIVE_PTR(va)));
-                        break;
-                    case obj_type_t::macro:
-                        break;
-                    case obj_type_t::cfunc:
                         break;
                     case obj_type_t::ptr:
                         fmt_args.push_back(format::format(

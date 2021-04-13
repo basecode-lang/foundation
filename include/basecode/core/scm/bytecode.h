@@ -383,12 +383,6 @@ namespace basecode::scm {
 
             u0 todo(bb_t& bb, str::slice_t msg);
 
-            compile_result_t fn(compiler_t& comp,
-                                const context_t& c,
-                                obj_t* sym,
-                                obj_t* form,
-                                obj_t* args);
-
             compile_result_t ffi(compiler_t& comp,
                                  const context_t& c,
                                  obj_t* sym,
@@ -408,16 +402,15 @@ namespace basecode::scm {
                                    obj_t* form,
                                    obj_t* args);
 
+            compile_result_t lambda(compiler_t& comp,
+                                    const context_t& c,
+                                    obj_t* form,
+                                    obj_t* args);
+
             compile_result_t cmp_op(compiler_t& comp,
                                     const context_t& c,
                                     prim_type_t type,
                                     obj_t* args);
-
-            compile_result_t inline_(compiler_t& comp,
-                                     const context_t& c,
-                                     obj_t* sym,
-                                     obj_t* form,
-                                     obj_t* args);
 
             compile_result_t arith_op(compiler_t& comp,
                                       const context_t& c,
@@ -433,6 +426,10 @@ namespace basecode::scm {
             compile_result_t comp_proc(compiler_t& comp,
                                        const context_t& c,
                                        proc_t* proc);
+
+            compile_result_t define_macro(compiler_t& comp,
+                                          const context_t& c,
+                                          obj_t* args);
 
             u0 alloc_stack(bb_t& bb, u32 words, var_t** base_addr);
 

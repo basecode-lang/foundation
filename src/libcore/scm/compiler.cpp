@@ -92,9 +92,13 @@ namespace basecode::scm::compiler {
 
                 switch (TYPE(form)) {
                     case obj_type_t::ffi:   return vm::bytecode::ffi(comp, c, sym, form, args);
-                    case obj_type_t::prim:  return vm::bytecode::prim(comp, c, sym, form, args, PRIM(form));
-                    case obj_type_t::func:  return vm::bytecode::apply(comp, c, sym, form, args);
-                    case obj_type_t::macro: return vm::bytecode::inline_(comp, c, sym, form, args);
+                    case obj_type_t::prim:  return vm::bytecode::prim(comp,
+                                                                      c,
+                                                                      sym,
+                                                                      form,
+                                                                      args,
+                                                                      PRIM(form));
+                    case obj_type_t::proc:  return vm::bytecode::apply(comp, c, sym, form, args);
                     case obj_type_t::cfunc: return vm::bytecode::call_back(comp, c, sym, form, args);
                     default:                error(ctx, "tried to call non-callable value");
                 }
@@ -111,6 +115,8 @@ namespace basecode::scm::compiler {
         c.ctx       = ctx;
         c.obj       = obj;
         c.env       = env;
+        c.sym       = ctx->nil;
+        c.is_macro  = false;
         c.top_level = top_level;
         return c;
     }
