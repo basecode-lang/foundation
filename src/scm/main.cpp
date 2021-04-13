@@ -45,10 +45,10 @@ static getopt_t                 s_cl        {};
 static jmp_buf                  s_top_level {};
 static u8                       s_buf[4096] {};
 
-static u0 on_error(scm::ctx_t* ctx, const s8* msg, scm::obj_t* cl) {
-    UNUSED(ctx);
-    UNUSED(cl);
-    format::print(stderr, "{}", msg);
+static u0 on_error(scm::ctx_t* ctx, scm::obj_t* obj) {
+    format::print(stderr,
+                  "{}\n",
+                  scm::printable_t{ctx, obj, true});
     longjmp(s_top_level, -1);
 }
 

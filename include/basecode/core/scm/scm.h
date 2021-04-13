@@ -40,7 +40,7 @@ namespace basecode::scm {
     using get_func_t            = obj_t* (*)(ctx_t*, str::slice_t, obj_t*);
     using set_func_t            = b8 (*)(ctx_t*, str::slice_t, obj_t*, obj_t*);
     using rest_array_t          = array_t<obj_t*>;
-    using error_func_t          = u0 (*)(ctx_t*, const s8*, obj_t*);
+    using error_func_t          = u0 (*)(ctx_t*, obj_t*);
     using define_func_t         = b8 (*)(ctx_t*, str::slice_t, obj_t*, obj_t*);
     using native_func_t         = obj_t* (*)(ctx_t*, obj_t*);
 
@@ -135,8 +135,6 @@ namespace basecode::scm {
 
     b8 is_list(ctx_t* ctx, obj_t* obj);
 
-    u32 length(ctx_t* ctx, obj_t* obj);
-
     u0 push_gc(ctx_t* ctx, obj_t* obj);
 
     u0 restore_gc(ctx_t* ctx, u32 idx);
@@ -150,6 +148,8 @@ namespace basecode::scm {
                      b8 macro = false);
 
     obj_t* cdr(ctx_t* ctx, obj_t* obj);
+
+    u32 length(ctx_t* ctx, obj_t* obj);
 
     obj_t* eval(ctx_t* ctx, obj_t* obj);
 
@@ -245,13 +245,13 @@ namespace basecode::scm {
     obj_t* make_error(ctx_t* ctx, obj_t* args, obj_t* call_stack);
 
     template <typename... Args>
-    u0 error(ctx_t* ctx, fmt_str_t fmt_msg, const Args&... args) {
-        format_error(ctx, fmt_msg, fmt::make_format_args(args...));
+    obj_t* error(ctx_t* ctx, fmt_str_t fmt_msg, const Args&... args) {
+        return format_error(ctx, fmt_msg, fmt::make_format_args(args...));
     }
 
     u0 format_object(const printable_t& printable, fmt_ctx_t& ctx);
 
-    u0 format_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args);
+    obj_t* format_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args);
 
     ctx_t* init(u0* ptr, u32 size, alloc_t* alloc = context::top()->alloc);
 }

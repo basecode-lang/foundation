@@ -130,8 +130,8 @@ namespace basecode::scm::module::log {
         if (maskv) {
             auto ll = find_log_level(*maskv);
             if (ll == -1) {
-                scm::error(g_log_mod.ctx,
-                           "#:mask invalid log level symbol");
+                return scm::error(g_log_mod.ctx,
+                                  "#:mask invalid log level symbol");
             }
             mask = log_level_t(ll);
         }
@@ -141,7 +141,7 @@ namespace basecode::scm::module::log {
         } else if (*color_type == "err"_ss) {
             config.color_type = spdlog_color_type_t::err;
         } else {
-            scm::error(
+            return scm::error(
                 g_log_mod.ctx,
                 "invalid color-type value; expected: 'out or 'err");
         }
@@ -151,8 +151,10 @@ namespace basecode::scm::module::log {
                                                   logger_type_t::spdlog,
                                                   &config,
                                                   mask);
-        if (!OK(status))
-            scm::error(g_log_mod.ctx, "failed to create color logger");
+        if (!OK(status)) {
+            return scm::error(g_log_mod.ctx,
+                              "failed to create color logger");
+        }
 
         return scm::make_user_ptr(g_log_mod.ctx, logger);
     }
@@ -172,8 +174,10 @@ namespace basecode::scm::module::log {
         config.ident = (const s8*) ident->data;
         if (maskv) {
             auto ll = find_log_level(*maskv);
-            if (ll == -1)
-                scm::error(ctx, "#:mask invalid log level symbol");
+            if (ll == -1) {
+                return scm::error(ctx,
+                                  "#:mask invalid log level symbol");
+            }
             mask = log_level_t(ll);
         }
 
@@ -183,20 +187,24 @@ namespace basecode::scm::module::log {
             if (type == scm::obj_type_t::nil)
                 break;
             else if (type != scm::obj_type_t::symbol) {
-                scm::error(ctx,
-                           "syslog opts list may only contain symbols");
+                return scm::error(ctx,
+                                  "syslog opts list may only contain symbols");
             }
             const auto opt_name = scm::to_string(ctx, obj);
             auto opt_value = find_syslog_opt_value(opt_name);
-            if (opt_value == -1)
-                scm::error(ctx, "invalid syslog opt flag");
+            if (opt_value == -1) {
+                return scm::error(ctx,
+                                  "invalid syslog opt flag");
+            }
             config.opts |= opt_value;
             opts = scm::cdr(ctx, opts);
         }
 
         auto facility = find_syslog_facility_value(*facility_name);
-        if (facility == -1)
-            scm::error(ctx, "invalid syslog facility value");
+        if (facility == -1) {
+            return scm::error(ctx,
+                              "invalid syslog facility value");
+        }
         config.facility = facility;
 
         logger_t* logger{};
@@ -204,8 +212,10 @@ namespace basecode::scm::module::log {
                                                   logger_type_t::syslog,
                                                   &config,
                                                   mask);
-        if (!OK(status))
-            scm::error(ctx, "failed to create syslog logger");
+        if (!OK(status)) {
+            return scm::error(ctx,
+                              "failed to create syslog logger");
+        }
 
         return scm::make_user_ptr(ctx, logger);
     }
@@ -232,8 +242,10 @@ namespace basecode::scm::module::log {
         config.pattern = pattern ? *pattern : str::slice_t{};
         if (maskv) {
             auto ll = find_log_level(*maskv);
-            if (ll == -1)
-                scm::error(g_log_mod.ctx, "#:mask invalid log level symbol");
+            if (ll == -1) {
+                return scm::error(g_log_mod.ctx,
+                                  "#:mask invalid log level symbol");
+            }
             mask = log_level_t(ll);
         }
 
@@ -247,8 +259,10 @@ namespace basecode::scm::module::log {
                                                   logger_type_t::spdlog,
                                                   &config,
                                                   mask);
-        if (!OK(status))
-            scm::error(g_log_mod.ctx, "failed to create daily file logger");
+        if (!OK(status)) {
+            return scm::error(g_log_mod.ctx,
+                              "failed to create daily file logger");
+        }
 
         return scm::make_user_ptr(g_log_mod.ctx, logger);
     }
@@ -263,8 +277,10 @@ namespace basecode::scm::module::log {
         config.pattern = pattern ? *pattern : str::slice_t{};
         if (maskv) {
             auto ll = find_log_level(*maskv);
-            if (ll == -1)
-                scm::error(g_log_mod.ctx, "#:mask invalid log level symbol");
+            if (ll == -1) {
+                return scm::error(g_log_mod.ctx,
+                                  "#:mask invalid log level symbol");
+            }
             mask = log_level_t(ll);
         }
 
@@ -278,8 +294,10 @@ namespace basecode::scm::module::log {
                                                   logger_type_t::spdlog,
                                                   &config,
                                                   mask);
-        if (!OK(status))
-            scm::error(g_log_mod.ctx, "failed to create basic file logger");
+        if (!OK(status)) {
+            return scm::error(g_log_mod.ctx,
+                              "failed to create basic file logger");
+        }
 
         return scm::make_user_ptr(g_log_mod.ctx, logger);
     }
@@ -318,10 +336,12 @@ namespace basecode::scm::module::log {
         if (scm::type(parent) != scm::obj_type_t::ptr) {
             scm::error(g_log_mod.ctx,
                        "parent: expected pointer argument");
+            return;
         }
         if (scm::type(child) != scm::obj_type_t::ptr) {
             scm::error(g_log_mod.ctx,
                        "child: expected pointer argument");
+            return;
         }
         basecode::log::append_child(
             (logger_t*) scm::to_user_ptr(g_log_mod.ctx, parent),
@@ -344,8 +364,8 @@ namespace basecode::scm::module::log {
         if (maskv) {
             auto ll = find_log_level(*maskv);
             if (ll == -1) {
-                scm::error(g_log_mod.ctx,
-                           "#:mask invalid log level symbol");
+                return scm::error(g_log_mod.ctx,
+                                  "#:mask invalid log level symbol");
             }
             mask = log_level_t(ll);
         }
@@ -361,8 +381,8 @@ namespace basecode::scm::module::log {
                                                   &config,
                                                   mask);
         if (!OK(status)) {
-            scm::error(g_log_mod.ctx,
-                       "failed to create rotating file logger");
+            return scm::error(g_log_mod.ctx,
+                              "failed to create rotating file logger");
         }
 
         return scm::make_user_ptr(g_log_mod.ctx, logger);
@@ -557,7 +577,7 @@ namespace basecode::scm::module::log {
 
                 {"logger-append-child"_ss, 1,
                     {
-                        {(u0*) logger_append_child, "logger_append_child"_ss, type_decl::obj_ptr, 2,
+                        {(u0*) logger_append_child, "logger_append_child"_ss, type_decl::u0_, 2,
                             {
                                 {"parent"_ss, type_decl::obj_ptr},
                                 {"child"_ss, type_decl::obj_ptr},

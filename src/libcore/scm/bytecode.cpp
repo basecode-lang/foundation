@@ -759,192 +759,8 @@ namespace basecode::scm {
                     format::format_to(buf, "\n");
             }
 
-            static u0 format_edges(str_buf_t& buf, bb_t* block, u64 addr) {
-                bb_digraph_t::Node_Array nodes{};
-                array::init(nodes, block->emit->alloc);
-                defer(array::free(nodes));
-
-                digraph::incoming_nodes(block->emit->bb_graph,
-                                        block->node,
-                                        nodes);
-                if (nodes.size > 0) {
-                    format::format_to(buf,
-                                      "${:08X}:    .preds      ",
-                                      addr);
-                    for (u32 i = 0; i < nodes.size; ++i) {
-                        if (i > 0) format::format_to(buf, ", ");
-                        format::format_to(buf,
-                                          "{}",
-                                          *(nodes[i]->value));
-                    }
-                    format::format_to(buf, "\n");
-                }
-
-                array::reset(nodes);
-                digraph::outgoing_nodes(block->emit->bb_graph,
-                                        block->node,
-                                        nodes);
-                if (nodes.size > 0) {
-                    format::format_to(buf,
-                                      "${:08X}:    .succs      ",
-                                      addr);
-                    for (u32 i = 0; i < nodes.size; ++i) {
-                        if (i > 0) format::format_to(buf, ", ");
-                        format::format_to(buf,
-                                          "{}",
-                                          *(nodes[i]->value));
-                    }
-                    format::format_to(buf, "\n");
-                }
-            }
-
-            u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf) {
-                auto curr = &start_block;
-                u64  addr = curr->addr;
-                u32  line{};
-                while (curr) {
-                    format_comments(buf,
-                                    0,
-                                    e.comments,
-                                    e.strtab,
-                                    comment_type_t::note,
-                                    curr->id,
-                                    curr->notes.sidx,
-                                    curr->notes.eidx,
-                                    -1,
-                                    addr);
-                    format::format_to(buf,
-                                      "${:08X}: {}:\n",
-                                      addr,
-                                      *curr);
-                    format_edges(buf, curr, addr);
-                    for (s32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
-                        const auto& inst = e.insts[i];
-                        if (inst.block_id != curr->id)
-                            continue;
-                        auto start_pos = buf.size();
-                        format::format_to(
-                            buf,
-                            "${:08X}:    {:<12}",
-                            addr,
-                            instruction::type::name(inst.type));
-                        switch (inst.encoding) {
-                            case instruction::encoding::imm: {
-                                if (inst.mode
-                                &&  inst.operands[1].type != operand_type_t::none) {
-                                    format::format_to(
-                                        buf,
-                                        "{}, ",
-                                        inst.operands[1]);
-                                    format::format_to(
-                                        buf,
-                                        "{}",
-                                        inst.operands[0]);
-                                } else {
-                                    format::format_to(
-                                        buf,
-                                        "{}",
-                                        inst.operands[0]);
-                                    if (inst.operands[1].type != operand_type_t::none) {
-                                        format::format_to(
-                                            buf,
-                                            ", {}",
-                                            inst.operands[1]);
-                                    }
-                                }
-                                break;
-                            }
-                            case instruction::encoding::reg1: {
-                                format::format_to(
-                                    buf,
-                                    "{}",
-                                    inst.operands[0]);
-                                break;
-                            }
-                            case instruction::encoding::reg2: {
-                                format::format_to(
-                                    buf,
-                                    "{}, {}",
-                                    inst.operands[0],
-                                    inst.operands[1]);
-                                break;
-                            }
-                            case instruction::encoding::reg2_imm: {
-                                format::format_to(
-                                    buf,
-                                    "{}, {}, {}",
-                                    inst.operands[0],
-                                    inst.operands[1],
-                                    inst.operands[2]);
-                                break;
-                            }
-                            case instruction::encoding::reg3: {
-                                format::format_to(
-                                    buf,
-                                    "{}, {}, {}",
-                                    inst.operands[0],
-                                    inst.operands[1],
-                                    inst.operands[2]);
-                                break;
-                            }
-                            case instruction::encoding::reg4: {
-                                format::format_to(
-                                    buf,
-                                    "{}, {}, {}, {}",
-                                    inst.operands[0],
-                                    inst.operands[1],
-                                    inst.operands[2],
-                                    inst.operands[3]);
-                                break;
-                            }
-                            case instruction::encoding::offset: {
-                                if (inst.mode) {
-                                    format::format_to(
-                                        buf,
-                                        "{}, {}({})",
-                                        inst.operands[0],
-                                        inst.operands[2],
-                                        inst.operands[1]);
-                                } else {
-                                    format::format_to(
-                                        buf,
-                                        "{}({}), {}",
-                                        inst.operands[2],
-                                        inst.operands[0],
-                                        inst.operands[1]);
-                                }
-                                break;
-                            }
-                            case instruction::encoding::indexed: {
-                                format::format_to(
-                                    buf,
-                                    "{}({}, {}), {}",
-                                    inst.operands[3],
-                                    inst.operands[0],
-                                    inst.operands[1],
-                                    inst.operands[2]);
-                                break;
-                            }
-                            default: {
-                                break;
-                            }
-                        }
-                        format_comments(buf,
-                                        buf.size() - start_pos,
-                                        e.comments,
-                                        e.strtab,
-                                        comment_type_t::margin,
-                                        curr->id,
-                                        curr->notes.sidx,
-                                        curr->notes.eidx,
-                                        line,
-                                        addr);
-                        addr += sizeof(encoded_inst_t);
-                        ++line;
-                    }
-                    line = {};
-                    curr = curr->next;
-                }
+            status_t allocate_registers(emitter_t& e) {
+                return status_t::fail;
             }
 
             u0 init(emitter_t& e, vm_t* vm, alloc_t* alloc) {
@@ -958,6 +774,10 @@ namespace basecode::scm {
                 digraph::init(e.var_graph, e.alloc);
                 stable_array::init(e.vars, e.alloc);
                 stable_array::init(e.blocks, e.alloc);
+            }
+
+            status_t find_liveliness_intervals(emitter_t& e) {
+                return status_t::fail;
             }
 
             status_t create_dot(emitter_t& e, const path_t& path) {
@@ -1139,6 +959,24 @@ namespace basecode::scm {
                 return size;
             }
 
+            inst_t* make_instruction(emitter_t& e, bb_t& bb, u8 encoding) {
+                auto inst = &array::append(e.insts);
+                inst->id        = e.insts.size;
+                inst->aux       = 0;
+                inst->pad       = 0;
+                inst->mode      = false;
+                inst->block_id  = bb.id;
+                inst->encoding  = encoding;
+                inst->is_signed = false;
+                if (bb.insts.eidx == 0) {
+                    bb.insts.sidx = e.insts.size - 1;
+                    bb.insts.eidx = bb.insts.sidx + 1;
+                } else {
+                    bb.insts.eidx = e.insts.size;
+                }
+                return inst;
+            }
+
             status_t assemble(emitter_t& e, bb_t& start_block, u64* heap) {
                 auto curr = &start_block;
 
@@ -1167,22 +1005,192 @@ namespace basecode::scm {
                 return status_t::ok;
             }
 
-            inst_t* make_instruction(emitter_t& e, bb_t& bb, u8 encoding) {
-                auto inst = &array::append(e.insts);
-                inst->id        = e.insts.size;
-                inst->aux       = 0;
-                inst->pad       = 0;
-                inst->mode      = false;
-                inst->block_id  = bb.id;
-                inst->encoding  = encoding;
-                inst->is_signed = false;
-                if (bb.insts.eidx == 0) {
-                    bb.insts.sidx = e.insts.size - 1;
-                    bb.insts.eidx = bb.insts.sidx + 1;
-                } else {
-                    bb.insts.eidx = e.insts.size;
+            static u0 format_edges(str_buf_t& buf, bb_t* block, u64 addr) {
+                bb_digraph_t::Node_Array nodes{};
+                array::init(nodes, block->emit->alloc);
+                defer(array::free(nodes));
+
+                digraph::incoming_nodes(block->emit->bb_graph,
+                                        block->node,
+                                        nodes);
+                if (nodes.size > 0) {
+                    format::format_to(buf,
+                                      "${:08X}:    .preds      ",
+                                      addr);
+                    for (u32 i = 0; i < nodes.size; ++i) {
+                        if (i > 0) format::format_to(buf, ", ");
+                        format::format_to(buf,
+                                          "{}",
+                                          *(nodes[i]->value));
+                    }
+                    format::format_to(buf, "\n");
                 }
-                return inst;
+
+                array::reset(nodes);
+                digraph::outgoing_nodes(block->emit->bb_graph,
+                                        block->node,
+                                        nodes);
+                if (nodes.size > 0) {
+                    format::format_to(buf,
+                                      "${:08X}:    .succs      ",
+                                      addr);
+                    for (u32 i = 0; i < nodes.size; ++i) {
+                        if (i > 0) format::format_to(buf, ", ");
+                        format::format_to(buf,
+                                          "{}",
+                                          *(nodes[i]->value));
+                    }
+                    format::format_to(buf, "\n");
+                }
+            }
+
+            u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf) {
+                auto curr = &start_block;
+                u64  addr = curr->addr;
+                u32  line{};
+                while (curr) {
+                    format_comments(buf,
+                                    0,
+                                    e.comments,
+                                    e.strtab,
+                                    comment_type_t::note,
+                                    curr->id,
+                                    curr->notes.sidx,
+                                    curr->notes.eidx,
+                                    -1,
+                                    addr);
+                    format::format_to(buf,
+                                      "${:08X}: {}:\n",
+                                      addr,
+                                      *curr);
+                    format_edges(buf, curr, addr);
+                    for (s32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
+                        const auto& inst = e.insts[i];
+                        if (inst.block_id != curr->id)
+                            continue;
+                        auto start_pos = buf.size();
+                        format::format_to(
+                            buf,
+                            "${:08X}:    {:<12}",
+                            addr,
+                            instruction::type::name(inst.type));
+                        switch (inst.encoding) {
+                            case instruction::encoding::imm: {
+                                if (inst.mode
+                                    &&  inst.operands[1].type != operand_type_t::none) {
+                                    format::format_to(
+                                        buf,
+                                        "{}, ",
+                                        inst.operands[1]);
+                                    format::format_to(
+                                        buf,
+                                        "{}",
+                                        inst.operands[0]);
+                                } else {
+                                    format::format_to(
+                                        buf,
+                                        "{}",
+                                        inst.operands[0]);
+                                    if (inst.operands[1].type != operand_type_t::none) {
+                                        format::format_to(
+                                            buf,
+                                            ", {}",
+                                            inst.operands[1]);
+                                    }
+                                }
+                                break;
+                            }
+                            case instruction::encoding::reg1: {
+                                format::format_to(
+                                    buf,
+                                    "{}",
+                                    inst.operands[0]);
+                                break;
+                            }
+                            case instruction::encoding::reg2: {
+                                format::format_to(
+                                    buf,
+                                    "{}, {}",
+                                    inst.operands[0],
+                                    inst.operands[1]);
+                                break;
+                            }
+                            case instruction::encoding::reg2_imm: {
+                                format::format_to(
+                                    buf,
+                                    "{}, {}, {}",
+                                    inst.operands[0],
+                                    inst.operands[1],
+                                    inst.operands[2]);
+                                break;
+                            }
+                            case instruction::encoding::reg3: {
+                                format::format_to(
+                                    buf,
+                                    "{}, {}, {}",
+                                    inst.operands[0],
+                                    inst.operands[1],
+                                    inst.operands[2]);
+                                break;
+                            }
+                            case instruction::encoding::reg4: {
+                                format::format_to(
+                                    buf,
+                                    "{}, {}, {}, {}",
+                                    inst.operands[0],
+                                    inst.operands[1],
+                                    inst.operands[2],
+                                    inst.operands[3]);
+                                break;
+                            }
+                            case instruction::encoding::offset: {
+                                if (inst.mode) {
+                                    format::format_to(
+                                        buf,
+                                        "{}, {}({})",
+                                        inst.operands[0],
+                                        inst.operands[2],
+                                        inst.operands[1]);
+                                } else {
+                                    format::format_to(
+                                        buf,
+                                        "{}({}), {}",
+                                        inst.operands[2],
+                                        inst.operands[0],
+                                        inst.operands[1]);
+                                }
+                                break;
+                            }
+                            case instruction::encoding::indexed: {
+                                format::format_to(
+                                    buf,
+                                    "{}({}, {}), {}",
+                                    inst.operands[3],
+                                    inst.operands[0],
+                                    inst.operands[1],
+                                    inst.operands[2]);
+                                break;
+                            }
+                            default: {
+                                break;
+                            }
+                        }
+                        format_comments(buf,
+                                        buf.size() - start_pos,
+                                        e.comments,
+                                        e.strtab,
+                                        comment_type_t::margin,
+                                        curr->id,
+                                        curr->notes.sidx,
+                                        curr->notes.eidx,
+                                        line,
+                                        addr);
+                        addr += sizeof(encoded_inst_t);
+                        ++line;
+                    }
+                    line = {};
+                    curr = curr->next;
+                }
             }
 
             status_t encode_inst(emitter_t& e, const inst_t& inst, u64* heap) {

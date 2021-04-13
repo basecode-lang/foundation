@@ -224,8 +224,11 @@ namespace basecode::ffi {
                         return pair.value;
                 }
             } else {
-                if (prefix.length > 0) {
+                if (prefix.length >= 2) {
                     prefix.length -= 2;
+                    goto retry;
+                } else if (prefix.length == 1) {
+                    --prefix.length;
                     goto retry;
                 }
             }

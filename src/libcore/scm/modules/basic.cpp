@@ -109,11 +109,12 @@ namespace basecode::scm::module::basic {
         auto ctx = g_basic_sys.ctx;
         const auto& lst = *rest;
         for (u32 i = 0; i < lst.size; ++i) {
-            if (i > 0 && i < lst.size - 1)
+            if (i > 0)
                 format::print(" ");
             format::print("{}", printable_t{ctx, lst[i]});
         }
-        format::print("\n");
+        if (lst.size > 0)
+            format::print("\n");
     }
 
     scm::obj_t* current_logger() {
@@ -135,17 +136,25 @@ namespace basecode::scm::module::basic {
             const auto& file_name = *string::interned::get_slice(STRING_ID(path));
             if (!adjust_load_path(load_path, file_name)) {
                 // XXX:
-                error(g_basic_sys.ctx,
-                      "load cannot resolve file path: {}",
-                      file_name);
+                return error(g_basic_sys.ctx,
+                             "load cannot resolve file path: {}",
+                             file_name);
             }
             auto status = scm::system::eval(load_path, &obj);
             if (!OK(status)) {
                 // XXX:
-                error(g_basic_sys.ctx, "load eval failed");
+                return error(g_basic_sys.ctx, "load eval failed");
             }
         }
-        return obj;
+        return obj ? obj : g_basic_sys.ctx->nil;
+    }
+
+    obj_t* fixnum_to_flonum(u32 num) {
+        return make_flonum(g_basic_sys.ctx, flonum_t(num));
+    }
+
+    obj_t* flonum_to_fixnum(f32 num) {
+        return make_fixnum(g_basic_sys.ctx, fixnum_t(num));
     }
 
     obj_t* append(rest_array_t* rest) {
@@ -307,7 +316,16 @@ namespace basecode::scm::module::basic {
                         break;
                 }
             }
-            fmt::vformat_to(str_buf, (std::string_view) *fmt_str, fmt_args);
+            // XXX: FIXME
+            //
+            // it appears that dyncall isn't exception friendly so this will
+            // still end up in a segfault.  however, by catching the exception here
+            // we at least get a stack dump from the scheme interpreter.
+            try {
+                fmt::vformat_to(str_buf, (std::string_view) *fmt_str, fmt_args);
+            } catch (std::runtime_error& ex) {
+                return error(ctx, ex.what());
+            }
         }
         return make_string(ctx, (const s8*) buf.data, buf.length);
     }
@@ -327,6 +345,26 @@ namespace basecode::scm::module::basic {
                     }
                 },
 
+                {"fl->fx"_ss, 1,
+                    {
+                        {(u0*) flonum_to_fixnum, "flonum_to_fixnum"_ss, type_decl::obj_ptr, 1,
+                            {
+                                {"num"_ss, type_decl::f32_},
+                            }
+                        }
+                    }
+                },
+
+                {"fx->fl"_ss, 1,
+                    {
+                        {(u0*) fixnum_to_flonum, "fixnum_to_flonum"_ss, type_decl::obj_ptr, 1,
+                            {
+                                {"num"_ss, type_decl::u32_},
+                            }
+                        }
+                    }
+                },
+
                 {"expand"_ss, 1,
                     {
                         {(u0*) expand, "expand"_ss, type_decl::obj_ptr, 1,
@@ -336,6 +374,7 @@ namespace basecode::scm::module::basic {
                         }
                     }
                 },
+
                 {"print"_ss, 1,
                     {
                         {(u0*) print, "print"_ss, type_decl::u0_, 1,

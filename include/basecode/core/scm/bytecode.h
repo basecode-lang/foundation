@@ -206,6 +206,10 @@ namespace basecode::scm {
                 return status_t::ok;
             }
 
+            status_t allocate_registers(emitter_t& e);
+
+            status_t find_liveliness_intervals(emitter_t& e);
+
             status_t create_dot(emitter_t& e, const path_t& path);
 
             template <String_Concept T>

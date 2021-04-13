@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/scm/types.h>
 #include <basecode/core/scm/system.h>
 
 namespace basecode::scm::system {
@@ -72,7 +73,19 @@ namespace basecode::scm::system {
         while (true) {
             auto expr = read(g_scm_sys.ctx, crsr);
             if (!expr) break;
+            if (IS_SCM_ERROR(expr)) {
+                format::print(stderr,
+                              "{}",
+                              printable_t{g_scm_sys.ctx, expr});
+                break;
+            }
             *obj = eval(g_scm_sys.ctx, expr);
+            if (IS_SCM_ERROR(*obj)) {
+                format::print(stderr,
+                              "{}",
+                              printable_t{g_scm_sys.ctx, *obj});
+                break;
+            }
             restore_gc(g_scm_sys.ctx, gc);
         }
         restore_gc(g_scm_sys.ctx, gc);
@@ -97,7 +110,19 @@ namespace basecode::scm::system {
             *obj = nil(g_scm_sys.ctx);
             return status_t::ok;
         }
+        if (IS_SCM_ERROR(expr)) {
+            format::print(stderr,
+                          "{}",
+                          printable_t{g_scm_sys.ctx, expr});
+            return status_t::error;
+        }
         *obj = eval(g_scm_sys.ctx, expr);
+        if (IS_SCM_ERROR(*obj)) {
+            format::print(stderr,
+                          "{}",
+                          printable_t{g_scm_sys.ctx, *obj});
+            return status_t::error;
+        }
         return status_t::ok;
     }
 }

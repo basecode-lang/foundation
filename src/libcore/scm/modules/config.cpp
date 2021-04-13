@@ -134,6 +134,7 @@ namespace basecode::config {
                 scm::error(ctx,
                            "[config] cvar '{}' is already defined",
                            name);
+                return false;
             }
 
             cvar_type_t type{};
@@ -144,6 +145,7 @@ namespace basecode::config {
                     scm::error(ctx,
                                "[config] cannot define cvar '{}' with nil object",
                                name);
+                    return false;
                 case scm::obj_type_t::ffi:
                 case scm::obj_type_t::ptr:
                 case scm::obj_type_t::pair:
@@ -176,6 +178,7 @@ namespace basecode::config {
                 scm::error(ctx,
                            "[config] unable to define cvar '{}'",
                            name);
+                return false;
             }
 
             cvar::set(var, value);
@@ -196,9 +199,9 @@ namespace basecode::config {
 
             cvar_t* var{};
             if (!OK(cvar::get(name, &var))) {
-                scm::error(ctx,
-                           "[config] unable to find cvar '{}'",
-                           name);
+                return scm::error(ctx,
+                                  "[config] unable to find cvar '{}'",
+                                  name);
             }
 
             switch (var->type) {
@@ -215,7 +218,7 @@ namespace basecode::config {
                 case cvar_type_t::pointer:
                     return scm::make_user_ptr(ctx, (u0*) var->value.ptr);
                 default:
-                    scm::error(ctx, "[config] invalid cvar type");
+                    return scm::error(ctx, "[config] invalid cvar type");
             }
 
             return ctx->nil;
@@ -339,6 +342,7 @@ namespace basecode::config {
                     break;
                 default:
                     scm::error(ctx, "[config] invalid cvar type");
+                    break;
             }
         }
 
