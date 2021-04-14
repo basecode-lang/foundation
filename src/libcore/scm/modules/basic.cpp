@@ -141,10 +141,8 @@ namespace basecode::scm::module::basic {
                              file_name);
             }
             auto status = scm::system::eval(load_path, &obj);
-            if (!OK(status)) {
-                // XXX:
-                return error(g_basic_sys.ctx, "load eval failed");
-            }
+            if (!OK(status))
+                return obj;
         }
         return obj ? obj : g_basic_sys.ctx->nil;
     }
@@ -316,11 +314,6 @@ namespace basecode::scm::module::basic {
                         break;
                 }
             }
-            // XXX: FIXME
-            //
-            // it appears that dyncall isn't exception friendly so this will
-            // still end up in a segfault.  however, by catching the exception here
-            // we at least get a stack dump from the scheme interpreter.
             try {
                 fmt::vformat_to(str_buf, (std::string_view) *fmt_str, fmt_args);
             } catch (std::runtime_error& ex) {

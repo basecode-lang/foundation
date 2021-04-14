@@ -41,19 +41,22 @@ static u0 assemble_and_execute_block(scm::ctx_t* ctx,
     defer(memory::free(ctx->alloc, code_buf));
 
     auto status = scm::vm::emitter::assemble(emit, bb, code_buf);
-    REQUIRE(OK(status));
+    if (!OK(status))
+        REQUIRE(false);
 
     const auto start_addr = u64(code_buf);
     PC = start_addr;
     status = scm::vm::step(vm, ctx, cycles);
-    REQUIRE(OK(status));
-    REQUIRE(PC == start_addr + (sizeof(scm::encoded_inst_t) * cycles));
+    if (!OK(status))
+        REQUIRE(false);
+    if (PC != start_addr + (sizeof(scm::encoded_inst_t) * cycles))
+        REQUIRE(false);
     auto flags = (scm::flag_register_t*) &F;
-    REQUIRE(flags->c == c);
-    REQUIRE(flags->i == i);
-    REQUIRE(flags->z == z);
-    REQUIRE(flags->n == n);
-    REQUIRE(flags->v == v);
+    if (flags->c != c) REQUIRE(false);
+    if (flags->i != i) REQUIRE(false);
+    if (flags->z != z) REQUIRE(false);
+    if (flags->n != n) REQUIRE(false);
+    if (flags->v != v) REQUIRE(false);
 }
 
 TEST_CASE("basecode::scm::vm instructions") {
@@ -107,7 +110,8 @@ TEST_CASE("basecode::scm::vm instructions") {
                                        false,
                                        false,
                                        false);
-            REQUIRE(R(0) == 42);
+            if (R(0) != 42)
+                REQUIRE(false);
 
             auto& bb2 = scm::vm::emitter::make_basic_block(emit,
                                                           "test2"_ss,
@@ -126,8 +130,10 @@ TEST_CASE("basecode::scm::vm instructions") {
                                        false,
                                        false,
                                        false);
-            REQUIRE(R(0) == 42);
-            REQUIRE(R(1) == 42);
+            if (R(0) != 42)
+                REQUIRE(false);
+            if (R(1) != 42)
+                REQUIRE(false);
 
             auto& bb3 = scm::vm::emitter::make_basic_block(emit,
                                                            "test3"_ss,
@@ -146,7 +152,8 @@ TEST_CASE("basecode::scm::vm instructions") {
                                        true,
                                        false,
                                        false);
-            REQUIRE(R(2) == 0);
+            if (R(2) != 0)
+                REQUIRE(false);
 
             auto& bb4 = scm::vm::emitter::make_basic_block(emit,
                                                            "test4"_ss,
@@ -165,7 +172,8 @@ TEST_CASE("basecode::scm::vm instructions") {
                                        false,
                                        true,
                                        false);
-            REQUIRE(R(2) == u32(-42));
+            if (R(2) != u32(-42))
+                REQUIRE(false);
         }
 
         /* add, adds */ {
@@ -187,7 +195,8 @@ TEST_CASE("basecode::scm::vm instructions") {
                                        false,
                                        false,
                                        false);
-            REQUIRE(R(0) == 84);
+            if (R(0) != 84)
+                REQUIRE(false);
 
             auto& bb2 = scm::vm::emitter::make_basic_block(emit,
                                                            "test2"_ss,
@@ -206,7 +215,8 @@ TEST_CASE("basecode::scm::vm instructions") {
                                        false,
                                        false,
                                        false);
-            REQUIRE(R(1) == 126);
+            if (R(1) != 126)
+                REQUIRE(false);
         }
 
         /* mul */ {
@@ -308,7 +318,8 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
 
     buf_t buf{};
     buf::init(buf);
-    REQUIRE(OK(buf::load(buf, source)));
+    if (!OK(buf::load(buf, source)))
+        REQUIRE(false);
     buf_crsr_t crsr{};
     buf::cursor::init(crsr, buf);
     auto gc = scm::save_gc(ctx);
@@ -322,6 +333,10 @@ TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
         auto expr = scm::read(ctx, crsr);
         if (!expr)
             break;
+        if (IS_SCM_ERROR(expr)) {
+            format::print("{}\n", scm::printable_t{ctx, expr});
+            break;
+        }
         auto obj = scm::eval2(ctx, expr);
         format::print("obj:  {}\n", scm::printable_t{ctx, obj, true});
     }

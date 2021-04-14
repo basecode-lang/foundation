@@ -120,11 +120,12 @@ namespace basecode::scm {
 
     static obj_t* read_expr(ctx_t* ctx, buf_crsr_t& crsr);
 
-    static u32 make_ffi_signature(ctx_t* ctx,
-                                  obj_t* args,
-                                  rest_array_t& eval_args,
-                                  u8* buf,
-                                  keyword_table_t& keywords);
+    static obj_t* make_ffi_signature(ctx_t* ctx,
+                                     obj_t* args,
+                                     rest_array_t& eval_args,
+                                     u8* buf,
+                                     u32& len,
+                                     keyword_table_t& keywords);
 
     static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type);
 
@@ -182,6 +183,10 @@ namespace basecode::scm {
 
     obj_t* top_env(ctx_t* ctx) {
         return vm::mem_area::top<obj_t*>(*ctx->env_stack);
+    }
+
+    u0 clear_error(ctx_t* ctx) {
+        ctx->err = ctx->nil;
     }
 
     obj_t* pop_env(ctx_t* ctx) {
@@ -339,6 +344,7 @@ namespace basecode::scm {
                 if (!OK(rc.status)) {
                     error(ctx,
                           "unable to find interned string: {}", STRING_ID(obj));
+                    return 0;
                 }
                 return rc.slice.length;
             }
@@ -353,6 +359,7 @@ namespace basecode::scm {
         ||  obj >= ctx->objects + ctx->object_count) {
             error(ctx,
                   "fatal: obj address outside of heap range! {}", (u0*) obj);
+            return;
         }
         vm::mem_area::push(*ctx->gc_stack, obj);
     }
@@ -430,29 +437,33 @@ namespace basecode::scm {
         return ctx->native_ptrs[idx - 1];
     }
 
-    static u32 make_ffi_signature(ctx_t* ctx,
-                                  obj_t* args,
-                                  rest_array_t& eval_args,
-                                  u8* buf,
-                                  keyword_table_t& keywords) {
-        u32 len{};
+    static obj_t* make_ffi_signature(ctx_t* ctx,
+                                     obj_t* args,
+                                     rest_array_t& eval_args,
+                                     u8* buf,
+                                     u32& len,
+                                     keyword_table_t& keywords) {
+        len = 0;
         if (IS_NIL(args)) {
             buf[len++] = u8(param_cls_t::void_);
-            return len;
+            return ctx->nil;
         }
         while (!IS_NIL(args)) {
             auto arg = CAR(args);
             if (TYPE(arg) == obj_type_t::keyword) {
                 args = CDR(args);
                 if (IS_NIL(args)) {
-                    error(ctx,
-                          "[ffi] argument value expected after keyword");
+                    return error(ctx,
+                                 "[ffi] argument value expected after keyword");
                 }
-                hashtab::insert(keywords,
-                                to_string(ctx, arg),
-                                EVAL(CAR(args)));
+                auto value = EVAL(CAR(args));
+                if (IS_SCM_ERROR(value))
+                    return value;
+                hashtab::insert(keywords, to_string(ctx, arg), value);
             } else {
                 auto eval_arg = EVAL(arg);
+                if (IS_SCM_ERROR(eval_arg))
+                    return eval_arg;
                 const auto& mapping = s_types[u32(TYPE(eval_arg))];
                 buf[len++] = mapping.type;
                 buf[len++] = mapping.size;
@@ -460,7 +471,7 @@ namespace basecode::scm {
             }
             args = CDR(args);
         }
-        return len;
+        return ctx->nil;
     }
 
     obj_t* make_bool(ctx_t* ctx, obj_t* obj) {
@@ -648,6 +659,8 @@ namespace basecode::scm {
         ctx->call_list = ctx->nil;
         ctx->free_list = ctx->nil;
 
+        ctx->err = ctx->nil;
+
         // populate freelist
         for (s32 i = ctx->object_count - 1; i >= ctx->object_used; i--) {
             obj_t* obj = &ctx->objects[i];
@@ -775,11 +788,8 @@ namespace basecode::scm {
     }
 
     obj_t* eval(ctx_t* ctx, obj_t* obj) {
-        {
-            auto tos = vm::mem_area::top<obj_t*>(*ctx->data_stack);
-            if (IS_SCM_ERROR(tos))
-                return vm::mem_area::pop<obj_t*>(*ctx->data_stack);
-        }
+        if (IS_SCM_ERROR(ctx->err))
+            return ctx->err;
 
         if (ctx->env_stack->size == 0) {
             return error(ctx, "environment stack is empty: push an "
@@ -866,6 +876,8 @@ namespace basecode::scm {
                         auto gs = save_gc(ctx);
                         while (true) {
                             vb = eval(ctx, va);
+                            if (IS_SCM_ERROR(vb))
+                                return vb;
                             if (IS_NIL(vb) || IS_FALSE(vb))
                                 break;
                             auto body = arg;
@@ -874,6 +886,8 @@ namespace basecode::scm {
                                 push_gc(ctx, body);
                                 push_gc(ctx, top_env(ctx));
                                 res = eval(ctx, CAR(body));
+                                if (IS_SCM_ERROR(res))
+                                    return res;
                                 body = CDR(body);
                             }
                             restore_gc(ctx, gs);
@@ -937,6 +951,8 @@ namespace basecode::scm {
                             push_gc(ctx, arg);
                             push_gc(ctx, top_env(ctx));
                             res = eval(ctx, CAR(arg));
+                            if (IS_SCM_ERROR(res))
+                                return res;
                             arg = CDR(arg);
                         }
                         return res;
@@ -1046,8 +1062,11 @@ namespace basecode::scm {
 
             case obj_type_t::proc: {
                 auto proc = PROC(fn);
-                if (!proc->is_macro)
+                if (!proc->is_macro) {
                     arg = eval_list(ctx, arg);
+                    if (IS_SCM_ERROR(arg))
+                        return arg;
+                }
                 push_env(ctx, make_environment(ctx, top_env(ctx)));
                 args_to_env(ctx, proc->params, arg);
                 auto body = proc->body;
@@ -1057,6 +1076,8 @@ namespace basecode::scm {
                     push_gc(ctx, body);
                     push_gc(ctx, top_env(ctx));
                     res = eval(ctx, CAR(body));
+                    if (IS_SCM_ERROR(res))
+                        return res;
                     body = CDR(body);
                 }
                 if (proc->is_macro) {
@@ -1103,9 +1124,10 @@ namespace basecode::scm {
         obj_t* head = ctx->nil;
         obj_t* tail = head;
         while (!IS_NIL(lst)) {
-            auto r = cons(ctx,
-                          EVAL(next_arg(ctx, &lst)),
-                          ctx->nil);
+            auto va = EVAL(next_arg(ctx, &lst));
+            if (IS_SCM_ERROR(va))
+                return va;
+            auto r = cons(ctx, va, ctx->nil);
             if (IS_NIL(tail)) {
                 head = r;
                 tail = head;
@@ -1130,11 +1152,15 @@ namespace basecode::scm {
         if (TYPE(a) == obj_type_t::pair) {
             auto aa = CAAR(obj);
             if (equal(ctx, aa, SYM("unquote-splicing"))) {
-                obj_t* t1[] = {SYM("append"), CADR(a), quasiquote(ctx, CDR(obj))};
+                obj_t* t1[] = {SYM("append"),
+                               CADR(a),
+                               quasiquote(ctx, CDR(obj))};
                 return make_list(ctx, t1, 3);
             }
         }
-        obj_t* t1[] = {SYM("cons"), quasiquote(ctx, a), quasiquote(ctx, CDR(obj))};
+        obj_t* t1[] = {SYM("cons"),
+                       quasiquote(ctx, a),
+                       quasiquote(ctx, CDR(obj))};
         return make_list(ctx, t1, 3);
     }
 
@@ -1251,7 +1277,13 @@ namespace basecode::scm {
 
     obj_t* ffi_apply(ctx_t* ctx, obj_t* fn, obj_t* args) {
         auto proto = PROTO(fn);
-        u8 sig_buf[32];
+        obj_t* err = ctx->nil;
+        param_alias_t ret{};
+        u8            sig_buf[32];
+        u32           p;
+        u32           i;
+        u32           len{};
+        ffi::status_t status{};
 
         ffi_t ffi{};
         ffi::init(ffi, 1024, ctx->alloc);
@@ -1262,28 +1294,26 @@ namespace basecode::scm {
         rest_array_t rest{};
         array::init(rest, ctx->alloc);
 
-        defer(array::free(rest);
-                  hashtab::free(keywords);
-                  ffi::free(ffi));
+        err = make_ffi_signature(ctx, args, rest, sig_buf, len, keywords);
+        if (IS_SCM_ERROR(err))
+            return err;
 
-        auto ol = ffi::proto::match_signature(
-            proto,
-            sig_buf,
-            make_ffi_signature(ctx, args, rest, sig_buf, keywords));
+        auto ol = ffi::proto::match_signature(proto, sig_buf, len);
         if (!ol) {
-            return error(ctx,
-                         "[ffi] no matching overload for function: {}",
-                         proto->name);
+            err = error(ctx,
+                        "[ffi] no matching overload for function: {}",
+                        proto->name);
+            goto _error;
         }
-        u32 p, i;
         for (p = 0, i = 0; i < rest.size; ++p, ++i) {
             const auto param = ol->params[p];
             auto       arg   = rest[i];
             if (p >= ol->params.size) {
-                return error(ctx,
-                             "[ffi] too many arguments: {}@{}",
-                             ol->name,
-                             proto->name);
+                err = error(ctx,
+                            "[ffi] too many arguments: {}@{}",
+                            ol->name,
+                            proto->name);
+                goto _error;
             }
             if (p >= ol->req_count) {
                 if (param->has_dft) {
@@ -1296,10 +1326,11 @@ namespace basecode::scm {
                 } else if (param->is_rest) {
                     break;
                 } else {
-                    return error(ctx,
-                                 "[ffi] too many arguments: {}@{}",
-                                 ol->name,
-                                 proto->name);
+                    err = error(ctx,
+                                "[ffi] too many arguments: {}@{}",
+                                ol->name,
+                                proto->name);
+                    goto _error;
                 }
             }
             switch (TYPE(arg)) {
@@ -1334,8 +1365,11 @@ namespace basecode::scm {
                         case ffi_type_t::object:
                             ffi::push(ffi, arg);
                             break;
-                        default:
-                            return error(ctx, "[ffi] invalid pair argument");
+                        default: {
+                            err = error(ctx,
+                                        "[ffi] invalid pair argument");
+                            goto _error;
+                        }
                     }
                     break;
                 case obj_type_t::fixnum:
@@ -1346,8 +1380,11 @@ namespace basecode::scm {
                         case param_cls_t::float_:
                             ffi::push(ffi, flonum_t(FIXNUM(arg)));
                             break;
-                        default:
-                            return error(ctx, "[ffi] invalid float conversion");
+                        default: {
+                            err = error(ctx,
+                                        "[ffi] invalid integer conversion");
+                            goto _error;
+                        }
                     }
                     break;
                 case obj_type_t::flonum:
@@ -1358,8 +1395,11 @@ namespace basecode::scm {
                         case param_cls_t::float_:
                             ffi::push(ffi, FLONUM(arg));
                             break;
-                        default:
-                            return error(ctx, "[ffi] invalid float conversion");
+                        default: {
+                            err = error(ctx,
+                                        "[ffi] invalid float conversion");
+                            goto _error;
+                        }
                     }
                     break;
                 case obj_type_t::symbol:
@@ -1367,9 +1407,10 @@ namespace basecode::scm {
                 case obj_type_t::keyword: {
                     auto s = string::interned::get_slice(STRING_ID(arg));
                     if (!s) {
-                        return error(ctx,
-                                     "[ffi] invalid interned string id: {}",
-                                     STRING_ID(arg));
+                        err = error(ctx,
+                                    "[ffi] invalid interned string id: {}",
+                                    STRING_ID(arg));
+                        goto _error;
                     }
                     ffi::push(ffi, s);
                     break;
@@ -1383,9 +1424,10 @@ namespace basecode::scm {
                             ffi::push(ffi, ctx);
                             break;
                         default:
-                            break;
+                            err = error(ctx,
+                                        "[ffi] unsupported scm object type");
+                            goto _error;
                     }
-                    return error(ctx, "[ffi] unsupported scm object type");
                 }
             }
         }
@@ -1402,10 +1444,16 @@ namespace basecode::scm {
             ffi::push(ffi, &rest);
         }
 
-        param_alias_t ret{};
-        auto status = ffi::call(ffi, ol, ret);
-        if (!OK(status))
-            return error(ctx, "[ffi] call failed: {}", ol->name);
+        status = ffi::call(ffi, ol, ret);
+        if (!OK(status)) {
+           err = error(ctx, "[ffi] call failed: {}", ol->name);
+           goto _error;
+        }
+
+        ffi::free(ffi);
+        array::free(rest);
+        hashtab::free(keywords);
+
         switch (ol->ret_type.cls) {
             case param_cls_t::ptr:
                 return !ret.p ? ctx->nil : (obj_t*) ret.p;
@@ -1423,7 +1471,11 @@ namespace basecode::scm {
                 return error(ctx, "[ffi] unsupported return type");
         }
 
-        return ctx->nil;
+    _error:
+        ffi::free(ffi);
+        array::free(rest);
+        hashtab::free(keywords);
+        return err;
     }
 
     obj_t* make_list(ctx_t* ctx, obj_t** objs, u32 size) {
@@ -1715,7 +1767,10 @@ namespace basecode::scm {
         return obj;
     }
 
-    obj_t* format_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args) {
+    obj_t* raise_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args) {
+        if (IS_SCM_ERROR(ctx->err))
+            return ctx->err;
+
         obj_t* cl = ctx->call_list;
         str_t str{};
         str::init(str, ctx->alloc);
@@ -1732,12 +1787,13 @@ namespace basecode::scm {
                 }
             }
         }
+
         auto irritants = CONS1(make_string(ctx, str));
         auto obj = make_error(ctx, irritants, ctx->call_list);
         ctx->call_list = ctx->nil;
         if (ctx->handlers.error)
             ctx->handlers.error(ctx, obj);
-        vm::mem_area::push(*ctx->data_stack, obj);
+        ctx->err = obj;
         return obj;
     }
 
@@ -1745,6 +1801,7 @@ namespace basecode::scm {
         auto o = fmt_ctx.out();
         auto ctx = printable.ctx;
         auto obj = printable.obj;
+        auto qt  = printable.quote;
 
         switch (TYPE(obj)) {
             case obj_type_t::nil:
@@ -1757,7 +1814,7 @@ namespace basecode::scm {
                 for (;;) {
                     fmt::format_to(o,
                                    "{}",
-                                   printable_t{ctx, CAR(p), true});
+                                   printable_t{ctx, CAR(p), qt});
                     p = CDR(p);
                     if (TYPE(p) != obj_type_t::pair)
                         break;
@@ -1766,7 +1823,7 @@ namespace basecode::scm {
                 if (!IS_NIL(p))
                     fmt::format_to(o,
                                    " . {}",
-                                   printable_t{ctx, p, true});
+                                   printable_t{ctx, p, qt});
                 fmt::format_to(o, ")");
                 break;
             }
@@ -1775,8 +1832,8 @@ namespace basecode::scm {
                 auto proc = PROC(obj);
                 fmt::format_to(o,
                                "(lambda {}\n    {})",
-                               printable_t{ctx, proc->params, true},
-                               printable_t{ctx, proc->body, true});
+                               printable_t{ctx, proc->params, qt},
+                               printable_t{ctx, proc->body, qt});
                 break;
             }
 

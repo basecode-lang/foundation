@@ -488,6 +488,7 @@ namespace basecode::scm {
         string_table_t          strtab;
         symbol_table_t          symtab;
         obj_t*                  objects;
+        obj_t*                  err;
         obj_t*                  env;
         obj_t*                  nil;
         obj_t*                  dot;

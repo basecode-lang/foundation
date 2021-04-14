@@ -109,7 +109,12 @@ s32 main(s32 argc, const s8** argv) {
         path_t config_path{};
         filesys::bin_rel_path(config_path, load_path);
         scm::obj_t* result{};
-        if (!OK(scm::system::eval(config_path, &result))) return 1;
+        if (!OK(scm::system::eval(config_path, &result))) {
+            format::print(stderr,
+                          "{}\n",
+                          scm::printable_t{scm::system::global_ctx(), result});
+            return 1;
+        }
 
         path::free(config_path);
         path::free(load_path);

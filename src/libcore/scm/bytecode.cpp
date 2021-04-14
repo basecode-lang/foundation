@@ -1393,7 +1393,8 @@ namespace basecode::scm {
                                 const context_t& c,
                                 obj_t* args) {
                 UNUSED(args);
-                scm::error(c.ctx, "unquote is not valid in this context.");
+                // XXX: need another mechanism for error reporting here
+                //scm::error(c.ctx, "unquote is not valid in this context.");
                 return {c.bb, 0};
             }
 
@@ -1473,7 +1474,8 @@ namespace basecode::scm {
                                  const context_t& c,
                                  obj_t* args) {
                 UNUSED(args);
-                scm::error(c.ctx, "unquote-splicing is not valid in this context.");
+                // XXX: need another mechanism for error reporting here
+//                scm::error(c.ctx, "unquote-splicing is not valid in this context.");
                 return {c.bb, 0};
             }
 
@@ -2099,7 +2101,10 @@ namespace basecode::scm {
                         break;
 
                     default:
-                        error(ctx, "unknown compare prim");
+                        // XXX: need another mechanism for error reporting here
+//                        error(ctx, "unknown compare prim");
+                        break;
+
                 }
 
                 return {c.bb, res};

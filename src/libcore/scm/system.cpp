@@ -74,18 +74,12 @@ namespace basecode::scm::system {
             auto expr = read(g_scm_sys.ctx, crsr);
             if (!expr) break;
             if (IS_SCM_ERROR(expr)) {
-                format::print(stderr,
-                              "{}",
-                              printable_t{g_scm_sys.ctx, expr});
-                break;
+                *obj = expr;
+                return status_t::error;
             }
             *obj = eval(g_scm_sys.ctx, expr);
-            if (IS_SCM_ERROR(*obj)) {
-                format::print(stderr,
-                              "{}",
-                              printable_t{g_scm_sys.ctx, *obj});
-                break;
-            }
+            if (IS_SCM_ERROR(*obj))
+                return status_t::error;
             restore_gc(g_scm_sys.ctx, gc);
         }
         restore_gc(g_scm_sys.ctx, gc);
@@ -111,18 +105,10 @@ namespace basecode::scm::system {
             return status_t::ok;
         }
         if (IS_SCM_ERROR(expr)) {
-            format::print(stderr,
-                          "{}",
-                          printable_t{g_scm_sys.ctx, expr});
+            *obj = expr;
             return status_t::error;
         }
         *obj = eval(g_scm_sys.ctx, expr);
-        if (IS_SCM_ERROR(*obj)) {
-            format::print(stderr,
-                          "{}",
-                          printable_t{g_scm_sys.ctx, *obj});
-            return status_t::error;
-        }
-        return status_t::ok;
+        return IS_SCM_ERROR(*obj) ? status_t::error : status_t::ok;
     }
 }

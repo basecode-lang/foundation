@@ -111,6 +111,8 @@ namespace basecode::scm {
 
     obj_t* top_env(ctx_t* ctx);
 
+    u0 clear_error(ctx_t* ctx);
+
     obj_t* pop_env(ctx_t* ctx);
 
     obj_type_t type(obj_t* obj);
@@ -244,14 +246,14 @@ namespace basecode::scm {
 
     obj_t* make_error(ctx_t* ctx, obj_t* args, obj_t* call_stack);
 
-    template <typename... Args>
-    obj_t* error(ctx_t* ctx, fmt_str_t fmt_msg, const Args&... args) {
-        return format_error(ctx, fmt_msg, fmt::make_format_args(args...));
-    }
-
     u0 format_object(const printable_t& printable, fmt_ctx_t& ctx);
 
-    obj_t* format_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args);
+    obj_t* raise_error(ctx_t* ctx, fmt_str_t fmt_msg, fmt_args_t args);
+
+    template <typename... Args>
+    obj_t* error(ctx_t* ctx, fmt_str_t fmt_msg, const Args&... args) {
+        return raise_error(ctx, fmt_msg, fmt::make_format_args(args...));
+    }
 
     ctx_t* init(u0* ptr, u32 size, alloc_t* alloc = context::top()->alloc);
 }

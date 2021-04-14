@@ -60,11 +60,11 @@ namespace basecode::scm::compiler {
                     .build();
             auto status = vm::emitter::find_liveliness_intervals(comp.emit);
             if (!OK(status)) {
-                format::print(stderr, "find_liveliness_intervals failed\n");
+//                format::print(stderr, "find_liveliness_intervals failed\n");
             }
             status = vm::emitter::allocate_registers(comp.emit);
             if (!OK(status)) {
-                format::print(stderr, "allocate_registers failed\n");
+//                format::print(stderr, "allocate_registers failed\n");
             }
         );
 

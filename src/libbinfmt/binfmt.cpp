@@ -20,9 +20,7 @@
 #include <basecode/core/error.h>
 #include <basecode/core/filesys.h>
 #include <basecode/binfmt/binfmt.h>
-#include <basecode/core/scm/system.h>
 #include <basecode/core/stable_array.h>
-#include <basecode/core/scm/modules/config.h>
 
 namespace basecode::binfmt {
     using module_map_t          = hashtab_t<module_id, module_t*>;
@@ -48,8 +46,8 @@ namespace basecode::binfmt {
             for (auto mod : g_binfmt_sys.modules)
                 module::free(*mod);
             stable_array::free(g_binfmt_sys.modules);
-            stable_array::free(g_binfmt_sys.sections);
             stable_array::free(g_binfmt_sys.symbols);
+            stable_array::free(g_binfmt_sys.sections);
             hashtab::free(g_binfmt_sys.module_map);
             io::fini();
         }
@@ -58,27 +56,9 @@ namespace basecode::binfmt {
             g_binfmt_sys.alloc = alloc;
             hashtab::init(g_binfmt_sys.module_map, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.modules, g_binfmt_sys.alloc);
-            stable_array::init(g_binfmt_sys.sections, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.symbols, g_binfmt_sys.alloc);
-            auto file_path = "../etc/binfmt.scm"_path;
-            path_t config_path{};
-            filesys::bin_rel_path(config_path, file_path);
-            defer({
-                path::free(config_path);
-                path::free(file_path);
-            });
-            {
-                auto status = io::init(g_binfmt_sys.alloc);
-                if (!OK(status))
-                    return status;
-            }
-            scm::obj_t* result{};
-            {
-                auto status = scm::system::eval(config_path, &result);
-                if (!OK(status))
-                    return status_t::config_eval_error;
-            }
-            return status_t::ok;
+            stable_array::init(g_binfmt_sys.sections, g_binfmt_sys.alloc);
+            return io::init(g_binfmt_sys.alloc);
         }
 
         u0 free_module(module_t* mod) {

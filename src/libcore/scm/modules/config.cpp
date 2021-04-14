@@ -220,8 +220,6 @@ namespace basecode::config {
                 default:
                     return scm::error(ctx, "[config] invalid cvar type");
             }
-
-            return ctx->nil;
         }
 
         status_t init(const config_settings_t& settings, alloc_t* alloc) {

@@ -89,7 +89,12 @@ TEST_CASE("basecode::config terp eval") {
 )"_ss;
 
     scm::obj_t* obj{};
-    scm::system::eval(source, &obj);
+    if (!OK(scm::system::eval(source, &obj))) {
+        format::print(stderr,
+                      "{}\n",
+                      scm::printable_t{scm::system::global_ctx(),
+                                       obj});
+    }
     if (!obj)
         REQUIRE(false);
     if (scm::type(obj) != scm::obj_type_t::fixnum)

@@ -86,6 +86,8 @@
 
 (define range (lambda (a b step)
     (define lst '())
+    (if (not step)
+        (set! step 1))
     (while (<= a b)
         (set! lst (cons a lst))
         (set! a (+ a step)))

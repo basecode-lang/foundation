@@ -16,7 +16,6 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <setjmp.h>
 #include <basecode/core/log.h>
 #include <basecode/core/ffi.h>
 #include <basecode/core/job.h>
@@ -42,15 +41,7 @@
 using namespace basecode;
 
 static getopt_t                 s_cl        {};
-static jmp_buf                  s_top_level {};
 static u8                       s_buf[4096] {};
-
-static u0 on_error(scm::ctx_t* ctx, scm::obj_t* obj) {
-    format::print(stderr,
-                  "{}\n",
-                  scm::printable_t{ctx, obj, true});
-    longjmp(s_top_level, -1);
-}
 
 static u0 usage(getopt_t& cl) {
     str_t buf{};
@@ -107,8 +98,12 @@ static s32 repl(scm::ctx_t* ctx, s32 argc, const s8** argv) {
             path_t load_path{};
             path::init(load_path, file_arg->subclass.string);
             defer(path::free(load_path));
-            if (!OK(scm::system::eval(load_path, &obj)))
+            if (!OK(scm::system::eval(load_path, &obj))) {
+                format::print(stderr,
+                              "{}\n",
+                              scm::printable_t{ctx, obj});
                 return EXIT_FAILURE;
+            }
             format::print(stdout,
                           "{}\n",
                           scm::printable_t{ctx, obj, true});
@@ -116,11 +111,7 @@ static s32 repl(scm::ctx_t* ctx, s32 argc, const s8** argv) {
     }
 
     FILE* fp = stdin;
-    scm::set_error_handler(ctx, on_error);
-
     auto gc = scm::save_gc(ctx);
-
-    setjmp(s_top_level);
 
     while (true) {
         scm::restore_gc(ctx, gc);
@@ -168,10 +159,16 @@ static s32 repl(scm::ctx_t* ctx, s32 argc, const s8** argv) {
             s_buf[pos++] = ch;
         } while (!expr_ready);
         scm::obj_t* obj = scm::nil(ctx);
-        scm::system::eval(s_buf, pos, &obj);
-        format::print(stdout,
-                      "{}\n",
-                      scm::printable_t{ctx, obj, true});
+        if (!OK(scm::system::eval(s_buf, pos, &obj))) {
+            format::print(stderr,
+                          "{}",
+                          scm::printable_t{ctx, obj, true});
+            scm::clear_error(ctx);
+        } else {
+            format::print(stdout,
+                          "{}\n",
+                          scm::printable_t{ctx, obj, true});
+        }
     }
 exit:
     return EXIT_SUCCESS;
@@ -273,8 +270,13 @@ s32 main(s32 argc, const s8** argv) {
         path_t config_path{};
         filesys::bin_rel_path(config_path, load_path);
         scm::obj_t* result{};
-        if (!OK(scm::system::eval(config_path, &result)))
+        if (!OK(scm::system::eval(config_path, &result))) {
+            format::print(stderr,
+                          "{}\n",
+                          scm::printable_t{scm::system::global_ctx(),
+                                           result});
             return 1;
+        }
 
         path::free(config_path);
         path::free(load_path);
