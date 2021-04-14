@@ -689,11 +689,13 @@ namespace basecode::scm {
                 array::free(e.insts);
                 symtab::free(e.vartab);
                 array::free(e.comments);
+                array::free(e.intervals);
                 digraph::free(e.bb_graph);
                 str_array::free(e.strtab);
                 digraph::free(e.var_graph);
                 stable_array::free(e.vars);
                 stable_array::free(e.blocks);
+                stable_array::free(e.ranges);
             }
 
             u0 reset(emitter_t& e) {
@@ -769,14 +771,137 @@ namespace basecode::scm {
                 array::init(e.insts, e.alloc);
                 symtab::init(e.vartab, e.alloc);
                 array::init(e.comments, e.alloc);
+                array::init(e.intervals, e.alloc);
                 digraph::init(e.bb_graph, e.alloc);
                 str_array::init(e.strtab, e.alloc);
                 digraph::init(e.var_graph, e.alloc);
                 stable_array::init(e.vars, e.alloc);
                 stable_array::init(e.blocks, e.alloc);
+                stable_array::init(e.ranges, e.alloc);
+            }
+
+            u0 format_liveliness_intervals(emitter_t& e) {
+                for (u32 i = 0; i < e.blocks.size; ++i) {
+                    format::print("block {:03}: ", i + 1);
+                    auto range = e.intervals[i];
+                    if (!range) {
+                        format::print("none\n");
+                        continue;
+                    }
+                    format::print("{:<8}@{:>2}=[{:>3}, {:>3}]",
+                                  *string::interned::get_slice(range->var->symbol),
+                                  range->var->version,
+                                  range->start,
+                                  range->end);
+                    range = range->next;
+                    while (range) {
+                        format::print(" -> {:<8}@{:>2}=[{:>3}, {:>3}]",
+                                      *string::interned::get_slice(range->var->symbol),
+                                      range->var->version,
+                                      range->start,
+                                      range->end);
+                        range = range->next;
+                    }
+                    format::print("\n");
+                }
+            }
+
+            static u0 swap_ranges(liveliness_range_t* lhs,
+                                  liveliness_range_t* rhs) {
+                if (lhs->next) {
+                    if (*rhs < *lhs->next) {
+                        rhs->next = lhs->next;
+                        lhs->next = rhs;
+                    } else {
+                        swap_ranges(lhs->next, rhs);
+                    }
+                } else {
+                    lhs->next = rhs;
+                }
+            }
+
+            static u0 set_interval(emitter_t& e,
+                                   u32 block_id,
+                                   liveliness_range_t* new_range) {
+                auto range = e.intervals[block_id - 1];
+                if (!range) {
+                    e.intervals[block_id - 1] = new_range;
+                } else {
+                    if (*new_range < *range) {
+                        new_range->next = range;
+                        e.intervals[block_id - 1] = new_range;
+                    } else {
+                        swap_ranges(range, new_range);
+                    }
+                }
+            }
+
+            static u0 create_ranges(emitter_t& e, var_t* var) {
+                var_digraph_t::Node_Array nodes{};
+                array::init(nodes, e.alloc);
+                defer(array::free(nodes));
+
+                u32 end     {};
+                u32 start   {};
+                u32 block_id{};
+                for (const auto& ac : var->accesses) {
+                    const auto& inst = e.insts[ac.inst_id - 1];
+                    if (block_id && block_id != inst.block_id) {
+                        auto new_range = &stable_array::append(e.ranges);
+                        new_range->var   = var;
+                        new_range->end   = end - 1;
+                        new_range->next  = {};
+                        new_range->start = start - 1;
+                        set_interval(e, block_id, new_range);
+                        start    = inst.id;
+                        end      = start;
+                        block_id = inst.block_id;
+                    }
+                    if (!block_id)
+                        block_id = inst.block_id;
+                    if (!start) {
+                        start = inst.id;
+                        end   = start;
+                    } else {
+                        end = inst.id;
+                    }
+                }
+                if (start && end && block_id) {
+                    auto new_range = &stable_array::append(e.ranges);
+                    new_range->var   = var;
+                    new_range->end   = end - 1;
+                    new_range->next  = {};
+                    new_range->start = start - 1;
+                    set_interval(e, block_id, new_range);
+                }
+
+                digraph::outgoing_nodes(e.var_graph, var->node, nodes);
+                for (const auto& node : nodes)
+                    create_ranges(e, node->value);
             }
 
             status_t find_liveliness_intervals(emitter_t& e) {
+                assoc_array_t<var_t*> pairs{};
+                assoc_array::init(pairs, e.alloc);
+                defer(assoc_array::free(pairs));
+                symtab::find_prefix(e.vartab, pairs);
+
+                array::resize(e.intervals, e.blocks.size);
+                for (u32 i = 0; i < pairs.size; ++i) {
+                    const auto& pair = pairs[i];
+                    auto rc = string::interned::fold_for_result(pair.key);
+                    if (!OK(rc.status))
+                        return status_t::var_intern_failure;
+                    for (auto var : e.vars) {
+                        if (var->symbol != rc.id
+                        ||  var->version != 1
+                        ||  var->incubate) {
+                            continue;
+                        }
+                        create_ranges(e, var);
+                    }
+                }
+
                 return status_t::fail;
             }
 
@@ -1392,10 +1517,10 @@ namespace basecode::scm {
             compile_result_t uq(compiler_t& comp,
                                 const context_t& c,
                                 obj_t* args) {
+                UNUSED(comp);
+                UNUSED(c);
                 UNUSED(args);
-                // XXX: need another mechanism for error reporting here
-                //scm::error(c.ctx, "unquote is not valid in this context.");
-                return {c.bb, 0};
+                return {.status = status_t::unquote_invalid};
             }
 
             compile_result_t car(compiler_t& comp,
@@ -1473,10 +1598,10 @@ namespace basecode::scm {
             compile_result_t uqs(compiler_t& comp,
                                  const context_t& c,
                                  obj_t* args) {
+                UNUSED(comp);
+                UNUSED(c);
                 UNUSED(args);
-                // XXX: need another mechanism for error reporting here
-//                scm::error(c.ctx, "unquote-splicing is not valid in this context.");
-                return {c.bb, 0};
+                return {.status = status_t::unquote_splicing_invalid};
             }
 
             compile_result_t set(compiler_t& comp,
@@ -2101,9 +2226,7 @@ namespace basecode::scm {
                         break;
 
                     default:
-                        // XXX: need another mechanism for error reporting here
-//                        error(ctx, "unknown compare prim");
-                        break;
+                        return {.status = status_t::unknown_primitive};
 
                 }
 

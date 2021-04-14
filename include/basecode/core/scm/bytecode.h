@@ -208,6 +208,8 @@ namespace basecode::scm {
 
             status_t allocate_registers(emitter_t& e);
 
+            u0 format_liveliness_intervals(emitter_t& e);
+
             status_t find_liveliness_intervals(emitter_t& e);
 
             status_t create_dot(emitter_t& e, const path_t& path);

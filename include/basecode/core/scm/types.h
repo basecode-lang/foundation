@@ -90,6 +90,7 @@ namespace basecode::scm {
     struct var_access_t;
     struct encoded_inst_t;
     union  encoded_operand_t;
+    struct liveliness_range_t;
 
     using reg_t                 = u8;
     using trap_t                = b8 (*)(vm_t& vm, u64 arg);
@@ -112,12 +113,18 @@ namespace basecode::scm {
     using keyword_table_t       = hashtab_t<str::slice_t, obj_t*>;
     using comment_array_t       = array_t<comment_t>;
     using mem_area_array_t      = array_t<mem_area_t>;
+    using interval_array_t      = array_t<liveliness_range_t*>;
+    using liveliness_array_t    = stable_array_t<liveliness_range_t>;
 
-    enum class status_t : u8 {
-        ok,
-        fail,
+    enum class status_t : u32 {
+        ok                          = 0,
+        fail                        = 300,
         error,
+        unquote_invalid,
         unresolved_label,
+        unknown_primitive,
+        var_intern_failure,
+        unquote_splicing_invalid,
         missing_sequential_branch,
     };
 
@@ -337,6 +344,25 @@ namespace basecode::scm {
         u8                      pad:        5;
     };
 
+    struct liveliness_range_t final {
+        liveliness_range_t*     next;
+        var_t*                  var;
+        u32                     start;
+        u32                     end;
+
+        inline auto operator<=>(const liveliness_range_t& other) const {
+            if (start < other.start)
+                return std::strong_ordering::less;
+            else if (start >= other.end)
+                return std::strong_ordering::greater;
+            else if (start == other.start
+                 &&  end   == other.end) {
+                return std::strong_ordering::equal;
+            }
+            return std::strong_ordering::equivalent;
+        }
+    };
+
     struct operand_t final {
         union {
             bb_t*               bb;
@@ -406,6 +432,8 @@ namespace basecode::scm {
         bb_digraph_t            bb_graph;
         var_digraph_t           var_graph;
         comment_array_t         comments;
+        interval_array_t        intervals;
+        liveliness_array_t      ranges;
     };
 
     struct mem_area_t final {
@@ -471,6 +499,9 @@ namespace basecode::scm {
     struct compile_result_t final {
         bb_t*                   bb;
         var_t*                  var;
+        status_t                status;
+
+        inline u32 u32() const  { return (uint32_t)status; }
     };
 
     struct ctx_t final {
