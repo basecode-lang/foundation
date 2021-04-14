@@ -2075,7 +2075,6 @@ namespace basecode::scm {
                                     const context_t& c,
                                     obj_t* form,
                                     obj_t* args) {
-                auto& vm = *comp.vm;
                 auto ctx    = c.ctx;
                 b8   is_mac = scm::equal(ctx, c.sym, SYM("define-macro"));
                 auto proc   = make_proc(c.ctx,
@@ -2083,9 +2082,9 @@ namespace basecode::scm {
                                         CAR(args),
                                         CDR(args),
                                         is_mac);
-                auto idx    = OBJ_IDX(proc);
-                auto reg    = rf::m;       //FIXME
-                G(reg) = idx;
+                auto idx = OBJ_IDX(proc);
+                auto res = c.target ? c.target :
+                           emitter::virtual_var::get(comp.emit, "res"_ss);
                 if (!c.top_level) {
                     basic_block::encode(c.bb)
                         .comment(format::format("literal: {}",
@@ -2093,10 +2092,12 @@ namespace basecode::scm {
                         .imm2()
                             .op(op::const_)
                             .src(u32(idx))
-                            .dst(reg)
+                            .dst(&res)
                             .build();
+                    return {c.bb, res};
+                } else {
+                    return {c.bb, .obj = proc};
                 }
-                return {c.bb, 0};
             }
 
             compile_result_t while_(compiler_t& comp,
@@ -2111,7 +2112,6 @@ namespace basecode::scm {
                                     const context_t& c,
                                     obj_t* args) {
                 auto ctx = c.ctx;
-                auto& vm = *comp.vm;
                 auto key  = CAR(args);
                 u32  idx  = OBJ_IDX(key);
                 auto name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
@@ -2122,12 +2122,10 @@ namespace basecode::scm {
                 vc.target   = res;
                 vc.is_macro = false;
                 auto comp_res = compiler::compile_expr(comp, vc);
-                if (c.top_level) {
-                    // FIXME: this is a temporary hack
-                    auto value = OBJ_AT(G(rf::m));
-                    scm::define(ctx, key, value);
-                    if (TYPE(value) == obj_type_t::proc) {
-                        auto proc = PROC(value);
+                if (c.top_level && comp_res.obj) {
+                    scm::define(ctx, key, comp_res.obj);
+                    if (TYPE(comp_res.obj) == obj_type_t::proc) {
+                        auto proc = PROC(comp_res.obj);
                         if (!proc->is_compiled) {
                             auto pc = c;
                             pc.top_level = false;
@@ -2449,7 +2447,6 @@ namespace basecode::scm {
                                           const context_t& c,
                                           obj_t* args) {
                 auto ctx = c.ctx;
-                auto& vm = *comp.vm;
                 auto key  = CAR(args);
                 u32  idx  = OBJ_IDX(key);
                 auto name = *string::interned::get_slice(STRING_ID(OBJ_AT(idx)));
@@ -2460,12 +2457,12 @@ namespace basecode::scm {
                 vc.target   = c.target;
                 vc.is_macro = true;
                 auto comp_res = compiler::compile_expr(comp, vc);
-                if (c.top_level) {
-                    // FIXME: this is a temporary hack
-                    auto value = OBJ_AT(G(rf::m));
-                    scm::check_type(ctx, value, obj_type_t::proc);
-                    scm::define(ctx, key, value);
-                    auto proc = PROC(value);
+                if (c.top_level && comp_res.obj) {
+                    scm::check_type(ctx,
+                                    comp_res.obj,
+                                    obj_type_t::proc);
+                    scm::define(ctx, key, comp_res.obj);
+                    auto proc = PROC(comp_res.obj);
                     if (!proc->is_compiled) {
                         auto pc = c;
                         pc.top_level = false;

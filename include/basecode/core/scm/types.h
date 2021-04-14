@@ -504,6 +504,7 @@ namespace basecode::scm {
     struct compile_result_t final {
         bb_t*                   bb;
         var_t*                  var;
+        obj_t*                  obj;
         status_t                status;
 
         inline u32 u32() const  { return (uint32_t)status; }
