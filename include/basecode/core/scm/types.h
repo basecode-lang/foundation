@@ -365,7 +365,11 @@ namespace basecode::scm {
 
     struct operand_t final {
         union {
-            bb_t*               bb;
+            struct {
+                bb_t*           bb;
+                var_t*          args[4];
+                u32             size;
+            }                   branch;
             reg_t               reg;
             var_t*              var;
             s32                 s;
@@ -407,17 +411,17 @@ namespace basecode::scm {
         struct {
             u32                 sidx;
             u32                 eidx;
-            inline u32 size() const {
-                return (eidx - sidx) + 1;
-            }
+            inline u32 size() const     { return (eidx - sidx) + 1; }
         }                       notes;
         struct {
             u32                 sidx;
             u32                 eidx;
-            inline u32 size() const {
-                return (eidx - sidx);
-            }
+            inline u32 size() const     { return (eidx - sidx); }
         }                       insts;
+        struct {
+            var_t*              vars[4];
+            u32                 size;
+        }                       params;
         bb_type_t               type;
     };
 
@@ -492,6 +496,7 @@ namespace basecode::scm {
         obj_t*                  obj;
         obj_t*                  env;
         obj_t*                  sym;
+        var_t*                  target;
         b8                      is_macro;
         b8                      top_level;
     };

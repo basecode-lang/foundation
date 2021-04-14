@@ -196,7 +196,7 @@ namespace basecode::scm {
                         break;
                     }
                     case operand_type_t::block: {
-                        auto target_block = &e.blocks[oper.kind.bb->id - 1];
+                        auto target_block = &e.blocks[oper.kind.branch.bb->id - 1];
                         field = s32(target_block->addr - addr);
                         break;
                     }
@@ -230,6 +230,7 @@ namespace basecode::scm {
                 bb.type   = type;
                 bb.notes  = {};
                 bb.insts  = {};
+                bb.params = {};
                 bb.str_id = e.strtab.size;
                 if (prev) {
                     prev->next = &bb;
@@ -710,14 +711,14 @@ namespace basecode::scm {
 
                 operand_t operand(bb_t* bb) {
                     return operand_t{
-                        .kind.bb = bb,
+                        .kind.branch.bb = bb,
                         .type = operand_type_t::block
                     };
                 }
 
                 operand_t operand(bb_t& bb) {
                     return operand_t{
-                        .kind.bb = &bb,
+                        .kind.branch.bb = &bb,
                         .type = operand_type_t::block
                     };
                 }
@@ -843,7 +844,7 @@ FORMAT_TYPE(
             format_to(ctx.out(), "{}", data.kind.s);
             break;
         case basecode::scm::operand_type_t::block:
-            format_to(ctx.out(), "{}", *data.kind.bb);
+            format_to(ctx.out(), "{}", *data.kind.branch.bb);
             break;
         case basecode::scm::operand_type_t::reg:
             format_to(

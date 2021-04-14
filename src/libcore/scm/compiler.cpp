@@ -68,6 +68,8 @@ namespace basecode::scm::compiler {
             }
         );
 
+        vm::emitter::format_liveliness_intervals(comp.emit);
+
         str_t str{};
         str::init(str, ctx->alloc);
         {
@@ -124,6 +126,7 @@ namespace basecode::scm::compiler {
         c.obj       = obj;
         c.env       = env;
         c.sym       = ctx->nil;
+        c.target    = {};
         c.is_macro  = false;
         c.top_level = top_level;
         return c;
