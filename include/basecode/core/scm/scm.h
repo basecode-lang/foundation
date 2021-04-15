@@ -68,7 +68,11 @@ namespace basecode::scm {
         ctx_t*                  ctx;
         obj_t*                  obj;
         b8                      quote;
-        u32                     indent  {1};
+        struct {
+            u32                 margin;
+            u32                 indent;
+            b8                  enabled;
+        }                       pretty;
     };
 
     enum class ffi_type_t : u8 {

@@ -1655,13 +1655,13 @@ namespace basecode::scm {
                                  obj_t* args) {
                 auto ctx = c.ctx;
 
-                auto& true_bb  = emitter::make_basic_block(*c.bb->emit,
+                auto& true_bb  = emitter::make_basic_block(comp.emit,
                                                            "if_true"_ss,
                                                            c.bb);
-                auto& false_bb = emitter::make_basic_block(*c.bb->emit,
+                auto& false_bb = emitter::make_basic_block(comp.emit,
                                                            "if_false"_ss,
                                                            &true_bb);
-                auto& exit_bb  = emitter::make_basic_block(*c.bb->emit,
+                auto& exit_bb  = emitter::make_basic_block(comp.emit,
                                                            "if_exit"_ss,
                                                            &false_bb);
 
@@ -1847,19 +1847,19 @@ namespace basecode::scm {
                     lc.bb = comp_res.bb;
                     basic_block::encode(comp_res.bb)
                         .offs()
-                        .op(op::store)
-                        .offset(offs)
-                        .src(&comp_res.var)
-                        .dst(&base_addr)
-                        .mode(true)
-                        .build();
+                            .op(op::store)
+                            .offset(offs)
+                            .src(&comp_res.var)
+                            .dst(&base_addr)
+                            .mode(true)
+                            .build();
                     args = CDR(args);
                     offs += 8;
                 }
                 auto res = c.target ? c.target :
                            emitter::virtual_var::get(comp.emit,
                                                      "res"_ss);
-                auto& list_bb = emitter::make_basic_block(*c.bb->emit,
+                auto& list_bb = emitter::make_basic_block(comp.emit,
                                                           "make_list"_ss,
                                                           lc.bb);
                 basic_block::encode(list_bb)
@@ -2075,16 +2075,14 @@ namespace basecode::scm {
                                     const context_t& c,
                                     obj_t* form,
                                     obj_t* args) {
-                auto ctx    = c.ctx;
-                b8   is_mac = scm::equal(ctx, c.sym, SYM("define-macro"));
-                auto proc   = make_proc(c.ctx,
-                                        c.sym,
-                                        CAR(args),
-                                        CDR(args),
-                                        is_mac);
-                auto idx = OBJ_IDX(proc);
-                auto res = c.target ? c.target :
-                           emitter::virtual_var::get(comp.emit, "res"_ss);
+                auto ctx  = c.ctx;
+                b8 is_mac = scm::equal(ctx, c.sym, SYM("define-macro"));
+                auto params = CAR(args);
+                auto body   = CDR(args);
+                auto proc = make_proc(c.ctx, c.sym, params, body, is_mac);
+                auto idx  = OBJ_IDX(proc);
+                auto res  = c.target ? c.target :
+                            emitter::virtual_var::get(comp.emit, "res"_ss);
                 if (!c.top_level) {
                     basic_block::encode(c.bb)
                         .comment(format::format("literal: {}",
@@ -2393,54 +2391,57 @@ namespace basecode::scm {
                                        const context_t& c,
                                        proc_t* proc) {
                 auto ctx = c.ctx;
-                auto& e = *c.bb->emit;
 
                 auto params = proc->params;
                 while (!IS_NIL(params)) {
                     auto name = *string::interned::get_slice(STRING_ID(CAR(params)));
-                    emitter::virtual_var::declare(e, name);
+                    emitter::virtual_var::declare(comp.emit, name);
                     params = CDR(params);
                 }
 
                 auto name = *string::interned::get_slice(STRING_ID(proc->sym));
-                auto& proc_bb = emitter::make_basic_block(*c.bb->emit,
+                auto& proc_bb = emitter::make_basic_block(comp.emit,
                                                           name,
                                                           c.bb);
                 proc->addr.bb = &proc_bb;
 
+                printable_t params_prt{c.ctx, proc->params, true};
+                printable_t body_prt{c.ctx, proc->body, true};
+                body_prt.pretty.indent  = 0;
+                body_prt.pretty.margin  = 13;
+                body_prt.pretty.enabled = true;
                 basic_block::encode(proc_bb)
-                    .note("-------------------------------------------------------------------"_ss)
+                    .note("----------------------------------------------------------------"_ss)
                     .note(format::format("procedure: {}", name))
-                    .note(format::format("(fn {} {})",
-                                         printable_t{c.ctx, proc->params, true},
-                                         printable_t{c.ctx, CAR(proc->body), true}))
-                    .note("-------------------------------------------------------------------"_ss);
+                    .note(format::format("(lambda {}\n{:<{}}{})",
+                                         params_prt,
+                                         " ",
+                                         17,
+                                         body_prt))
+                    .note("----------------------------------------------------------------"_ss);
 
-                auto body = proc->body;
-                auto bc   = c;
-                bc.bb = &enter(proc_bb, 0);
-                while (!IS_NIL(body)) {
-                    bc.obj = CAR(body);
-                    auto comp_res = compiler::compile_expr(comp, bc);
-                    bc.bb = comp_res.bb;
-                    body = CDR(body);
-                }
-
-                auto res = emitter::virtual_var::get(comp.emit,
+                auto res = c.target ? c.target :
+                           emitter::virtual_var::get(comp.emit,
                                                      "res"_ss);
                 auto base = emitter::virtual_var::get(comp.emit,
                                                       "base"_ss);
-                basic_block::encode(bc.bb)
+                auto bc = c;
+                bc.bb     = &enter(proc_bb, 0);
+                bc.obj    = proc->body;
+                bc.target = res;
+                auto comp_res = compiler::compile_expr(comp, bc);
+
+                basic_block::encode(comp_res.bb)
                     .offs()
                         .op(op::store)
-                        .src(&res)
+                        .src(&comp_res.var)
                         .dst(&base)
                         .offset(0)
                         .mode(true)
                         .build();
 
                 proc->is_compiled = true;
-                return {&leave(*bc.bb), res};
+                return {&leave(*comp_res.bb), comp_res.var};
             }
 
             compile_result_t define_macro(compiler_t& comp,
@@ -2506,7 +2507,8 @@ namespace basecode::scm {
             compile_result_t lookup(compiler_t& comp, const context_t& c) {
                 auto ctx = c.ctx;
                 auto sym = scm::to_string(c.ctx, c.obj);
-                auto res = emitter::virtual_var::get(*c.bb->emit, sym);
+                auto res = emitter::virtual_var::get(comp.emit, sym);
+                assert(res && "you may need to declare it");
                 basic_block::encode(c.bb)
                     .comment(format::format("symbol: {}", sym))
                     .imm2()

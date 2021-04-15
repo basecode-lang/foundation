@@ -116,6 +116,11 @@ namespace basecode::scm {
 
     static obj_t* make_object(ctx_t* ctx);
 
+    static u0 format_environment(ctx_t* ctx,
+                                 obj_t* env,
+                                 fmt_ctx_t& fmt_ctx,
+                                 u32 indent);
+
     static num_type_t get_numtype(const s8* buf, s32 len);
 
     static obj_t* read_expr(ctx_t* ctx, buf_crsr_t& crsr);
@@ -128,8 +133,6 @@ namespace basecode::scm {
                                      keyword_table_t& keywords);
 
     static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type);
-
-    static u0 format_environment(ctx_t* ctx, obj_t* env, fmt_ctx_t& fmt_ctx, u32 indent);
 
     u0 free(ctx_t* ctx) {
         collect_garbage(ctx);
@@ -164,6 +167,13 @@ namespace basecode::scm {
                      b8 macro) {
         auto proc = &array::append(ctx->procedures);
         auto env  = top_env(ctx);
+        auto begin_sym = SYM("begin");
+        if (TYPE(body) != obj_type_t::pair
+        || (!equal(ctx, CAAR(body), begin_sym))) {
+            body = cons(ctx,
+                        get(ctx, begin_sym),
+                        is_list(ctx, body) ? body : CONS1(body));
+        }
         proc->e            = ENV(env);
         proc->env          = env;
         proc->addr         = {};
@@ -1139,6 +1149,57 @@ namespace basecode::scm {
         return head;
     }
 
+    static u0 format_environment(ctx_t* ctx,
+                                 obj_t* env,
+                                 fmt_ctx_t& fmt_ctx,
+                                 u32 indent) {
+        auto e = ENV(env);
+        if (indent > 0) {
+            fmt::format_to(fmt_ctx.out(),
+                           "{:<{}}(",
+                           " ",
+                           indent);
+        }
+        b8 first = true;
+        printable_t prt{ctx, .obj = {}, .quote = true};
+        prt.pretty.indent  = 4;
+        prt.pretty.margin  = 37;
+        prt.pretty.enabled = true;
+        for (const auto& pair : e->bindings) {
+            prt.obj = pair.value;
+            auto s = string::interned::get_slice(pair.key);
+            if (!s)
+                continue;
+            if (first) {
+                fmt::format_to(fmt_ctx.out(),
+                               "({:<32} . {})\n",
+                               *s,
+                               prt);
+                first = false;
+            } else {
+                fmt::format_to(fmt_ctx.out(),
+                               "{:<{}}({:<32} . {})\n",
+                               " ",
+                               indent,
+                               *s,
+                               prt);
+            }
+        }
+        if (IS_NIL(e->parent)) {
+            fmt::format_to(fmt_ctx.out(),
+                           "{:<{}}(parent . nil)",
+                           " ",
+                           indent);
+        } else {
+            fmt::format_to(fmt_ctx.out(),
+                           "{:<{}}(parent . [environment {}])",
+                           " ",
+                           indent,
+                           (u0*) e->parent);
+        }
+        fmt::format_to(fmt_ctx.out(), ")\n");
+    }
+
     obj_t* quasiquote(ctx_t* ctx, obj_t* obj) {
         if (TYPE(obj) != obj_type_t::pair)
             return CONS(SYM("quote"), CONS1(obj));
@@ -1201,7 +1262,7 @@ namespace basecode::scm {
                 return str_t("nil"_ss);
             case obj_type_t::pair:
                 return format::format("{}",
-                                      printable_t{ctx, obj, true});
+                                      printable_t{ctx, obj, quote});
             case obj_type_t::prim: {
                 auto name = s_prim_names[u32(PRIM(obj))];
                 return str_t(name);
@@ -1797,11 +1858,36 @@ namespace basecode::scm {
         return obj;
     }
 
+    static print_rule_t s_print_rules[] = {
+        {"begin"_ss,        false,  true},
+        {"if"_ss,           true,   true},
+        {"while"_ss,        true,   true},
+        {"lambda"_ss,       true,   true},
+        {str::slice_t{}},
+    };
+
+    static print_rule_t* find_print_rule(ctx_t* ctx, obj_t* obj) {
+        if (TYPE(obj) == obj_type_t::prim
+        &&  PRIM(obj) == prim_type_t::begin) {
+            return &s_print_rules[0];
+        }
+        if (TYPE(obj) != obj_type_t::symbol)
+            return nullptr;
+        const auto& s = *string::interned::get_slice(STRING_ID(obj));
+        for (u32 i = 0; s_print_rules[i].symbol.length > 0; ++i) {
+            if (s_print_rules[i].symbol == s)
+                return &s_print_rules[i];
+        }
+        return nullptr;
+    }
+
     u0 format_object(const printable_t& printable, fmt_ctx_t& fmt_ctx) {
-        auto o = fmt_ctx.out();
+        auto o   = fmt_ctx.out();
+        auto qt  = printable.quote;
         auto ctx = printable.ctx;
         auto obj = printable.obj;
-        auto qt  = printable.quote;
+        auto& pretty = printable.pretty;
+        auto indent  = pretty.indent;
 
         switch (TYPE(obj)) {
             case obj_type_t::nil:
@@ -1810,30 +1896,109 @@ namespace basecode::scm {
 
             case obj_type_t::pair: {
                 obj_t* p = obj;
-                fmt::format_to(o, "(");
-                for (;;) {
-                    fmt::format_to(o,
-                                   "{}",
-                                   printable_t{ctx, CAR(p), qt});
-                    p = CDR(p);
-                    if (TYPE(p) != obj_type_t::pair)
-                        break;
-                    fmt::format_to(o, " ");
+                if (pretty.enabled) {
+                    printable_t prt{ctx, ctx->nil, qt};
+                    prt.pretty.margin  = pretty.margin;
+                    prt.pretty.enabled = true;
+
+                    auto& c = get_container(o);
+                    s32 skip_count = -1;
+                    auto print_rule = find_print_rule(ctx, CAR(p));
+                    if (print_rule) {
+                        if (print_rule->skip_first_arg)
+                            skip_count = 1;
+                        if (print_rule->increase_indent) {
+                            fmt::format_to(o,
+                                           "\n{:<{}}",
+                                           " ",
+                                           pretty.margin + indent);
+                            indent += 4;
+                        }
+                    }
+
+                    auto pos = c.size();
+                    prt.pretty.indent = indent;
+                    fmt::format_to(o, "(");
+                    for (;;) {
+                        auto a = CAR(p);
+                        prt.obj = a;
+                        fmt::format_to(o, "{}", prt);
+                        p = CDR(p);
+                        if (TYPE(p) != obj_type_t::pair)
+                            break;
+                        if (skip_count > 0) {
+                            --skip_count;
+                            fmt::format_to(o, " ");
+                        } else if (skip_count == 0) {
+                            skip_count = -1;
+                            fmt::format_to(o,
+                                           "\n{:<{}}",
+                                           " ",
+                                           pretty.margin + indent);
+                        } else {
+                            const auto width = c.size() - pos;
+                            if (width > 30) {
+                                fmt::format_to(o,
+                                               "\n{:<{}}",
+                                               " ",
+                                               pretty.margin + indent);
+                                pos = c.size();
+                            } else {
+                                fmt::format_to(o, " ");
+                            }
+                        }
+                    }
+                    if (!IS_NIL(p)) {
+                        fmt::format_to(o,
+                                       " . {}",
+                                       printable_t{ctx, p, qt});
+                    }
+                    fmt::format_to(o, ")");
+                } else {
+                    fmt::format_to(o, "(");
+                    for (;;) {
+                        fmt::format_to(o,
+                                       "{}",
+                                       printable_t{ctx, CAR(p), qt});
+                        p = CDR(p);
+                        if (TYPE(p) != obj_type_t::pair)
+                            break;
+                        fmt::format_to(o, " ");
+                    }
+                    if (!IS_NIL(p))
+                        fmt::format_to(o,
+                                       " . {}",
+                                       printable_t{ctx, p, qt});
+                    fmt::format_to(o, ")");
                 }
-                if (!IS_NIL(p))
-                    fmt::format_to(o,
-                                   " . {}",
-                                   printable_t{ctx, p, qt});
-                fmt::format_to(o, ")");
                 break;
             }
 
+            case obj_type_t::prim:
+                fmt::format_to(o, "{}", s_prim_names[u32(PRIM(obj))]);
+                break;
+
+            case obj_type_t::proc:
             case obj_type_t::lambda: {
                 auto proc = PROC(obj);
-                fmt::format_to(o,
-                               "(lambda {}\n    {})",
-                               printable_t{ctx, proc->params, qt},
-                               printable_t{ctx, proc->body, qt});
+                if (pretty.enabled) {
+                    printable_t prt{};
+                    prt.ctx   = ctx;
+                    prt.obj   = proc->body;
+                    prt.quote = qt;
+                    prt.pretty.indent  = 4;
+                    prt.pretty.enabled = true;
+                    prt.pretty.margin  = pretty.margin;
+                    fmt::format_to(o,
+                                   "(lambda {} {})",
+                                   printable_t{ctx, proc->params, qt},
+                                   prt);
+                } else {
+                    fmt::format_to(o,
+                                   "(lambda {} {})",
+                                   printable_t{ctx, proc->params, qt},
+                                   printable_t{ctx, proc->body, qt});
+                }
                 break;
             }
 
@@ -1879,47 +2044,12 @@ namespace basecode::scm {
                 break;
 
             case obj_type_t::environment:
-                format_environment(ctx, obj, fmt_ctx, printable.indent);
+                format_environment(ctx, obj, fmt_ctx, 0);
                 break;
 
             default:
                 fmt::format_to(o, "[{:<8} {}]", type_name(obj), (u0*) obj);
                 break;
         }
-    }
-
-    static u0 format_environment(ctx_t* ctx, obj_t* env, fmt_ctx_t& fmt_ctx, u32 indent) {
-        auto e = ENV(env);
-        fmt::format_to(fmt_ctx.out(), "{:<{}}(", " ", indent);
-        b8 first = true;
-        for (const auto& pair : e->bindings) {
-            auto s = string::interned::get_slice(pair.key);
-            if (!s)
-                continue;
-            if (first) {
-                fmt::format_to(fmt_ctx.out(),
-                               "({:<32} . {})\n",
-                               *s,
-                               printable_t{ctx, pair.value, true});
-                first = false;
-            } else {
-                fmt::format_to(fmt_ctx.out(),
-                               "{:<{}}({:<32} . {})\n",
-                               " ",
-                               indent,
-                               *s,
-                               printable_t{ctx, pair.value, true});
-            }
-        }
-        if (IS_NIL(e->parent)) {
-            fmt::format_to(fmt_ctx.out(), "{:<{}}(parent . nil)", " ", indent);
-        } else {
-            fmt::format_to(fmt_ctx.out(),
-                           "{:<{}}(parent . [environment {}])",
-                           " ",
-                           indent,
-                           (u0*) e->parent);
-        }
-        fmt::format_to(fmt_ctx.out(), ")\n");
     }
 }

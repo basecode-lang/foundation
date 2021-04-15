@@ -208,6 +208,13 @@ namespace basecode::scm {
         write
     };
 
+    struct print_rule_t final {
+        str::slice_t            symbol;
+        u8                      skip_first_arg:     1;
+        u8                      increase_indent:    1;
+        u8                      pad:                6;
+    };
+
     struct env_t final {
         obj_t*                  self;
         obj_t*                  parent;
