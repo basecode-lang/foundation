@@ -338,11 +338,21 @@ namespace basecode {
             u32 idx{};
             u32 node_ids[table.nodes.size];
             for (auto node : table.nodes) {
-                auto trie_node = graph::make_node(g);
-                node::label(*trie_node, format::format("<f0> node: {}|<f1> sym: {}|<f2> type: {}",
-                                                       node->id,
-                                                       isprint(node->sym) ? node->sym : '.',
-                                                       symtab::node_type_name(node->type)));
+                auto trie_node  = graph::make_node(g);
+                u32  id_field   = node::make_field(*trie_node);
+                u32  sym_field  = node::make_field(*trie_node);
+                u32  type_field = node::make_field(*trie_node);
+                node::set_field_label(*trie_node,
+                                      id_field,
+                                      format::format("id: {}", node->id));
+                node::set_field_label(*trie_node,
+                                      sym_field,
+                                      format::format("sym: {}",
+                                                     isprint(node->sym) ? node->sym : '.'));
+                node::set_field_label(*trie_node,
+                                      type_field,
+                                      format::format("type: {}",
+                                                     symtab::node_type_name(node->type)));
                 node::shape(*trie_node, shape_t::record);
                 node::style(*trie_node, node_style_t::filled);
                 node::fill_color(*trie_node, color_t::aliceblue);
@@ -355,10 +365,12 @@ namespace basecode {
                     auto edge = graph::make_edge(g);
                     edge->first  = graph::node_ref(&g,
                                                    node_ids[node->id - 1],
-                                                   "f2:e"_ss);
+                                                   3,
+                                                   compass_point_t::e);
                     edge->second = graph::node_ref(&g,
                                                    node_ids[node->next->id - 1],
-                                                   "f0:w"_ss);
+                                                   1,
+                                                   compass_point_t::w);
                     edge::label(*edge, "next"_ss);
                     edge::dir(*edge, dir_type_t::both);
                     edge::arrow_tail(*edge, arrow_type_t::dot);
@@ -369,10 +381,12 @@ namespace basecode {
                     auto edge = graph::make_edge(g);
                     edge->first  = graph::node_ref(&g,
                                                    node_ids[node->id - 1],
-                                                   "f1:s"_ss);
+                                                   2,
+                                                   compass_point_t::s);
                     edge->second = graph::node_ref(&g,
                                                    node_ids[node->child->id - 1],
-                                                   "f1:n"_ss);
+                                                   2,
+                                                   compass_point_t::n);
                     edge::label(*edge, "child"_ss);
                     edge::dir(*edge, dir_type_t::both);
                     edge::arrow_tail(*edge, arrow_type_t::dot);

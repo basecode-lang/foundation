@@ -26,6 +26,7 @@ namespace basecode::graphviz {
     struct node_t;
     struct edge_t;
     struct graph_t;
+    struct field_t;
     struct attr_set_t;
     struct attr_value_t;
 
@@ -33,6 +34,7 @@ namespace basecode::graphviz {
     using edge_list_t           = array_t<edge_t>;
     using node_list_t           = array_t<node_t>;
     using attr_list_t           = array_t<attr_value_t>;
+    using field_list_t          = array_t<field_t>;
     using graph_list_t          = array_t<graph_t*>;
 
     enum status_t : u8 {
@@ -1175,16 +1177,27 @@ namespace basecode::graphviz {
         component_type_t        type;
     };
 
+    struct field_t final {
+        intern_id               label;
+        u32                     id;
+    };
+
     struct node_t final {
         attr_set_t              attrs;
+        field_list_t            fields;
         intern_id               name;
         u32                     id;
     };
 
+    struct field_ref_t final {
+        u32                     id;
+        compass_point_t         point;
+    };
+
     struct node_ref_t final {
-        str::slice_t            field_id;
         graph_t*                graph;
         u32                     id;
+        field_ref_t             field;
     };
 
     struct edge_t final {
@@ -1210,6 +1223,11 @@ namespace basecode::graphviz {
     };
 
     namespace attr {
+        u0 serialize(graph_t& g,
+                     const attr_value_t& attr,
+                     mem_buf_t& mb,
+                     const node_t* node = {});
+
         str::slice_t dir_name(dir_type_t dir);
 
         str::slice_t color_name(color_t color);
@@ -1242,6 +1260,8 @@ namespace basecode::graphviz {
 
         str::slice_t output_mode_name(output_mode_t mode);
 
+        str::slice_t spline_mode_name(spline_mode_t mode);
+
         str::slice_t label_loc_name(node_label_loc_t loc);
 
         str::slice_t graph_style_name(graph_style_t style);
@@ -1250,7 +1270,7 @@ namespace basecode::graphviz {
 
         str::slice_t color_scheme_name(color_scheme_t scheme);
 
-        u0 serialize(graph_t& g, const attr_value_t& attr, mem_buf_t& mb);
+        str::slice_t compass_point_name(compass_point_t point);
     }
 
     namespace attr_set {
@@ -1290,6 +1310,8 @@ namespace basecode::graphviz {
         u0 free(node_t& n);
 
         u0 skew(node_t& n, f64 v);
+
+        u32 make_field(node_t& n);
 
         u0 sortv(node_t& n, u32 v);
 
@@ -1380,6 +1402,8 @@ namespace basecode::graphviz {
         }
 
         u0 serialize(graph_t& g, const node_t& n, mem_buf_t& mb);
+
+        u0 set_field_label(node_t& n, u32 id, str::slice_t label);
 
         status_t init(node_t& n, u32 id, str::slice_t name, alloc_t* alloc = context::top()->alloc);
     }
@@ -1681,12 +1705,6 @@ namespace basecode::graphviz {
             UNUSED(v);
         }
 
-        constexpr node_ref_t node_ref(graph_t* g,
-                                      u32 id,
-                                      str::slice_t field_id = {}) {
-            return {field_id, g, id};
-        }
-
         u0 layers_select(graph_t& g, const String_Concept auto& v) {
             UNUSED(g);
             UNUSED(v);
@@ -1701,6 +1719,16 @@ namespace basecode::graphviz {
             auto node = &array::append(g.nodes);
             node::init(*node, g.nodes.size, name, g.alloc);
             return node;
+        }
+
+        constexpr node_ref_t node_ref(graph_t* g,
+                                      u32 id,
+                                      u32 field_id = 0,
+                                      compass_point_t point = compass_point_t::_) {
+            return {g,
+                    id,
+                    .field = {.id = field_id,
+                              .point = point}};
         }
     }
 }

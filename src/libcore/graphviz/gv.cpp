@@ -1043,6 +1043,389 @@ namespace basecode::graphviz {
             [u32(overlap_t::porthoyx)]          = "porthoyx"_ss,
         };
 
+        static str::slice_t s_compass_point_names[] = {
+            [u32(compass_point_t::n)]           = "n"_ss,
+            [u32(compass_point_t::ne)]          = "ne"_ss,
+            [u32(compass_point_t::e)]           = "e"_ss,
+            [u32(compass_point_t::se)]          = "se"_ss,
+            [u32(compass_point_t::s)]           = "s"_ss,
+            [u32(compass_point_t::sw)]          = "sw"_ss,
+            [u32(compass_point_t::w)]           = "w"_ss,
+            [u32(compass_point_t::nw)]          = "nw"_ss,
+            [u32(compass_point_t::c)]           = "c"_ss,
+            [u32(compass_point_t::_)]           = "_"_ss
+        };
+
+        u0 serialize(graph_t& g,
+                     const attr_value_t& attr,
+                     mem_buf_t& mb,
+                     const node_t* node) {
+            format::format_to(mb, "{}=", type_name(attr.type));
+            switch (attr_type_t(attr.type)) {
+                // enumeration
+                case attr_type_t::dir: {
+                    const auto type = dir_type_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      dir_name(type));
+                    break;
+                }
+                case attr_type_t::rank: {
+                    format::format_to(mb,
+                                      "{}",
+                                      rank_type_name(rank_type_t(attr.value.dw)));
+                    break;
+                }
+                case attr_type_t::style: {
+                    switch (attr.value_type) {
+                        case attr_value_type_t::edge_style:
+                            format::format_to(mb,
+                                              "{}",
+                                              edge_style_name(edge_style_t(attr.value.dw)));
+                            break;
+                        case attr_value_type_t::node_style:
+                            format::format_to(mb,
+                                              "{}",
+                                              node_style_name(node_style_t(attr.value.dw)));
+                            break;
+                        case attr_value_type_t::graph_style:
+                            format::format_to(mb,
+                                              "{}",
+                                              graph_style_name(graph_style_t(attr.value.dw)));
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
+                }
+                case attr_type_t::shape: {
+                    const auto type = shape_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      shape_name(type));
+                    break;
+                }
+                case attr_type_t::overlap: {
+                    format::format_to(mb,
+                                      "{}",
+                                      overlap_name(overlap_t(attr.value.dw)));
+                    break;
+                }
+                case attr_type_t::charset: {
+                    const auto type = charset_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      charset_name(type));
+                    break;
+                }
+                case attr_type_t::rank_dir: {
+                    const auto type = rank_dir_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      rank_dir_name(type));
+                    break;
+                }
+                case attr_type_t::page_dir: {
+                    const auto type = page_dir_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      page_dir_name(type));
+                    break;
+                }
+                case attr_type_t::ordering: {
+                    const auto type = ordering_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      ordering_name(type));
+                    break;
+                }
+                case attr_type_t::image_pos: {
+                    const auto type = image_pos_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      image_pos_name(type));
+                    break;
+                }
+                case attr_type_t::label_loc: {
+                    format::format_to(mb,
+                                      "{}",
+                                      label_loc_name(node_label_loc_t(attr.value.dw)));
+                    break;
+                }
+                case attr_type_t::pack_mode: {
+                    format::format_to(mb,
+                                      "{}",
+                                      pack_mode_name(pack_mode_t(attr.value.dw)));
+                    break;
+                }
+                case attr_type_t::arrow_head:
+                case attr_type_t::arrow_tail: {
+                    const auto type = arrow_type_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      arrow_type_name(type));
+                    break;
+                }
+                case attr_type_t::color_scheme: {
+                    const auto type = color_scheme_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      color_scheme_name(type));
+                    break;
+                }
+                case attr_type_t::cluster_rank: {
+                    format::format_to(mb,
+                                      "{}",
+                                      cluster_mode_name(cluster_mode_t(attr.value.dw)));
+                    break;
+                }
+                case attr_type_t::output_order: {
+                    const auto type = output_mode_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      output_mode_name(type));
+                    break;
+                }
+                case attr_type_t::label: {
+                    auto r = string::interned::get(attr.value.dw);
+                    if (OK(r.status)) {
+                        if (node && node->fields.size > 0) {
+                            format::format_to(mb, "\"");
+                            for (u32 i = 0; i < node->fields.size; ++i) {
+                                const auto& field = node->fields[i];
+                                if (i > 0)
+                                    format::format_to(mb, "|");
+                                format::format_to(mb,
+                                                  "<f{}>",
+                                                  field.id);
+                                if (field.label) {
+                                    r = string::interned::get(field.label);
+                                    if (OK(r.status)) {
+                                        escape_chars(r.slice, g.scratch);
+                                        format::format_to(mb,
+                                                          "{}",
+                                                          g.scratch);
+                                    }
+                                }
+                            }
+                            format::format_to(mb, "\"");
+                        } else {
+                            escape_chars(r.slice, g.scratch);
+                            format::format_to(mb,
+                                              "\"{}\"",
+                                              g.scratch);
+                        }
+                    }
+                    break;
+                }
+                case attr_type_t::group:
+                case attr_type_t::lhead:
+                case attr_type_t::ltail:
+                case attr_type_t::image:
+                case attr_type_t::xlabel:
+                case attr_type_t::comment:
+                case attr_type_t::font_name:
+                case attr_type_t::same_head:
+                case attr_type_t::same_tail:
+                case attr_type_t::font_path:
+                case attr_type_t::head_label:
+                case attr_type_t::tail_label:
+                case attr_type_t::image_path:
+                case attr_type_t::label_font_name: {
+                    auto r = string::interned::get(attr.value.dw);
+                    if (OK(r.status)) {
+                        escape_chars(r.slice, g.scratch);
+                        format::format_to(mb,
+                                          "\"{}\"",
+                                          g.scratch);
+                    }
+                    break;
+                }
+
+                // numbers
+                case attr_type_t::sep:
+                case attr_type_t::pad:
+                case attr_type_t::pack:
+                case attr_type_t::page:
+                case attr_type_t::skew:
+                case attr_type_t::size:
+                case attr_type_t::esep:
+                case attr_type_t::ratio:
+                case attr_type_t::sides:
+                case attr_type_t::scale:
+                case attr_type_t::width:
+                case attr_type_t::margin:
+                case attr_type_t::sort_v:
+                case attr_type_t::height:
+                case attr_type_t::weight:
+                case attr_type_t::rotate:
+                case attr_type_t::quantum:
+                case attr_type_t::min_len:
+                case attr_type_t::mc_limit:
+                case attr_type_t::ns_limit:
+                case attr_type_t::rank_sep:
+                case attr_type_t::node_sep:
+                case attr_type_t::ns_limit1:
+                case attr_type_t::normalize:
+                case attr_type_t::pen_width:
+                case attr_type_t::font_size:
+                case attr_type_t::arrow_size:
+                case attr_type_t::distortion:
+                case attr_type_t::show_boxes:
+                case attr_type_t::image_scale:
+                case attr_type_t::label_angle:
+                case attr_type_t::voro_margin:
+                case attr_type_t::search_size:
+                case attr_type_t::orientation:
+                case attr_type_t::peripheries:
+                case attr_type_t::label_distance:
+                case attr_type_t::gradient_angle:
+                case attr_type_t::label_font_size: {
+                    switch (attr.value_type) {
+                        case attr_value_type_t::point: {
+                            const auto& p = attr.value.point;
+                            format::format_to(mb,
+                                              "{},{}",
+                                              p.x,
+                                              p.y);
+                            break;
+                        }
+                        case attr_value_type_t::integer: {
+                            format::format_to(mb,
+                                              "{}",
+                                              attr.value.dw);
+                            break;
+                        }
+                        case attr_value_type_t::floating_point: {
+                            format::format_to(mb,
+                                              "{}",
+                                              attr.value.fqw);
+                            break;
+                        }
+                        default: {
+                            break;
+                        }
+                    }
+                    break;
+                }
+
+                // colors
+                case attr_type_t::color:
+                case attr_type_t::bg_color:
+                case attr_type_t::pen_color:
+                case attr_type_t::fill_color:
+                case attr_type_t::font_color:
+                case attr_type_t::label_font_color: {
+                    switch (attr.value_type) {
+                        case attr_value_type_t::hsv: {
+                            const auto& hsv = attr.value.hsv;
+                            format::format_to(mb,
+                                              "{},{},{}",
+                                              hsv.h,
+                                              hsv.s,
+                                              hsv.v);
+                            break;
+                        }
+                        case attr_value_type_t::rgb: {
+                            const auto& rgb = attr.value.rgb;
+                            format::format_to(mb,
+                                              "#{:02x}{:02x}{:02x}",
+                                              rgb.r,
+                                              rgb.g,
+                                              rgb.b);
+                            break;
+                        }
+                        case attr_value_type_t::rgba: {
+                            const auto& rgba = attr.value.rgba;
+                            format::format_to(mb,
+                                              "#{:02x}{:02x}{:02x}{:02x}",
+                                              rgba.r,
+                                              rgba.g,
+                                              rgba.b,
+                                              rgba.a);
+                            break;
+                        }
+                        case attr_value_type_t::color:
+                            format::format_to(mb,
+                                              "{}",
+                                              attr::color_name(color_t(attr.value.dw)));
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
+                }
+
+                // boolean
+                case attr_type_t::center:
+                case attr_type_t::regular:
+                case attr_type_t::new_rank:
+                case attr_type_t::decorate:
+                case attr_type_t::compound:
+                case attr_type_t::head_clip:
+                case attr_type_t::tail_clip:
+                case attr_type_t::landscape:
+                case attr_type_t::fixed_size:
+                case attr_type_t::constraint:
+                case attr_type_t::label_just:
+                case attr_type_t::no_justify:
+                case attr_type_t::concentrate:
+                case attr_type_t::label_float:
+                case attr_type_t::force_labels:
+                case attr_type_t::re_min_cross: {
+                    format::format_to(mb,
+                                      "{}",
+                                      attr.value.f ? "yes"_ss : "no"_ss);
+                    break;
+                }
+
+                // custom
+                case attr_type_t::pos: {
+                    format::format_to(mb,
+                                      "{},{}",
+                                      attr.value.point.x,
+                                      attr.value.point.y);
+                    break;
+                }
+                case attr_type_t::splines: {
+                    const auto type = spline_mode_t(attr.value.dw);
+                    format::format_to(mb,
+                                      "{}",
+                                      spline_mode_name(type));
+                    break;
+                }
+                case attr_type_t::viewport: {
+                    const auto& vp = attr.value.viewport;
+                    format::format_to(mb,
+                                      "{},{},{},{},{}",
+                                      vp.w,
+                                      vp.h,
+                                      vp.z,
+                                      vp.x,
+                                      vp.y);
+                    break;
+                }
+                case attr_type_t::head_port:
+                case attr_type_t::tail_port: {
+                    break;
+                }
+
+                // not supported
+                case attr_type_t::z:
+                case attr_type_t::layer:
+                case attr_type_t::layout:
+                case attr_type_t::layers:
+                case attr_type_t::layer_sep:
+                case attr_type_t::shape_file:
+                case attr_type_t::background:
+                case attr_type_t::layer_select:
+                case attr_type_t::sample_points:
+                case attr_type_t::layer_list_sep: {
+                    break;
+                }
+            }
+        }
+
         str::slice_t dir_name(dir_type_t dir) {
             return s_dir_names[u32(dir)];
         }
@@ -1152,287 +1535,25 @@ namespace basecode::graphviz {
             return s_color_scheme_names[u32(scheme)];
         }
 
-        u0 serialize(graph_t& g, const attr_value_t& attr, mem_buf_t& mb) {
-            format::format_to(mb, "{}=", type_name(attr.type));
-            switch (attr_type_t(attr.type)) {
-                // enumeration
-                case attr_type_t::dir: {
-                    const auto type = dir_type_t(attr.value.dw);
-                    format::format_to(mb, "{}", dir_name(type));
-                    break;
-                }
-                case attr_type_t::rank: {
-                    format::format_to(mb, "{}", rank_type_name(rank_type_t(attr.value.dw)));
-                    break;
-                }
-                case attr_type_t::style: {
-                    switch (attr.value_type) {
-                        case attr_value_type_t::edge_style:
-                            format::format_to(mb, "{}", edge_style_name(edge_style_t(attr.value.dw)));
-                            break;
-                        case attr_value_type_t::node_style:
-                            format::format_to(mb, "{}", node_style_name(node_style_t(attr.value.dw)));
-                            break;
-                        case attr_value_type_t::graph_style:
-                            format::format_to(mb, "{}", graph_style_name(graph_style_t(attr.value.dw)));
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                }
-                case attr_type_t::shape: {
-                    const auto type = shape_t(attr.value.dw);
-                    format::format_to(mb, "{}", shape_name(type));
-                    break;
-                }
-                case attr_type_t::overlap: {
-                    format::format_to(mb, "{}", overlap_name(overlap_t(attr.value.dw)));
-                    break;
-                }
-                case attr_type_t::charset: {
-                    const auto type = charset_t(attr.value.dw);
-                    format::format_to(mb, "{}", charset_name(type));
-                    break;
-                }
-                case attr_type_t::rank_dir: {
-                    const auto type = rank_dir_t(attr.value.dw);
-                    format::format_to(mb, "{}", rank_dir_name(type));
-                    break;
-                }
-                case attr_type_t::page_dir: {
-                    const auto type = page_dir_t(attr.value.dw);
-                    format::format_to(mb, "{}", page_dir_name(type));
-                    break;
-                }
-                case attr_type_t::ordering: {
-                    const auto type = ordering_t(attr.value.dw);
-                    format::format_to(mb, "{}", ordering_name(type));
-                    break;
-                }
-                case attr_type_t::image_pos: {
-                    const auto type = image_pos_t(attr.value.dw);
-                    format::format_to(mb, "{}", image_pos_name(type));
-                    break;
-                }
-                case attr_type_t::label_loc: {
-                    format::format_to(mb, "{}", label_loc_name(node_label_loc_t(attr.value.dw)));
-                    break;
-                }
-                case attr_type_t::pack_mode: {
-                    format::format_to(mb, "{}", pack_mode_name(pack_mode_t(attr.value.dw)));
-                    break;
-                }
-                case attr_type_t::arrow_head:
-                case attr_type_t::arrow_tail: {
-                    const auto type = arrow_type_t(attr.value.dw);
-                    format::format_to(mb, "{}", arrow_type_name(type));
-                    break;
-                }
-                case attr_type_t::color_scheme: {
-                    const auto type = color_scheme_t(attr.value.dw);
-                    format::format_to(mb, "{}", color_scheme_name(type));
-                    break;
-                }
-                case attr_type_t::cluster_rank: {
-                    format::format_to(mb, "{}", cluster_mode_name(cluster_mode_t(attr.value.dw)));
-                    break;
-                }
-                case attr_type_t::output_order: {
-                    const auto type = output_mode_t(attr.value.dw);
-                    format::format_to(mb, "{}", output_mode_name(type));
-                    break;
-                }
-
-                // string
-                // XXX: FIXME
-                //      this is a temporary hack to get record fields working
-                //      need to add full support for fields to the data structures
-                //      so the fields and the data can be serialized properly with
-                //      escaping over the data.
-                case attr_type_t::label: {
-                    auto r = string::interned::get(attr.value.dw);
-                    if (OK(r.status)) {
-//                        escape_chars(r.slice, g.scratch);
-                        format::format_to(mb, "\"{}\"", r.slice);
-                    }
-                    break;
-                }
-                case attr_type_t::group:
-                case attr_type_t::lhead:
-                case attr_type_t::ltail:
-                case attr_type_t::image:
-                case attr_type_t::xlabel:
-                case attr_type_t::comment:
-                case attr_type_t::font_name:
-                case attr_type_t::same_head:
-                case attr_type_t::same_tail:
-                case attr_type_t::font_path:
-                case attr_type_t::head_label:
-                case attr_type_t::tail_label:
-                case attr_type_t::image_path:
-                case attr_type_t::label_font_name: {
-                    auto r = string::interned::get(attr.value.dw);
-                    if (OK(r.status)) {
-                        escape_chars(r.slice, g.scratch);
-                        format::format_to(mb, "\"{}\"", g.scratch);
-                    }
-                    break;
-                }
-
-                // numbers
-                case attr_type_t::sep:
-                case attr_type_t::pad:
-                case attr_type_t::pack:
-                case attr_type_t::page:
-                case attr_type_t::skew:
-                case attr_type_t::size:
-                case attr_type_t::esep:
-                case attr_type_t::ratio:
-                case attr_type_t::sides:
-                case attr_type_t::scale:
-                case attr_type_t::width:
-                case attr_type_t::margin:
-                case attr_type_t::sort_v:
-                case attr_type_t::height:
-                case attr_type_t::weight:
-                case attr_type_t::rotate:
-                case attr_type_t::quantum:
-                case attr_type_t::min_len:
-                case attr_type_t::mc_limit:
-                case attr_type_t::ns_limit:
-                case attr_type_t::rank_sep:
-                case attr_type_t::node_sep:
-                case attr_type_t::ns_limit1:
-                case attr_type_t::normalize:
-                case attr_type_t::pen_width:
-                case attr_type_t::font_size:
-                case attr_type_t::arrow_size:
-                case attr_type_t::distortion:
-                case attr_type_t::show_boxes:
-                case attr_type_t::image_scale:
-                case attr_type_t::label_angle:
-                case attr_type_t::voro_margin:
-                case attr_type_t::search_size:
-                case attr_type_t::orientation:
-                case attr_type_t::peripheries:
-                case attr_type_t::label_distance:
-                case attr_type_t::gradient_angle:
-                case attr_type_t::label_font_size: {
-                    switch (attr.value_type) {
-                        case attr_value_type_t::point: {
-                            const auto& p = attr.value.point;
-                            format::format_to(mb, "{},{}", p.x, p.y);
-                            break;
-                        }
-                        case attr_value_type_t::integer: {
-                            format::format_to(mb, "{}", attr.value.dw);
-                            break;
-                        }
-                        case attr_value_type_t::floating_point: {
-                            format::format_to(mb, "{}", attr.value.fqw);
-                            break;
-                        }
-                        default: {
-                            break;
-                        }
-                    }
-                    break;
-                }
-
-                // colors
-                case attr_type_t::color:
-                case attr_type_t::bg_color:
-                case attr_type_t::pen_color:
-                case attr_type_t::fill_color:
-                case attr_type_t::font_color:
-                case attr_type_t::label_font_color: {
-                    switch (attr.value_type) {
-                        case attr_value_type_t::hsv: {
-                            const auto& hsv = attr.value.hsv;
-                            format::format_to(mb, "{},{},{}", hsv.h, hsv.s, hsv.v);
-                            break;
-                        }
-                        case attr_value_type_t::rgb: {
-                            const auto& rgb = attr.value.rgb;
-                            format::format_to(mb, "#{:02x}{:02x}{:02x}", rgb.r, rgb.g, rgb.b);
-                            break;
-                        }
-                        case attr_value_type_t::rgba: {
-                            const auto& rgba = attr.value.rgba;
-                            format::format_to(mb, "#{:02x}{:02x}{:02x}{:02x}", rgba.r, rgba.g, rgba.b, rgba.a);
-                            break;
-                        }
-                        case attr_value_type_t::color:
-                            format::format_to(mb, "{}", attr::color_name(color_t(attr.value.dw)));
-                            break;
-                        default:
-                            break;
-                    }
-                    break;
-                }
-
-                // boolean
-                case attr_type_t::center:
-                case attr_type_t::regular:
-                case attr_type_t::new_rank:
-                case attr_type_t::decorate:
-                case attr_type_t::compound:
-                case attr_type_t::head_clip:
-                case attr_type_t::tail_clip:
-                case attr_type_t::landscape:
-                case attr_type_t::fixed_size:
-                case attr_type_t::constraint:
-                case attr_type_t::label_just:
-                case attr_type_t::no_justify:
-                case attr_type_t::concentrate:
-                case attr_type_t::label_float:
-                case attr_type_t::force_labels:
-                case attr_type_t::re_min_cross: {
-                    format::format_to(mb, "{}", attr.value.f ? "yes"_ss : "no"_ss);
-                    break;
-                }
-
-                // custom
-                case attr_type_t::pos: {
-                    format::format_to(mb, "{},{}", attr.value.point.x, attr.value.point.y);
-                    break;
-                }
-                case attr_type_t::splines: {
-                    const auto type = spline_mode_t(attr.value.dw);
-                    format::format_to(mb, "{}", spline_mode_name(type));
-                    break;
-                }
-                case attr_type_t::viewport: {
-                    const auto& vp = attr.value.viewport;
-                    format::format_to(mb, "{},{},{},{},{}", vp.w, vp.h, vp.z, vp.x, vp.y);
-                    break;
-                }
-                case attr_type_t::head_port:
-                case attr_type_t::tail_port: {
-                    break;
-                }
-
-                // not supported
-                case attr_type_t::z:
-                case attr_type_t::layer:
-                case attr_type_t::layout:
-                case attr_type_t::layers:
-                case attr_type_t::layer_sep:
-                case attr_type_t::shape_file:
-                case attr_type_t::background:
-                case attr_type_t::layer_select:
-                case attr_type_t::sample_points:
-                case attr_type_t::layer_list_sep: {
-                    break;
-                }
-            }
+        str::slice_t compass_point_name(compass_point_t point) {
+            return s_compass_point_names[u32(point)];
         }
     }
 
     namespace node {
         u0 free(node_t& n) {
+            array::free(n.fields);
             attr_set::free(n.attrs);
+        }
+
+        u32 make_field(node_t& n) {
+            auto& field = array::append(n.fields);
+            field.id = n.fields.size;
+            field.label = {};
+            attr_set::set(n.attrs,
+                          attr_type_t::label,
+                          str::slice_t{});
+            return field.id;
         }
 
         u0 skew(node_t& n, f64 v) {
@@ -1536,7 +1657,10 @@ namespace basecode::graphviz {
         }
 
         u0 style(node_t& n, node_style_t v) {
-            attr_set::set(n.attrs, attr_type_t::style, u32(v), attr_value_type_t::node_style);
+            attr_set::set(n.attrs,
+                          attr_type_t::style,
+                          u32(v),
+                          attr_value_type_t::node_style);
         }
 
         u0 fill_color(node_t& n, color_t v) {
@@ -1579,7 +1703,9 @@ namespace basecode::graphviz {
         u0 serialize(graph_t& g, const node_t& n, mem_buf_t& mb) {
             auto node_name = string::interned::get(n.name);
             if (!OK(node_name.status)) {
-                format::format_to(mb, "// node has invalid name: {}", n.id);
+                format::format_to(mb,
+                                  "// node has invalid name: {}",
+                                  n.id);
                 return;
             }
             format::format_to(mb, "{}", node_name.slice);
@@ -1587,17 +1713,26 @@ namespace basecode::graphviz {
                 format::format_to(mb, "[");
                 for (u32 i = 0; i < n.attrs.values.size; ++i) {
                     if (i > 0) format::format_to(mb, ", ");
-                    attr::serialize(g, n.attrs.values[i], mb);
+                    attr::serialize(g, n.attrs.values[i], mb, &n);
                 }
                 format::format_to(mb, "]");
             }
             format::format_to(mb, ";");
         }
 
+        u0 set_field_label(node_t& n, u32 id, str::slice_t label) {
+            if (id == 0 || id > n.fields.size)
+                return;
+            auto& field = n.fields[id - 1];
+            auto rc = string::interned::fold_for_result(label);
+            field.label = rc.id;
+        }
+
         status_t init(node_t& n, u32 id, str::slice_t name, alloc_t* alloc) {
             auto r = string::interned::fold_for_result(name);
             n.id   = id;
             n.name = r.id;
+            array::init(n.fields, alloc);
             attr_set::init(n.attrs, component_type_t::node, alloc);
             return status_t::ok;
         }
@@ -1713,7 +1848,10 @@ namespace basecode::graphviz {
         }
 
         u0 style(edge_t& e, edge_style_t v) {
-            attr_set::set(e.attrs, attr_type_t::style, u32(v), attr_value_type_t::edge_style);
+            attr_set::set(e.attrs,
+                          attr_type_t::style,
+                          u32(v),
+                          attr_value_type_t::edge_style);
         }
 
         u0 label_font_size(edge_t& e, f64 v) {
@@ -1751,7 +1889,8 @@ namespace basecode::graphviz {
         }
 
         u0 serialize(graph_t& g, const edge_t& e, mem_buf_t& mb) {
-            const auto node_connector = g.type == graph_type_t::directed ? "->"_ss : "--"_ss;
+            const auto node_connector = g.type == graph_type_t::directed ?
+                                        "->"_ss : "--"_ss;
             auto lhs = graph::get_node(*e.first.graph, e.first.id);
             auto rhs = graph::get_node(*e.second.graph, e.second.id);
             if (!lhs || !rhs) {
@@ -1761,14 +1900,24 @@ namespace basecode::graphviz {
 
             auto lhs_name = string::interned::get(lhs->name);
             format::format_to(mb, "\"{}\"", lhs_name.slice);
-            if (!slice::empty(e.first.field_id)) {
-                format::format_to(mb, ":{}", e.first.field_id);
+            if (e.first.field.id) {
+                format::format_to(mb, ":f{}", e.first.field.id);
+                if (e.first.field.point != compass_point_t::_) {
+                    format::format_to(mb,
+                                      ":{}",
+                                      attr::compass_point_name(e.first.field.point));
+                }
             }
             format::format_to(mb, " {} ", node_connector);
             auto rhs_name = string::interned::get(rhs->name);
             format::format_to(mb, "\"{}\"", rhs_name.slice);
-            if (!slice::empty(e.second.field_id)) {
-                format::format_to(mb, ":{}", e.second.field_id);
+            if (e.second.field.id) {
+                format::format_to(mb, ":f{}", e.second.field.id);
+                if (e.second.field.point != compass_point_t::_) {
+                    format::format_to(mb,
+                                      ":{}",
+                                      attr::compass_point_name(e.second.field.point));
+                }
             }
 
             if (e.attrs.values.size > 0) {
@@ -2022,7 +2171,10 @@ namespace basecode::graphviz {
         }
 
         u0 style(graph_t& g, graph_style_t v) {
-            attr_set::set(g.attrs, attr_type_t::style, u32(v), attr_value_type_t::graph_style);
+            attr_set::set(g.attrs,
+                          attr_type_t::style,
+                          u32(v),
+                          attr_value_type_t::graph_style);
         }
 
         u0 rank_dir(graph_t& g, rank_dir_t v) {

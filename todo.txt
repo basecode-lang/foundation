@@ -1,10 +1,5 @@
 HIGH
 ---------
-- graphviz: need to add proper support for record fields; i temporarily
-            hacked label serialization to prevent escaping special field
-            characters.
-- term: isatty checks aren't working under linux
-- memory: run through valgrind on linux
 - scm: first pass register allocator
 
 MEDIUM
@@ -35,6 +30,11 @@ LOW
 
 DONE
 ----
+- graphviz: need to add proper support for record fields; i temporarily
+            hacked label serialization to prevent escaping special field
+            characters.
+- memory: run through valgrind on linux
+- term: isatty checks aren't working under linux
 - symtab_t: i did it...i had to rework the entire symtab_t.  when i pulled the latest code
             down onto a linux machine, i had all sorts of issues.  it took me a lot longer than
             i would have liked, but i think it's all the better for it now.
