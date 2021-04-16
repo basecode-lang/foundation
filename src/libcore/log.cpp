@@ -87,6 +87,7 @@ namespace basecode::log {
             slab_config.backing   = g_log_system.alloc;
             slab_config.buf_size  = sizeof(logger_t);
             slab_config.buf_align = alignof(logger_t);
+            slab_config.num_pages = DEFAULT_NUM_PAGES;
             memory::init(&g_log_system.slab_alloc, alloc_type_t::slab, &slab_config);
 
             return make(&g_log_system.default_logger, type, config, mask);

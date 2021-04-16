@@ -33,15 +33,8 @@ namespace basecode {
     using param_array_t         = array_t<param_t*>;
     using symbol_array_t        = assoc_array_t<u0*>;
     using overload_array_t      = array_t<overload_t*>;
-    using overload_symtab_t     = symtab_t<overload_t*>;
+    using overload_table_t      = array_t<overload_t*>;
     using param_value_array_t   = array_t<param_value_t>;
-
-    struct lib_t final {
-        alloc_t*                alloc;
-        DLLib*                  handle;
-        symtab_t<u0*>           symbols;
-        path_t                  path;
-    };
 
     enum class call_mode_t : u8 {
         system                  = 1,
@@ -64,11 +57,18 @@ namespace basecode {
         qword                   = 'q',
     };
 
+    struct lib_t final {
+        alloc_t*                alloc;
+        DLLib*                  handle;
+        symtab_t<u0*>           symbols;
+        path_t                  path;
+    } __attribute__((aligned(128)));
+
     struct param_type_t final {
         param_cls_t             cls;
         param_size_t            size;
         u8                      user;
-    };
+    } __attribute__((aligned(4)));
 
     union param_alias_t final {
         u0*                     p;
@@ -83,7 +83,7 @@ namespace basecode {
     struct param_value_t final {
         param_alias_t           alias;
         param_type_t            type;
-    };
+    } __attribute__((aligned(16)));
 
     struct param_t final {
         param_value_t           value;
@@ -92,7 +92,7 @@ namespace basecode {
         u8                      has_dft:    1;
         u8                      is_rest:    1;
         u8                      pad:        6;
-    };
+    } __attribute__((aligned(64)));
 
     struct overload_t final {
         proto_t*                proto;
@@ -107,21 +107,21 @@ namespace basecode {
         u8                      has_rest:   1;
         u8                      pad:        6;
         call_mode_t             mode;
-    };
+    } __attribute__((aligned(128)));
 
     struct proto_t final {
         lib_t*                  lib;
         str::slice_t            name;
-        overload_symtab_t       overloads;
+        overload_table_t        overloads;
         u32                     min_req;
         u32                     max_req;
-    };
+    } __attribute__((aligned(128)));
 
     struct ffi_t final {
         alloc_t*                alloc;
         DCCallVM*               vm;
         u32                     heap_size;
-    };
+    } __attribute__((aligned(32)));
 
     namespace ffi {
         enum class status_t : u8 {
@@ -151,7 +151,8 @@ namespace basecode {
         namespace system {
             u0 fini();
 
-            status_t init(alloc_t* alloc = context::top()->alloc, u8 num_pages = 1);
+            status_t init(alloc_t* alloc = context::top()->alloc,
+                          u8 num_pages = DEFAULT_NUM_PAGES);
         }
 
         namespace param {
@@ -188,11 +189,13 @@ namespace basecode {
 
             b8 remove(str::slice_t symbol);
 
+            overload_t* make(str::slice_t symbol,
+                             param_type_t ret_type,
+                             u0* func = {});
+
             overload_t* find(str::slice_t symbol);
 
             status_t append(overload_t* ol, param_t* param);
-
-            overload_t* make(str::slice_t symbol, param_type_t ret_type, u0* func = {});
         }
 
         u0 free(ffi_t& ffi);
@@ -267,8 +270,10 @@ namespace basecode {
             }
         }
 
-        status_t call(ffi_t& ffi, const overload_t* ol, param_alias_t& ret);
+        status_t init(ffi_t& ffi,
+                      u32 heap_size = 2 * 1024,
+                      alloc_t* alloc = context::top()->alloc);
 
-        status_t init(ffi_t& ffi, u32 heap_size = 2 * 1024, alloc_t* alloc = context::top()->alloc);
+        status_t call(ffi_t& ffi, const overload_t* ol, param_alias_t& ret);
     }
 }

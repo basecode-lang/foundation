@@ -378,12 +378,14 @@ namespace basecode {
             node_cfg.backing   = tree.alloc;
             node_cfg.buf_size  = avl_t<T>::Node_Type_Size;
             node_cfg.buf_align = avl_t<T>::Node_Type_Align;
+            node_cfg.num_pages = DEFAULT_NUM_PAGES;
             tree.node_slab = memory::system::make(alloc_type_t::slab, &node_cfg);
 
             slab_config_t value_cfg{};
             value_cfg.backing   = tree.alloc;
             value_cfg.buf_size  = avl_t<T>::Value_Type_Size;
             value_cfg.buf_align = avl_t<T>::Value_Type_Align;
+            value_cfg.num_pages = DEFAULT_NUM_PAGES;
             tree.value_slab = memory::system::make(alloc_type_t::slab, &value_cfg);
         }
     }

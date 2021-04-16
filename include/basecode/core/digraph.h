@@ -210,12 +210,14 @@ namespace basecode {
             node_cfg.backing   = graph.alloc;
             node_cfg.buf_size  = digraph_t<T>::Node_Size;
             node_cfg.buf_align = digraph_t<T>::Node_Align;
+            node_cfg.num_pages = DEFAULT_NUM_PAGES;
             graph.node_slab = memory::system::make(alloc_type_t::slab, &node_cfg);
 
             slab_config_t edge_cfg{};
             edge_cfg.backing   = graph.alloc;
             edge_cfg.buf_size  = digraph_t<T>::Edge_Size;
             edge_cfg.buf_align = digraph_t<T>::Edge_Align;
+            edge_cfg.num_pages = DEFAULT_NUM_PAGES;
             graph.edge_slab    = memory::system::make(alloc_type_t::slab, &edge_cfg);
 
             return status_t::ok;

@@ -78,7 +78,7 @@ namespace basecode {
                 slab_config.backing   = g_system.alloc;
                 slab_config.buf_size  = sizeof(event_t_);
                 slab_config.buf_align = alignof(event_t_);
-                slab_config.num_pages = 1;
+                slab_config.num_pages = DEFAULT_NUM_PAGES;
                 g_system.event_pool = memory::system::make(alloc_type_t::slab, &slab_config);
 
                 return status_t::ok;

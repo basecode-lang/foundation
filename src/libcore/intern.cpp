@@ -120,7 +120,7 @@ namespace basecode::intern {
                 return result_t{.status = status, .new_value = false};
         }
 
-        const auto value = slice::make(data, len == -1 ? strlen(data) : len);
+        const auto value = slice::make(data, s32(len == -1 ? strlen(data) : len));
         u64 hash         = hash::hash64(value);
         u32 bucket_index = hash_common::range_reduction(hash, pool.capacity);
         if (find_key(pool, hash, value, bucket_index)) {
@@ -137,11 +137,12 @@ namespace basecode::intern {
         if (!hash_common::find_free_bucket(pool.hashes, pool.capacity, bucket_index))
             return result_t{.status = status_t::no_bucket, .new_value = false};
 
-        auto& str = array::append(pool.strings);
         auto buf = buf_pool::retain(value.length + 1);
         assert(buf && "buf_pool::retain failed!");
         std::memcpy(buf, value.data, value.length);
         buf[value.length] = '\0';
+
+        auto& str = array::append(pool.strings);
         str.value        = slice::make(buf, value.length);
         str.bucket_index = bucket_index;
 

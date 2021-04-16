@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/ffi.h>
+#include <basecode/core/hashtab.h>
 #include <basecode/core/stable_array.h>
 
 namespace basecode::ffi {
@@ -25,38 +26,38 @@ namespace basecode::ffi {
     struct overload_pair_t;
 
     using lib_slab_t            = stable_array_t<lib_t>;
-    using lib_symtab_t          = symtab_t<lib_pair_t>;
-    using proto_symtab_t        = symtab_t<proto_pair_t>;
+    using lib_table_t           = hashtab_t<str::slice_t, lib_pair_t>;
     using param_slab_t          = stable_array_t<param_t>;
     using proto_slab_t          = stable_array_t<proto_t>;
+    using proto_table_t         = hashtab_t<str::slice_t, proto_pair_t>;
     using overload_slab_t       = stable_array_t<overload_t>;
-    using overload_symtab_t     = symtab_t<overload_pair_t>;
+    using overload_table_t      = hashtab_t<str::slice_t, overload_pair_t>;
 
     struct lib_pair_t final {
         lib_t*                  lib;
         u32                     idx;
-    };
+    } __attribute__((aligned(16)));
 
     struct overload_pair_t final {
         overload_t*             overload;
         u32                     idx;
-    };
+    } __attribute__((aligned(16)));
 
     struct proto_pair_t final {
         proto_t*                proto;
         u32                     idx;
-    };
+    } __attribute__((aligned(16)));
 
     struct system_t final {
         alloc_t*                alloc;
-        lib_symtab_t            libs;
-        proto_symtab_t          protos;
-        overload_symtab_t       overloads;
+        lib_table_t             libs;
+        proto_table_t           protos;
+        overload_table_t        overloads;
         lib_slab_t              lib_slab;
         param_slab_t            param_slab;
         proto_slab_t            proto_slab;
         overload_slab_t         overload_slab;
-    };
+    } __attribute__((aligned(128)));
 
     system_t                    g_ffi_system;
 
@@ -67,11 +68,12 @@ namespace basecode::ffi {
             symtab::free(lib->symbols);
             if (lib->handle)
                 dlFreeLibrary(lib->handle);
-            lib_pair_t pair{};
             const auto path_slice = slice::make(lib->path.str);
-            if (symtab::find(g_ffi_system.libs, path_slice, pair)) {
-                stable_array::erase(g_ffi_system.lib_slab, pair.idx - 1);
-                symtab::remove(g_ffi_system.libs, path_slice);
+            auto pair = hashtab::find(g_ffi_system.libs, path_slice);
+            if (pair) {
+                stable_array::erase(g_ffi_system.lib_slab,
+                                    pair->idx - 1);
+                hashtab::remove(g_ffi_system.libs, path_slice);
                 path::free(lib->path);
                 return status_t::ok;
             }
@@ -79,19 +81,22 @@ namespace basecode::ffi {
         }
 
         status_t load(const path_t& path, lib_t** lib) {
-            lib_pair_t pair{};
             const auto path_slice = slice::make(path);
-            if (symtab::find(g_ffi_system.libs, path_slice, pair)) {
-                *lib = pair.lib;
+            auto pair = hashtab::find(g_ffi_system.libs, path_slice);
+            if (pair) {
+                *lib = pair->lib;
                 return status_t::ok;
             }
-            lib_pair_t* new_pair{};
-            if (symtab::emplace(g_ffi_system.libs, path_slice, &new_pair)) {
+            auto [new_pair, added] = hashtab::emplace2(g_ffi_system.libs,
+                                                       path_slice);
+            if (added) {
                 new_pair->lib = &stable_array::append(g_ffi_system.lib_slab);
                 new_pair->idx = g_ffi_system.libs.size;
-                path::init(new_pair->lib->path, path_slice, g_ffi_system.alloc);
+                path::init(new_pair->lib->path,
+                           path_slice,
+                           g_ffi_system.alloc);
                 new_pair->lib->alloc  = g_ffi_system.alloc;
-                new_pair->lib->handle = dlLoadLibrary(str::c_str(const_cast<str_t&>(path.str)));
+                new_pair->lib->handle = dlLoadLibrary(path::c_str(path));
                 if (!new_pair->lib->handle)
                     return status_t::load_library_failure;
                 symtab::init(new_pair->lib->symbols, new_pair->lib->alloc);
@@ -109,7 +114,8 @@ namespace basecode::ffi {
             if (!address) return status_t::address_null;
             if (symtab::find(lib->symbols, name, *address))
                 return status_t::ok;
-            WITH_SLICE_AS_CSTR(name, *address = dlFindSymbol(lib->handle, name););
+            WITH_SLICE_AS_CSTR(name,
+                               *address = dlFindSymbol(lib->handle, name););
             if (!(*address))
                 return status_t::symbol_not_found;
             symtab::insert(lib->symbols, name, *address);
@@ -126,7 +132,10 @@ namespace basecode::ffi {
             array::free(param->members);
         }
 
-        param_t* make(str::slice_t name, param_type_t type, b8 rest, param_alias_t* dft_val) {
+        param_t* make(str::slice_t name,
+                      param_type_t type,
+                      b8 rest,
+                      param_alias_t* dft_val) {
             auto param = &stable_array::append(g_ffi_system.param_slab);
             param->pad        = {};
             param->name       = name;
@@ -143,37 +152,35 @@ namespace basecode::ffi {
 
     namespace proto {
         u0 free(proto_t* proto) {
-            assoc_array_t<overload_t*> pairs{};
-            assoc_array::init(pairs, g_ffi_system.alloc);
-            symtab::find_prefix(proto->overloads, pairs);
-            for (u32 i = 0; i < pairs.size; ++i)
-                overload::free(pairs[i].value);
-            symtab::free(proto->overloads);
-            assoc_array::free(pairs);
+            for (auto ol : proto->overloads)
+                overload::free(ol);
+            array::free(proto->overloads);
         }
 
         b8 remove(str::slice_t symbol) {
-            proto_pair_t pair{};
-            if (symtab::find(g_ffi_system.protos, symbol, pair)) {
-                proto::free(pair.proto);
-                stable_array::erase(g_ffi_system.proto_slab, pair.idx - 1);
-                symtab::remove(g_ffi_system.protos, symbol);
+            auto pair = hashtab::find(g_ffi_system.protos, symbol);
+            if (pair) {
+                proto::free(pair->proto);
+                stable_array::erase(g_ffi_system.proto_slab,
+                                    pair->idx - 1);
+                hashtab::remove(g_ffi_system.protos, symbol);
                 return true;
             }
             return false;
         }
 
         proto_t* find(str::slice_t symbol) {
-            proto_pair_t pair{};
-            return symtab::find(g_ffi_system.protos, symbol, pair) ? pair.proto : nullptr;
+            auto pair = hashtab::find(g_ffi_system.protos, symbol);
+            return pair ? pair->proto : nullptr;
         }
 
         proto_t* make(str::slice_t symbol, lib_t* lib) {
-            proto_pair_t pair{};
-            if (symtab::find(g_ffi_system.protos, symbol, pair))
-                return pair.proto;
-            proto_pair_t* new_pair{};
-            if (symtab::emplace(g_ffi_system.protos, symbol, &new_pair)) {
+            auto pair = hashtab::find(g_ffi_system.protos, symbol);
+            if (pair)
+                return pair->proto;
+            auto [new_pair, added] = hashtab::emplace2(g_ffi_system.protos,
+                                                       symbol);
+            if (added) {
                 auto proto = &stable_array::append(g_ffi_system.proto_slab);
                 new_pair->idx   = g_ffi_system.proto_slab.size;
                 new_pair->proto = proto;
@@ -181,7 +188,7 @@ namespace basecode::ffi {
                 proto->name     = symbol;
                 proto->min_req  = {};
                 proto->max_req  = {};
-                symtab::init(proto->overloads, g_ffi_system.alloc);
+                array::init(proto->overloads, g_ffi_system.alloc);
                 return proto;
             }
             return nullptr;
@@ -196,9 +203,7 @@ namespace basecode::ffi {
             ol->proto = proto;
             if (ol->key_len == 0)
                 ol->key[ol->key_len++] = u8(param_cls_t::void_);
-            auto key = slice::make(ol->key, ol->key_len);
-            if (!symtab::insert(proto->overloads, key, ol))
-                return status_t::duplicate_overload;
+            array::append(proto->overloads, ol);
             if (ol->params.size > proto->min_req)
                 proto->min_req = ol->params.size;
             if (ol->params.size > proto->max_req)
@@ -207,32 +212,9 @@ namespace basecode::ffi {
         }
 
         overload_t* match_signature(proto_t* proto, const u8* buf, u32 len) {
-            assoc_array_t<overload_t*> pairs{};
-            assoc_array::init(pairs, g_ffi_system.alloc);
-            defer(assoc_array::free(pairs));
-
-            auto prefix = slice::make(buf, len);
-        retry:
-            symtab::find_prefix(proto->overloads, pairs, prefix);
-
-            if (pairs.size == 1)
-                return pairs[0].value;
-            else if (pairs.size > 1) {
-                for (u32 i = 0; i < pairs.size; ++i) {
-                    const auto& pair = pairs[i];
-                    if (pair.value->has_rest)
-                        return pair.value;
-                }
-            } else {
-                if (prefix.length >= 2) {
-                    prefix.length -= 2;
-                    goto retry;
-                } else if (prefix.length == 1) {
-                    --prefix.length;
-                    goto retry;
-                }
-            }
-            return nullptr;
+            UNUSED(buf);
+            UNUSED(len);
+            return array::empty(proto->overloads) ? nullptr : proto->overloads[0];
         }
     }
 
@@ -244,22 +226,22 @@ namespace basecode::ffi {
         }
 
         b8 remove(str::slice_t symbol) {
-            overload_pair_t pair{};
-            if (symtab::find(g_ffi_system.overloads, symbol, pair)) {
-                auto ol = pair.overload;
-                auto key = slice::make(ol->key, ol->key_len);
-                symtab::remove(ol->proto->overloads, key);
+            auto pair = hashtab::find(g_ffi_system.overloads, symbol);
+            if (pair) {
+                auto ol = pair->overload;
+                array::erase(ol->proto->overloads, ol);
                 overload::free(ol);
-                stable_array::erase(g_ffi_system.overload_slab, pair.idx - 1);
-                symtab::remove(g_ffi_system.overloads, symbol);
+                stable_array::erase(g_ffi_system.overload_slab,
+                                    pair->idx - 1);
+                hashtab::remove(g_ffi_system.overloads, symbol);
                 return true;
             }
             return false;
         }
 
         overload_t* find(str::slice_t symbol) {
-            overload_pair_t pair{};
-            return symtab::find(g_ffi_system.overloads, symbol, pair) ? pair.overload : nullptr;
+            auto pair = hashtab::find(g_ffi_system.overloads, symbol);
+            return pair ? pair->overload : nullptr;
         }
 
         status_t append(overload_t* overload, param_t* param) {
@@ -283,11 +265,12 @@ namespace basecode::ffi {
         }
 
         overload_t* make(str::slice_t symbol, param_type_t ret_type, u0* func) {
-            overload_pair_t pair{};
-            if (symtab::find(g_ffi_system.overloads, symbol, pair))
-                return pair.overload;
-            overload_pair_t* new_pair{};
-            if (symtab::emplace(g_ffi_system.overloads, symbol, &new_pair)) {
+            auto pair = hashtab::find(g_ffi_system.overloads, symbol);
+            if (pair)
+                return pair->overload;
+            auto [new_pair, added ] = hashtab::emplace2(g_ffi_system.overloads,
+                                                        symbol);
+            if (added) {
                 auto ol = &stable_array::append(g_ffi_system.overload_slab);
                 new_pair->idx      = g_ffi_system.overload_slab.size;
                 new_pair->overload = ol;
@@ -313,9 +296,9 @@ namespace basecode::ffi {
                 proto::free(proto);
             for (auto overload : g_ffi_system.overload_slab)
                 overload::free(overload);
-            symtab::free(g_ffi_system.libs);
-            symtab::free(g_ffi_system.protos);
-            symtab::free(g_ffi_system.overloads);
+            hashtab::free(g_ffi_system.libs);
+            hashtab::free(g_ffi_system.protos);
+            hashtab::free(g_ffi_system.overloads);
             stable_array::free(g_ffi_system.lib_slab);
             stable_array::free(g_ffi_system.proto_slab);
             stable_array::free(g_ffi_system.param_slab);
@@ -324,13 +307,21 @@ namespace basecode::ffi {
 
         status_t init(alloc_t* alloc, u8 num_pages) {
             g_ffi_system.alloc = alloc;
-            stable_array::init(g_ffi_system.lib_slab, g_ffi_system.alloc, num_pages);
-            stable_array::init(g_ffi_system.param_slab, g_ffi_system.alloc, num_pages);
-            stable_array::init(g_ffi_system.proto_slab, g_ffi_system.alloc, num_pages);
-            stable_array::init(g_ffi_system.overload_slab, g_ffi_system.alloc, num_pages);
-            symtab::init(g_ffi_system.libs, g_ffi_system.alloc);
-            symtab::init(g_ffi_system.protos, g_ffi_system.alloc);
-            symtab::init(g_ffi_system.overloads, g_ffi_system.alloc);
+            stable_array::init(g_ffi_system.lib_slab,
+                               g_ffi_system.alloc,
+                               num_pages);
+            stable_array::init(g_ffi_system.param_slab,
+                               g_ffi_system.alloc,
+                               num_pages);
+            stable_array::init(g_ffi_system.proto_slab,
+                               g_ffi_system.alloc,
+                               num_pages);
+            stable_array::init(g_ffi_system.overload_slab,
+                               g_ffi_system.alloc,
+                               num_pages);
+            hashtab::init(g_ffi_system.libs, g_ffi_system.alloc);
+            hashtab::init(g_ffi_system.protos, g_ffi_system.alloc);
+            hashtab::init(g_ffi_system.overloads, g_ffi_system.alloc);
             return status_t::ok;
         }
     }

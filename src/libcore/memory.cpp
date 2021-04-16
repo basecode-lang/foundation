@@ -172,6 +172,7 @@ namespace basecode::memory {
             slab_config.backing   = &t_system.default_alloc;
             slab_config.buf_size  = sizeof(alloc_t);
             slab_config.buf_align = alignof(alloc_t);
+            slab_config.num_pages = DEFAULT_NUM_PAGES;
             memory::init(&t_system.slab_alloc, alloc_type_t::slab, &slab_config);
 
             return status_t::ok;

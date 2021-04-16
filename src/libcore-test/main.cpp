@@ -156,7 +156,6 @@ s32 main(s32 argc, const s8** argv) {
     });
     if (!OK(rc)) return rc;
 
-
     rc = stopwatch::time_block("config::system::init"_ss,  []() -> s32 {
         config_settings_t settings{};
         settings.ctx           = scm::system::global_ctx();

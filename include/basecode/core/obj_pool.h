@@ -78,6 +78,7 @@ namespace basecode {
                 cfg.backing     = pool.alloc;
                 cfg.buf_size    = sizeof(T);
                 cfg.buf_align   = alignof(T);
+                cfg.num_pages   = DEFAULT_NUM_PAGES;
                 type->alloc     = memory::system::make(alloc_type_t::slab, &cfg);
                 type->type_id   = type_id;
                 type->type_name = typeid(T).name();

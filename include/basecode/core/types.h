@@ -64,6 +64,12 @@
 #   endif
 #endif
 
+#ifdef _WIN32
+#   define  DEFAULT_NUM_PAGES 1
+#else
+#   define  DEFAULT_NUM_PAGES 8
+#endif
+
 #define ALIGNED16               __attribute__((aligned(16)))
 #define UNIQUE_NAME_1(x, y)     x##y
 #define UNIQUE_NAME_2(x, y)     UNIQUE_NAME_1(x, y)

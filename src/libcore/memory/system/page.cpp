@@ -52,10 +52,13 @@ namespace basecode::memory::page {
         auto cfg = (page_config_t*) config;
         auto sc  = &alloc->subclass.page;
         sc->count      = {};
+        sc->tail       = {};
+        sc->head       = {};
+        sc->cursor     = {};
+        sc->num_pages  = cfg->num_pages;
         alloc->backing = cfg->backing;
-        sc->cursor     = sc->tail = sc->head = {};
         auto page_size = memory::system::os_alloc_granularity();
-        sc->page_size  = (page_size * std::max<u8>(1, cfg->num_pages)) - sizeof(page_header_t);
+        sc->page_size  = (page_size * sc->num_pages) - sizeof(page_header_t);
         assert(alloc->backing);
     }
 

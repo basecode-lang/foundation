@@ -74,12 +74,14 @@ namespace basecode::job {
         }
 
         static u0 run(worker_t& worker) {
-            memory::system::init(alloc_type_t::dlmalloc, 4 * 1024 * 1024);
+            memory::system::init(alloc_type_t::dlmalloc,
+                                 4 * 1024 * 1024);
             auto ctx = context::make(worker.parent_ctx->argc,
                                      worker.parent_ctx->argv,
                                      memory::system::default_alloc(),
                                      worker.parent_ctx->logger);
             context::push(&ctx);
+            memory::proxy::init();
             array::init(worker.active);
             array::reserve(worker.active, 128);
             array::init(worker.pending);
@@ -155,7 +157,7 @@ namespace basecode::job {
             slab_config.backing   = g_job_sys.alloc;
             slab_config.buf_size  = job_task_buffer_size;
             slab_config.buf_align = alignof(job_task_base_t*);
-            slab_config.num_pages = 1;
+            slab_config.num_pages = DEFAULT_NUM_PAGES;
             g_job_sys.task_pool = memory::system::make(alloc_type_t::slab, &slab_config);
 
             mutex::init(g_job_sys.jobs_mutex);

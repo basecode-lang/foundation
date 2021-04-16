@@ -170,7 +170,7 @@ namespace basecode::memory::slab {
         if (!head_slab || head_slab->buf_count == sc->buf_max_count) {
             auto [slab_mem, slab_size] = grow(alloc);
             head_slab = slab_mem;
-            r.size = slab_size;
+            r.size = s32(slab_size);
         }
         r.mem = head_slab->free_list;
         head_slab->free_list = *((u0**) r.mem);

@@ -69,7 +69,7 @@ namespace basecode::thread {
             slab_config.backing   = g_system.alloc;
             slab_config.buf_size  = 128;
             slab_config.buf_align = 8;
-            slab_config.num_pages = 1;
+            slab_config.num_pages = DEFAULT_NUM_PAGES;
             g_system.proc_pool = memory::system::make(alloc_type_t::slab, &slab_config);
             g_system.num_cores = sysconf(_SC_NPROCESSORS_ONLN);
             return status_t::ok;

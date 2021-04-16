@@ -242,6 +242,23 @@ namespace basecode {
 
         template <Stable_Array T,
                   typename Value_Type = typename T::Value_Type>
+        u0 init(T& array,
+                alloc_t* alloc = context::top()->alloc,
+                u8 num_pages = DEFAULT_NUM_PAGES) {
+            array.data  = {};
+            array.alloc = alloc;
+            array.size  = array.capacity = {};
+
+            slab_config_t slab_config{};
+            slab_config.backing   = array.alloc;
+            slab_config.buf_size  = sizeof(Value_Type);
+            slab_config.buf_align = alignof(Value_Type);
+            slab_config.num_pages = num_pages;
+            array.slab            = memory::system::make(alloc_type_t::slab, &slab_config);
+        }
+
+        template <Stable_Array T,
+                  typename Value_Type = typename T::Value_Type>
         u0 insert(T& array, u32 index, Value_Type&& value) {
             if (array.size + 1 > array.capacity)
                 grow(array);
@@ -270,21 +287,6 @@ namespace basecode {
             *v = value;
             array.data[index] = v;
             ++array.size;
-        }
-
-        template <Stable_Array T,
-                  typename Value_Type = typename T::Value_Type>
-        u0 init(T& array, alloc_t* alloc = context::top()->alloc, u8 num_pages = 1) {
-            array.data  = {};
-            array.alloc = alloc;
-            array.size  = array.capacity = {};
-
-            slab_config_t slab_config{};
-            slab_config.backing   = array.alloc;
-            slab_config.buf_size  = sizeof(Value_Type);
-            slab_config.buf_align = alignof(Value_Type);
-            slab_config.num_pages = num_pages;
-            array.slab            = memory::system::make(alloc_type_t::slab, &slab_config);
         }
 
         template <typename T>

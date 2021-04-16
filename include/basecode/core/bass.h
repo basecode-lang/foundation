@@ -23,11 +23,6 @@
 #define DICTV(d, k)             ((d).values[(k)])
 #define RECORD_BYTE_SIZE(n)     ((n) * sizeof(field_t))
 #define RECORD_FIELD_COUNT(n)   (((n) / sizeof(field_t)) - 1)
-#ifdef _WIN32
-#   define  DEFAULT_NUM_PAGES 1
-#else
-#   define  DEFAULT_NUM_PAGES 16
-#endif
 
 namespace basecode {
     namespace kind {
