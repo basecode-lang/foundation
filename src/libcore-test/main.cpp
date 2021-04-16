@@ -40,18 +40,33 @@
 
 using namespace basecode;
 
-s32 run(s32 argc, const s8** argv) {
-    s32 rc;
+struct test_suite_t final {
+    Catch::Session          session;
+    const s8**              argv;
+    s32                     argc;
+    s32                     extra_idx;
+    u32                     repeat_count;
+    u8                      no_scm:         1;
+    u8                      pad:            7;
+};
 
-    // N.B. must init the profiler first so the stopwatch_t
-    //      gives us meaningful results.
-    //
-    // !!! IMPORTANT !!!
-    //
-    // keep profiler dependency free!
-    //
-    if (!OK(profiler::init()))
-        return 1;
+static u0 print_time(u64 e) {
+    if (e == 0) {
+        fprintf(stdout, "---\n");
+    } else if (e < 1000) {
+        fprintf(stdout, "%lld ns\n", e);
+    } else {
+        const auto us = e / 1000;
+        if (us >= 1000) {
+            fprintf(stdout, "%lld ms\n", us / 1000);
+        } else {
+            fprintf(stdout, "%lld us\n", us);
+        }
+    }
+}
+
+s32 run(test_suite_t& suite) {
+    s32 rc;
 
     alloc_t* alloc; {
         auto status = memory::system::init(alloc_type_t::dlmalloc);
@@ -64,7 +79,7 @@ s32 run(s32 argc, const s8** argv) {
 
         alloc = memory::system::default_alloc();
     }
-    auto ctx = context::make(argc, argv, alloc);
+    auto ctx = context::make(suite.argc, suite.argv, alloc);
     context::push(&ctx);
 
     TIME_BLOCK("memory::proxy::init"_ss,
@@ -74,7 +89,7 @@ s32 run(s32 argc, const s8** argv) {
     TIME_BLOCK("log::system::init"_ss,
         default_config_t dft_config{};
         dft_config.file        = stderr;
-        dft_config.process_arg = argv[0];
+        dft_config.process_arg = suite.argv[0];
         auto status = log::system::init(logger_type_t::default_,
                                         &dft_config,
                                         log_level_t::debug,
@@ -131,21 +146,23 @@ s32 run(s32 argc, const s8** argv) {
                if (!OK(network::system::init()))
                    return 1);
 
-    TIME_BLOCK("scm::system::init"_ss,
-               if (!OK(scm::system::init(256 * 1024)))
-                   return 1);
+    if (!suite.no_scm) {
+        TIME_BLOCK("scm::system::init"_ss,
+                   if (!OK(scm::system::init(256 * 1024)))
+                       return 1);
 
-    TIME_BLOCK("scm::module::basic::init"_ss,
-               if (!OK(scm::module::basic::system::init(scm::system::global_ctx())))
-                   return 1);
+        TIME_BLOCK("scm::module::basic::init"_ss,
+                   if (!OK(scm::module::basic::system::init(scm::system::global_ctx())))
+                       return 1);
 
-    TIME_BLOCK("scm::module::log::init"_ss,
-               if (!OK(scm::module::log::system::init(scm::system::global_ctx())))
-                   return 1);
+        TIME_BLOCK("scm::module::log::init"_ss,
+                   if (!OK(scm::module::log::system::init(scm::system::global_ctx())))
+                       return 1);
 
-    TIME_BLOCK("scm::module::cxx::init"_ss,
-               if (!OK(scm::module::cxx::system::init(scm::system::global_ctx())))
-                   return 1);
+        TIME_BLOCK("scm::module::cxx::init"_ss,
+                   if (!OK(scm::module::cxx::system::init(scm::system::global_ctx())))
+                       return 1);
+    }
 
     TIME_BLOCK("config::system::init"_ss,
                config_settings_t settings{};
@@ -192,10 +209,24 @@ s32 run(s32 argc, const s8** argv) {
                    path::free(config_path);
                    path::free(load_path));
 
-    TIME_BLOCK("Catch::Session().run"_ss,
-               rc = Catch::Session().run(argc, argv));
+    TIME_BLOCK("catch2 session::run"_ss, rc = suite.session.run(suite.argc,
+                                                                suite.argv));
 
     log::notice("shutdown test program");
+
+    if (!suite.no_scm) {
+        TIME_BLOCK("scm::module::cxx::system::fini"_ss,
+                   scm::module::cxx::system::fini());
+
+        TIME_BLOCK("scm::module::log::system::fini"_ss,
+                   scm::module::log::system::fini());
+
+        TIME_BLOCK("scm::module::basic::system::fini"_ss,
+                   scm::module::basic::system::fini());
+
+        TIME_BLOCK("scm::system::fini"_ss,
+                   scm::system::fini());
+    }
 
     TIME_BLOCK("network::system::fini"_ss,              network::system::fini());
     TIME_BLOCK("filesys::fini"_ss,                      filesys::fini());
@@ -203,10 +234,6 @@ s32 run(s32 argc, const s8** argv) {
     TIME_BLOCK("job::system::fini"_ss,                  job::system::fini());
     TIME_BLOCK("thread::system::fini"_ss,               thread::system::fini());
     TIME_BLOCK("config::system::fini"_ss,               config::system::fini());
-    TIME_BLOCK("scm::module::cxx::system::fini"_ss,     scm::module::cxx::system::fini());
-    TIME_BLOCK("scm::module::log::system::fini"_ss,     scm::module::log::system::fini());
-    TIME_BLOCK("scm::module::basic::system::fini"_ss,   scm::module::basic::system::fini());
-    TIME_BLOCK("scm::system::fini"_ss,                  scm::system::fini());
     TIME_BLOCK("string::system::fini"_ss,               string::system::fini());
     TIME_BLOCK("error::system::fini"_ss,                error::system::fini());
     TIME_BLOCK("buf_pool::system::fini"_ss,             buf_pool::system::fini());
@@ -217,12 +244,70 @@ s32 run(s32 argc, const s8** argv) {
     TIME_BLOCK("memory::proxy::fini"_ss,                memory::proxy::fini());
     TIME_BLOCK("memory::system::fini"_ss,               memory::system::fini());
     TIME_BLOCK_ALLOC("context::pop"_ss,                 alloc, context::pop());
-    TIME_BLOCK_ALLOC("profiler::fini"_ss,               alloc, profiler::fini());
 
     return rc;
 }
 
 s32 main(s32 argc, const s8** argv) {
-    s32 rc = run(argc, argv);
-    return rc;
+    test_suite_t suite{};
+    suite.argc         = argc;
+    suite.argv         = argv;
+    suite.extra_idx    = -1;
+    suite.repeat_count = 1;
+
+    // N.B. must init the profiler first so the stopwatch_t
+    //      gives us meaningful results.
+    //
+    // !!! IMPORTANT !!!
+    //
+    // keep profiler dependency free!
+    //
+    if (!OK(profiler::init()))
+        return 1;
+
+    stopwatch_t watch{};
+    stopwatch::start(watch);
+
+    for (s32 i = 0; i < argc; ++i) {
+        if (strcmp(argv[i], "--") == 0)
+            suite.extra_idx = i;
+    }
+
+    if (suite.extra_idx != -1) {
+        suite.argc = suite.extra_idx;
+        for (s32 i = suite.extra_idx + 1; i < argc; ++i) {
+            if (strcmp(argv[i], "--repeat") == 0) {
+                suite.repeat_count = atoi(argv[i + 1]);
+                if (suite.repeat_count < 1)
+                    suite.repeat_count = 1;
+                ++i;
+            } else if (strcmp(argv[i], "--no-scm") == 0) {
+                suite.no_scm = true;
+            }
+        }
+    }
+
+    for (s32 i = 0; i < suite.repeat_count; ++i) {
+        s32 rc = run(suite);
+        if (rc)
+            return rc;
+    }
+
+    stopwatch::stop(watch);
+    fprintf(stdout, "\n\n=============================================================================\n");
+    fprintf(stdout, "total execution cycles ...................................... %d\n", suite.repeat_count);
+    fprintf(stdout, "total elapsed time .......................................... ");
+    print_time(stopwatch::elapsed(watch));
+    fprintf(stdout, "average elapsed time per cycle .............................. ");
+    print_time(stopwatch::elapsed(watch) / suite.repeat_count);
+    fprintf(stdout, "\nNOTE: the profiler burns ~250ms at process start to calibrate\n"
+                    "      to the machine.\n\n"
+                    "              *** this time overhead is excluded from these numbers! ***\n\n"
+                    "      to capture this overhead plus other platform specific process start costs,\n"
+                    "      use *time* as a wrapper on this process and subtract the\n"
+                    "      'total elapsed time' value from what *time* reports.\n\n");
+
+    profiler::fini();
+
+    return 0;
 }
