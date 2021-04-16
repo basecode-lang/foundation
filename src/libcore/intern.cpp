@@ -139,6 +139,7 @@ namespace basecode::intern {
 
         auto& str = array::append(pool.strings);
         auto buf = buf_pool::retain(value.length + 1);
+        assert(buf && "buf_pool::retain failed!");
         std::memcpy(buf, value.data, value.length);
         buf[value.length] = '\0';
         str.value        = slice::make(buf, value.length);

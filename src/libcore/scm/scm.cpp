@@ -832,9 +832,21 @@ namespace basecode::scm {
 
         kar = CAR(obj);
         arg = CDR(obj);
-        if (TYPE(kar) == obj_type_t::symbol)
-                fn = get(ctx, kar);
-        else    fn = kar;
+        if (TYPE(kar) == obj_type_t::symbol) {
+            fn = get(ctx, kar);
+            switch (TYPE(fn)) {
+                case obj_type_t::ffi:
+                case obj_type_t::prim:
+                case obj_type_t::cfunc:
+                case obj_type_t::lambda:
+                    SET_CAR(obj, fn);
+                    break;
+                default:
+                    break;
+            }
+        } else {
+            fn = kar;
+        }
 
         switch (TYPE(fn)) {
             case obj_type_t::prim:
@@ -867,7 +879,8 @@ namespace basecode::scm {
                         b8 is_macro{};
                         if (type) {
                             kar      = vm::mem_area::pop<obj_t*>(*ctx->data_stack);
-                            is_macro = equal(ctx, type, SYM("define-macro"));
+                            is_macro = equal(ctx, type, SYM("define-macro"))
+                                       || (TYPE(type) == obj_type_t::prim && PRIM(type) == prim_type_t::define_macro);
                         }
                         return make_proc(ctx,
                                          kar,
@@ -1237,11 +1250,12 @@ namespace basecode::scm {
     u0 define(ctx_t* ctx, obj_t* sym, obj_t* v) {
         auto env = top_env(ctx);
         const auto str_id = FIXNUM(sym);
-        const auto name = *string::interned::get_slice(str_id);
+        const auto name = string::interned::get_slice(str_id);
+        assert(name && "string::interned::get_slice returned null");
         auto chain = ctx->handlers.chain;
         while (chain) {
             if (chain->define_enabled && chain->define) {
-                if (chain->define(ctx, name, v, env))
+                if (chain->define(ctx, *name, v, env))
                     return;
             }
             chain = chain->next;
@@ -1735,7 +1749,7 @@ namespace basecode::scm {
                     p = CRSR_POS(crsr);
                 } while (chr && !strchr(s_delims, chr));
                 const s8*  start = (const s8*) (crsr.buf->data + s);
-                const auto len = p - s;
+                const s32 len = p - s;
                 s8* end = (s8*) (start + len);
                 if (p != s) {
                     switch (get_numtype(start, len)) {
@@ -1748,7 +1762,7 @@ namespace basecode::scm {
                         case num_type_t::fixnum:
                             return make_fixnum(ctx, strtol(start, &end, 10));
                         case num_type_t::flonum:
-                            return make_flonum(ctx, strtod(start, &end));
+                            return make_flonum(ctx, flonum_t(strtod(start, &end)));
                     }
                 } else {
                     return error(ctx, "expected flonum, fixnum, keyword, or symbol");
@@ -1853,7 +1867,7 @@ namespace basecode::scm {
                 for (; !IS_NIL(cl); cl = CDR(cl)) {
                     format::format_to(buf,
                                       "=> {}\n",
-                                      printable_t{ctx, CAR(cl)});
+                                      printable_t{ctx, CAR(cl), true});
                 }
             }
         }
@@ -1986,6 +2000,12 @@ namespace basecode::scm {
             case obj_type_t::prim:
                 fmt::format_to(o, "{}", s_prim_names[u32(PRIM(obj))]);
                 break;
+
+            case obj_type_t::ffi: {
+                auto proto = PROTO(obj);
+                fmt::format_to(o, "{}", proto->name);
+                break;
+            }
 
             case obj_type_t::proc:
             case obj_type_t::lambda: {

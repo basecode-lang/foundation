@@ -22,13 +22,16 @@
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode::buf_pool {
-    constexpr u32 max_pool_count = 4;
+    constexpr u32 max_pool_count = 7;
 
     static u32 s_pool_sizes[max_pool_count] = {
         32,
         128,
         512,
-        2048
+        2048,
+        4096,
+        8192,
+        16384,
     };
 
     using lease_map_t           = hashtab_t<u64, lease_t>;
@@ -56,7 +59,7 @@ namespace basecode::buf_pool {
 #ifdef _WIN32
             slab_config.num_pages = 1;
 #else
-            slab_config.num_pages = 15;
+            slab_config.num_pages = 16;
 #endif
             slab_config.backing   = g_system.alloc;
             slab_config.buf_align = alignof(u0*);

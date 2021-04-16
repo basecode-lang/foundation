@@ -30,11 +30,7 @@ namespace basecode::log::default_ {
         auto cfg = (default_config_t*) config;
         auto sc  = &logger->subclass.default_;
         sc->file = !cfg->file ? stdout : cfg->file;
-#ifdef _WIN32
-        sc->is_redirected = isatty(_fileno(sc->file));
-#else
-        sc->is_redirected = isatty(fileno(sc->file));
-#endif
+        sc->is_redirected = !isatty(fileno(sc->file));
 
         str::init(sc->buf, logger->alloc);
         str::reserve(sc->buf, 4096);
