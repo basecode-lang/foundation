@@ -25,13 +25,14 @@
 #include "test.h"
 
 using namespace basecode;
+using namespace basecode::graphviz;
 
 TEST_CASE("basecode::symtab_t keys with repeated chars", "[symtab]") {
-    symtab_t<s32> symbols{};
+    symtab_t<s64> symbols{};
     symtab::init(symbols);
     defer(symtab::free(symbols));
 
-    s32 val{};
+    s64 val{};
 
     symtab::insert(symbols, "intern/get"_ss, 1);
     symtab::insert(symbols, "cxx/make-program"_ss, 2);
@@ -52,15 +53,19 @@ TEST_CASE("basecode::symtab_t keys with repeated chars", "[symtab]") {
     symtab::insert(symbols, "cxx/unary/++"_ss, 17);
     symtab::insert(symbols, "cxx/unary/--"_ss, 18);
 
+    symtab::format_pairs(symbols);
+
+//    auto file_name = "symtab.dot"_path;
+//    symtab::create_dot_file(symbols, file_name);
+//    path::free(file_name);
+
     REQUIRE(symtab::find(symbols, "cxx/unary/-"_ss, val));
     REQUIRE(val == 14);
     REQUIRE(symtab::find(symbols, "cxx/unary/--"_ss, val));
     REQUIRE(val == 18);
-
-//    symtab::format_nodes(symbols);
 }
 
-TEST_CASE("basecode::symtab_t remove key") {
+TEST_CASE("basecode::symtab_t remove key", "[symtab]") {
     symtab_t<s32> symbols{};
     symtab::init(symbols);
     defer(symtab::free(symbols));
@@ -93,7 +98,7 @@ TEST_CASE("basecode::symtab_t remove key") {
     symtab::format_pairs(symbols);
 }
 
-TEST_CASE("basecode::symtab_t names") {
+TEST_CASE("basecode::symtab_t names", "[symtab]") {
     auto path = "../etc/ut.txt"_path;
     auto buf = buf::make();
     REQUIRE(OK(buf::load(buf, path)));

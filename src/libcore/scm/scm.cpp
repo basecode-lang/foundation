@@ -132,8 +132,6 @@ namespace basecode::scm {
                                      u32& len,
                                      keyword_table_t& keywords);
 
-    static obj_t* check_type(ctx_t* ctx, obj_t* obj, obj_type_t type);
-
     u0 free(ctx_t* ctx) {
         collect_garbage(ctx);
         array::free(ctx->native_ptrs);
@@ -865,7 +863,7 @@ namespace basecode::scm {
                     case prim_type_t::lambda: {
                         obj_t* params = CAR(arg);
                         obj_t* body   = CDR(arg);
-                        obj_t* type   = vm::mem_area::pop<obj_t*>(*ctx->data_stack);
+                        auto* type    = vm::mem_area::pop<obj_t*>(*ctx->data_stack);
                         b8 is_macro{};
                         if (type) {
                             kar      = vm::mem_area::pop<obj_t*>(*ctx->data_stack);
@@ -888,7 +886,7 @@ namespace basecode::scm {
                             vb = eval(ctx, va);
                             if (IS_SCM_ERROR(vb))
                                 return vb;
-                            if (IS_NIL(vb) || IS_FALSE(vb))
+                            if (IS_FALSE(vb))
                                 break;
                             auto body = arg;
                             while (!IS_NIL(body)) {
@@ -947,11 +945,22 @@ namespace basecode::scm {
                                      "unquote-splicing is not valid in this context.");
 
                     case prim_type_t::and_:
-                        while (!IS_NIL(arg) && !IS_NIL(res = EVAL_ARG()));
+                        while (!IS_NIL(arg)) {
+                            va = EVAL_ARG();
+                            if (IS_FALSE(va))
+                                break;
+                            res = va;
+                        }
                         return res;
 
                     case prim_type_t::or_:
-                        while (!IS_NIL(arg) && IS_NIL(res = EVAL_ARG()));
+                        while (!IS_NIL(arg)) {
+                            va = EVAL_ARG();
+                            if (!IS_FALSE(va)) {
+                                res = va;
+                                break;
+                            }
+                        }
                         return res;
 
                     case prim_type_t::begin: {

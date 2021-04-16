@@ -208,7 +208,7 @@ namespace basecode::config {
                 case cvar_type_t::flag:
                     return scm::make_bool(ctx, var->value.flag);
                 case cvar_type_t::real:
-                    return scm::make_flonum(ctx, var->value.real);
+                    return scm::make_flonum(ctx, scm::flonum_t(var->value.real));
                 case cvar_type_t::integer:
                     return scm::make_fixnum(ctx, var->value.integer);
                 case cvar_type_t::string: {

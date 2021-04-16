@@ -54,7 +54,7 @@ namespace basecode::term {
                 g_term_sys.redirected = true;
             }
 #else
-            g_term_sys.redirected = isatty(stdout);
+            g_term_sys.redirected = isatty(fileno(stdout));
 #endif
             g_term_sys.enabled = enabled && !g_term_sys.redirected;
             return status_t::ok;

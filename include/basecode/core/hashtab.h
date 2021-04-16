@@ -142,6 +142,13 @@ namespace basecode {
                   typename Value_Type = typename T::Value_Type>
         u0 rehash(T& table, s32 new_capacity = -1);
 
+        template <Hash_Table T,
+                  typename Key_Type = typename T::Key_Type,
+                  typename Value_Type = typename T::Value_Type,
+                  b8 Is_Pointer = std::is_pointer_v<Value_Type>,
+                  typename Base_Type_Value = std::remove_pointer_t<Value_Type>*>
+        Base_Type_Value insert(T& table, const Key_Type& key, const Value_Type& value);
+
         template <Hash_Table T>
         u0 free(T& table) {
             clear(table);
@@ -425,10 +432,10 @@ namespace basecode {
         }
 
         template <Hash_Table T,
-                  typename Key_Type = typename T::Key_Type,
-                  typename Value_Type = typename T::Value_Type,
-                  b8 Is_Pointer = std::is_pointer_v<Value_Type>,
-                  typename Base_Type_Value = std::remove_pointer_t<Value_Type>*>
+                  typename Key_Type,
+                  typename Value_Type,
+                  b8 Is_Pointer,
+                  typename Base_Type_Value>
         Base_Type_Value insert(T& table, const Key_Type& key, const Value_Type& value) {
             auto v = find(table, key);
             if (v)

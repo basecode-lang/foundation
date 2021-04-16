@@ -37,6 +37,7 @@ namespace basecode::graphviz {
 
     enum status_t : u8 {
         ok,
+        error,
         intern_failure,
     };
 
@@ -1181,6 +1182,7 @@ namespace basecode::graphviz {
     };
 
     struct node_ref_t final {
+        str::slice_t            field_id;
         graph_t*                graph;
         u32                     id;
     };
@@ -1648,10 +1650,6 @@ namespace basecode::graphviz {
 
         u0 add_subgraph(graph_t& g, graph_t* subgraph);
 
-        constexpr node_ref_t node_ref(graph_t* g, u32 id) {
-            return {g, id};
-        }
-
         u0 label(graph_t& g, const String_Concept auto& v) {
             attr_set::set(g.attrs, attr_type_t::label, v);
         }
@@ -1681,6 +1679,12 @@ namespace basecode::graphviz {
         u0 layers_sep(graph_t& g, const String_Concept auto& v) {
             UNUSED(g);
             UNUSED(v);
+        }
+
+        constexpr node_ref_t node_ref(graph_t* g,
+                                      u32 id,
+                                      str::slice_t field_id = {}) {
+            return {field_id, g, id};
         }
 
         u0 layers_select(graph_t& g, const String_Concept auto& v) {

@@ -33,7 +33,7 @@ namespace basecode::log::default_ {
 #ifdef _WIN32
         sc->is_redirected = isatty(_fileno(sc->file));
 #else
-        sc->is_redirected = isatty(sc->file);
+        sc->is_redirected = isatty(fileno(sc->file));
 #endif
 
         str::init(sc->buf, logger->alloc);

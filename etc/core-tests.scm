@@ -57,14 +57,12 @@
         (assert '(is 1 *version-minor*))
         (assert '(is 0 *version-revision*))
         (assert '(begin
-                    (define build-type *build-type*)
-                    (or (is "Debug"             build-type)
-                        (is "RelWithDebInfo"    build-type)
-                        (is "Release"           build-type))))
+                    (or (is "Debug"             *build-type*)
+                        (is "RelWithDebInfo"    *build-type*)
+                        (is "Release"           *build-type*))))
         (assert '(begin
-                    (define platform *platform*)
-                    (or (is "Windows" platform)
-                        (is "Linux" platform))))
+                    (or (is "Windows" *platform*)
+                        (is "Linux" *platform*))))
         (assert '(is #t *test-runner*))
 
         ; N.B. these initial values come from libcore-test's main.cpp

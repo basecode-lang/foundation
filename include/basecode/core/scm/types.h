@@ -21,7 +21,6 @@
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "altera-struct-pack-align"
 
-#include <bit>
 #include <basecode/core/string.h>
 #include <basecode/core/scm/scm.h>
 #include <basecode/core/hashtab.h>

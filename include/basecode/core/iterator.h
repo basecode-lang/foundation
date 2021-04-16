@@ -30,7 +30,7 @@
     iterator end()   { return iterator::end(this);   }
 
 #define DECL_CONST_ITER(Container, Type, State)                             \
-    using const_iterator = basecode::const_iterator<Container, Type, State>;\
+    using const_iterator = basecode::const_iterator<Container, const Type, State>;\
     const_iterator begin() const { return const_iterator::begin(this); }    \
     const_iterator end()   const { return const_iterator::end(this);   }
 

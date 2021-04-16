@@ -1245,7 +1245,19 @@ namespace basecode::graphviz {
                 }
 
                 // string
-                case attr_type_t::label:
+                // XXX: FIXME
+                //      this is a temporary hack to get record fields working
+                //      need to add full support for fields to the data structures
+                //      so the fields and the data can be serialized properly with
+                //      escaping over the data.
+                case attr_type_t::label: {
+                    auto r = string::interned::get(attr.value.dw);
+                    if (OK(r.status)) {
+//                        escape_chars(r.slice, g.scratch);
+                        format::format_to(mb, "\"{}\"", r.slice);
+                    }
+                    break;
+                }
                 case attr_type_t::group:
                 case attr_type_t::lhead:
                 case attr_type_t::ltail:
@@ -1746,9 +1758,19 @@ namespace basecode::graphviz {
                 format::format_to(mb, "// empty edge: {}", e.id);
                 return;
             }
+
             auto lhs_name = string::interned::get(lhs->name);
+            format::format_to(mb, "\"{}\"", lhs_name.slice);
+            if (!slice::empty(e.first.field_id)) {
+                format::format_to(mb, ":{}", e.first.field_id);
+            }
+            format::format_to(mb, " {} ", node_connector);
             auto rhs_name = string::interned::get(rhs->name);
-            format::format_to(mb, "{} {} {}", lhs_name.slice, node_connector, rhs_name.slice);
+            format::format_to(mb, "\"{}\"", rhs_name.slice);
+            if (!slice::empty(e.second.field_id)) {
+                format::format_to(mb, ":{}", e.second.field_id);
+            }
+
             if (e.attrs.values.size > 0) {
                 format::format_to(mb, "[");
                 for (u32 i = 0; i < e.attrs.values.size; ++i) {

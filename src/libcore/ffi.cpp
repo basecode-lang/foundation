@@ -294,6 +294,7 @@ namespace basecode::ffi {
                 ol->func           = func;
                 ol->name           = symbol;
                 ol->mode           = call_mode_t::system;
+                ol->key_len        = {};
                 ol->ret_type       = ret_type;
                 array::init(ol->params, g_ffi_system.alloc);
                 return ol;

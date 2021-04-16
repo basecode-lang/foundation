@@ -164,10 +164,11 @@ namespace basecode::intern {
     }
 
     static status_t rehash(intern_t& pool, s32 new_capacity) {
-        s32 idx = new_capacity == -1 ? pool.cap_idx : hash_common::find_nearest_prime_capacity(new_capacity);
+        s32 idx = s32(new_capacity == -1 ? pool.cap_idx :
+                      hash_common::find_nearest_prime_capacity(new_capacity));
         f32 lf;
         do {
-            new_capacity = hash_common::prime_capacity(idx++);
+            new_capacity = s32(hash_common::prime_capacity(idx++));
             lf = f32(pool.size) / f32(new_capacity);
         } while (lf > pool.load_factor);
         pool.cap_idx = idx;

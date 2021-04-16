@@ -38,7 +38,9 @@ namespace basecode {
 
     template<typename T>
     struct stable_array_t final {
-        using                   Value_Type = T;
+        using Value_Type        = T;
+        using Is_Static         [[maybe_unused]] = std::integral_constant<b8, false>;
+        using Size_Per_16       [[maybe_unused]] = std::integral_constant<u32, 16 / sizeof(Value_Type)>;
 
         alloc_t*                alloc;
         alloc_t*                slab;
@@ -109,6 +111,15 @@ namespace basecode {
 
         template <Stable_Array T,
                   typename Value_Type = typename T::Value_Type>
+        auto& append(T& array) {
+            if (array.size + 1 > array.capacity)
+                grow(array);
+            array.data[array.size] = (Value_Type*) memory::alloc(array.slab);
+            return *(array.data[array.size++]);
+        }
+
+        template <Stable_Array T,
+                  typename Value_Type = typename T::Value_Type>
         Value_Type* back(T& array) {
             return array.size == 0 ? nullptr : array.data[array.size - 1];
         }
@@ -117,16 +128,6 @@ namespace basecode {
                   typename Value_Type = typename T::Value_Type>
         Value_Type* front(T& array) {
             return array.size == 0 ? nullptr : array.data[0];
-        }
-
-        template <Stable_Array T,
-                  typename Value_Type = typename T::Value_Type>
-        Value_Type& append(T& array) {
-            if (array.size + 1 > array.capacity)
-                grow(array);
-            auto v = (Value_Type*) memory::alloc(array.slab);
-            array.data[array.size++] = v;
-            return *v;
         }
 
         template <Stable_Array T,
@@ -151,12 +152,12 @@ namespace basecode {
 
         template <Stable_Array T,
                   typename Value_Type = typename T::Value_Type>
-        u0 append(T& array, Value_Type&& value) {
+        auto& append(T& array, Value_Type&& value) {
             if (array.size + 1 > array.capacity)
                 grow(array);
-            auto v = (Value_Type*) memory::alloc(array.slab);
-            *v = value;
-            array.data[array.size++] = v;
+            array.data[array.size] = (Value_Type*) memory::alloc(array.slab);
+            *(array.data[array.size]) = value;
+            return *(array.data[array.size++]);
         }
 
         template <Stable_Array T>
@@ -178,17 +179,18 @@ namespace basecode {
             s32 idx = -1;
             for (u32 i = 0; i < array.size; ++i) {
                 if (array.data[i] == value) {
-                    idx = i;
+                    idx = s32(i);
                     break;
                 }
             }
-            if (idx == -1) return false;
+            if (idx == -1)
+                return false;
             memory::free(array.slab, array.data[idx]);
-            --array.size;
             auto dest = array.data + idx;
             std::memcpy(dest,
                         dest + 1,
                         (array.size - idx) * sizeof(Value_Type*));
+            --array.size;
             return true;
         }
 
@@ -220,12 +222,12 @@ namespace basecode {
 
         template <Stable_Array T,
                   typename Value_Type = typename T::Value_Type>
-        u0 append(T& array, const Value_Type& value) {
+        auto& append(T& array, const Value_Type& value) {
             if (array.size + 1 > array.capacity)
                 grow(array);
-            auto v = (Value_Type*) memory::alloc(array.slab);
-            *v = value;
-            array.data[array.size++] = v;
+            array.data[array.size] = (Value_Type*) memory::alloc(array.slab);
+            *(array.data[array.size]) = value;
+            return *(array.data[array.size++]);
         }
 
         template <Stable_Array T,

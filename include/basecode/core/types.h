@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <bit>
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
@@ -160,3 +161,14 @@ namespace basecode {
         typename T::ok;
     };
 }
+
+#if defined(__GNUC__) && defined(__clang__)
+namespace std {
+    template <typename To, typename From> requires (sizeof(From) == sizeof(To)
+                                                    && std::is_trivially_constructible_v<From>
+                                                    && std::is_trivially_constructible_v<To>)
+    constexpr To bit_cast(const From& src) noexcept {
+        return __builtin_bit_cast(To, src);
+    }
+}
+#endif
