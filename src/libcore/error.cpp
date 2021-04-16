@@ -109,6 +109,10 @@ namespace basecode::error {
 
     namespace system {
         u0 fini() {
+            for (auto& report : g_err_sys.reports) {
+                auto args = &report.args;
+                args->~fmt_dyn_args_t();
+            }
             array::free(g_err_sys.reports);
             hashtab::free(g_err_sys.errors);
             memory::system::free(g_err_sys.error_slab);

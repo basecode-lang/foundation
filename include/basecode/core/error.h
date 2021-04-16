@@ -33,8 +33,6 @@ namespace basecode {
         u32                     lc_str_id;
     };
 
-    constexpr u32 max_report_args_count = 4;
-
     enum class error_report_level_t : u8 {
         warning,
         error,
@@ -73,8 +71,6 @@ namespace basecode {
             namespace internal {
                 template <typename T>
                 u0 add_arg(error_report_t* report, const T& arg) {
-                    if (report->args_size == max_report_args_count - 1)
-                        return;
                     report->args.push_back(arg);
                 }
             }
