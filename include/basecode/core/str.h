@@ -221,6 +221,28 @@ namespace basecode {
             return str.length == 0;
         }
 
+        b8 each_line(const String_Concept auto& str,
+                     const line_callback_t& cb,
+                     str::slice_t sep = "\n"_ss) {
+            s32 i{}, start_pos{};
+            while (i < str.length) {
+                if (std::memcmp(str.data + i, sep.data, sep.length) == 0) {
+                    str::slice_t line;
+                    line.data = str.data + start_pos;
+                    line.length = (i - start_pos) - 1;
+                    if (!cb(line))
+                        return false;
+                    start_pos = i + sep.length;
+                }
+                ++i;
+            }
+            if (start_pos < str.length) {
+                return cb(slice::make(str.data + start_pos,
+                                      str.length - start_pos));
+            }
+            return true;
+        }
+
         const s8* c_str(String_Concept auto& str) {
             using T = std::remove_reference_t<decltype(str)>;
             if constexpr (T::Is_Static::value) {
@@ -372,22 +394,6 @@ namespace basecode {
 
         u0 insert(String_Concept auto& str, u32 pos, const String_Concept auto& value) {
             insert(str, pos, value.data, value.length);
-        }
-
-        b8 each_line(const String_Concept auto& str, const line_callback_t& cb, str::slice_t sep = "\n"_ss) {
-            s32 i{}, start_pos{};
-            while (i < str.length) {
-                if (std::memcmp(str.data + i, sep.data, sep.length) == 0) {
-                    str::slice_t line;
-                    line.data = str.data + start_pos;
-                    line.length = (i - start_pos) - 1;
-                    if (!cb(line))
-                        return false;
-                    start_pos = i + sep.length;
-                }
-                ++i;
-            }
-            return true;
         }
     }
 }

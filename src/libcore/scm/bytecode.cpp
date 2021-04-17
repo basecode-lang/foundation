@@ -20,7 +20,6 @@
 #include <basecode/core/scm/compiler.h>
 #include <basecode/core/scm/bytecode.h>
 
-
 #define ENCODE_REG(o, f)        SAFE_SCOPE(                                     \
     u8  __tmp{};                                                                \
     auto __status = encode_reg((o), __tmp);                                     \
@@ -683,6 +682,18 @@ namespace basecode::scm {
         }
 
         namespace emitter {
+            static u0 swap_ranges(liveliness_range_t* lhs,
+                                  liveliness_range_t* rhs);
+
+            static u0 create_ranges(emitter_t& e, var_t* var);
+
+            static u0 set_interval(emitter_t& e,
+                                   u32 block_id,
+                                   liveliness_range_t* new_range);
+
+            [[maybe_unused]] static u0 create_split_ranges(emitter_t& e,
+                                                           var_t* var);
+
             u0 free(emitter_t& e) {
                 for (auto var : e.vars)
                     array::free(var->accesses);
@@ -727,35 +738,38 @@ namespace basecode::scm {
                         continue;
                     }
                     const auto& str = strings[c.id - 1];
-                    switch (type) {
-                        case comment_type_t::note:
-                        case comment_type_t::line: {
-                            format::format_to(buf,
-                                              "${:08X}: ; {}\n",
-                                              addr,
-                                              str);
-                            ++j;
-                            break;
-                        }
-                        case comment_type_t::margin: {
-                            if (c.line != line)
-                                break;
-                            if (j > 0) {
+                    str::each_line(str, [&](str::slice_t this_line) -> b8 {
+                        switch (type) {
+                            case comment_type_t::note:
+                            case comment_type_t::line: {
                                 format::format_to(buf,
-                                                  "${:08X}:{:<{}}",
+                                                  "${:08X}: ; {}\n",
                                                   addr,
-                                                  " ",
-                                                  54 - std::min<s32>(len, 54));
+                                                  this_line);
+                                ++j;
+                                break;
                             }
-                            format::format_to(buf,
-                                              "{:<{}}; {}\n",
-                                              " ",
-                                              52 - std::min<s32>(len, 52),
-                                              str);
-                            ++j;
-                            break;
+                            case comment_type_t::margin: {
+                                if (c.line != line)
+                                    break;
+                                if (j > 0) {
+                                    format::format_to(buf,
+                                                      "${:08X}:{:<{}}",
+                                                      addr,
+                                                      " ",
+                                                      54 - std::min<s32>(len, 54));
+                                }
+                                format::format_to(buf,
+                                                  "{:<{}}; {}\n",
+                                                  " ",
+                                                  62 - std::min<s32>(len, 62),
+                                                  this_line);
+                                ++j;
+                                break;
+                            }
                         }
-                    }
+                        return true;
+                    });
                 }
                 if (!j && type != comment_type_t::note)
                     format::format_to(buf, "\n");
@@ -772,7 +786,7 @@ namespace basecode::scm {
                 array::resize(spilled, e.ranges.size);
                 reg_pool::init(pool, register_file::r0, register_file::r15);
                 defer(array::free(active);
-                    array::free(spilled));
+                      array::free(spilled));
 
                 for (u32 i = 0; i < e.blocks.size; ++i) {
                     auto interval = e.intervals[i];
@@ -795,19 +809,15 @@ namespace basecode::scm {
                         // to *interval* and move the *interval* to active.
                         if (reg_pool::has_free(pool)) {
                             auto reg = reg_pool::retain(pool);
-                            if (reg == register_file::none)
-                                goto spill;
                             interval->reg      = reg;
                             interval->var->reg = reg;
                             active[interval->id - 1] = interval;
                         } else {
                             // if there are *no* free registers in the pool, we
                             // spill the range with the largest end point amongst
-                            // this block's intervals and those in active (the
-                            // range that lives the longest).  if something from
-                            // active is spilled, we reclaim the register and
-                            // assign it to our current *interval*
-                        spill:;
+                            // those in active (the range that lives the longest).
+                            // if something from active is spilled, we reclaim
+                            // the register and assign it to our current *interval*
                         }
                         interval = interval->next;
                     }
@@ -1111,6 +1121,50 @@ namespace basecode::scm {
                 return status_t::ok;
             }
 
+            static u0 create_split_ranges(emitter_t& e, var_t* var) {
+                var_digraph_t::Node_Array nodes{};
+                array::init(nodes, e.alloc);
+                defer(array::free(nodes));
+
+                u32 end     {};
+                u32 start   {};
+                u32 block_id{};
+                for (const auto& ac : var->accesses) {
+                    const auto& inst = e.insts[ac.inst_id - 1];
+                    if (block_id && block_id != inst.block_id) {
+                        auto new_range = &stable_array::append(e.ranges);
+                        new_range->var   = var;
+                        new_range->end   = end - 1;
+                        new_range->next  = {};
+                        new_range->start = start - 1;
+                        set_interval(e, block_id, new_range);
+                        start    = inst.id;
+                        end      = start;
+                        block_id = inst.block_id;
+                    }
+                    if (!block_id)
+                        block_id = inst.block_id;
+                    if (!start) {
+                        start = inst.id;
+                        end   = start;
+                    } else {
+                        end = inst.id;
+                    }
+                }
+                if (start && end && block_id) {
+                    auto new_range = &stable_array::append(e.ranges);
+                    new_range->var   = var;
+                    new_range->end   = end - 1;
+                    new_range->next  = {};
+                    new_range->start = start - 1;
+                    set_interval(e, block_id, new_range);
+                }
+
+                digraph::outgoing_nodes(e.var_graph, var->node, nodes);
+                for (const auto& node : nodes)
+                    create_ranges(e, node->value);
+            }
+
             u32 assembled_size_bytes(emitter_t& e, bb_t& start_block) {
                 auto curr = &start_block;
                 u64  size = 0;
@@ -1255,7 +1309,7 @@ namespace basecode::scm {
                         switch (inst.encoding) {
                             case instruction::encoding::imm: {
                                 if (inst.mode
-                                    &&  inst.operands[1].type != operand_type_t::none) {
+                                &&  inst.operands[1].type != operand_type_t::none) {
                                     format::format_to(
                                         buf,
                                         "{}, ",
@@ -1748,6 +1802,12 @@ namespace basecode::scm {
                 return {&exit_bb, res};
             }
 
+            // ----------------
+            // RETURN VALUE     <-- SP upon entry
+            // ----------------
+            // LINK REGISTER    <-- SP after saving LR
+            // ----------------
+            // FP <- SP
             bb_t& enter(bb_t& bb, u32 locals) {
                 auto& entry_block = emitter::make_basic_block(*bb.emit,
                                                               "proc_prologue"_ss,
@@ -2424,6 +2484,7 @@ namespace basecode::scm {
                 return {c.bb, 0};
             }
 
+            //
             compile_result_t comp_proc(compiler_t& comp,
                                        const context_t& c,
                                        proc_t* proc) {
@@ -2445,23 +2506,20 @@ namespace basecode::scm {
                 printable_t params_prt{c.ctx, proc->params, true};
                 printable_t body_prt{c.ctx, proc->body, true};
                 body_prt.pretty.indent  = 0;
-                body_prt.pretty.margin  = 13;
+                body_prt.pretty.margin  = 2;
                 body_prt.pretty.enabled = true;
                 basic_block::encode(proc_bb)
                     .note("----------------------------------------------------------------"_ss)
                     .note(format::format("procedure: {}", name))
-                    .note(format::format("(lambda {}\n{:<{}}{})",
+                    .note(format::format("(lambda {}{:<{}}{})",
                                          params_prt,
                                          " ",
-                                         17,
+                                         6,
                                          body_prt))
                     .note("----------------------------------------------------------------"_ss);
 
                 auto res = c.target ? c.target :
-                           emitter::virtual_var::get(comp.emit,
-                                                     "res"_ss);
-                auto base = emitter::virtual_var::get(comp.emit,
-                                                      "base"_ss);
+                           emitter::virtual_var::get(comp.emit, "res"_ss);
                 auto bc = c;
                 bc.bb     = &enter(proc_bb, 0);
                 bc.obj    = proc->body;
@@ -2471,9 +2529,9 @@ namespace basecode::scm {
                 basic_block::encode(comp_res.bb)
                     .offs()
                         .op(op::store)
-                        .src(&comp_res.var)
-                        .dst(&base)
-                        .offset(0)
+                        .src(rf::r0)        // FIXME
+                        .dst(rf::fp)
+                        .offset(-16)
                         .mode(true)
                         .build();
 

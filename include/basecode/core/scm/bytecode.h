@@ -332,6 +332,7 @@ namespace basecode::scm {
 
                 inline var_t* read(emitter_t& e, var_t* var, u32 inst_id) {
                     assert(var && "virtual_var: cannot read a null var_t!");
+                    assert(!var->incubate && "virtual_var: cannot read an incubated var_t!");
                     auto& ac = array::append(var->accesses);
                     ac.type    = var_access_type_t::read;
                     ac.inst_id = inst_id;
