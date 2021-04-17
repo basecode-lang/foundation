@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/scm/vm.h>
-#include <basecode/core/scm/bytecode.h>
 
 #define EXEC_NEXT()             SAFE_SCOPE(                                         \
     if (cycles == 0)    return status;                                              \
@@ -29,6 +28,140 @@
     goto *s_microcode[s_op_decode[inst->type][inst->is_signed][inst->encoding]];)
 
 namespace basecode::scm::vm {
+    namespace trap {
+        static str::slice_t s_names[] = {
+            [hash]       = "HASH"_ss,
+            [functor]    = "FUNCTOR"_ss,
+        };
+
+        str::slice_t name(u8 type) {
+            return s_names[u32(type)];
+        }
+    }
+
+    namespace instruction {
+        namespace type {
+            static str::slice_t s_names[] = {
+                [nop]       = "NOP"_ss,
+                [add]       = "ADD"_ss,
+                [mul]       = "MUL"_ss,
+                [sub]       = "SUB"_ss,
+                [div]       = "DIV"_ss,
+                [pow]       = "POW"_ss,
+                [mod]       = "MOD"_ss,
+                [neg]       = "NEG"_ss,
+                [not_]      = "NOT"_ss,
+                [shl]       = "SHL"_ss,
+                [shr]       = "SHR"_ss,
+                [or_]       = "OR"_ss,
+                [and_]      = "AND"_ss,
+                [xor_]      = "XOR"_ss,
+                [br]        = "BR"_ss,
+                [blr]       = "BLR"_ss,
+                [cmp]       = "CMP"_ss,
+                [beq]       = "BEQ"_ss,
+                [bne]       = "BNE"_ss,
+                [bl]        = "BL"_ss,
+                [ble]       = "BLE"_ss,
+                [bg]        = "BG"_ss,
+                [bge]       = "BGE"_ss,
+                [seq]       = "SEQ"_ss,
+                [sne]       = "SNE"_ss,
+                [sl]        = "SL"_ss,
+                [sle]       = "SLE"_ss,
+                [sg]        = "SG"_ss,
+                [sge]       = "SGE"_ss,
+                [ret]       = "RET"_ss,
+                [mma]       = "MMA"_ss,
+                [pop]       = "POP"_ss,
+                [get]       = "GET"_ss,
+                [set]       = "SET"_ss,
+                [push]      = "PUSH"_ss,
+                [move]      = "MOVE"_ss,
+                [load]      = "LOAD"_ss,
+                [store]     = "STORE"_ss,
+                [exit]      = "EXIT"_ss,
+                [trap]      = "TRAP"_ss,
+                [lea]       = "LEA"_ss,
+                [bra]       = "BRA"_ss,
+                [car]       = "CAR"_ss,
+                [cdr]       = "CDR"_ss,
+                [setcar]    = "SETCAR"_ss,
+                [setcdr]    = "SETCDR"_ss,
+                [fix]       = "FIX"_ss,
+                [flo]       = "FLO"_ss,
+                [cons]      = "CONS"_ss,
+                [env]       = "ENV"_ss,
+                [type]      = "TYPE"_ss,
+                [list]      = "LIST"_ss,
+                [eval]      = "EVAL"_ss,
+                [error]     = "ERROR"_ss,
+                [write]     = "WRITE"_ss,
+                [qt]        = "QT"_ss,
+                [qq]        = "QQ"_ss,
+                [collect]   = "COLLECT"_ss,
+                [apply]     = "APPLY"_ss,
+                [const_]    = "CONST"_ss,
+                [ladd]      = "LADD"_ss,
+                [lsub]      = "LSUB"_ss,
+                [lmul]      = "LMUL"_ss,
+                [ldiv]      = "LDIV"_ss,
+                [lmod]      = "LMOD"_ss,
+                [lnot]      = "LNOT"_ss,
+                [pairp]     = "PAIRP"_ss,
+                [symp]      = "SYMP"_ss,
+                [atomp]     = "ATOMP"_ss,
+                [truep]     = "TRUEP"_ss,
+                [falsep]    = "FALSEP"_ss,
+                [lcmp]      = "LCMP"_ss,
+                [clc]       = "CLC"_ss,
+                [sec]       = "SEC"_ss,
+                [read]      = "READ"_ss,
+                [define]    = "DEFINE"_ss,
+            };
+
+            str::slice_t name(reg_t op) {
+                return s_names[u32(op)];
+            }
+        }
+    }
+
+    namespace register_file {
+        static str::slice_t s_names[] = {
+            [none]  = "NONE"_ss,
+            [pc]    = "PC"_ss,
+            [gp]    = "GP"_ss,
+            [ep]    = "EP"_ss,
+            [dp]    = "DP"_ss,
+            [hp]    = "HP"_ss,
+            [sp]    = "SP"_ss,
+            [fp]    = "FP"_ss,
+            [m]     = "M"_ss,
+            [f]     = "F"_ss,
+            [lr]    = "LR"_ss,
+            [r0]    = "R0"_ss,
+            [r1]    = "R1"_ss,
+            [r2]    = "R2"_ss,
+            [r3]    = "R3"_ss,
+            [r4]    = "R4"_ss,
+            [r5]    = "R5"_ss,
+            [r6]    = "R6"_ss,
+            [r7]    = "R7"_ss,
+            [r8]    = "R8"_ss,
+            [r9]    = "R9"_ss,
+            [r10]   = "R10"_ss,
+            [r11]   = "R11"_ss,
+            [r12]   = "R12"_ss,
+            [r13]   = "R13"_ss,
+            [r14]   = "R14"_ss,
+            [r15]   = "R15"_ss,
+        };
+
+        str::slice_t name(reg_t reg) {
+            return s_names[u32(reg)];
+        }
+    }
+
     constexpr u8 op_nop             = 0;
     constexpr u8 op_add_imm         = 1;
     constexpr u8 op_add_reg2        = 2;

@@ -198,12 +198,15 @@ set(
     ${CORE_INC_DIR}/set.h
 
     ${CORE_INC_DIR}/scm/types.h
+    ${CORE_INC_DIR}/scm/register_pool.h
     scm/vm.cpp ${CORE_INC_DIR}/scm/vm.h
     scm/scm.cpp ${CORE_INC_DIR}/scm/scm.h
     scm/kernel.cpp ${CORE_INC_DIR}/scm/kernel.h
     scm/system.cpp ${CORE_INC_DIR}/scm/system.h
+    scm/emitter.cpp ${CORE_INC_DIR}/scm/emitter.h
     scm/compiler.cpp ${CORE_INC_DIR}/scm/compiler.h
     scm/bytecode.cpp ${CORE_INC_DIR}/scm/bytecode.h
+    scm/basic_block.cpp ${CORE_INC_DIR}/scm/basic_block.h
     scm/modules/cxx.cpp ${CORE_INC_DIR}/scm/modules/cxx.h
     scm/modules/log.cpp ${CORE_INC_DIR}/scm/modules/log.h
     scm/modules/basic.cpp ${CORE_INC_DIR}/scm/modules/basic.h

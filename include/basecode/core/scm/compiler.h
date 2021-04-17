@@ -19,7 +19,6 @@
 #pragma once
 
 #include <basecode/core/scm/vm.h>
-#include <basecode/core/scm/bytecode.h>
 
 namespace basecode::scm::compiler {
     u0 free(compiler_t& comp);

@@ -19,9 +19,8 @@
 #include <catch.hpp>
 #include <basecode/core/buf.h>
 #include <basecode/core/string.h>
-#include <basecode/core/scm/types.h>
 #include <basecode/core/stopwatch.h>
-#include <basecode/core/scm/compiler.h>
+#include <basecode/core/scm/bytecode.h>
 
 using namespace basecode;
 
@@ -36,11 +35,11 @@ static u0 assemble_and_execute_block(scm::ctx_t* ctx,
     auto& emit = ctx->compiler.emit;
     auto& vm   = ctx->vm;
 
-    auto code_size = scm::vm::emitter::assembled_size_bytes(emit, bb);
+    auto code_size = scm::emitter::assembled_size_bytes(emit, bb);
     auto code_buf  = (u64*) memory::alloc(ctx->alloc, code_size, alignof(u64));
     defer(memory::free(ctx->alloc, code_buf));
 
-    auto status = scm::vm::emitter::assemble(emit, bb, code_buf);
+    auto status = scm::emitter::assemble(emit, bb, code_buf);
     if (!OK(status))
         REQUIRE(false);
 
@@ -60,6 +59,9 @@ static u0 assemble_and_execute_block(scm::ctx_t* ctx,
 }
 
 TEST_CASE("basecode::scm::vm instructions") {
+    namespace rf = scm::vm::register_file;
+    namespace op = scm::vm::instruction;
+
     const auto heap_size = 64 * 1024;
     auto alloc = memory::system::default_alloc();
 
@@ -74,13 +76,13 @@ TEST_CASE("basecode::scm::vm instructions") {
     TIME_BLOCK(
         "execute virtual machine instructions"_ss,
         /* nop */ {
-            scm::vm::emitter::reset(emit);
-            auto& bb = scm::vm::emitter::make_basic_block(emit,
-                                                          "test"_ss,
-                                                          nullptr);
-            scm::vm::basic_block::encode(bb)
+            scm::emitter::reset(emit);
+            auto& bb = scm::emitter::make_basic_block(emit,
+                                                      "test"_ss,
+                                                      nullptr);
+            scm::basic_block::encode(bb)
                 .none()
-                    .op(scm::instruction::type::nop)
+                    .op(op::type::nop)
                     .build();
             assemble_and_execute_block(ctx, bb,
                                        1,
@@ -92,15 +94,15 @@ TEST_CASE("basecode::scm::vm instructions") {
         }
 
         /* move */ {
-            scm::vm::emitter::reset(emit);
-            auto& bb = scm::vm::emitter::make_basic_block(emit,
-                                                          "test"_ss,
-                                                          nullptr);
-            scm::vm::basic_block::encode(bb)
+            scm::emitter::reset(emit);
+            auto& bb = scm::emitter::make_basic_block(emit,
+                                                      "test"_ss,
+                                                      nullptr);
+            scm::basic_block::encode(bb)
                 .imm2()
-                    .op(scm::instruction::type::move)
+                    .op(op::type::move)
                     .src(42)
-                    .dst(scm::register_file::r0)
+                    .dst(rf::r0)
                     .build();
             assemble_and_execute_block(ctx,
                                        bb,
@@ -113,14 +115,14 @@ TEST_CASE("basecode::scm::vm instructions") {
             if (R(0) != 42)
                 REQUIRE(false);
 
-            auto& bb2 = scm::vm::emitter::make_basic_block(emit,
-                                                          "test2"_ss,
-                                                          nullptr);
-            scm::vm::basic_block::encode(bb2)
+            auto& bb2 = scm::emitter::make_basic_block(emit,
+                                                       "test2"_ss,
+                                                       nullptr);
+            scm::basic_block::encode(bb2)
                 .reg2()
-                    .op(scm::instruction::type::move)
-                    .src(scm::register_file::r0)
-                    .dst(scm::register_file::r1)
+                    .op(op::type::move)
+                    .src(rf::r0)
+                    .dst(rf::r1)
                     .build();
             assemble_and_execute_block(ctx,
                                        bb2,
@@ -135,14 +137,14 @@ TEST_CASE("basecode::scm::vm instructions") {
             if (R(1) != 42)
                 REQUIRE(false);
 
-            auto& bb3 = scm::vm::emitter::make_basic_block(emit,
-                                                           "test3"_ss,
-                                                           nullptr);
-            scm::vm::basic_block::encode(bb3)
+            auto& bb3 = scm::emitter::make_basic_block(emit,
+                                                       "test3"_ss,
+                                                       nullptr);
+            scm::basic_block::encode(bb3)
                 .imm2()
-                    .op(scm::instruction::type::move)
+                    .op(op::type::move)
                     .src(0)
-                    .dst(scm::register_file::r2)
+                    .dst(rf::r2)
                     .build();
             assemble_and_execute_block(ctx,
                                        bb3,
@@ -155,14 +157,14 @@ TEST_CASE("basecode::scm::vm instructions") {
             if (R(2) != 0)
                 REQUIRE(false);
 
-            auto& bb4 = scm::vm::emitter::make_basic_block(emit,
-                                                           "test4"_ss,
-                                                           nullptr);
-            scm::vm::basic_block::encode(bb4)
+            auto& bb4 = scm::emitter::make_basic_block(emit,
+                                                       "test4"_ss,
+                                                       nullptr);
+            scm::basic_block::encode(bb4)
                 .imm2()
-                    .op(scm::instruction::type::move)
+                    .op(op::type::move)
                     .src(-42)
-                    .dst(scm::register_file::r2)
+                    .dst(rf::r2)
                     .build();
             assemble_and_execute_block(ctx,
                                        bb4,
@@ -177,15 +179,15 @@ TEST_CASE("basecode::scm::vm instructions") {
         }
 
         /* add, adds */ {
-            scm::vm::emitter::reset(emit);
-            auto& bb = scm::vm::emitter::make_basic_block(emit,
-                                                          "test"_ss,
-                                                          nullptr);
-            scm::vm::basic_block::encode(bb)
+            scm::emitter::reset(emit);
+            auto& bb = scm::emitter::make_basic_block(emit,
+                                                      "test"_ss,
+                                                      nullptr);
+            scm::basic_block::encode(bb)
                 .imm2()
-                    .op(scm::instruction::type::add)
+                    .op(op::type::add)
                     .src(u32(42))
-                    .dst(scm::register_file::r0)
+                    .dst(rf::r0)
                     .build();
             assemble_and_execute_block(ctx,
                                        bb,
@@ -198,14 +200,14 @@ TEST_CASE("basecode::scm::vm instructions") {
             if (R(0) != 84)
                 REQUIRE(false);
 
-            auto& bb2 = scm::vm::emitter::make_basic_block(emit,
-                                                           "test2"_ss,
-                                                           nullptr);
-            scm::vm::basic_block::encode(bb2)
+            auto& bb2 = scm::emitter::make_basic_block(emit,
+                                                       "test2"_ss,
+                                                       nullptr);
+            scm::basic_block::encode(bb2)
                 .reg2()
-                    .op(scm::instruction::type::add)
-                    .src(scm::register_file::r0)
-                    .dst(scm::register_file::r1)
+                    .op(op::type::add)
+                    .src(rf::r0)
+                    .dst(rf::r1)
                     .build();
             assemble_and_execute_block(ctx,
                                        bb2,

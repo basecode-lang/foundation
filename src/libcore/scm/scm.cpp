@@ -591,7 +591,7 @@ namespace basecode::scm {
     }
 
     ctx_t* init(u0* ptr, u32 size, alloc_t* alloc) {
-        namespace rf = scm::register_file;
+        namespace rf = vm::register_file;
 
         // init context struct
         auto ctx = (ctx_t*) ptr;
@@ -614,31 +614,31 @@ namespace basecode::scm {
         ctx->alloc = alloc;
         vm::init(vm, ctx->alloc);
         vm::add_mem_area(vm,
-                         scm::mem_area_type_t::heap,
-                         register_file::hp,
+                         mem_area_type_t::heap,
+                         rf::hp,
                          ctx->alloc,
                          0);
         vm::add_mem_area(vm,
-                         scm::mem_area_type_t::code_stack,
-                         register_file::sp,
+                         mem_area_type_t::code_stack,
+                         rf::sp,
                          ctx->alloc,
                          1024,
                          true);
         ctx->data_stack = &vm::add_mem_area(vm,
-                                           scm::mem_area_type_t::data_stack,
-                                           register_file::dp,
+                                           mem_area_type_t::data_stack,
+                                           rf::dp,
                                            ctx->alloc,
                                            1024,
                                            true);
         ctx->gc_stack = &vm::add_mem_area(vm,
-                                           scm::mem_area_type_t::gc_stack,
-                                           register_file::gp,
+                                           mem_area_type_t::gc_stack,
+                                           rf::gp,
                                            ctx->alloc,
                                            1024,
                                            true);
         ctx->env_stack = &vm::add_mem_area(vm,
-                                           scm::mem_area_type_t::env_stack,
-                                           register_file::ep,
+                                           mem_area_type_t::env_stack,
+                                           rf::ep,
                                            ctx->alloc,
                                            1024,
                                            true);

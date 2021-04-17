@@ -19,31 +19,32 @@
 #include <basecode/core/scm/scm.h>
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/scm/compiler.h>
+#include <basecode/core/scm/bytecode.h>
 
 namespace basecode::scm::compiler {
     u0 free(compiler_t& comp) {
-        vm::emitter::free(comp.emit);
+        emitter::free(comp.emit);
     }
 
     u0 reset(compiler_t& comp) {
-        vm::emitter::reset(comp.emit);
+        emitter::reset(comp.emit);
     }
 
     u0 init(compiler_t& comp, vm_t* vm, alloc_t* alloc) {
         comp.vm = vm;
-        vm::emitter::init(comp.emit, vm, alloc);
+        emitter::init(comp.emit, vm, alloc);
     }
 
     compile_result_t compile(compiler_t& comp, ctx_t* ctx, obj_t* obj) {
         compiler::reset(comp);
 
-        auto& bb = vm::emitter::make_basic_block(comp.emit,
+        auto& bb = emitter::make_basic_block(comp.emit,
                                                  "eval2"_ss,
                                                  {});
-        vm::emitter::virtual_var::declare(comp.emit, "_"_ss);
-        vm::emitter::virtual_var::declare(comp.emit, "res"_ss);
-        vm::emitter::virtual_var::declare(comp.emit, "lit"_ss);
-        vm::emitter::virtual_var::declare(comp.emit, "base"_ss);
+        emitter::virtual_var::declare(comp.emit, "_"_ss);
+        emitter::virtual_var::declare(comp.emit, "res"_ss);
+        emitter::virtual_var::declare(comp.emit, "lit"_ss);
+        emitter::virtual_var::declare(comp.emit, "base"_ss);
 
         TIME_BLOCK(
             "compile expr"_ss,
@@ -53,39 +54,39 @@ namespace basecode::scm::compiler {
                                              top_env(ctx),
                                              true);
             auto comp_result = compiler::compile_expr(comp, tc);
-            vm::basic_block::encode(comp_result.bb)
+            basic_block::encode(comp_result.bb)
                 .imm1()
-                    .op(instruction::type::exit)
+                    .op(vm::instruction::type::exit)
                     .value(1)
                     .build();
-            auto status = vm::emitter::find_liveliness_intervals(comp.emit);
+            auto status = emitter::find_liveliness_intervals(comp.emit);
             if (!OK(status)) {
 //                format::print(stderr, "find_liveliness_intervals failed\n");
             }
-            status = vm::emitter::allocate_registers(comp.emit);
+            status = emitter::allocate_registers(comp.emit);
             if (!OK(status)) {
 //                format::print(stderr, "allocate_registers failed\n");
             }
         );
 
-        vm::emitter::format_liveliness_intervals(comp.emit);
+        emitter::format_liveliness_intervals(comp.emit);
 
         str_t str{};
         str::init(str, ctx->alloc);
         {
             str_buf_t buf{&str};
-            vm::emitter::disassemble(comp.emit, bb, buf);
+            emitter::disassemble(comp.emit, bb, buf);
         }
         format::print("{}\n", str);
 
         auto dot_file = "eval2.dot"_path;
-        if (!OK(vm::emitter::create_dot(ctx->compiler.emit, dot_file))) {
+        if (!OK(emitter::create_dot(ctx->compiler.emit, dot_file))) {
             format::print("error writing dot file.\n");
         }
         path::free(dot_file);
 
         return {&bb,
-                vm::emitter::virtual_var::get(comp.emit, "res"_ss)};
+                emitter::virtual_var::get(comp.emit, "res"_ss)};
     }
 
     compile_result_t compile_expr(compiler_t& comp, const context_t& c) {
@@ -101,21 +102,21 @@ namespace basecode::scm::compiler {
                 defer(ctx->call_list = CDR(cl));
 
                 switch (TYPE(form)) {
-                    case obj_type_t::ffi:   return vm::bytecode::ffi(comp, c, sym, form, args);
-                    case obj_type_t::prim:  return vm::bytecode::prim(comp,
-                                                                      c,
-                                                                      sym,
-                                                                      form,
-                                                                      args,
-                                                                      PRIM(form));
-                    case obj_type_t::proc:  return vm::bytecode::apply(comp, c, sym, form, args);
-                    case obj_type_t::cfunc: return vm::bytecode::call_back(comp, c, sym, form, args);
+                    case obj_type_t::ffi:   return bytecode::ffi(comp, c, sym, form, args);
+                    case obj_type_t::prim:  return bytecode::prim(comp,
+                                                                  c,
+                                                                  sym,
+                                                                  form,
+                                                                  args,
+                                                                  PRIM(form));
+                    case obj_type_t::proc:  return bytecode::apply(comp, c, sym, form, args);
+                    case obj_type_t::cfunc: return bytecode::call_back(comp, c, sym, form, args);
                     default:                error(ctx, "tried to call non-callable value");
                 }
                 return {c.bb, 0};
             }
-            case obj_type_t::symbol:    return vm::bytecode::lookup(comp, c);
-            default:                    return vm::bytecode::self_eval(comp, c);
+            case obj_type_t::symbol:    return bytecode::lookup(comp, c);
+            default:                    return bytecode::self_eval(comp, c);
         }
     }
 
