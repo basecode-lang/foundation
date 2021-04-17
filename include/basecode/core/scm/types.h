@@ -87,6 +87,7 @@ namespace basecode::scm {
     struct emitter_t;
     struct mem_area_t;
     struct var_access_t;
+    struct var_version_t;
     struct encoded_inst_t;
     union  encoded_operand_t;
     struct liveliness_range_t;
@@ -105,7 +106,7 @@ namespace basecode::scm {
     using proc_array_t          = array_t<proc_t>;
     using bind_table_t          = hashtab_t<u32, obj_t*>;
     using trap_table_t          = hashtab_t<u32, trap_t>;
-    using var_digraph_t         = digraph_t<var_t>;
+    using var_digraph_t         = digraph_t<var_version_t>;
     using symbol_table_t        = hashtab_t<u32, obj_t*>;
     using string_table_t        = hashtab_t<u32, obj_t*>;
     using access_array_t        = array_t<var_access_t>;
@@ -114,6 +115,7 @@ namespace basecode::scm {
     using mem_area_array_t      = array_t<mem_area_t>;
     using interval_array_t      = array_t<liveliness_range_t*>;
     using liveliness_array_t    = stable_array_t<liveliness_range_t>;
+    using var_version_array_t   = stable_array_t<var_version_t>;
 
     enum class status_t : u32 {
         ok                          = 0,
@@ -345,22 +347,24 @@ namespace basecode::scm {
     };
 
     struct var_t final {
+        str::slice_t            symbol;
+        var_version_t*          first;
+        var_version_t*          current;
+    };
+
+    struct var_version_t final {
         using Node_Type         = typename var_digraph_t::Node;
 
+        var_t*                  var;
         Node_Type*              node;
         access_array_t          accesses;
-        intern_id               symbol;
-        u32                     version;
+        u32                     number;
         reg_t                   reg;
-        u8                      active:     1;
-        u8                      spilled:    1;
-        u8                      incubate:   1;
-        u8                      pad:        5;
     };
 
     struct liveliness_range_t final {
         liveliness_range_t*     next;
-        var_t*                  var;
+        var_version_t*          version;
         u32                     start;
         u32                     end;
         u32                     id;
@@ -383,11 +387,11 @@ namespace basecode::scm {
         union {
             struct {
                 bb_t*           bb;
-                var_t*          args[4];
+                var_version_t*  args[4];
                 u32             size;
             }                   branch;
             reg_t               reg;
-            var_t*              var;
+            var_version_t*      var;
             s32                 s;
             u32                 u;
         }                       kind;
@@ -435,25 +439,26 @@ namespace basecode::scm {
             inline u32 size() const     { return (eidx - sidx); }
         }                       insts;
         struct {
-            var_t*              vars[4];
+            var_version_t*      vars[4];
             u32                 size;
         }                       params;
         bb_type_t               type;
     };
 
     struct emitter_t final {
-        vm_t*                   vm;
         alloc_t*                alloc;
-        bb_array_t              blocks;
+        vm_t*                   vm;
         var_array_t             vars;
+        bb_array_t              blocks;
         var_table_t             vartab;
         str_array_t             strtab;
         inst_array_t            insts;
-        bb_digraph_t            bb_graph;
-        var_digraph_t           var_graph;
-        comment_array_t         comments;
-        interval_array_t        intervals;
         liveliness_array_t      ranges;
+        comment_array_t         comments;
+        bb_digraph_t            bb_graph;
+        var_version_array_t     versions;
+        var_digraph_t           var_graph;
+        interval_array_t        intervals;
     };
 
     struct mem_area_t final {
@@ -512,14 +517,14 @@ namespace basecode::scm {
         obj_t*                  obj;
         obj_t*                  env;
         obj_t*                  sym;
-        var_t*                  target;
+        var_version_t*          target;
         b8                      is_macro;
         b8                      top_level;
     };
 
     struct compile_result_t final {
         bb_t*                   bb;
-        var_t*                  var;
+        var_version_t*          var;
         obj_t*                  obj;
         status_t                status;
 

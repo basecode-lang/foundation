@@ -24,8 +24,8 @@ namespace basecode::scm::basic_block {
     class bb_builder_t;
 
     class reg1_builder_t final {
-        var_t**         _dst;
-        bb_builder_t*   _builder;
+        var_version_t**         _dst;
+        bb_builder_t*           _builder;
     public:
         reg1_builder_t(bb_builder_t* builder) : _dst(),
                                                 _builder(builder) {};
@@ -36,15 +36,15 @@ namespace basecode::scm::basic_block {
 
         reg1_builder_t& dst(reg_t reg);
 
-        reg1_builder_t& dst(var_t** var);
-
         reg1_builder_t& op(op_code_t op_code);
+
+        reg1_builder_t& dst(var_version_t** var);
     };
 
     class reg2_builder_t final {
-        var_t**         _src;
-        var_t**         _dst;
-        bb_builder_t*   _builder;
+        var_version_t**         _src;
+        var_version_t**         _dst;
+        bb_builder_t*           _builder;
 
     public:
         reg2_builder_t(bb_builder_t* builder) : _src(),
@@ -61,20 +61,20 @@ namespace basecode::scm::basic_block {
 
         reg2_builder_t& src(reg_t reg);
 
-        reg2_builder_t& dst(var_t** var);
-
-        reg2_builder_t& src(var_t** var);
-
         reg2_builder_t& is_signed(b8 flag);
 
         reg2_builder_t& op(op_code_t op_code);
+
+        reg2_builder_t& dst(var_version_t** var);
+
+        reg2_builder_t& src(var_version_t** var);
     };
 
     class reg3_builder_t final {
-        var_t**         _a;
-        var_t**         _b;
-        var_t**         _c;
-        bb_builder_t*   _builder;
+        var_version_t**         _a;
+        var_version_t**         _b;
+        var_version_t**         _c;
+        bb_builder_t*           _builder;
     public:
         reg3_builder_t(bb_builder_t* builder) : _a(),
                                                 _b(),
@@ -91,19 +91,19 @@ namespace basecode::scm::basic_block {
 
         reg3_builder_t& c(reg_t reg);
 
-        reg3_builder_t& a(var_t** var);
-
-        reg3_builder_t& b(var_t** var);
-
-        reg3_builder_t& c(var_t** var);
-
         reg3_builder_t& op(op_code_t op_code);
+
+        reg3_builder_t& a(var_version_t** var);
+
+        reg3_builder_t& b(var_version_t** var);
+
+        reg3_builder_t& c(var_version_t** var);
     };
 
     class offs_builder_t final {
-        var_t**         _src;
-        var_t**         _dst;
-        bb_builder_t*   _builder;
+        var_version_t**         _src;
+        var_version_t**         _dst;
+        bb_builder_t*           _builder;
     public:
         offs_builder_t(bb_builder_t* builder) : _src(),
                                                 _dst(),
@@ -119,19 +119,19 @@ namespace basecode::scm::basic_block {
 
         offs_builder_t& src(reg_t reg);
 
-        offs_builder_t& dst(var_t** var);
-
-        offs_builder_t& src(var_t** var);
-
         offs_builder_t& offset(s32 value);
 
         offs_builder_t& op(op_code_t op_code);
+
+        offs_builder_t& dst(var_version_t** var);
+
+        offs_builder_t& src(var_version_t** var);
     };
 
     class reg2_imm_builder_t final {
-        var_t**         _src;
-        var_t**         _dst;
-        bb_builder_t*   _builder;
+        var_version_t**         _src;
+        var_version_t**         _dst;
+        bb_builder_t*           _builder;
     public:
         reg2_imm_builder_t(bb_builder_t* builder) : _src(),
                                                     _dst(),
@@ -145,10 +145,6 @@ namespace basecode::scm::basic_block {
 
         reg2_imm_builder_t& src(reg_t reg);
 
-        reg2_imm_builder_t& dst(var_t** var);
-
-        reg2_imm_builder_t& src(var_t** var);
-
         reg2_imm_builder_t& value(s32 value);
 
         reg2_imm_builder_t& value(u32 value);
@@ -158,6 +154,10 @@ namespace basecode::scm::basic_block {
         reg2_imm_builder_t& value(bb_t* value);
 
         reg2_imm_builder_t& op(op_code_t op_code);
+
+        reg2_imm_builder_t& dst(var_version_t** var);
+
+        reg2_imm_builder_t& src(var_version_t** var);
     };
 
     class none_builder_t final {
@@ -193,8 +193,8 @@ namespace basecode::scm::basic_block {
     };
 
     class imm2_builder_t final {
-        var_t**         _dst;
-        bb_builder_t*   _builder;
+        var_version_t**         _dst;
+        bb_builder_t*           _builder;
     public:
         imm2_builder_t(bb_builder_t* builder) : _dst(),
                                                 _builder(builder) {};
@@ -211,13 +211,13 @@ namespace basecode::scm::basic_block {
 
         imm2_builder_t& src(u32 value);
 
-        imm2_builder_t& dst(var_t** var);
-
         imm2_builder_t& src(bb_t* value);
 
         imm2_builder_t& is_signed(b8 flag);
 
         imm2_builder_t& op(op_code_t op_code);
+
+        imm2_builder_t& dst(var_version_t** var);
     };
 
     class bb_builder_t final {
@@ -270,7 +270,7 @@ namespace basecode::scm::basic_block {
             };
         }
 
-        operand_t operand(var_t* var) {
+        operand_t operand(var_version_t* var) {
             return operand_t{
                 .kind.var = var,
                 .type = operand_type_t::var

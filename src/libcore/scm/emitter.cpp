@@ -36,18 +36,18 @@ namespace basecode::scm::emitter {
     static u0 swap_ranges(liveliness_range_t* lhs,
                           liveliness_range_t* rhs);
 
-    static u0 create_ranges(emitter_t& e, var_t* var);
-
     static u0 set_interval(emitter_t& e,
                            u32 block_id,
                            liveliness_range_t* new_range);
 
+    static u0 create_ranges(emitter_t& e, var_version_t* version);
+
     [[maybe_unused]] static u0 create_split_ranges(emitter_t& e,
-                                                   var_t* var);
+                                                   var_version_t* version);
 
     u0 free(emitter_t& e) {
-        for (auto var : e.vars)
-            array::free(var->accesses);
+        for (auto version : e.versions)
+            array::free(version->accesses);
         array::free(e.insts);
         symtab::free(e.vartab);
         array::free(e.comments);
@@ -58,17 +58,23 @@ namespace basecode::scm::emitter {
         stable_array::free(e.vars);
         stable_array::free(e.blocks);
         stable_array::free(e.ranges);
+        stable_array::free(e.versions);
     }
 
     u0 reset(emitter_t& e) {
+        for (auto version : e.versions)
+            array::free(version->accesses);
         array::reset(e.insts);
         symtab::reset(e.vartab);
         array::reset(e.comments);
+        array::reset(e.intervals);
         digraph::reset(e.bb_graph);
         str_array::reset(e.strtab);
         digraph::reset(e.var_graph);
         stable_array::reset(e.vars);
         stable_array::reset(e.blocks);
+        stable_array::reset(e.ranges);
+        stable_array::reset(e.versions);
     }
 
     static u0 format_comments(str_buf_t& buf,
@@ -160,8 +166,8 @@ namespace basecode::scm::emitter {
                 // to *interval* and move the *interval* to active.
                 if (reg_pool::has_free(pool)) {
                     auto reg = reg_pool::retain(pool);
-                    interval->reg      = reg;
-                    interval->var->reg = reg;
+                    interval->reg          = reg;
+                    interval->version->reg = reg;
                     active[interval->id - 1] = interval;
                 } else {
                     // if there are *no* free registers in the pool, we
@@ -190,6 +196,7 @@ namespace basecode::scm::emitter {
         stable_array::init(e.vars, e.alloc);
         stable_array::init(e.blocks, e.alloc);
         stable_array::init(e.ranges, e.alloc);
+        stable_array::init(e.versions, e.alloc);
     }
 
     u0 format_liveliness_intervals(emitter_t& e) {
@@ -201,16 +208,16 @@ namespace basecode::scm::emitter {
                 continue;
             }
             format::print("{}@{}({})=[{:>3}, {:>3}]",
-                          *string::interned::get_slice(range->var->symbol),
-                          range->var->version,
+                          range->version->var->symbol,
+                          range->version->number,
                           vm::register_file::name(range->reg),
                           range->start,
                           range->end);
             range = range->next;
             while (range) {
                 format::print(" -> {}@{}({})=[{:>3}, {:>3}]",
-                              *string::interned::get_slice(range->var->symbol),
-                              range->var->version,
+                              range->version->var->symbol,
+                              range->version->number,
                               vm::register_file::name(range->reg),
                               range->start,
                               range->end);
@@ -234,6 +241,17 @@ namespace basecode::scm::emitter {
         }
     }
 
+    status_t find_liveliness_intervals(emitter_t& e) {
+        assoc_array_t<var_t*> pairs{};
+        assoc_array::init(pairs, e.alloc);
+        defer(assoc_array::free(pairs));
+        symtab::find_prefix(e.vartab, pairs);
+        array::resize(e.intervals, e.blocks.size);
+        for (u32 i = 0; i < pairs.size; ++i)
+            create_ranges(e, pairs[i].value->first);
+        return status_t::ok;
+    }
+
     static u0 set_interval(emitter_t& e,
                            u32 block_id,
                            liveliness_range_t* new_range) {
@@ -248,59 +266,6 @@ namespace basecode::scm::emitter {
                 swap_ranges(range, new_range);
             }
         }
-    }
-
-    static u0 create_ranges(emitter_t& e, var_t* var) {
-        var_digraph_t::Node_Array nodes{};
-        array::init(nodes, e.alloc);
-        defer(array::free(nodes));
-
-        u32 end     {};
-        u32 start   {};
-
-        if (var->accesses.size > 0) {
-            start = array::front(var->accesses)->inst_id;
-            end   = array::back(var->accesses)->inst_id;
-
-            const auto& start_inst = e.insts[start - 1];
-            auto new_range = &stable_array::append(e.ranges);
-            new_range->id    = e.ranges.size;
-            new_range->var   = var;
-            new_range->end   = end - 1;
-            new_range->reg   = vm::register_file::none;
-            new_range->next  = {};
-            new_range->start = start - 1;
-            set_interval(e, start_inst.block_id, new_range);
-        }
-
-        digraph::outgoing_nodes(e.var_graph, var->node, nodes);
-        for (const auto& node : nodes)
-            create_ranges(e, node->value);
-    }
-
-    status_t find_liveliness_intervals(emitter_t& e) {
-        assoc_array_t<var_t*> pairs{};
-        assoc_array::init(pairs, e.alloc);
-        defer(assoc_array::free(pairs));
-        symtab::find_prefix(e.vartab, pairs);
-
-        array::resize(e.intervals, e.blocks.size);
-        for (u32 i = 0; i < pairs.size; ++i) {
-            const auto& pair = pairs[i];
-            auto rc = string::interned::fold_for_result(pair.key);
-            if (!OK(rc.status))
-                return status_t::var_intern_failure;
-            for (auto var : e.vars) {
-                if (var->symbol != rc.id
-                ||  var->version != 1
-                ||  var->incubate) {
-                    continue;
-                }
-                create_ranges(e, var);
-            }
-        }
-
-        return status_t::fail;
     }
 
     status_t create_dot(emitter_t& e, const path_t& path) {
@@ -472,7 +437,32 @@ namespace basecode::scm::emitter {
         return status_t::ok;
     }
 
-    static u0 create_split_ranges(emitter_t& e, var_t* var) {
+    static u0 create_ranges(emitter_t& e, var_version_t* version) {
+        if (version->accesses.size > 0) {
+            auto start = array::front(version->accesses)->inst_id;
+            auto end   = array::back(version->accesses)->inst_id;
+
+            const auto& start_inst = e.insts[start - 1];
+            auto new_range = &stable_array::append(e.ranges);
+            new_range->id      = e.ranges.size;
+            new_range->end     = end - 1;
+            new_range->reg     = vm::register_file::none;
+            new_range->next    = {};
+            new_range->start   = start - 1;
+            new_range->version = version;
+            set_interval(e, start_inst.block_id, new_range);
+        }
+
+        var_digraph_t::Node_Array nodes{};
+        array::init(nodes, e.alloc);
+        defer(array::free(nodes));
+
+        digraph::outgoing_nodes(e.var_graph, version->node, nodes);
+        for (const auto& node : nodes)
+            create_ranges(e, node->value);
+    }
+
+    static u0 create_split_ranges(emitter_t& e, var_version_t* version) {
         var_digraph_t::Node_Array nodes{};
         array::init(nodes, e.alloc);
         defer(array::free(nodes));
@@ -480,14 +470,14 @@ namespace basecode::scm::emitter {
         u32 end     {};
         u32 start   {};
         u32 block_id{};
-        for (const auto& ac : var->accesses) {
+        for (const auto& ac : version->accesses) {
             const auto& inst = e.insts[ac.inst_id - 1];
             if (block_id && block_id != inst.block_id) {
                 auto new_range = &stable_array::append(e.ranges);
-                new_range->var   = var;
-                new_range->end   = end - 1;
-                new_range->next  = {};
-                new_range->start = start - 1;
+                new_range->end     = end - 1;
+                new_range->next    = {};
+                new_range->start   = start - 1;
+                new_range->version = version;
                 set_interval(e, block_id, new_range);
                 start    = inst.id;
                 end      = start;
@@ -504,16 +494,16 @@ namespace basecode::scm::emitter {
         }
         if (start && end && block_id) {
             auto new_range = &stable_array::append(e.ranges);
-            new_range->var   = var;
-            new_range->end   = end - 1;
-            new_range->next  = {};
-            new_range->start = start - 1;
+            new_range->end     = end - 1;
+            new_range->next    = {};
+            new_range->start   = start - 1;
+            new_range->version = version;
             set_interval(e, block_id, new_range);
         }
 
-        digraph::outgoing_nodes(e.var_graph, var->node, nodes);
+        digraph::outgoing_nodes(e.var_graph, version->node, nodes);
         for (const auto& node : nodes)
-            create_ranges(e, node->value);
+            create_split_ranges(e, node->value);
     }
 
     u32 assembled_size_bytes(emitter_t& e, bb_t& start_block) {
@@ -660,7 +650,7 @@ namespace basecode::scm::emitter {
                 switch (inst.encoding) {
                     case vm::instruction::encoding::imm: {
                         if (inst.mode
-                            &&  inst.operands[1].type != operand_type_t::none) {
+                        &&  inst.operands[1].type != operand_type_t::none) {
                             format::format_to(
                                 buf,
                                 "{}, ",

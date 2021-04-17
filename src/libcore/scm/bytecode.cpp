@@ -154,9 +154,7 @@ namespace basecode::scm::bytecode {
                          const context_t& c,
                          obj_t* args) {
         auto ctx = c.ctx;
-        auto& exit_bb = emitter::make_basic_block(comp.emit,
-                                                  "or_exit"_ss,
-                                                  c.bb);
+        auto& exit_bb = emitter::make_basic_block(comp.emit, "or_exit"_ss, c.bb);
         auto res = c.target ? c.target :
                    emitter::virtual_var::get(comp.emit, "res"_ss);
         auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
@@ -224,15 +222,9 @@ namespace basecode::scm::bytecode {
                          obj_t* args) {
         auto ctx = c.ctx;
 
-        auto& true_bb  = emitter::make_basic_block(comp.emit,
-                                                   "if_true"_ss,
-                                                   c.bb);
-        auto& false_bb = emitter::make_basic_block(comp.emit,
-                                                   "if_false"_ss,
-                                                   &true_bb);
-        auto& exit_bb  = emitter::make_basic_block(comp.emit,
-                                                   "if_exit"_ss,
-                                                   &false_bb);
+        auto& true_bb  = emitter::make_basic_block(comp.emit, "if_true"_ss, c.bb);
+        auto& false_bb = emitter::make_basic_block(comp.emit, "if_false"_ss, &true_bb);
+        auto& exit_bb  = emitter::make_basic_block(comp.emit, "if_exit"_ss, &false_bb);
 
         auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
         auto res = c.target ? c.target :
@@ -550,9 +542,7 @@ namespace basecode::scm::bytecode {
         auto proc = PROC(form);
         auto tmp       = emitter::virtual_var::get(comp.emit, "_"_ss);
         auto base_addr = emitter::virtual_var::get(comp.emit, "base"_ss);
-        auto& apply_bb = emitter::make_basic_block(comp.emit,
-                                                   "apply"_ss,
-                                                   c.bb);
+        auto& apply_bb = emitter::make_basic_block(comp.emit, "apply"_ss, c.bb);
         basic_block::encode(apply_bb)
             .reg2()
                 .op(op::env)
@@ -1044,7 +1034,7 @@ namespace basecode::scm::bytecode {
         return {comp_res.bb, res};
     }
 
-    u0 alloc_stack(bb_t& bb, u32 words, var_t** base_addr) {
+    u0 alloc_stack(bb_t& bb, u32 words, var_version_t** base_addr) {
         basic_block::encode(bb)
             .imm2()
                 .op(op::sub)

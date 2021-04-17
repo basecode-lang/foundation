@@ -79,9 +79,9 @@ namespace basecode::scm::bytecode {
                                   const context_t& c,
                                   obj_t* args);
 
-    u0 alloc_stack(bb_t& bb, u32 words, var_t** base_addr);
-
     compile_result_t lookup(compiler_t& comp, const context_t& c);
+
+    u0 alloc_stack(bb_t& bb, u32 words, var_version_t** base_addr);
 
     compile_result_t self_eval(compiler_t& comp, const context_t& c);
 

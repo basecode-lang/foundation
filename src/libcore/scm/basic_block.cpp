@@ -225,11 +225,6 @@ namespace basecode::scm::basic_block {
         return *this;
     }
 
-    imm2_builder_t& imm2_builder_t::dst(var_t** var) {
-        _dst = var;
-        return *this;
-    }
-
     imm2_builder_t& imm2_builder_t::src(bb_t* value) {
         _builder->_inst->operands[0] = _builder->operand(value);
         return *this;
@@ -242,6 +237,11 @@ namespace basecode::scm::basic_block {
 
     imm2_builder_t& imm2_builder_t::op(op_code_t op_code) {
         _builder->_inst->type = op_code;
+        return *this;
+    }
+
+    imm2_builder_t& imm2_builder_t::dst(var_version_t** var) {
+        _dst = var;
         return *this;
     }
 
@@ -263,13 +263,13 @@ namespace basecode::scm::basic_block {
         return *this;
     }
 
-    reg1_builder_t& reg1_builder_t::dst(var_t** var) {
-        _dst = var;
+    reg1_builder_t& reg1_builder_t::op(op_code_t op_code) {
+        _builder->_inst->type = op_code;
         return *this;
     }
 
-    reg1_builder_t& reg1_builder_t::op(op_code_t op_code) {
-        _builder->_inst->type = op_code;
+    reg1_builder_t& reg1_builder_t::dst(var_version_t** var) {
+        _dst = var;
         return *this;
     }
 
@@ -319,16 +319,6 @@ namespace basecode::scm::basic_block {
         return *this;
     }
 
-    reg2_builder_t& reg2_builder_t::src(var_t** var) {
-        _src = var;
-        return *this;
-    }
-
-    reg2_builder_t& reg2_builder_t::dst(var_t** var) {
-        _dst = var;
-        return *this;
-    }
-
     reg2_builder_t& reg2_builder_t::is_signed(b8 flag) {
         _builder->_inst->is_signed = flag;
         return *this;
@@ -336,6 +326,16 @@ namespace basecode::scm::basic_block {
 
     reg2_builder_t& reg2_builder_t::op(op_code_t op_code) {
         _builder->_inst->type = op_code;
+        return *this;
+    }
+
+    reg2_builder_t& reg2_builder_t::src(var_version_t** var) {
+        _src = var;
+        return *this;
+    }
+
+    reg2_builder_t& reg2_builder_t::dst(var_version_t** var) {
+        _dst = var;
         return *this;
     }
 
@@ -368,16 +368,6 @@ namespace basecode::scm::basic_block {
         return *this;
     }
 
-    reg2_imm_builder_t& reg2_imm_builder_t::src(var_t** var) {
-        _src = var;
-        return *this;
-    }
-
-    reg2_imm_builder_t& reg2_imm_builder_t::dst(var_t** var) {
-        _dst = var;
-        return *this;
-    }
-
     reg2_imm_builder_t& reg2_imm_builder_t::is_signed(b8 flag) {
         _builder->_inst->is_signed = flag;
         return *this;
@@ -400,6 +390,16 @@ namespace basecode::scm::basic_block {
 
     reg2_imm_builder_t& reg2_imm_builder_t::op(op_code_t op_code) {
         _builder->_inst->type = op_code;
+        return *this;
+    }
+
+    reg2_imm_builder_t& reg2_imm_builder_t::src(var_version_t** var) {
+        _src = var;
+        return *this;
+    }
+
+    reg2_imm_builder_t& reg2_imm_builder_t::dst(var_version_t** var) {
+        _dst = var;
         return *this;
     }
 
@@ -453,16 +453,6 @@ namespace basecode::scm::basic_block {
         return *this;
     }
 
-    offs_builder_t& offs_builder_t::src(var_t** var) {
-        _src = var;
-        return *this;
-    }
-
-    offs_builder_t& offs_builder_t::dst(var_t** var) {
-        _dst = var;
-        return *this;
-    }
-
     offs_builder_t& offs_builder_t::offset(s32 value) {
         _builder->_inst->operands[2] = _builder->operand(value);
         return *this;
@@ -470,6 +460,16 @@ namespace basecode::scm::basic_block {
 
     offs_builder_t& offs_builder_t::op(op_code_t op_code) {
         _builder->_inst->type = op_code;
+        return *this;
+    }
+
+    offs_builder_t& offs_builder_t::src(var_version_t** var) {
+        _src = var;
+        return *this;
+    }
+
+    offs_builder_t& offs_builder_t::dst(var_version_t** var) {
+        _dst = var;
         return *this;
     }
 
@@ -513,23 +513,23 @@ namespace basecode::scm::basic_block {
         return *this;
     }
 
-    reg3_builder_t& reg3_builder_t::a(var_t** var) {
+    reg3_builder_t& reg3_builder_t::op(op_code_t op_code) {
+        _builder->_inst->type = op_code;
+        return *this;
+    }
+
+    reg3_builder_t& reg3_builder_t::a(var_version_t** var) {
         _a = var;
         return *this;
     }
 
-    reg3_builder_t& reg3_builder_t::b(var_t** var) {
+    reg3_builder_t& reg3_builder_t::b(var_version_t** var) {
         _b = var;
         return *this;
     }
 
-    reg3_builder_t& reg3_builder_t::c(var_t** var) {
+    reg3_builder_t& reg3_builder_t::c(var_version_t** var) {
         _c = var;
-        return *this;
-    }
-
-    reg3_builder_t& reg3_builder_t::op(op_code_t op_code) {
-        _builder->_inst->type = op_code;
         return *this;
     }
 }

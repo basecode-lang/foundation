@@ -122,119 +122,88 @@ namespace basecode::scm::emitter {
             }
         }
 
-        template <String_Concept T>
-        var_t* get(emitter_t& e, const T& name) {
-            var_t* var{};
-            if (!symtab::find(e.vartab, name, var))
-                return nullptr;
-            return var;
+        inline var_version_t* read(emitter_t& e,
+                                   var_version_t* curr,
+                                   u32 inst_id) {
+            assert(curr && "virtual_var: cannot read a null var_version_t!");
+            if (curr->accesses.size == 0) {
+                auto& ac = array::append(curr->accesses);
+                ac.type    = var_access_type_t::def;
+                ac.inst_id = inst_id;
+            }
+            auto& ac = array::append(curr->accesses);
+            ac.type    = var_access_type_t::read;
+            ac.inst_id = inst_id;
+            return curr;
+        }
+
+        inline var_version_t* write(emitter_t& e,
+                                    var_version_t* curr,
+                                    u32 inst_id) {
+            auto var = curr->var;
+
+            if (curr->accesses.size == 0) {
+                auto& ac = array::append(curr->accesses);
+                ac.type    = var_access_type_t::def;
+                ac.inst_id = inst_id;
+            }
+
+            auto new_version = &stable_array::append(e.versions);
+            array::init(new_version->accesses, e.alloc);
+            var->current = new_version;
+            new_version->var    = var;
+            new_version->reg    = vm::register_file::none;
+            new_version->node   = digraph::make_node(e.var_graph, *new_version);
+            new_version->number = curr->number + 1;
+
+            auto& ac = array::append(new_version->accesses);
+            ac.type    = var_access_type_t::write;
+            ac.inst_id = inst_id;
+            digraph::make_edge(e.var_graph, curr->node, new_version->node);
+            return new_version;
         }
 
         template <String_Concept T>
-        var_t* declare(emitter_t& e, const T& name) {
+        var_version_t* get(emitter_t& e, const T& name) {
+            var_t* var;
+            symtab::find(e.vartab, name, var);
+            return var ? var->current : nullptr;
+        }
+
+        template <String_Concept T>
+        var_version_t* declare(emitter_t& e, const T& name) {
             var_t* var{};
             if (symtab::find(e.vartab, name, var))
                 assert(false && "virtual_var: ssa var can only be declared once!");
-            auto rc = string::interned::fold_for_result(name);
-            if (!OK(rc.status))
-                return nullptr;
             var = &stable_array::append(e.vars);
-            array::init(var->accesses, e.alloc);
-            var->node     = digraph::make_node(e.var_graph, *var);
-            var->active   = false;
-            var->symbol   = rc.id;
-            var->version  = 1;
-            var->spilled  = false;
-            var->incubate = true;
-            var->reg      = vm::register_file::none;
+            var->symbol  = name;
+            auto first = &stable_array::append(e.versions);
+            array::init(first->accesses, e.alloc);
+            first->var    = var;
+            first->reg    = vm::register_file::none;
+            first->node   = digraph::make_node(e.var_graph, *first);
+            first->number = 1;
+            var->first    = var->current = first;
             symtab::insert(e.vartab, name, var);
-            return var;
+            return var->first;
         }
 
-        inline u0 format_to(fmt_ctx_t& ctx, const var_t* var) {
+        inline u0 format_to(fmt_ctx_t& ctx, const var_version_t* version) {
             auto buf = ctx.out();
-            if (var->reg != vm::register_file::none) {
+            if (version->reg != vm::register_file::none) {
                 fmt::format_to(buf,
                                "{} <",
-                               vm::register_file::name(var->reg));
+                               vm::register_file::name(version->reg));
             }
-            fmt::format_to(buf,
-                           "{}",
-                           *string::interned::get_slice(var->symbol));
-            if (!var->incubate)
-                fmt::format_to(buf, "@{}", var->version);
-            if (var->reg != vm::register_file::none)
+            fmt::format_to(buf, "{}", version->var->symbol);
+            fmt::format_to(buf, "@{}", version->number);
+            if (version->reg != vm::register_file::none)
                 fmt::format_to(buf, ">");
-        }
-
-        inline var_t* latest(emitter_t& e, intern_id symbol) {
-            auto key = *string::interned::get_slice(symbol);
-            var_t* var{};
-            if (!symtab::find(e.vartab, key, var))
-                assert(false && "virtual_var: latest should always find something!");
-            return var;
-        }
-
-        inline var_t* read(emitter_t& e, var_t* var, u32 inst_id) {
-            assert(var && "virtual_var: cannot read a null var_t!");
-            assert(!var->incubate && "virtual_var: cannot read an incubated var_t!");
-            auto& ac = array::append(var->accesses);
-            ac.type    = var_access_type_t::read;
-            ac.inst_id = inst_id;
-            return var;
-        }
-
-        template <String_Concept T>
-        var_t* read(emitter_t& e, const T& name, u32 inst_id) {
-            var_t* var{};
-            if (!symtab::find(e.vartab, name, var))
-                assert(false && "virtual_var: cannot read an undeclared var_t!");
-            return read(e, var, inst_id);
-        }
-
-        inline var_t* write(emitter_t& e, var_t* prev, u32 inst_id) {
-            const auto curr = latest(e, prev->symbol);
-            auto var = &stable_array::append(e.vars);
-            array::init(var->accesses, e.alloc);
-            if (prev->incubate) {
-                if (curr->incubate) {
-                    auto& ac      = array::append(var->accesses);
-                    ac.type       = var_access_type_t::def;
-                    ac.inst_id    = inst_id;
-                    var->version  = prev->version;
-                } else {
-                    prev = curr;
-                }
-            }
-            if (!prev->incubate) {
-                var->version = curr->version + 1;
-                auto& ac = array::append(var->accesses);
-                ac.type    = var_access_type_t::write;
-                ac.inst_id = inst_id;
-            }
-            var->symbol  = prev->symbol;
-            var->active  = prev->active;
-            var->spilled = prev->spilled;
-            var->incubate = false;
-            symtab::set(e.vartab,
-                        *string::interned::get_slice(var->symbol),
-                        var);
-            var->node = digraph::make_node(e.var_graph, *var);
-            digraph::make_edge(e.var_graph, prev->node, var->node);
-            return var;
-        }
-
-        template <String_Concept T>
-        var_t* write(emitter_t& e, const T& name, u32 inst_id) {
-            var_t* var{};
-            if (!symtab::find(e.vartab, name, var))
-                assert(false && "virtual_var: cannot write an undeclared var_t!");
-            return write(e, var, inst_id);
         }
     }
 }
 
-FORMAT_TYPE(basecode::scm::var_t,
+FORMAT_TYPE(basecode::scm::var_version_t,
             basecode::scm::emitter::virtual_var::format_to(ctx, &data));
 
 FORMAT_TYPE(
