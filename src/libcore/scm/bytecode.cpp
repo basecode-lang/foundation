@@ -1756,14 +1756,13 @@ namespace basecode::scm {
                                                            "if_exit"_ss,
                                                            &false_bb);
 
-                auto tmp = emitter::virtual_var::get(comp.emit,
-                                                     "_"_ss);
+                auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
                 auto res = c.target ? c.target :
-                           emitter::virtual_var::get(comp.emit,
-                                                     "res"_ss);
+                           emitter::virtual_var::get(comp.emit, "res"_ss);
 
+                auto predicate = CAR(args);
                 auto ic = c;
-                ic.obj = CAR(args);
+                ic.obj = predicate;
                 auto pred_res = compiler::compile_expr(comp, ic);
                 basic_block::encode(c.bb)
                     .next(true_bb)
@@ -1777,8 +1776,9 @@ namespace basecode::scm {
                         .value(&false_bb)
                         .build();
 
-                ic.bb  = &true_bb;
-                ic.obj = CADR(args);
+                auto consequent = CADR(args);
+                ic.bb     = &true_bb;
+                ic.obj    = consequent;
                 ic.target = res;
                 auto true_res = compiler::compile_expr(comp, ic);
                 basic_block::encode(true_res.bb)
@@ -1788,18 +1788,25 @@ namespace basecode::scm {
                         .value(&exit_bb)
                         .build();
 
-                ic.bb  = &false_bb;
-                ic.obj = CADDR(args);
-                ic.target = res;
-                auto false_res = compiler::compile_expr(comp, ic);
-                basic_block::encode(false_res.bb)
-                    .next(exit_bb)
-                    .imm1()
-                        .op(op::br)
-                        .value(&exit_bb)
-                        .build();
+                auto subsequent = CADDR(args);
+                if (!IS_NIL(subsequent)) {
+                    ic.bb     = &false_bb;
+                    ic.obj    = subsequent;
+                    ic.target = res;
+                    auto false_res = compiler::compile_expr(comp, ic);
+                    basic_block::encode(false_res.bb)
+                        .next(exit_bb)
+                        .imm1()
+                            .op(op::br)
+                            .value(&exit_bb)
+                            .build();
+                }
 
-                return {&exit_bb, res};
+                // XXX: FIXME
+                //      i'm returning the var from the true branch for
+                //      now but ultimately this will have to be a phi-node or...
+                //      something else; not sure.
+                return {&exit_bb, true_res.var};
             }
 
             // ----------------
@@ -2036,9 +2043,10 @@ namespace basecode::scm {
                 auto dc = c;
                 compile_result_t comp_res;
                 while (!IS_NIL(args)) {
-                    dc.obj   = CAR(args);
+                    dc.obj = CAR(args);
                     comp_res = compiler::compile_expr(comp, dc);
-                    dc.bb = comp_res.bb;
+                    dc.bb     = comp_res.bb;
+                    dc.target = comp_res.var;
                     args = CDR(args);
                 }
                 return {dc.bb, comp_res.var};
@@ -2529,7 +2537,7 @@ namespace basecode::scm {
                 basic_block::encode(comp_res.bb)
                     .offs()
                         .op(op::store)
-                        .src(rf::r0)        // FIXME
+                        .src(&comp_res.var)
                         .dst(rf::fp)
                         .offset(-16)
                         .mode(true)
