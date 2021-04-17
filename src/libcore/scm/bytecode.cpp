@@ -745,12 +745,12 @@ namespace basecode::scm {
                                                   "${:08X}:{:<{}}",
                                                   addr,
                                                   " ",
-                                                  54 - len);
+                                                  54 - std::min<s32>(len, 54));
                             }
                             format::format_to(buf,
                                               "{:<{}}; {}\n",
                                               " ",
-                                              52 - len,
+                                              52 - std::min<s32>(len, 52),
                                               str);
                             ++j;
                             break;
@@ -762,6 +762,57 @@ namespace basecode::scm {
             }
 
             status_t allocate_registers(emitter_t& e) {
+                reg_pool_t pool{};
+                interval_array_t active{};
+                interval_array_t spilled{};
+
+                array::init(active, e.alloc);
+                array::resize(active, e.ranges.size);
+                array::init(spilled, e.alloc);
+                array::resize(spilled, e.ranges.size);
+                reg_pool::init(pool, register_file::r0, register_file::r15);
+                defer(array::free(active);
+                    array::free(spilled));
+
+                for (u32 i = 0; i < e.blocks.size; ++i) {
+                    auto interval = e.intervals[i];
+                    if (!interval)
+                        continue;
+                    while (interval) {
+                        // if there are live intervals in active, we need to check
+                        // their expiry against our current *interval*.  if expired,
+                        // we remove them from active and release their register in
+                        // the pool.
+                        for (u32 j = 0; j < active.size; ++j) {
+                            auto a = active[j];
+                            if (!a || a->end > interval->start)
+                                continue;
+                            reg_pool::release(pool, a->reg);
+                            active[j] = {};
+                        }
+
+                        // if there are free registers in the pool, we assign one
+                        // to *interval* and move the *interval* to active.
+                        if (reg_pool::has_free(pool)) {
+                            auto reg = reg_pool::retain(pool);
+                            if (reg == register_file::none)
+                                goto spill;
+                            interval->reg      = reg;
+                            interval->var->reg = reg;
+                            active[interval->id - 1] = interval;
+                        } else {
+                            // if there are *no* free registers in the pool, we
+                            // spill the range with the largest end point amongst
+                            // this block's intervals and those in active (the
+                            // range that lives the longest).  if something from
+                            // active is spilled, we reclaim the register and
+                            // assign it to our current *interval*
+                        spill:;
+                        }
+                        interval = interval->next;
+                    }
+                }
+
                 return status_t::fail;
             }
 
@@ -788,16 +839,18 @@ namespace basecode::scm {
                         format::print("none\n");
                         continue;
                     }
-                    format::print("{:<8}@{:>2}=[{:>3}, {:>3}]",
+                    format::print("{}@{}({})=[{:>3}, {:>3}]",
                                   *string::interned::get_slice(range->var->symbol),
                                   range->var->version,
+                                  register_file::name(range->reg),
                                   range->start,
                                   range->end);
                     range = range->next;
                     while (range) {
-                        format::print(" -> {:<8}@{:>2}=[{:>3}, {:>3}]",
+                        format::print(" -> {}@{}({})=[{:>3}, {:>3}]",
                                       *string::interned::get_slice(range->var->symbol),
                                       range->var->version,
+                                      register_file::name(range->reg),
                                       range->start,
                                       range->end);
                         range = range->next;
@@ -843,36 +896,20 @@ namespace basecode::scm {
 
                 u32 end     {};
                 u32 start   {};
-                u32 block_id{};
-                for (const auto& ac : var->accesses) {
-                    const auto& inst = e.insts[ac.inst_id - 1];
-                    if (block_id && block_id != inst.block_id) {
-                        auto new_range = &stable_array::append(e.ranges);
-                        new_range->var   = var;
-                        new_range->end   = end - 1;
-                        new_range->next  = {};
-                        new_range->start = start - 1;
-                        set_interval(e, block_id, new_range);
-                        start    = inst.id;
-                        end      = start;
-                        block_id = inst.block_id;
-                    }
-                    if (!block_id)
-                        block_id = inst.block_id;
-                    if (!start) {
-                        start = inst.id;
-                        end   = start;
-                    } else {
-                        end = inst.id;
-                    }
-                }
-                if (start && end && block_id) {
+
+                if (var->accesses.size > 0) {
+                    start = array::front(var->accesses)->inst_id;
+                    end   = array::back(var->accesses)->inst_id;
+
+                    const auto& start_inst = e.insts[start - 1];
                     auto new_range = &stable_array::append(e.ranges);
+                    new_range->id    = e.ranges.size;
                     new_range->var   = var;
                     new_range->end   = end - 1;
+                    new_range->reg   = register_file::none;
                     new_range->next  = {};
                     new_range->start = start - 1;
-                    set_interval(e, block_id, new_range);
+                    set_interval(e, start_inst.block_id, new_range);
                 }
 
                 digraph::outgoing_nodes(e.var_graph, var->node, nodes);

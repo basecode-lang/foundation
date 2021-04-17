@@ -1,6 +1,5 @@
 HIGH
 ---------
-- scm: first pass register allocator
 
 MEDIUM
 ---------
@@ -30,6 +29,7 @@ LOW
 
 DONE
 ----
+- scm: first pass register allocator
 - graphviz: need to add proper support for record fields; i temporarily
             hacked label serialization to prevent escaping special field
             characters.

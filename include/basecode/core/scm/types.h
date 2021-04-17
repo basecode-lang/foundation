@@ -207,6 +207,14 @@ namespace basecode::scm {
         write
     };
 
+    struct reg_pool_t final {
+        u64                     slots;
+        reg_t                   start;
+        reg_t                   end;
+        u32                     size;
+        u32                     bit_count;
+    };
+
     struct print_rule_t final {
         str::slice_t            symbol;
         u8                      skip_first_arg:     1;
@@ -355,6 +363,8 @@ namespace basecode::scm {
         var_t*                  var;
         u32                     start;
         u32                     end;
+        u32                     id;
+        reg_t                   reg;
 
         inline auto operator<=>(const liveliness_range_t& other) const {
             if (start < other.start)
