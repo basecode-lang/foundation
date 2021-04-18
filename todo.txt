@@ -18,7 +18,6 @@ HIGH
 - scm: extend emitter to support append (default) or insert modes
 - scm: add .segment meta-op to emitter
 - scm: add .dq meta-op to emitter
-- libgfx: create test bed application within foundation project
 - libgfx: pull in nfd or rewrite based on nfd_extended
 
 MEDIUM
@@ -46,6 +45,7 @@ LOW
 
 DONE
 ----
+- libgfx: create test bed application within foundation project
 - memory: reimplement meta tracking
 - ffi: reimplement match_signature
 - scm: first pass register allocator

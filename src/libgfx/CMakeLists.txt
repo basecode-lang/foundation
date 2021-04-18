@@ -73,28 +73,19 @@ else ()
 endif ()
 
 # harfbuzz
-#
-# N.B.  harfbuzz and freetype have a circular dependency. these
-#       variables need to be set at this point so harfbuzz's find_package(freetype)
-#       invocation succeeds and points at our internal version of freetype.
-#
-set(FREETYPE_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/freetype/include)
-if (CMAKE_BUILD_TYPE MATCHES Debug)
-    set(FREETYPE_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libfreetyped.a")
-else()
-    set(FREETYPE_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libfreetype.a")
-endif()
-
-option(HB_HAVE_FREETYPE     "" ON)
-add_subdirectory(harfbuzz EXCLUDE_FROM_ALL)
-set(HARFBUZZ_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/harfbuzz/src)
-set(HARFBUZZ_LIBRARIES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libharfbuzz.a")
+#add_subdirectory(harfbuzz EXCLUDE_FROM_ALL)
+#set(HARFBUZZ_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/harfbuzz/src)
+#if (MSVC)
+#    set(HARFBUZZ_LIBRARIES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libharfbuzz.lib")
+#else ()
+#    set(HARFBUZZ_LIBRARIES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libharfbuzz.a")
+#endif ()
 
 # freetype
 option(FT_WITH_ZLIB         "" ON)
 option(FT_WITH_BZIP2        "" ON)
 option(FT_WITH_PNG          "" ON)
-option(FT_WITH_HARFBUZZ     "" ON)
+#option(FT_WITH_HARFBUZZ     "" ON)
 set(SKIP_INSTALL_ALL ON)
 add_subdirectory(freetype EXCLUDE_FROM_ALL)
 
@@ -116,106 +107,127 @@ configure_file (
 # -----------------------------------------------------------------------------
 
 if (APPLE)
-    set(
-            FRAMEWORKS
-            "-framework OpenGL"
-            "-framework Cocoa"
-            "-framework IOKit"
-            "-framework CoreVideo"
-            "-framework Quartz"
-            "-framework WebKit"
+    set(FRAMEWORKS
+
+       "-framework OpenGL"
+       "-framework Cocoa"
+       "-framework IOKit"
+       "-framework CoreVideo"
+       "-framework Quartz"
+       "-framework WebKit"
+    )
+elseif (WIN32)
+    set(FRAMEWORKS
+
+        shcore
     )
 else()
     set(FRAMEWORKS "")
 endif()
 
-set(
-        CLIP_SOURCES
+set(CLIP_SOURCES
 
-        ${GFX_INC_DIR}/clip/clip.h
-        ${GFX_INC_DIR}/clip/clip_common.h
-        ${GFX_INC_DIR}/clip/clip_win_wic.h
-        ${GFX_INC_DIR}/clip/clip_lock_impl.h
+   ${GFX_INC_DIR}/clip/clip.h
+   ${GFX_INC_DIR}/clip/clip_common.h
+   ${GFX_INC_DIR}/clip/clip_win_wic.h
+   ${GFX_INC_DIR}/clip/clip_lock_impl.h
 
-        clip/clip.cpp
-        clip/image.cpp
-        clip/clip_none.cpp
+   clip/clip.cpp
+   clip/image.cpp
+   clip/clip_none.cpp
 )
 if (APPLE)
     set(CLIP_SOURCES ${CLIP_SOURCES} clip/clip_osx.mm)
 elseif (WIN32)
     set(CLIP_SOURCES ${CLIP_SOURCES} clip/clip_win.cpp)
 elseif (UNIX)
-    set(CLIP_SOURCES ${CLIP_SOURCES} clip/clip_x11.cpp ${GFX_INC_DIR}/clip/clip_x11_png.h)
+    set(CLIP_SOURCES
+
+        ${CLIP_SOURCES}
+        clip/clip_x11.cpp
+        ${GFX_INC_DIR}/clip/clip_x11_png.h
+    )
 endif()
 
-set(
-        IMGUI_SOURCES
+set(IMPLOT_SOURCES
 
-        ${GFX_INC_DIR}/imgui/imgui.h
-        ${GFX_INC_DIR}/imgui/imconfig.h
-        ${GFX_INC_DIR}/imgui/imgui_internal.h
-        ${GFX_INC_DIR}/imgui/imstb_rectpack.h
-        ${GFX_INC_DIR}/imgui/imstb_textedit.h
-        ${GFX_INC_DIR}/imgui/imstb_truetype.h
-        ${GFX_INC_DIR}/imgui/imgui_freetype.h
-        ${GFX_INC_DIR}/imgui/imgui_impl_glfw.h
-        ${GFX_INC_DIR}/imgui/imgui_impl_opengl3.h
-
-        imgui/imgui.cpp
-        imgui/imgui_draw.cpp
-        imgui/imgui_tables.cpp
-        imgui/imgui_widgets.cpp
-        imgui/imgui_freetype.cpp
-        imgui/imgui_impl_glfw.cpp
-        imgui/imgui_impl_opengl3.cpp
+    implot/implot.cpp
+    implot/implot.h
+    implot/implot_internal.h
+    implot/implot_items.cpp
 )
 
-set(
-        GL3W_SOURCES
+set(IMGUI_SOURCES
 
-        ${GFX_INC_DIR}/gl3w/GL/gl3w.h
-        ${GFX_INC_DIR}/gl3w/GL/glcorearb.h
-        ${GFX_INC_DIR}/gl3w/KHR/khrplatform.h
+   ${GFX_INC_DIR}/imgui/imgui.h
+   ${GFX_INC_DIR}/imgui/imconfig.h
+   ${GFX_INC_DIR}/imgui/imgui_internal.h
+   ${GFX_INC_DIR}/imgui/imstb_rectpack.h
+   ${GFX_INC_DIR}/imgui/imstb_textedit.h
+   ${GFX_INC_DIR}/imgui/imstb_truetype.h
+   ${GFX_INC_DIR}/imgui/imgui_freetype.h
+   ${GFX_INC_DIR}/imgui/imgui_impl_glfw.h
+   ${GFX_INC_DIR}/imgui/imgui_impl_opengl3.h
+   ${GFX_INC_DIR}/imgui/imgui_memory_editor.h
 
-        gl3w/gl3w.c
+   imgui/imgui.cpp
+   imgui/imgui_draw.cpp
+   imgui/imgui_tables.cpp
+   imgui/imgui_widgets.cpp
+   imgui/imgui_freetype.cpp
+   imgui/imgui_impl_glfw.cpp
+   imgui/imgui_impl_opengl3.cpp
 )
 
-set(
-        GFX_SOURCES
+set(GL3W_SOURCES
 
-        ${GFX_INC_DIR}/gfx.h
+   ${GFX_INC_DIR}/gl3w/GL/gl3w.h
+   ${GFX_INC_DIR}/gl3w/GL/glcorearb.h
+   ${GFX_INC_DIR}/gl3w/KHR/khrplatform.h
 
-        font.cpp ${GFX_INC_DIR}/font.h
+   gl3w/gl3w.c
+)
+
+set(GFX_SOURCES
+
+    ${GFX_INC_DIR}/gfx.h
+
+    app.cpp ${GFX_INC_DIR}/app.h
+    font.cpp ${GFX_INC_DIR}/font.h
 )
 
 add_library(
-        ${LIBRARY_TARGET}
 
-        ${GFX_SOURCES}
-        ${CLIP_SOURCES}
-        ${GL3W_SOURCES}
-        ${IMGUI_SOURCES}
+    ${LIBRARY_TARGET}
+
+    ${GFX_SOURCES}
+    ${CLIP_SOURCES}
+    ${GL3W_SOURCES}
+    ${IMGUI_SOURCES}
 )
 target_include_directories(
-        ${LIBRARY_TARGET}
+    ${LIBRARY_TARGET}
 
-        PRIVATE ${INC_DIR_BASE}
-                ${GFX_INC_DIR}
-                ${GFX_INC_DIR}/clip
-                ${GFX_INC_DIR}/gl3w
-                ${GFX_INC_DIR}/imgui
-                ${PROJECT_SOURCE_DIR}
-                ${PROJECT_SOURCE_DIR}/harfbuzz/src
-                ${PROJECT_SOURCE_DIR}/freetype/include
+    PRIVATE ${INC_DIR_BASE}
+            ${GFX_INC_DIR}
+            ${GFX_INC_DIR}/clip
+            ${GFX_INC_DIR}/gl3w
+            ${GFX_INC_DIR}/imgui
+            ${PROJECT_SOURCE_DIR}
+            ${PROJECT_SOURCE_DIR}/harfbuzz/src
+            ${PROJECT_SOURCE_DIR}/freetype/include
 )
-set_target_properties(${LIBRARY_TARGET} PROPERTIES OUTPUT_NAME ${LIBRARY_NAME})
+set_target_properties(
+    ${LIBRARY_TARGET} PROPERTIES
+    OUTPUT_NAME ${LIBRARY_NAME}
+)
 target_link_libraries(
-        ${LIBRARY_TARGET}
+    ${LIBRARY_TARGET}
 
-        PRIVATE basecode-core
-                glfw
-                ${FRAMEWORKS}
+    PRIVATE basecode-core
+            glfw
+            freetype
+            ${FRAMEWORKS}
 )
 
 # -----------------------------------------------------------------------------
@@ -226,22 +238,23 @@ target_link_libraries(
 
 add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(
-        ${PROJECT_NAME}
+    ${PROJECT_NAME}
 
-        INTERFACE   ${INC_DIR_BASE}
-                    ${GFX_INC_DIR}
-                    ${GFX_INC_DIR}/clip
-                    ${GFX_INC_DIR}/gl3w
-                    ${GFX_INC_DIR}/imgui
-                    ${CMAKE_BINARY_DIR}/include
-                    ${PROJECT_SOURCE_DIR}/harfbuzz/src
-                    ${PROJECT_SOURCE_DIR}/freetype/include
+    INTERFACE   ${INC_DIR_BASE}
+                ${GFX_INC_DIR}
+                ${GFX_INC_DIR}/clip
+                ${GFX_INC_DIR}/gl3w
+                ${GFX_INC_DIR}/imgui
+                ${CMAKE_BINARY_DIR}/include
+                ${PROJECT_SOURCE_DIR}/harfbuzz/src
+                ${PROJECT_SOURCE_DIR}/freetype/include
 )
 target_link_libraries(
-        ${PROJECT_NAME}
+    ${PROJECT_NAME}
 
-        INTERFACE   ${LIBRARY_TARGET}
-                    basecode-core
-                    glfw
-                    ${FRAMEWORKS}
+    INTERFACE   ${LIBRARY_TARGET}
+                basecode-core
+                glfw
+                freetype
+                ${FRAMEWORKS}
 )

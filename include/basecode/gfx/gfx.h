@@ -20,12 +20,18 @@
 
 #include <basecode/core/types.h>
 
-#define COL32_R_SHIFT    ((u32)0)
-#define COL32_G_SHIFT    ((u32)8)
-#define COL32_B_SHIFT    ((u32)16)
-#define COL32_A_SHIFT    ((u32)24)
-#define COL32_A_MASK     0xff000000
-#define COL32(R,G,B,A)   (((u32)(A)<<COL32_A_SHIFT) | ((u32)(B)<<COL32_B_SHIFT) | ((u32)(G)<<COL32_G_SHIFT) | ((u32)(R)<<COL32_R_SHIFT))
+#define COL32_R_SHIFT           ((u32)0)
+#define COL32_G_SHIFT           ((u32)8)
+#define COL32_B_SHIFT           ((u32)16)
+#define COL32_A_SHIFT           ((u32)24)
+#define COL32_A_MASK            0xff000000
+#define COL32(R,G,B,A)          (((u32)(A)<<COL32_A_SHIFT)                      \
+                                | ((u32)(B)<<COL32_B_SHIFT)                     \
+                                | ((u32)(G)<<COL32_G_SHIFT)                     \
+                                | ((u32)(R)<<COL32_R_SHIFT))
+#define IM_MIN(A, B)            (((A) < (B)) ? (A) : (B))
+#define IM_MAX(A, B)            (((A) >= (B)) ? (A) : (B))
+#define IM_CLAMP(V, MN, MX)     ((V) < (MN) ? (MN) : (V) > (MX) ? (MX) : (V))
 
 struct GLFWwindow;
 
@@ -70,7 +76,7 @@ namespace basecode {
     };
 
     struct window_t final {
-        GLFWwindow*             window      {};
+        GLFWwindow*             backing     {};
         s32                     x           = -1;
         s32                     y           = -1;
         s32                     width       = 1280;
