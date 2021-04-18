@@ -303,10 +303,6 @@ namespace basecode::scm::emitter {
 
         u32 block_node_ids[e.bb_graph.size];
         {
-            bb_digraph_t::Node_Array nodes{};
-            array::init(nodes, e.alloc);
-            defer(array::free(nodes));
-
             for (auto bb_node : e.bb_graph.nodes) {
                 auto block_node = graph::make_node(bb_sg);
                 block_node_ids[bb_node->id - 1] = block_node->id;
@@ -319,13 +315,13 @@ namespace basecode::scm::emitter {
             }
 
             for (auto bb_node : e.bb_graph.nodes) {
-                array::reset(nodes);
-                digraph::incoming_nodes(e.bb_graph, bb_node, nodes);
-                for (auto incoming : nodes) {
+                const auto& ic_nodes = digraph::incoming_nodes(e.bb_graph,
+                                                               bb_node);
+                for (const auto& incoming : ic_nodes) {
                     auto edge = graph::make_edge(bb_sg);
-                    edge->first  = graph::node_ref(
+                    edge->first = graph::node_ref(
                         &bb_sg,
-                        block_node_ids[incoming->id - 1]);
+                        block_node_ids[incoming.node->id - 1]);
                     edge->second = graph::node_ref(
                         &bb_sg,
                         block_node_ids[bb_node->id - 1]);
@@ -334,16 +330,16 @@ namespace basecode::scm::emitter {
                     edge::dir(*edge, dir_type_t::back);
                 }
 
-                array::reset(nodes);
-                digraph::outgoing_nodes(e.bb_graph, bb_node, nodes);
-                for (auto outgoing : nodes) {
+                const auto& og_nodes = digraph::outgoing_nodes(e.bb_graph,
+                                                               bb_node);
+                for (const auto& outgoing : og_nodes) {
                     auto edge = graph::make_edge(bb_sg);
                     edge->first  = graph::node_ref(
                         &bb_sg,
                         block_node_ids[bb_node->id - 1]);
                     edge->second = graph::node_ref(
                         &bb_sg,
-                        block_node_ids[outgoing->id - 1]);
+                        block_node_ids[outgoing.node->id - 1]);
                     edge::label(*edge, "succ"_ss);
                     edge::dir(*edge, dir_type_t::forward);
                 }
@@ -366,9 +362,6 @@ namespace basecode::scm::emitter {
 
         {
             u32 var_node_ids[e.var_graph.size];
-            var_digraph_t::Node_Array nodes{};
-            array::init(nodes, e.alloc);
-            defer(array::free(nodes));
 
             str_t str{};
             str::init(str, e.alloc);
@@ -389,16 +382,16 @@ namespace basecode::scm::emitter {
             }
 
             for (auto vv_node : e.var_graph.nodes) {
-                array::reset(nodes);
-                digraph::outgoing_nodes(e.var_graph, vv_node, nodes);
-                for (auto outgoing : nodes) {
+                const auto& og_nodes = digraph::outgoing_nodes(e.var_graph,
+                                                               vv_node);
+                for (const auto& outgoing : og_nodes) {
                     auto edge = graph::make_edge(var_sg);
                     edge->first  = graph::node_ref(
                         &var_sg,
                         var_node_ids[vv_node->id - 1]);
                     edge->second = graph::node_ref(
                         &var_sg,
-                        var_node_ids[outgoing->id - 1]);
+                        var_node_ids[outgoing.node->id - 1]);
                     edge::label(*edge, "next"_ss);
                     edge::dir(*edge, dir_type_t::both);
                     edge::arrow_tail(*edge, arrow_type_t::dot);
@@ -458,20 +451,12 @@ namespace basecode::scm::emitter {
             set_interval(e, start_inst.block_id, new_range);
         }
 
-        var_digraph_t::Node_Array nodes{};
-        array::init(nodes, e.alloc);
-        defer(array::free(nodes));
-
-        digraph::outgoing_nodes(e.var_graph, version->node, nodes);
-        for (const auto& node : nodes)
-            create_ranges(e, node->value);
+        auto& nodes = digraph::outgoing_nodes(e.var_graph, version->node);
+        for (const auto& pair : nodes)
+            create_ranges(e, pair.node->value);
     }
 
     static u0 create_split_ranges(emitter_t& e, var_version_t* version) {
-        var_digraph_t::Node_Array nodes{};
-        array::init(nodes, e.alloc);
-        defer(array::free(nodes));
-
         u32 end     {};
         u32 start   {};
         u32 block_id{};
@@ -506,9 +491,9 @@ namespace basecode::scm::emitter {
             set_interval(e, block_id, new_range);
         }
 
-        digraph::outgoing_nodes(e.var_graph, version->node, nodes);
-        for (const auto& node : nodes)
-            create_split_ranges(e, node->value);
+        const auto& nodes = digraph::outgoing_nodes(e.var_graph, version->node);
+        for (const auto& pair : nodes)
+            create_split_ranges(e, pair.node->value);
     }
 
     u32 assembled_size_bytes(emitter_t& e, bb_t& start_block) {
@@ -568,39 +553,32 @@ namespace basecode::scm::emitter {
     }
 
     static u0 format_edges(str_buf_t& buf, bb_t* block, u64 addr) {
-        bb_digraph_t::Node_Array nodes{};
-        array::init(nodes, block->emit->alloc);
-        defer(array::free(nodes));
-
-        digraph::incoming_nodes(block->emit->bb_graph,
-                                block->node,
-                                nodes);
-        if (nodes.size > 0) {
+        const auto& ic_nodes = digraph::incoming_nodes(block->emit->bb_graph,
+                                                       block->node);
+        if (ic_nodes.size > 0) {
             format::format_to(buf,
                               "${:08X}:    .preds      ",
                               addr);
-            for (u32 i = 0; i < nodes.size; ++i) {
+            for (u32 i = 0; i < ic_nodes.size; ++i) {
                 if (i > 0) format::format_to(buf, ", ");
                 format::format_to(buf,
                                   "{}",
-                                  *(nodes[i]->value));
+                                  *(ic_nodes[i].node->value));
             }
             format::format_to(buf, "\n");
         }
 
-        array::reset(nodes);
-        digraph::outgoing_nodes(block->emit->bb_graph,
-                                block->node,
-                                nodes);
-        if (nodes.size > 0) {
+        const auto& og_nodes = digraph::outgoing_nodes(block->emit->bb_graph,
+                                                       block->node);
+        if (og_nodes.size > 0) {
             format::format_to(buf,
                               "${:08X}:    .succs      ",
                               addr);
-            for (u32 i = 0; i < nodes.size; ++i) {
+            for (u32 i = 0; i < og_nodes.size; ++i) {
                 if (i > 0) format::format_to(buf, ", ");
                 format::format_to(buf,
                                   "{}",
-                                  *(nodes[i]->value));
+                                  *(og_nodes[i].node->value));
             }
             format::format_to(buf, "\n");
         }

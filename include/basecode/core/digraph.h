@@ -28,10 +28,13 @@ namespace basecode {
     concept Directed_Graph = requires(const T& t) {
         typename                T::Node;
         typename                T::Edge;
+        typename                T::Edge_Set;
+        typename                T::Edge_Pair;
         typename                T::Value_Type;
         typename                T::Node_Array;
         typename                T::Edge_Array;
         typename                T::Node_Stack;
+        typename                T::Edge_Pair_Array;
         typename                T::Component_Array;
 
         {t.alloc}               -> same_as<alloc_t*>;
@@ -39,6 +42,8 @@ namespace basecode {
         {t.edge_slab}           -> same_as<alloc_t*>;
         {t.nodes}               -> same_as<typename T::Node_Array>;
         {t.edges}               -> same_as<typename T::Edge_Array>;
+        {t.outgoing}            -> same_as<typename T::Edge_Set>;
+        {t.incoming}            -> same_as<typename T::Edge_Set>;
         {t.size}                -> same_as<u32>;
         {t.id}                  -> same_as<u32>;
     };
@@ -47,14 +52,23 @@ namespace basecode {
     struct digraph_t final {
         struct node_t;
         struct edge_t;
+        struct edge_pair_t;
 
         using Node              = node_t;
         using Edge              = edge_t;
+        using Edge_Pair         = edge_pair_t;
+        using Edge_Pair_Array   = array_t<Edge_Pair>;
+        using Edge_Set          = array_t<Edge_Pair_Array>;
         using Value_Type        = V;
         using Node_Array        = array_t<Node*>;
         using Edge_Array        = array_t<Edge*>;
         using Node_Stack        = stack_t<Node*>;
         using Component_Array   = array_t<array_t<Node*>>;
+
+        struct edge_pair_t final {
+            const Edge*         edge;
+            const Node*         node;
+        };
 
         struct node_t final {
             Value_Type*         value;
@@ -62,13 +76,32 @@ namespace basecode {
             s32                 index;
             s32                 low_link;
             b8                  on_stack;
+
+            inline b8 operator==(const node_t& rhs) const {
+                return id == rhs.id;
+            }
         };
 
         struct edge_t final {
             const Node*         src;
             const Node*         dst;
-            f64                 wgt;
+            s64                 wgt;
             s32                 type;
+
+            inline b8 operator==(const edge_t& rhs) const {
+                return src == rhs.src
+                       && dst == rhs.dst
+                       && type == rhs.type;
+            }
+
+            inline auto operator<=>(const edge_t& rhs) const {
+                const auto eq = src == rhs.src
+                                && dst == rhs.dst
+                                && type == rhs.type;
+                if (!eq)
+                    return std::strong_ordering::less;
+                return wgt <=> rhs.wgt;
+            }
         };
 
         static constexpr u32    Node_Size    = sizeof(node_t);
@@ -81,9 +114,12 @@ namespace basecode {
         alloc_t*                edge_slab;
         Node_Array              nodes;
         Edge_Array              edges;
+        Edge_Set                outgoing;
+        Edge_Set                incoming;
         u32                     size;
         u32                     id;
     };
+    static_assert(sizeof(digraph_t<s32>) <= 128, "digraph_t<T> is now larger than 128 bytes!");
 
     namespace digraph {
         enum class status_t {
@@ -92,25 +128,37 @@ namespace basecode {
 
         template <Directed_Graph T,
                   typename Node = typename T::Node,
-                  typename Node_Array = typename T::Node_Array>
-        u0 outgoing_nodes(const T& graph, Node* node, Node_Array& nodes);
+                  typename Edge_Pair_Array = typename T::Edge_Pair_Array>
+        const Edge_Pair_Array& incoming_nodes(T& graph, Node* node);
 
         template <Directed_Graph T,
                   typename Node = typename T::Node,
-                  typename Node_Array = typename T::Node_Array>
-        u0 incoming_nodes(const T& graph, Node* node, Node_Array& nodes);
+                  typename Edge_Pair_Array = typename T::Edge_Pair_Array>
+        const Edge_Pair_Array& outgoing_nodes(T& graph, Node* node);
 
         template <Directed_Graph T>
         u0 free(T& graph) {
-            memory::system::free(graph.edge_slab);
-            memory::system::free(graph.node_slab);
+            for (auto& nodes : graph.outgoing)
+                array::free(nodes);
+            for (auto& nodes : graph.incoming)
+                array::free(nodes);
+            array::free(graph.outgoing);
+            array::free(graph.incoming);
             array::free(graph.edges);
             array::free(graph.nodes);
+            memory::system::free(graph.edge_slab);
+            memory::system::free(graph.node_slab);
             graph.id = graph.size = {};
         }
 
         template <Directed_Graph T>
         u0 reset(T& graph) {
+            for (auto& nodes : graph.outgoing)
+                array::free(nodes);
+            for (auto& nodes : graph.incoming)
+                array::free(nodes);
+            array::reset(graph.outgoing);
+            array::reset(graph.incoming);
             array::reset(graph.edges);
             array::reset(graph.nodes);
             memory::slab::reset(graph.edge_slab);
@@ -120,11 +168,52 @@ namespace basecode {
 
         template <Directed_Graph T,
                   typename Edge = typename T::Edge,
+                  typename Node = typename T::Node>
+        const Edge* make_edge(T& graph,
+                              const Node* src,
+                              const Node* dst,
+                              s32 type = 0,
+                              s64 wgt = 0) {
+            if (src->id > graph.outgoing.size)
+                array::resize(graph.outgoing, src->id);
+            if (dst->id > graph.incoming.size)
+                array::resize(graph.incoming, dst->id);
+            auto& outgoing = graph.outgoing[src->id - 1];
+            if (!outgoing.alloc)
+                array::init(outgoing, graph.alloc);
+            auto& incoming = graph.incoming[dst->id - 1];
+            if (!incoming.alloc)
+                array::init(incoming, graph.alloc);
+
+            for (auto& pair : outgoing) {
+                if (pair.node == dst
+                &&  pair.edge->wgt == wgt
+                &&  pair.edge->type == type) {
+                    return pair.edge;
+                }
+            }
+
+            auto edge = (Edge*) memory::alloc(graph.edge_slab);
+            edge->src  = src;
+            edge->dst  = dst;
+            edge->wgt  = wgt;
+            edge->type = type;
+            array::append(graph.edges, edge);
+            auto& og_pair = array::append(outgoing);
+            og_pair.edge = edge;
+            og_pair.node = dst;
+            auto& ic_pair = array::append(incoming);
+            ic_pair.edge = edge;
+            ic_pair.node = src;
+            return edge;
+        }
+
+        template <Directed_Graph T,
+                  typename Edge = typename T::Edge,
                   typename Node = typename T::Node,
-                  typename Node_Array = typename T::Node_Array,
                   typename Node_Stack = typename T::Node_Stack,
                   typename Component_Array = typename T::Component_Array>
-        u0 strongly_connected(const T& graph,
+        u0 strongly_connected(T& graph,
                               Component_Array& comps,
                               Node_Stack& stack,
                               u32& index,
@@ -134,17 +223,17 @@ namespace basecode {
             stack::push(stack, v);
             v->on_stack = true;
 
-            Node_Array succs{};
-            array::init(succs, graph.alloc);
-            defer(array::free(succs));
-
-            outgoing_nodes(graph, v, succs);
-            for (auto w : succs) {
-                if (w->index == -1) {
-                    strongly_connected(graph, comps, stack, index, w);
-                    v->low_link = std::min(v->low_link, w->low_link);
-                } else if (w->on_stack) {
-                    v->low_link = std::min(v->low_link, w->index);
+            const auto& succs = outgoing_nodes(graph, v);
+            for (const auto& w : succs) {
+                if (w.node->index == -1) {
+                    strongly_connected(graph,
+                                       comps,
+                                       stack,
+                                       index,
+                                       const_cast<Node*>(w.node));
+                    v->low_link = std::min(v->low_link, w.node->low_link);
+                } else if (w.node->on_stack) {
+                    v->low_link = std::min(v->low_link, w.node->index);
                 }
             }
 
@@ -168,7 +257,7 @@ namespace basecode {
                   typename Node = typename T::Node,
                   typename Node_Stack = typename T::Node_Stack,
                   typename Component_Array = typename T::Component_Array>
-        Component_Array strongly_connected(const T& graph) {
+        Component_Array strongly_connected(T& graph) {
             Node_Stack stack{};
             stack::init(stack, graph.alloc);
 
@@ -177,9 +266,8 @@ namespace basecode {
 
             u32 index{};
             for (auto n : graph.nodes) {
-                if (n->index == -1) {
+                if (n->index == -1)
                     strongly_connected(graph, comps, stack, index, n);
-                }
             }
 
             stack::free(stack);
@@ -200,11 +288,38 @@ namespace basecode {
             return node;
         }
 
+        template <Directed_Graph T,
+                  typename Node,
+                  typename Edge_Pair_Array>
+        const Edge_Pair_Array& outgoing_nodes(T& graph, Node* node) {
+            if (node->id > graph.outgoing.size)
+                array::resize(graph.outgoing, node->id);
+            auto& outgoing = graph.outgoing[node->id - 1];
+            if (!outgoing.alloc)
+                array::init(outgoing, graph.alloc);
+            return outgoing;
+        }
+
+        template <Directed_Graph T,
+                  typename Node,
+                  typename Edge_Pair_Array>
+        const Edge_Pair_Array& incoming_nodes(T& graph, Node* node) {
+            if (node->id > graph.incoming.size)
+                array::resize(graph.incoming, node->id);
+            auto& incoming = graph.incoming[node->id - 1];
+            if (!incoming.alloc)
+                array::init(incoming, graph.alloc);
+            return incoming;
+        }
+
         template <Directed_Graph T>
         status_t init(T& graph, alloc_t* alloc = context::top()->alloc) {
             graph.alloc = alloc;
+            graph.id    = {};
             array::init(graph.nodes, graph.alloc);
             array::init(graph.edges, graph.alloc);
+            array::init(graph.outgoing, graph.alloc);
+            array::init(graph.incoming, graph.alloc);
 
             slab_config_t node_cfg{};
             node_cfg.backing   = graph.alloc;
@@ -222,47 +337,5 @@ namespace basecode {
 
             return status_t::ok;
         }
-
-        template <Directed_Graph T, typename Node, typename Node_Array>
-        u0 outgoing_nodes(const T& graph, Node* node, Node_Array& nodes) {
-            for (auto e : graph.edges) {
-                if (e->src != node) continue;
-                array::append(nodes, const_cast<Node*>(e->dst));
-            }
-        }
-
-        template <Directed_Graph T, typename Node, typename Node_Array>
-        u0 incoming_nodes(const T& graph, Node* node, Node_Array& nodes) {
-            for (auto e : graph.edges) {
-                if (e->dst != node) continue;
-                array::append(nodes, const_cast<Node*>(e->src));
-            }
-        }
-
-        template <Directed_Graph T,
-                  typename Edge = typename T::Edge,
-                  typename Node = typename T::Node>
-        Edge* make_edge(T& graph, const Node* src, const Node* dst, s32 type = 0, f64 wgt = 1.0) {
-            for (auto e : graph.edges) {
-                if (e->src == src && e->dst == dst && e->type == type)
-                    return e;
-            }
-
-            auto edge = (Edge*) memory::alloc(graph.edge_slab);
-            edge->src  = src;
-            edge->dst  = dst;
-            edge->wgt  = wgt;
-            edge->type = type;
-            array::append(graph.edges, edge);
-            return edge;
-        }
-    }
-}
-
-namespace basecode::hash {
-    template <Directed_Graph T,
-              typename Node = typename T::Node>
-    inline u64 hash64(const Node& key) {
-        return murmur::hash64(key.id, sizeof(u32));
     }
 }
