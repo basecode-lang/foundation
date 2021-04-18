@@ -15,11 +15,9 @@ target_include_directories(
 
     PRIVATE ${PROJECT_SOURCE_DIR}
 )
-#add_custom_command(
-#    TARGET ${PROJECT_NAME} POST_BUILD
-#
-#    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/etc
-#    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_DIR_BASE}/etc/ut.txt ${CMAKE_BINARY_DIR}/etc
-#    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_DIR_BASE}/etc/hello.wasm ${CMAKE_BINARY_DIR}/etc
-#    COMMAND ${CMAKE_COMMAND} -E copy ${PROJECT_DIR_BASE}/etc/instructions.ig ${CMAKE_BINARY_DIR}/etc
-#)
+add_custom_command(
+    TARGET ${PROJECT_NAME} POST_BUILD
+
+    COMMAND ${CMAKE_COMMAND} -E copy_directory ${PROJECT_DIR_BASE}/share
+                                               ${CMAKE_BINARY_DIR}/share
+)

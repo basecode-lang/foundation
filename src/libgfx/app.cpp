@@ -127,8 +127,9 @@ namespace basecode::app {
         ImGui_ImplGlfw_InitForOpenGL(app.window.backing, true);
         ImGui_ImplOpenGL3_Init(glsl_version);
 
-        io.FontDefault = io.Fonts->AddFontDefault();
-        ImGuiFreeType::BuildFontAtlas(io.Fonts, 0);
+        io.FontDefault = io.Fonts->AddFontFromFileTTF("../share/fonts/SEGOEUI.TTF",
+                                                      24);
+        ImGuiFreeType::BuildFontAtlas(io.Fonts);
 
         s32 dw{};
         s32 dh{};
