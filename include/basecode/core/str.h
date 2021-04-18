@@ -110,11 +110,6 @@ namespace basecode {
         operator std::string_view () const      { return std::string_view((const s8*) data, length); }
         operator str::slice_t() const           { return str::slice_t{.data = data, .length = length};  }
 
-        str_t& operator+(const str_t& other) {
-            str::append(*this, other);
-            return *this;
-        }
-
         str_t& operator=(const str_t& other) {
             if (this != &other) {
                 if (!alloc)
@@ -125,24 +120,6 @@ namespace basecode {
                 length = n;
             }
             return *this;
-        }
-
-        b8 operator<(const str_t& other) const {
-            return std::lexicographical_compare(begin(), end(), other.begin(), other.end());
-        }
-
-        b8 operator>(const str_t& other) const {
-            return !std::lexicographical_compare(begin(), end(), other.begin(),
-                other.end());
-        }
-
-        b8 operator==(const char* other) const {
-            const auto n = strlen(other);
-            return length == n && std::memcmp(data, other, length) == 0;
-        }
-
-        b8 operator==(const str_t& other) const {
-            return length == other.length && std::memcmp(data, other.data, length) == 0;
         }
 
         str_t& operator=(str_t&& other) noexcept {
@@ -159,8 +136,34 @@ namespace basecode {
             return *this;
         }
 
-        b8 operator==(const str::slice_t& other) const {
-            return length == other.length && std::memcmp(data, other.data, length) == 0;
+        inline str_t& operator+(const str_t& other) {
+            str::append(*this, other);
+            return *this;
+        }
+
+        inline auto operator==(const char* other) const {
+            const auto n = strlen(other);
+            return length == n && std::memcmp(data, other, length) == 0;
+        }
+
+        inline auto operator==(const str_t& other) const {
+            const auto cmp = std::lexicographical_compare_three_way(begin(),
+                                                          end(),
+                                                          other.begin(),
+                                                          other.end());
+            return cmp == std::strong_ordering::equal;
+        }
+
+        inline auto operator<=>(const str_t& other) const {
+            return std::lexicographical_compare_three_way(begin(),
+                                                          end(),
+                                                          other.begin(),
+                                                          other.end());
+        }
+
+        inline auto operator==(const str::slice_t& other) const {
+            return length == other.length
+                   && std::memcmp(data, other.data, length) == 0;
         }
     };
     static_assert(sizeof(str_t) <= 24, "str_t is now larger than 24 bytes!");

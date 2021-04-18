@@ -33,7 +33,6 @@ namespace basecode {
     using param_array_t         = array_t<param_t*>;
     using symbol_array_t        = assoc_array_t<u0*>;
     using overload_array_t      = array_t<overload_t*>;
-    using overload_table_t      = array_t<overload_t*>;
     using param_value_array_t   = array_t<param_value_t>;
 
     enum class call_mode_t : u8 {
@@ -97,11 +96,10 @@ namespace basecode {
     struct overload_t final {
         proto_t*                proto;
         u0*                     func;
-        u8                      key[16];
+        str_t                   signature;
         str::slice_t            name;
         param_array_t           params;
         param_type_t            ret_type;
-        u32                     key_len;
         u32                     req_count;
         u8                      has_dft:    1;
         u8                      has_rest:   1;
@@ -112,7 +110,7 @@ namespace basecode {
     struct proto_t final {
         lib_t*                  lib;
         str::slice_t            name;
-        overload_table_t        overloads;
+        overload_array_t        overloads;
         u32                     min_req;
         u32                     max_req;
     } __attribute__((aligned(128)));
@@ -136,6 +134,7 @@ namespace basecode {
             duplicate_overload                  = 116,
             load_library_failure                = 114,
             struct_by_value_not_implemented     = 115,
+            only_one_rest_param_allowed         = 118,  // FIXME
         };
 
         namespace lib {
@@ -181,7 +180,7 @@ namespace basecode {
 
             proto_t* make(str::slice_t symbol, lib_t* lib = {});
 
-            overload_t* match_signature(proto_t* proto, const u8* buf, u32 len);
+            overload_t* match_signature(proto_t* proto, const str_t& candidate);
         }
 
         namespace overload {

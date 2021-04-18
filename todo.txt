@@ -1,21 +1,40 @@
 HIGH
 ---------
+- ffi: reimplement match_signature
+- memory: reimplement meta tracking
+- binfmt: one-pass cleanup & make task notes here
+- binfmt: rework test runner main.cpp to match core
+- scm: add a B instruction and change BR to be only reg1 encoded
+- scm: map out bytecode, closure, continuation, literal frame model
+- scm: compiler should wrap top-level expression in an anonymous lambda
+       that's surfaced as a real proc to scheme.  probably can just recycle
+       the same proc and just replace the bytecode buffer each time.
+- scm: consider a single BOX/UNBOX instruction pair instead of the
+       different FIXNUM/FLONUM/etc.
+- scm: arithmetic ops should compile down to pairwise ADD/ADDF, et al. instead
+       of the high-level LADD/LSUB/LMUL/LDIV/LMOD, etc.
+- scm: introduce a new CP (continuation pointer) and LP (literal-frame pointer)
+       register and mem area
+- scm: extend emitter to support append (default) or insert modes
+- scm: add .segment meta-op to emitter
+- scm: add .dq meta-op to emitter
+- libgfx: create test bed application within foundation project
+- libgfx: pull in nfd or rewrite based on nfd_extended
 
 MEDIUM
 ---------
-- rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
-    * add ca_hashtab_t and ca_set_t using chaining via linked list?
-- review and improve symtab_t if possible
 - filesys: implement glob function, which will also touch the init and fini functions for the
             filesys module.
 - filesys: need to open and read the xdg config file (if found) and put into a symtab_t or hashtab_t.
             also, need to read applicable env vars once at module init and put them into the
             same symtab_t/hashtab_t.
 - filesys: once meta data is done (previous task), implement the remaining places::* functions
-- libgfx: create test bed application within foundation project
 
 LOW
 ---------
+- review and improve symtab_t if possible
+- rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
+    * add ca_hashtab_t and ca_set_t using chaining via linked list?
 - abstract: shared memory buffer between processes
 - ipc: create an ipc module for low-level base
     ipc_addr_t, ipc_transport_t, ipc_
@@ -24,8 +43,6 @@ LOW
 - page allocator/slab allocator: implement reserve function so n numbers of pages can be allocated at a time.
         this would replace passing num_pages into these up front and makes the interface (perhaps) more consistent
         with other mechanisms in the library.
-
-- libgfx: pull in nfd or rewrite based on nfd_extended
 
 DONE
 ----

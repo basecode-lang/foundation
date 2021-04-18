@@ -48,6 +48,15 @@ namespace basecode::ffi {
         u32                     idx;
     } __attribute__((aligned(16)));
 
+    struct signature_pair_t final {
+        overload_t*     overload;
+        const str_t*    signature;
+
+        inline auto operator<=>(const signature_pair_t& rhs) const {
+            return signature->operator<=>(*rhs.signature);
+        }
+    };
+
     struct system_t final {
         alloc_t*                alloc;
         lib_table_t             libs;
@@ -201,8 +210,8 @@ namespace basecode::ffi {
                     return status;
             }
             ol->proto = proto;
-            if (ol->key_len == 0)
-                ol->key[ol->key_len++] = u8(param_cls_t::void_);
+            if (ol->signature.length == 0)
+                str::append(ol->signature, u8(param_cls_t::void_));
             array::append(proto->overloads, ol);
             if (ol->params.size > proto->min_req)
                 proto->min_req = ol->params.size;
@@ -211,10 +220,54 @@ namespace basecode::ffi {
             return status_t::ok;
         }
 
-        overload_t* match_signature(proto_t* proto, const u8* buf, u32 len) {
-            UNUSED(buf);
-            UNUSED(len);
-            return array::empty(proto->overloads) ? nullptr : proto->overloads[0];
+        overload_t* match_signature(proto_t* proto, const str_t& candidate) {
+            if (array::empty(proto->overloads))
+                return nullptr;
+
+            if (proto->overloads.size == 1)
+                return proto->overloads[0];
+
+            array_t<signature_pair_t> signatures{};
+            array::init(signatures, g_ffi_system.alloc);
+            defer(array::free(signatures));
+            /* add the candidate */ {
+                auto& pair = array::append(signatures);
+                pair.overload = {};
+                pair.signature = &candidate;
+            }
+            for (auto ol : proto->overloads) {
+                auto& pair = array::append(signatures);
+                pair.overload  = ol;
+                pair.signature = &ol->signature;
+            }
+            std::sort(signatures.begin(), signatures.end());
+            s32 idx = -1;
+            for (u32 i = 0; i < signatures.size; ++i) {
+                if (!signatures[i].overload) {
+                    idx = i;
+                    break;
+                }
+            }
+            if (idx == -1)
+                return nullptr;
+            const auto& test = signatures[idx];
+            if (idx == signatures.size - 1) {
+                const auto& prev = signatures[idx - 1];
+                if (*prev.signature == *test.signature)
+                    return prev.overload;
+            } else if (idx == 0) {
+                const auto& next = signatures[idx + 1];
+                if (*next.signature == *test.signature)
+                    return next.overload;
+            } else {
+                const auto& prev = signatures[idx - 1];
+                const auto& next = signatures[idx + 1];
+                if (*prev.signature == *test.signature)
+                    return prev.overload;
+                if (*next.signature == *test.signature)
+                    return next.overload;
+            }
+            return nullptr;
         }
     }
 
@@ -223,6 +276,7 @@ namespace basecode::ffi {
             for (auto param : ol->params)
                 param::free(param);
             array::free(ol->params);
+            str::free(ol->signature);
         }
 
         b8 remove(str::slice_t symbol) {
@@ -246,16 +300,16 @@ namespace basecode::ffi {
 
         status_t append(overload_t* overload, param_t* param) {
             array::append(overload->params, param);
-            if (overload->key_len > 14)
-                return status_t::parameter_overflow;
+            if (overload->has_rest && param->is_rest)
+                return status_t::only_one_rest_param_allowed;
             if (param->is_rest) {
                 overload->has_rest = true;
-                overload->key[overload->key_len++] = '_';
+                str::append(overload->signature, '_');
             } else {
-                overload->key[overload->key_len++] = param->value.type.user != 0 ?
-                    param->value.type.user :
-                    u8(param->value.type.cls);
-                overload->key[overload->key_len++] = u8(param->value.type.size);
+                str::append(overload->signature,
+                            param->value.type.user != 0 ? param->value.type.user :
+                            u8(param->value.type.cls));
+                str::append(overload->signature, u8(param->value.type.size));
                 if (!param->has_dft)
                     ++overload->req_count;
                 else
@@ -277,8 +331,8 @@ namespace basecode::ffi {
                 ol->func           = func;
                 ol->name           = symbol;
                 ol->mode           = call_mode_t::system;
-                ol->key_len        = {};
                 ol->ret_type       = ret_type;
+                str::init(ol->signature, g_ffi_system.alloc);
                 array::init(ol->params, g_ffi_system.alloc);
                 return ol;
             }

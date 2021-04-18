@@ -128,8 +128,7 @@ namespace basecode::scm {
     static obj_t* make_ffi_signature(ctx_t* ctx,
                                      obj_t* args,
                                      rest_array_t& eval_args,
-                                     u8* buf,
-                                     u32& len,
+                                     str_t& signature,
                                      keyword_table_t& keywords);
 
     u0 free(ctx_t* ctx) {
@@ -448,12 +447,10 @@ namespace basecode::scm {
     static obj_t* make_ffi_signature(ctx_t* ctx,
                                      obj_t* args,
                                      rest_array_t& eval_args,
-                                     u8* buf,
-                                     u32& len,
+                                     str_t& signature,
                                      keyword_table_t& keywords) {
-        len = 0;
         if (IS_NIL(args)) {
-            buf[len++] = u8(param_cls_t::void_);
+            str::append(signature, u8(param_cls_t::void_));
             return ctx->nil;
         }
         while (!IS_NIL(args)) {
@@ -473,8 +470,8 @@ namespace basecode::scm {
                 if (IS_SCM_ERROR(eval_arg))
                     return eval_arg;
                 const auto& mapping = s_types[u32(TYPE(eval_arg))];
-                buf[len++] = mapping.type;
-                buf[len++] = mapping.size;
+                str::append(signature, mapping.type);
+                str::append(signature, mapping.size);
                 array::append(eval_args, eval_arg);
             }
             args = CDR(args);
@@ -1363,11 +1360,13 @@ namespace basecode::scm {
         auto proto = PROTO(fn);
         obj_t* err = ctx->nil;
         param_alias_t ret{};
-        u8            sig_buf[32];
         u32           p;
         u32           i;
-        u32           len{};
         ffi::status_t status{};
+
+        str_t         signature{};
+        str::init(signature, ctx->alloc);
+        str::reserve(signature, 32);
 
         ffi_t ffi{};
         ffi::init(ffi, 1024, ctx->alloc);
@@ -1378,11 +1377,11 @@ namespace basecode::scm {
         rest_array_t rest{};
         array::init(rest, ctx->alloc);
 
-        err = make_ffi_signature(ctx, args, rest, sig_buf, len, keywords);
+        err = make_ffi_signature(ctx, args, rest, signature, keywords);
         if (IS_SCM_ERROR(err))
             return err;
 
-        auto ol = ffi::proto::match_signature(proto, sig_buf, len);
+        auto ol = ffi::proto::match_signature(proto, signature);
         if (!ol) {
             err = error(ctx,
                         "[ffi] no matching overload for function: {}",
