@@ -1,6 +1,5 @@
 HIGH
 ---------
-- ffi: reimplement match_signature
 - memory: reimplement meta tracking
 - binfmt: one-pass cleanup & make task notes here
 - binfmt: rework test runner main.cpp to match core
@@ -46,6 +45,7 @@ LOW
 
 DONE
 ----
+- ffi: reimplement match_signature
 - scm: first pass register allocator
 - graphviz: need to add proper support for record fields; i temporarily
             hacked label serialization to prevent escaping special field

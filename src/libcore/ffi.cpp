@@ -250,22 +250,26 @@ namespace basecode::ffi {
             }
             if (idx == -1)
                 return nullptr;
-            const auto& test = signatures[idx];
+            const auto test = &signatures[idx];
+            const signature_pair_t* prev{};
+            const signature_pair_t* next{};
             if (idx == signatures.size - 1) {
-                const auto& prev = signatures[idx - 1];
-                if (*prev.signature == *test.signature)
-                    return prev.overload;
+                prev = &signatures[idx - 1];
             } else if (idx == 0) {
-                const auto& next = signatures[idx + 1];
-                if (*next.signature == *test.signature)
-                    return next.overload;
+                next = &signatures[idx + 1];
             } else {
-                const auto& prev = signatures[idx - 1];
-                const auto& next = signatures[idx + 1];
-                if (*prev.signature == *test.signature)
-                    return prev.overload;
-                if (*next.signature == *test.signature)
-                    return next.overload;
+                prev = &signatures[idx - 1];
+                next = &signatures[idx + 1];
+            }
+            if (prev
+            &&  (*(prev->signature) == *(test->signature)
+                ||  str::back(*(prev->signature)) == '_')) {
+                return prev->overload;
+            }
+            if (next
+            &&  (*(next->signature) == *(test->signature)
+                ||  str::back(*(next->signature)) == '_')) {
+                return next->overload;
             }
             return nullptr;
         }
