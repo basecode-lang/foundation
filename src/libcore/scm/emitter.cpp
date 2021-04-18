@@ -133,17 +133,19 @@ namespace basecode::scm::emitter {
     }
 
     status_t allocate_registers(emitter_t& e) {
-        reg_pool_t pool{};
-        interval_array_t active{};
-        interval_array_t spilled{};
+        reg_pool_t       pool       {};
+        interval_array_t active     {};
+        interval_array_t spilled    {};
 
+        reg_pool::init(pool,
+                       vm::register_file::r0,
+                       vm::register_file::r15);
         array::init(active, e.alloc);
-        array::resize(active, e.ranges.size);
         array::init(spilled, e.alloc);
-        array::resize(spilled, e.ranges.size);
-        reg_pool::init(pool, vm::register_file::r0, vm::register_file::r15);
+        array::resize(active, pool.size);
+        array::resize(spilled, pool.size);
         defer(array::free(active);
-                  array::free(spilled));
+              array::free(spilled));
 
         for (u32 i = 0; i < e.blocks.size; ++i) {
             auto interval = e.intervals[i];
@@ -154,12 +156,15 @@ namespace basecode::scm::emitter {
                 // their expiry against our current *interval*.  if expired,
                 // we remove them from active and release their register in
                 // the pool.
-                for (u32 j = 0; j < active.size; ++j) {
-                    auto a = active[j];
+                u64 mask = pool.slots;
+                while (mask) {
+                    const auto bit = __builtin_ffs(mask) - 1;
+                    mask &= ~(1UL << bit);
+                    auto a = active[bit];
                     if (!a || a->end > interval->start)
                         continue;
                     reg_pool::release(pool, a->reg);
-                    active[j] = {};
+                    active[bit] = {};
                 }
 
                 // if there are free registers in the pool, we assign one
@@ -168,7 +173,7 @@ namespace basecode::scm::emitter {
                     auto reg = reg_pool::retain(pool);
                     interval->reg          = reg;
                     interval->version->reg = reg;
-                    active[interval->id - 1] = interval;
+                    active[reg - pool.start] = interval;
                 } else {
                     // if there are *no* free registers in the pool, we
                     // spill the range with the largest end point amongst
