@@ -1,6 +1,5 @@
 HIGH
 ---------
-- memory: reimplement meta tracking
 - binfmt: one-pass cleanup & make task notes here
 - binfmt: rework test runner main.cpp to match core
 - scm: add a B instruction and change BR to be only reg1 encoded
@@ -45,6 +44,7 @@ LOW
 
 DONE
 ----
+- memory: reimplement meta tracking
 - ffi: reimplement match_signature
 - scm: first pass register allocator
 - graphviz: need to add proper support for record fields; i temporarily

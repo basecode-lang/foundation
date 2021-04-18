@@ -75,7 +75,7 @@ namespace basecode::memory {
             }
             array::free(t_system.allocators);
             memory::internal::fini(&t_system.slab_alloc);
-            meta::fini();
+            meta::system::fini();
             memory::internal::fini(&t_system.default_alloc);
         }
 
@@ -165,7 +165,7 @@ namespace basecode::memory {
                 }
             }
 
-            meta::init(&t_system.default_alloc);
+            meta::system::init(&t_system.default_alloc);
             array::init(t_system.allocators, &t_system.default_alloc);
 
             slab_config_t slab_config{};
@@ -195,7 +195,7 @@ namespace basecode::memory {
                 alloc->total_allocated -= size_freed;
                 assert(alloc->total_allocated == 0);
             }
-            meta::untrack(alloc);
+            meta::system::untrack(alloc);
             alloc->backing = {};
             return size_freed;
         }
@@ -272,7 +272,7 @@ namespace basecode::memory {
         alloc->total_allocated = {};
         if (alloc->system->init)
             alloc->system->init(alloc, config);
-        meta::track(alloc);
+        meta::system::track(alloc);
         return status_t::ok;
     }
 }

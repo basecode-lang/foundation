@@ -21,19 +21,23 @@
 #include <basecode/core/array.h>
 
 namespace basecode {
+    struct data_point_t;
+
+    using data_point_array_t    = array_t<data_point_t>;
+
     struct data_point_t final {
         f32                     x, y;
     };
 
     struct rolled_view_t final {
-        array_t<data_point_t>   values;
+        data_point_array_t      values;
         f32                     span;
         f32                     time;
         f32                     max_y;
     };
 
     struct scrolled_view_t final {
-        array_t<data_point_t>   values;
+        data_point_array_t      values;
         f32                     time;
         f32                     max_y;
         s32                     offset;
@@ -44,9 +48,12 @@ namespace basecode {
         namespace rolled {
             u0 free(rolled_view_t& view);
 
-            u0 append_point(rolled_view_t& view, f32 x, f32 y);
+            u0 init(rolled_view_t& view,
+                    f32 span = 10.0f,
+                    u32 capacity = 1000,
+                    alloc_t* alloc = context::top()->alloc);
 
-            u0 init(rolled_view_t& view, f32 span = 10.0f, u32 capacity = 1000, alloc_t* alloc = context::top()->alloc);
+            u0 append_point(rolled_view_t& view, f32 x, f32 y);
         }
 
         namespace scrolled {
@@ -54,9 +61,12 @@ namespace basecode {
 
             u0 erase(scrolled_view_t& view);
 
-            u0 append_point(scrolled_view_t& view, f32 x, f32 y);
+            u0 init(scrolled_view_t& view,
+                    s32 offset = 0,
+                    s32 max_size = 1000,
+                    alloc_t* alloc = context::top()->alloc);
 
-            u0 init(scrolled_view_t& view, s32 offset = 0, s32 max_size = 1000, alloc_t* alloc = context::top()->alloc);
+            u0 append_point(scrolled_view_t& view, f32 x, f32 y);
         }
     }
 }

@@ -18,14 +18,60 @@
 
 #pragma once
 
-#include <basecode/core/bst.h>
+#include <basecode/core/plot.h>
 
-namespace basecode::memory::meta {
-    u0 fini();
+namespace basecode {
+    struct alloc_info_t;
 
-    u0 track(alloc_t* alloc);
+    using alloc_info_array_t    = array_t<alloc_info_t*>;
 
-    u0 untrack(alloc_t* alloc);
+    enum class plot_mode_t : u8 {
+        none,
+        rolled,
+        scrolled,
+    };
 
-    u0 init(alloc_t* alloc = context::top()->alloc);
+    struct alloc_info_t final {
+        alloc_t*                alloc;
+        alloc_info_t*           parent;
+        alloc_t*                tracked;
+        alloc_info_array_t      children;
+        union {
+            rolled_view_t       rolled;
+            scrolled_view_t     scrolled;
+        }                       plot;
+        plot_mode_t             mode;
+    };
+
+    namespace memory::meta {
+        namespace system {
+            u0 fini();
+
+            u0 update(u32 dt);
+
+            u0 track(alloc_t* alloc);
+
+            u0 untrack(alloc_t* alloc);
+
+            u0 stop_plot(alloc_t* alloc);
+
+            const alloc_info_array_t& roots();
+
+            u0 start_plot(alloc_t* alloc, plot_mode_t mode);
+
+            u0 init(alloc_t* alloc = context::top()->alloc);
+        }
+
+        namespace alloc_info {
+            u0 free(alloc_info_t& info);
+
+            u0 stop_plot(alloc_info_t& info);
+
+            u0 init(alloc_info_t& info, alloc_t* alloc);
+
+            u0 append_point(alloc_info_t& info, f32 x, f32 y);
+
+            u0 start_plot(alloc_info_t& info, plot_mode_t mode);
+        }
+    }
 }

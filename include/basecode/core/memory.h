@@ -23,14 +23,14 @@
 #define IS_PROXY(a)                 ((a)->system && (a)->system->type == alloc_type_t::proxy)
 
 namespace basecode {
-    using mspace                    = u0*;
-
     struct slab_t;
     struct alloc_t;
     struct proxy_pair_t;
     struct buddy_block_t;
     struct page_header_t;
     struct alloc_config_t {};
+
+    using mspace                    = u0*;
 
     enum class alloc_type_t : u8 {
         default_,
