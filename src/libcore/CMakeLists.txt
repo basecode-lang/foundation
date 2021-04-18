@@ -155,6 +155,8 @@ set(
     log/system/spdlog.cpp ${CORE_INC_DIR}/log/system/spdlog.h
     log/system/default.cpp ${CORE_INC_DIR}/log/system/default.h
 
+    macro.cpp ${CORE_INC_DIR}/macro.h
+
     memory.cpp ${CORE_INC_DIR}/memory.h
 
     memory/meta.cpp ${CORE_INC_DIR}/memory/meta.h

@@ -1,5 +1,7 @@
 HIGH
 ---------
+- legal: clean up all file headers
+- macro: text macro system
 - binfmt: one-pass cleanup & make task notes here
 - binfmt: rework test runner main.cpp to match core
 - scm: add a B instruction and change BR to be only reg1 encoded
