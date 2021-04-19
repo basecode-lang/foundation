@@ -138,7 +138,7 @@ namespace basecode::intern {
             return result_t{.status = status_t::no_bucket, .new_value = false};
 
         auto buf = buf_pool::retain(value.length + 1);
-        assert(buf && "buf_pool::retain failed!");
+        BC_ASSERT_MSG(buf, "buf_pool::retain failed!");
         std::memcpy(buf, value.data, value.length);
         buf[value.length] = '\0';
 

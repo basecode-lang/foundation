@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <cassert>
+#include <basecode/core/assert.h>
 #include <basecode/core/context.h>
 
 namespace basecode::context {
@@ -26,17 +26,17 @@ namespace basecode::context {
     thread_local context_t*     t_stack[stack_size];
 
     u0 pop() {
-        assert(t_index < stack_size);
+        BC_ASSERT_MSG(t_index < stack_size, "context stack underflow");
         t_index++;
     }
 
     context_t* top() {
-        assert(t_index < stack_size);
+        BC_ASSERT_MSG(t_index < stack_size, "context stack underflow");
         return t_stack[t_index];
     }
 
     u0 push(context_t* ctx) {
-        assert(t_index > 0);
+        BC_ASSERT_MSG(t_index > 0, "context stack overflow");
         t_stack[--t_index] = ctx;
     }
 

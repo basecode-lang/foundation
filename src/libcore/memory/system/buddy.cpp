@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/bits.h>
+#include <basecode/core/assert.h>
 #include <basecode/core/memory/system/buddy.h>
 
 #define BIT_ARRAY_NUM_BITS                              (u32(8 * sizeof(u32)))
@@ -244,7 +245,8 @@ namespace basecode::memory::buddy {
         if (level > 0) {
             bit_array_not(sc->block_index, free_index(alloc, index));
             size = 1U << (sc->total_levels - level);
-            assert(size <= alloc->total_allocated);
+            BC_ASSERT_MSG(size <= alloc->total_allocated,
+                          "attempt to release more memory than allocated");
         } else {
             size = sc->size - sc->metadata_size;
         }

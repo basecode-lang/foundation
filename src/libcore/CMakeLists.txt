@@ -58,6 +58,8 @@ configure_file(
 set(
     CORE_SOURCES
 
+    assert.cpp ${CORE_INC_DIR}/assert.h
+
     ${CORE_INC_DIR}/avl.h
 
     ${CORE_INC_DIR}/src_loc.h

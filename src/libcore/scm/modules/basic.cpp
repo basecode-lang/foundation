@@ -323,153 +323,63 @@ namespace basecode::scm::module::basic {
         return make_string(ctx, (const s8*) buf.data, buf.length);
     }
 
-    namespace system {
+#define EXPORTS EXPORT_PROC("load",                                             \
+                    OVERLOAD(load, obj_ptr,                                     \
+                        REST("rest", obj_ptr)))                                 \
+                EXPORT_PROC("fl->fx",                                           \
+                    OVERLOAD(flonum_to_fixnum, obj_ptr,                         \
+                        REQ("num", f32)))                                       \
+                EXPORT_PROC("fx->fl",                                           \
+                    OVERLOAD(fixnum_to_flonum, obj_ptr,                         \
+                        REQ("num", u32)))                                       \
+                EXPORT_PROC("expand",                                           \
+                    OVERLOAD(expand, obj_ptr,                                   \
+                        REQ("obj", obj_ptr)))                                   \
+                EXPORT_PROC("print",                                            \
+                    OVERLOAD(print, u0,                                         \
+                        REST("rest", obj_ptr)))                                 \
+                EXPORT_PROC("format",                                           \
+                    OVERLOAD(format, obj_ptr,                                   \
+                        REQ("fmt_str", slice_ptr),                              \
+                        OPT("quote", b8, false),                                \
+                        REST("rest", obj_ptr)))                                 \
+                EXPORT_PROC("append",                                           \
+                    OVERLOAD(append, obj_ptr,                                   \
+                        REST("rest", obj_ptr)))                                 \
+                EXPORT_PROC("length",                                           \
+                    OVERLOAD(length, u32,                                       \
+                        REQ("obj", obj_ptr)))                                   \
+                EXPORT_PROC("reverse",                                          \
+                    OVERLOAD(reverse, obj_ptr,                                  \
+                        REQ("lst", list_ptr)))                                  \
+                EXPORT_PROC("intern/get",                                       \
+                    OVERLOAD(intern_get, obj_ptr,                               \
+                        REQ("id", u32)))                                        \
+                EXPORT_PROC("current-environment",                              \
+                    OVERLOAD(current_environment, obj_ptr))                     \
+                EXPORT_PROC("parent-environment",                               \
+                    OVERLOAD(parent_environment, obj_ptr,                       \
+                        REQ("env", obj_ptr)))                                   \
+                EXPORT_PROC("current-user",                                     \
+                    OVERLOAD(current_user, obj_ptr))                            \
+                EXPORT_PROC("current-alloc",                                    \
+                    OVERLOAD(current_alloc, obj_ptr))                           \
+                EXPORT_PROC("current-logger",                                   \
+                    OVERLOAD(current_logger, obj_ptr))                          \
+                EXPORT_PROC("current-command-line",                             \
+                    OVERLOAD(current_command_line, obj_ptr))
+
+namespace system {
         namespace exports {
             using namespace scm::kernel;
 
             static proc_export_t s_exports[] = {
-                {"load"_ss, 1,
-                    {
-                        {(u0*) load, "load"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"rest"_ss, type_decl::obj_ptr, .is_rest = true},
-                            }
-                        }
-                    }
-                },
-
-                {"fl->fx"_ss, 1,
-                    {
-                        {(u0*) flonum_to_fixnum, "flonum_to_fixnum"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"num"_ss, type_decl::f32_},
-                            }
-                        }
-                    }
-                },
-
-                {"fx->fl"_ss, 1,
-                    {
-                        {(u0*) fixnum_to_flonum, "fixnum_to_flonum"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"num"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"expand"_ss, 1,
-                    {
-                        {(u0*) expand, "expand"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"obj"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"print"_ss, 1,
-                    {
-                        {(u0*) print, "print"_ss, type_decl::u0_, 1,
-                            {
-                                {"rest"_ss, type_decl::obj_ptr, .is_rest = true},
-                            }
-                        }
-                    }
-                },
-
-                {"format"_ss, 1,
-                    {
-                        {(u0*) format, "format"_ss, type_decl::obj_ptr, 3,
-                            {
-                                {"fmt_str"_ss, type_decl::slice_ptr},
-                                {"quote"_ss, type_decl::b8_, .default_value.b = false, .has_default = true},
-                                {"rest"_ss, type_decl::obj_ptr, .is_rest = true},
-                            }
-                        }
-                    }
-                },
-
-                {"append"_ss, 1,
-                    {
-                        {(u0*) append, "append"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"rest"_ss, type_decl::obj_ptr, .is_rest = true},
-                            }
-                        }
-                    }
-                },
-
-                {"length"_ss, 1,
-                    {
-                        {(u0*) length, "length"_ss, type_decl::u32_, 1,
-                            {
-                                {"obj"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"reverse"_ss, 1,
-                    {
-                        {(u0*) reverse, "reverse"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"lst"_ss, type_decl::list_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"intern/get"_ss, 1,
-                    {
-                        {(u0*) intern_get, "intern_get"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"current-environment"_ss, 1,
-                    {
-                        {(u0*) current_environment, "current_environment"_ss, type_decl::obj_ptr, 0}
-                    }
-                },
-
-                {"parent-environment"_ss, 1,
-                    {
-                        {(u0*) parent_environment, "parent_environment"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"env"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"current-user"_ss, 1,
-                    {
-                        {(u0*) current_user, "current_user"_ss, type_decl::obj_ptr, 0}
-                    }
-                },
-
-                {"current-alloc"_ss, 1,
-                    {
-                        {(u0*) current_alloc, "current_alloc"_ss, type_decl::obj_ptr, 0}
-                    }
-                },
-
-                {"current-logger"_ss, 1,
-                    {
-                        {(u0*) current_logger, "current_logger"_ss, type_decl::obj_ptr, 0}
-                    }
-                },
-
-                {"current-command-line"_ss, 1,
-                    {
-                        {(u0*) current_command_line, "current_command_line"_ss, type_decl::obj_ptr, 0}
-                    }
-                },
-
+#define EXPORT_PROC(n, ...)    basecode::scm::kernel::proc_export_t{    \
+    n##_ss, \
+    u32(VA_COUNT(__VA_ARGS__)), \
+    __VA_ARGS__},
+                EXPORTS
+#undef EXPORT_PROC
                 {str::slice_t{}},
             };
         }

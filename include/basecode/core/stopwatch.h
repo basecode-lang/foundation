@@ -64,7 +64,7 @@ namespace basecode {
                          const String_Concept auto& label,
                          s32 width,
                          stopwatch_t& w) {
-            assert(s32(width - label.length) > 5);
+            BC_ASSERT(s32(width - label.length) > 5);
             const auto sv_label = (std::string_view) label;
             const auto e = elapsed(w);
             if (e == 0) {

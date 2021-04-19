@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/memory.h>
+#include <basecode/core/context.h>
 
 using namespace basecode;
 

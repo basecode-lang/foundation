@@ -19,10 +19,11 @@
 #pragma once
 
 #include <cstring>
-#include <cassert>
 #include <basecode/core/types.h>
 #include <basecode/core/slice.h>
+#include <basecode/core/assert.h>
 #include <basecode/core/memory.h>
+#include <basecode/core/context.h>
 #include <basecode/core/hashable.h>
 #include <basecode/core/hash/murmur.h>
 
@@ -249,7 +250,7 @@ namespace basecode {
         const s8* c_str(String_Concept auto& str) {
             using T = std::remove_reference_t<decltype(str)>;
             if constexpr (T::Is_Static::value) {
-                assert(str.length + 1 < str.capacity);
+                BC_ASSERT(str.length + 1 < str.capacity);
             } else {
                 if (str.length + 1 > str.capacity)
                     grow(str);
@@ -261,7 +262,7 @@ namespace basecode {
         u0 append(String_Concept auto& str, u8 value) {
             using T = std::remove_reference_t<decltype(str)>;
             if constexpr (T::Is_Static::value) {
-                assert(str.length + 1 < str.capacity);
+                BC_ASSERT(str.length + 1 < str.capacity);
             } else {
                 if (str.length + 1 > str.capacity)
                     grow(str);
@@ -352,7 +353,7 @@ namespace basecode {
             if (len == 0) return;
             const auto n = len != -1 ? len : strlen((const char*) value);
             if constexpr (T::Is_Static::value) {
-                assert(str.length + n < str.capacity);
+                BC_ASSERT(str.length + n < str.capacity);
             } else {
                 if (str.length + n > str.capacity)
                     grow(str, n);
@@ -372,7 +373,7 @@ namespace basecode {
             auto const n = len == -1 ? strlen((const char*) value) : len;
             const auto offset = (ptrdiff_t) str.data + pos;
             if constexpr (T::Is_Static::value) {
-                assert(str.length + n < str.capacity);
+                BC_ASSERT(str.length + n < str.capacity);
             } else {
                 if (str.length + n > str.capacity)
                     grow(str, n);

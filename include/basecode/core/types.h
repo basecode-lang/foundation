@@ -30,44 +30,46 @@
 #include <type_traits>
 
 #if defined(WIN32)
-#   define api_export   __declspec(dllexport)
+#   define API_EXPORT           __declspec(dllexport)
 #else
-#   define api_export
+#   define API_EXPORT
 #endif
 
 #if defined(__GNUC__)
-#   define force_inline inline __attribute__((always_inline, unused))
-#   define never_inline inline __attribute__((noinline, unused))
-#   ifndef likely
-#       define likely(x) __builtin_expect(!!(x), 1)
+#   define DEBUG_TRAP()         __builtin_trap()
+#   define FORCE_INLINE         inline __attribute__((always_inline, unused))
+#   define NEVER_INLINE         inline __attribute__((noinline, unused))
+#   ifndef LIKELY
+#       define LIKELY(x)        __builtin_expect(!!(x), 1)
 #   endif
-#   ifndef unlikely
-#       define unlikely(x) __builtin_expect(!!(x), 0)
+#   ifndef UNLIKELY
+#       define UNLIKELY(x)      __builtin_expect(!!(x), 0)
 #   endif
 #elif defined(_MSC_VER)
-#   define force_inline __forceinline
-#   define never_inline __declspec(noinline)
-#   ifndef likely
-#       define likely(x) x
+#   define DEBUG_TRAP()         __debugbreak()
+#   define FORCE_INLINE         __forceinline
+#   define NEVER_INLINE         __declspec(noinline)
+#   ifndef LIKELY
+#       define LIKELY(x)        x
 #   endif
-#   ifndef unlikely
-#       define unlikely(x) x
+#   ifndef UNLIKELY
+#       define UNLIKELY(x)      x
 #   endif
 #else
-#   define force_inline inline
-#   define never_inline
-#   ifndef likely
-#       define likely(x) x
+#   define FORCE_INLINE         inline
+#   define NEVER_INLINE
+#   ifndef LIKELY
+#       define LIKELY(x)        x
 #   endif
-#   ifndef unlikely
-#       define unlikely(x) x
+#   ifndef UNLIKELY
+#       define UNLIKELY(x)      x
 #   endif
 #endif
 
 #ifdef _WIN32
-#   define  DEFAULT_NUM_PAGES 1
+#   define  DEFAULT_NUM_PAGES   1
 #else
-#   define  DEFAULT_NUM_PAGES 8
+#   define  DEFAULT_NUM_PAGES   8
 #endif
 
 #define ALIGNED16               __attribute__((aligned(16)))
@@ -79,6 +81,7 @@
 #define SAFE_SCOPE(x)           do { x } while (false)
 #define ZERO_MEM(x, s)          std::memset((x), 0, sizeof(s))
 #define HAS_ZERO(v)             (((v)-UINT64_C(0x0101010101010101)) & ~(v)&UINT64_C(0x8080808080808080))
+#define VA_COUNT(...)           basecode::va_count(__VA_ARGS__)
 
 namespace basecode {
     using u0                    = void;
@@ -166,6 +169,9 @@ namespace basecode {
     concept Status_Concept = std::is_enum_v<T> || requires(const T& t) {
         typename T::ok;
     };
+
+    template <typename... Args>
+    constexpr usize va_count(Args&&...) { return sizeof...(Args); }
 }
 
 #if defined(__GNUC__) && defined(__clang__)

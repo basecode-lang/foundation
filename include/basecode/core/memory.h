@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include <basecode/core/slice.h>
+#include <basecode/core/types.h>
 
-#define IS_PROXY(a)                 ((a)->system && (a)->system->type == alloc_type_t::proxy)
+#define IS_PROXY(a)                 ((a)->system                                \
+                                     && (a)->system->type == alloc_type_t::proxy)
 
 namespace basecode {
     struct slab_t;
@@ -53,8 +54,13 @@ namespace basecode {
     using mem_size_callback_t       = u32 (*)(alloc_t*, u0* mem);
     using mem_free_callback_t       = u32 (*)(alloc_t*, u0* mem);
     using mem_init_callback_t       = u0  (*)(alloc_t*, alloc_config_t*);
-    using mem_alloc_callback_t      = mem_result_t (*)(alloc_t*, u32 size, u32 align);
-    using mem_realloc_callback_t    = mem_result_t (*)(alloc_t*, u0* mem, u32 size, u32 align);
+    using mem_alloc_callback_t      = mem_result_t (*)(alloc_t*,
+                                                       u32 size,
+                                                       u32 align);
+    using mem_realloc_callback_t    = mem_result_t (*)(alloc_t*,
+                                                       u0* mem,
+                                                       u32 size,
+                                                       u32 align);
 
     struct alloc_system_t final {
         mem_size_callback_t         size;
@@ -151,6 +157,10 @@ namespace basecode {
 
             usize os_alloc_granularity();
 
+            status_t init(alloc_type_t type,
+                          u32 heap_size = 32 * 1024 * 1024,
+                          u0* base = {});
+
             b8 set_page_executable(u0* ptr, usize size);
 
             inline u0* align_forward(u0* p, u32 align, u32& adjust) {
@@ -161,8 +171,6 @@ namespace basecode {
             }
 
             alloc_t* make(alloc_type_t type, alloc_config_t* config = {});
-
-            status_t init(alloc_type_t type, u32 heap_size = 32 * 1024 * 1024, u0* base = {});
         }
 
         namespace internal {
@@ -187,9 +195,9 @@ namespace basecode {
             return internal::alloc(alloc, 0, 0).mem;
         }
 
-        str::slice_t type_name(alloc_type_t type);
+        const s8* type_name(alloc_type_t type);
 
-        str::slice_t status_name(status_t status);
+        const s8* status_name(status_t status);
 
         inline u32 size(alloc_t* alloc, u0* mem) {
             return internal::size(alloc, mem);
@@ -199,14 +207,19 @@ namespace basecode {
             return internal::free(alloc, mem);
         }
 
-        inline u0* alloc(alloc_t* alloc, u32 size, u32 align = sizeof(u64)) {
-            return internal::alloc(alloc, size, align).mem;
+        status_t init(alloc_t* alloc,
+                      alloc_type_t type,
+                      alloc_config_t* config = {});
+
+        inline u0* realloc(alloc_t* alloc,
+                           u0* mem,
+                           u32 size,
+                           u32 align = sizeof(u64)) {
+            return internal::realloc(alloc, mem, size, align).mem;
         }
 
-        status_t init(alloc_t* alloc, alloc_type_t type, alloc_config_t* config = {});
-
-        inline u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align = sizeof(u64)) {
-            return internal::realloc(alloc, mem, size, align).mem;
+        inline u0* alloc(alloc_t* alloc, u32 size, u32 align = sizeof(u64)) {
+            return internal::alloc(alloc, size, align).mem;
         }
     }
 }

@@ -39,25 +39,25 @@ namespace basecode {
 
         alloc_system_t* system();
 
-        force_inline u0* buf(alloc_t* alloc) {
+        FORCE_INLINE u0* buf(alloc_t* alloc) {
             auto a = unwrap(alloc);
-            assert(a && a->system->type == alloc_type_t::bump);
+            BC_ASSERT(a && a->system->type == alloc_type_t::bump);
             auto subclass = &a->subclass.bump;
             return subclass->buf;
         }
 
-        force_inline u16 offset(alloc_t* alloc) {
+        FORCE_INLINE u16 offset(alloc_t* alloc) {
             auto a = unwrap(alloc);
-            assert(a && a->system->type == alloc_type_t::bump);
+            BC_ASSERT(a && a->system->type == alloc_type_t::bump);
             auto subclass = &a->subclass.bump;
             return subclass->offset;
         }
 
         u0 buf(alloc_t* alloc, u0* buf, u32 size);
 
-        force_inline u16 end_offset(alloc_t* alloc) {
+        FORCE_INLINE u16 end_offset(alloc_t* alloc) {
             auto a = unwrap(alloc);
-            assert(a && a->system->type == alloc_type_t::bump);
+            BC_ASSERT(a && a->system->type == alloc_type_t::bump);
             auto subclass = &a->subclass.bump;
             return subclass->end_offset;
         }

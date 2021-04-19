@@ -412,180 +412,88 @@ namespace basecode::scm::module::log {
         basecode::log::emergency(vlog(*fmt_msg, *rest));
     }
 
-    namespace system {
-        namespace exports {
-            using namespace scm::kernel;
+#define EXPORTS EXPORT_PROC("log-info",                                         \
+                    OVERLOAD(log_info, u0,                                      \
+                        REQ("fmt_msg", slice_ptr),                              \
+                        REST("rest", list_ptr)))                                \
+                EXPORT_PROC("log-warn",                                         \
+                    OVERLOAD(log_warn, u0,                                      \
+                        REQ("fmt_msg", slice_ptr),                              \
+                        REST("rest", list_ptr)))                                \
+                EXPORT_PROC("log-error",                                        \
+                    OVERLOAD(log_error, u0,                                     \
+                        REQ("fmt_msg", slice_ptr),                              \
+                        REST("rest", list_ptr)))                                \
+                EXPORT_PROC("log-alert",                                        \
+                    OVERLOAD(log_alert, u0,                                     \
+                        REQ("fmt_msg", slice_ptr),                              \
+                        REST("rest", list_ptr)))                                \
+                EXPORT_PROC("log-debug",                                        \
+                    OVERLOAD(log_debug, u0,                                     \
+                        REQ("fmt_msg", slice_ptr),                              \
+                        REST("rest", list_ptr)))                                \
+                EXPORT_PROC("log-notice",                                       \
+                    OVERLOAD(log_notice, u0,                                    \
+                        REQ("fmt_msg", slice_ptr),                              \
+                        REST("rest", list_ptr)))                                \
+                EXPORT_PROC("log-critical",                                     \
+                    OVERLOAD(log_critical, u0,                                  \
+                        REQ("fmt_msg", slice_ptr),                              \
+                        REST("rest", list_ptr)))                                \
+                EXPORT_PROC("log-emergency",                                    \
+                    OVERLOAD(log_emergency, u0,                                 \
+                        REQ("fmt_msg", slice_ptr),                              \
+                        REST("rest", list_ptr)))                                \
+                EXPORT_PROC("log-create-basic-file",                            \
+                    OVERLOAD(log_create_basic_file, obj_ptr,                    \
+                        REQ("file_name", slice_ptr),                            \
+                        OPT("name", slice_ptr, nullptr),                        \
+                        OPT("pattern", slice_ptr, nullptr),                     \
+                        OPT("mask", slice_ptr, nullptr)))                       \
+                EXPORT_PROC("log-create-daily-file",                            \
+                    OVERLOAD(log_create_daily_file, obj_ptr,                    \
+                        REQ("file_name", slice_ptr),                            \
+                        REQ("hour", u32),                                       \
+                        REQ("minute", u32),                                     \
+                        OPT("name", slice_ptr, nullptr),                        \
+                        OPT("pattern", slice_ptr, nullptr),                     \
+                        OPT("mask", slice_ptr, nullptr)))                       \
+                EXPORT_PROC("log-create-color",                                 \
+                    OVERLOAD(log_create_color, obj_ptr,                         \
+                        REQ("color_type", slice_ptr),                           \
+                        OPT("name", slice_ptr, nullptr),                        \
+                        OPT("pattern", slice_ptr, nullptr),                     \
+                        OPT("mask", slice_ptr, nullptr)))                       \
+                EXPORT_PROC("log-create-rotating-file",                         \
+                    OVERLOAD(log_create_rotating_file, obj_ptr,                 \
+                        REQ("file_name", slice_ptr),                            \
+                        REQ("max_size", u32),                                   \
+                        REQ("max_files", u32),                                  \
+                        OPT("name", slice_ptr, nullptr),                        \
+                        OPT("pattern", slice_ptr, nullptr),                     \
+                        OPT("mask", slice_ptr, nullptr)))                       \
+                EXPORT_PROC("syslog-create",                                    \
+                    OVERLOAD(syslog_create, obj_ptr,                            \
+                        REQ("ident", slice_ptr),                                \
+                        REQ("opts", list_ptr),                                  \
+                        REQ("facility", slice_ptr),                             \
+                        OPT("name", slice_ptr, nullptr),                        \
+                        OPT("mask", slice_ptr, nullptr)))                       \
+                EXPORT_PROC("logger-append-child",                              \
+                    OVERLOAD(logger_append_child, u0,                           \
+                        REQ("parent", obj_ptr),                                 \
+                        REQ("child", obj_ptr)))
 
-            static proc_export_t s_exports[] = {
-                {"log-info"_ss, 1,
-                    {
-                        {(u0*) log_info, "log_info"_ss, type_decl::u0_, 2,
-                            {
-                                {"fmt_msg"_ss, type_decl::slice_ptr},
-                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
-                            }
-                        }
-                    }
-                },
-
-                {"log-warn"_ss, 1,
-                    {
-                        {(u0*) log_warn, "log_warn"_ss, type_decl::u0_, 2,
-                            {
-                                {"fmt_msg"_ss, type_decl::slice_ptr},
-                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
-                            }
-                        }
-                    }
-                },
-
-                {"log-error"_ss, 1,
-                    {
-                        {(u0*) log_error, "log_error"_ss, type_decl::u0_, 2,
-                            {
-                                {"fmt_msg"_ss, type_decl::slice_ptr},
-                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
-                            }
-                        }
-                    }
-                },
-
-                {"log-alert"_ss, 1,
-                    {
-                        {(u0*) log_alert, "log_alert"_ss, type_decl::u0_, 2,
-                            {
-                                {"fmt_msg"_ss, type_decl::slice_ptr},
-                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
-                            }
-                        }
-                    }
-                },
-
-                {"log-debug"_ss, 1,
-                    {
-                        {(u0*) log_debug, "log_debug"_ss, type_decl::u0_, 2,
-                            {
-                                {"fmt_msg"_ss, type_decl::slice_ptr},
-                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
-                            }
-                        }
-                    }
-                },
-
-                {"log-notice"_ss, 1,
-                    {
-                        {(u0*) log_notice, "log_notice"_ss, type_decl::u0_, 2,
-                            {
-                                {"fmt_msg"_ss, type_decl::slice_ptr},
-                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
-                            }
-                        }
-                    }
-                },
-
-                {"log-critical"_ss, 1,
-                    {
-                        {(u0*) log_critical, "log_critical"_ss, type_decl::u0_, 2,
-                            {
-                                {"fmt_msg"_ss, type_decl::slice_ptr},
-                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
-                            }
-                        }
-                    }
-                },
-
-                {"log-emergency"_ss, 1,
-                    {
-                        {(u0*) log_emergency, "log_emergency"_ss, type_decl::u0_, 2,
-                            {
-                                {"fmt_msg"_ss, type_decl::slice_ptr},
-                                {"rest"_ss, type_decl::list_ptr, .is_rest = true },
-                            }
-                        }
-                    }
-                },
-
-                {"log-create-basic-file"_ss, 1,
-                    {
-                        {(u0*) log_create_basic_file, "log_create_basic_file"_ss, type_decl::obj_ptr, 4,
-                            {
-                                {"file_name"_ss, type_decl::slice_ptr},
-                                {"name"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                                {"pattern"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                                {"mask"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"log-create-daily-file"_ss, 1,
-                    {
-                        {(u0*) log_create_daily_file, "log_create_daily_file"_ss, type_decl::obj_ptr, 6,
-                            {
-                                {"file_name"_ss, type_decl::slice_ptr},
-                                {"hour"_ss, type_decl::u32_},
-                                {"minute"_ss, type_decl::u32_},
-                                {"name"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                                {"pattern"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                                {"mask"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"log-create-color"_ss, 1,
-                    {
-                        {(u0*) log_create_color, "log_create_color"_ss, type_decl::obj_ptr, 4,
-                            {
-                                {"color_type"_ss, type_decl::slice_ptr},
-                                {"name"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                                {"pattern"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                                {"mask"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"log-create-rotating-file"_ss, 1,
-                    {
-                        {(u0*) log_create_rotating_file, "log_create_rotating_file"_ss, type_decl::obj_ptr, 6,
-                            {
-                                {"file_name"_ss, type_decl::slice_ptr},
-                                {"max_size"_ss, type_decl::u32_},
-                                {"max_files"_ss, type_decl::u32_},
-                                {"name"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                                {"pattern"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                                {"mask"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"syslog-create"_ss, 1,
-                    {
-                        {(u0*) syslog_create, "syslog_create"_ss, type_decl::obj_ptr, 5,
-                            {
-                                {"ident"_ss, type_decl::slice_ptr},
-                                {"opts"_ss, type_decl::list_ptr},
-                                {"facility"_ss, type_decl::slice_ptr},
-                                {"name"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                                {"mask"_ss, type_decl::slice_ptr, .default_value.p = {}, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"logger-append-child"_ss, 1,
-                    {
-                        {(u0*) logger_append_child, "logger_append_child"_ss, type_decl::u0_, 2,
-                            {
-                                {"parent"_ss, type_decl::obj_ptr},
-                                {"child"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
+namespace system {
+    namespace exports {
+        using namespace scm::kernel;
+        static proc_export_t s_exports[] = {
+#define EXPORT_PROC(n, ...)    basecode::scm::kernel::proc_export_t{    \
+    n##_ss, \
+    u32(VA_COUNT(__VA_ARGS__)), \
+    __VA_ARGS__},
+            EXPORTS
+#undef EXPORT_PROC
                 {str::slice_t{}},
             };
         }

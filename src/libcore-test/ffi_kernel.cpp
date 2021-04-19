@@ -20,6 +20,6 @@
 
 using namespace basecode;
 
-api_export extern "C" u32 simple(u32 a, u32 b) {
+API_EXPORT extern "C" u32 simple(u32 a, u32 b) {
     return a * b;
 }

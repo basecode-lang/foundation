@@ -16,23 +16,25 @@
 //
 // ----------------------------------------------------------------------------
 
-#pragma once
-
-#include <basecode/core/memory.h>
-#include <basecode/core/context.h>
+#include <basecode/core/format.h>
 
 namespace basecode {
-
-    namespace ipc {
-        enum class status_t : u8 {
-            ok                  = 0,
-            error,
-        };
-
-        namespace system {
-            u0 fini();
-
-            status_t init(alloc_t* alloc = context::top()->alloc);
+    u0 format_assert(const s8* prefix,
+                     const s8* condition,
+                     const s8* file,
+                     s32 line,
+                     const s8* msg,
+                     fmt_args_t args) {
+        str_t buf{};
+        str::init(buf); {
+            str_buf_t sb(&buf);
+            format::format_to(sb, "{}({}): {}: ", file, line, prefix);
+            if (condition)
+                format::format_to(sb, "`{}` ", condition);
+            if (msg)
+                fmt::vformat_to(sb, msg, args);
         }
+        format::print(stderr, "{}\n", buf);
+        str::free(buf);
     }
 }

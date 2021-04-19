@@ -203,13 +203,13 @@ namespace basecode::cxx::serializer {
         cursor_t pgm_cursor{};
         if (!bass::seek_first(store, pgm_cursor))
             return status_t::pgm_not_found;
-        if (unlikely(!bass::next_field(pgm_cursor, value, element::field::list)))
+        if (UNLIKELY(!bass::next_field(pgm_cursor, value, element::field::list)))
             return status_t::list_not_found;
         cursor_t list_cursor{};
         bass::seek_record(store, value, list_cursor);
         while (bass::next_field(list_cursor, value, element::field::child)) {
             auto status = serialize_module(s, value, s.alloc);
-            if (unlikely(!OK(status)))
+            if (UNLIKELY(!OK(status)))
                 return status;
         }
         return status_t::ok;
@@ -220,7 +220,7 @@ namespace basecode::cxx::serializer {
                         str_buf_t& buf,
                         fmt::string_view format_str,
                         const Args&... args) {
-        if (likely(s.column == 0 && s.indent > 0))
+        if (LIKELY(s.column == 0 && s.indent > 0))
             format::format_to(buf, "{:<{}}", " ", s.indent);
         auto start = buf.size();
         format::format_to(buf, format_str, args...);
@@ -246,14 +246,14 @@ namespace basecode::cxx::serializer {
         process_var_flags(s, buf, type_id);
         expand_type(store, lhs_id, type_info);
         at_indent(s, buf, "{} ", *type_info.name);
-        if (unlikely(!bass::seek_record(store, rhs_id, rhs_cursor)))
+        if (UNLIKELY(!bass::seek_record(store, rhs_id, rhs_cursor)))
             return status_t::rhs_not_found;
         auto status = process_expr(s, buf, rhs_cursor);
-        if (unlikely(!OK(status)))
+        if (UNLIKELY(!OK(status)))
             return status;
         at_indent(s, buf, "{}", *type_info.var_suffix);
         if (init_id) {
-            if (unlikely(!bass::seek_record(store, init_id, init_cursor)))
+            if (UNLIKELY(!bass::seek_record(store, init_id, init_cursor)))
                 return status_t::element_not_found;
             status = process_expr(s, buf, init_cursor);
         }
@@ -280,7 +280,7 @@ namespace basecode::cxx::serializer {
                                              id,
                                              element::field::child);
         if (!has_more) return status;
-        if (unlikely(!bass::seek_record(store, id, element_cursor)))
+        if (UNLIKELY(!bass::seek_record(store, id, element_cursor)))
             return status_t::element_not_found;
         switch (element_cursor.header->type) {
             case element::header::scope:
@@ -301,7 +301,7 @@ namespace basecode::cxx::serializer {
         // rest
         while (OK(status)
             && bass::next_field(cursor, id, element::field::child)) {
-            if (unlikely(!bass::seek_record(store, id, element_cursor)))
+            if (UNLIKELY(!bass::seek_record(store, id, element_cursor)))
                 return status_t::element_not_found;
             switch (element_cursor.header->type) {
                 case element::header::variable:
@@ -377,13 +377,13 @@ namespace basecode::cxx::serializer {
         auto type       = (expression_type_t) BASE_TYPE(type_field);
         cursor_t lhs_cursor{}, rhs_cursor{};
         auto lhs = DICTV(dict, element::field::lhs);
-        if (unlikely(!bass::seek_record(store, lhs, lhs_cursor)))
+        if (UNLIKELY(!bass::seek_record(store, lhs, lhs_cursor)))
             return status_t::lhs_not_found;
         switch (type) {
             case expression_type_t::raw: {
                 auto intern_id = DICTV(dict, element::field::intern);
                 auto interned = GET_INTERN(intern_id);
-                if (unlikely(!OK(interned.status)))
+                if (UNLIKELY(!OK(interned.status)))
                     return status_t::intern_not_found;
                 at_indent(s, buf, "{}", interned.slice);
                 break;
@@ -406,7 +406,7 @@ namespace basecode::cxx::serializer {
                                 status = process_expr(s,
                                                       buf,
                                                       lhs_cursor);
-                                if (unlikely(!OK(status)))
+                                if (UNLIKELY(!OK(status)))
                                     return status;
                                 break;
                             }
@@ -414,7 +414,7 @@ namespace basecode::cxx::serializer {
                                 status = process_expr(s,
                                                       buf,
                                                       lhs_cursor);
-                                if (unlikely(!OK(status)))
+                                if (UNLIKELY(!OK(status)))
                                     return status;
                                 at_indent(s,
                                           buf,
@@ -438,11 +438,11 @@ namespace basecode::cxx::serializer {
                 auto lhs_dict = bass::dict::make(lhs_cursor);
 
                 status = process_expr(s, buf, lhs_cursor);
-                if (unlikely(!OK(status)))
+                if (UNLIKELY(!OK(status)))
                     return status;
 
                 auto rhs = DICTV(dict, element::field::rhs);
-                if (unlikely(!bass::seek_record(store, rhs, rhs_cursor)))
+                if (UNLIKELY(!bass::seek_record(store, rhs, rhs_cursor)))
                     return status_t::rhs_not_found;
 
                 auto op_type = (binary_op_type_t) SUB_TYPE(type_field);
@@ -476,14 +476,14 @@ namespace basecode::cxx::serializer {
                         case binary_op_type_t::cast:
                             at_indent(s, buf, "(");
                             status = process_expr(s, buf, rhs_cursor);
-                            if (unlikely(!OK(status)))
+                            if (UNLIKELY(!OK(status)))
                                 return status;
                             at_indent(s, buf, ")");
                             break;
                         case binary_op_type_t::subscript:
                             at_indent(s, buf, "[");
                             status = process_expr(s, buf, rhs_cursor);
-                            if (unlikely(!OK(status)))
+                            if (UNLIKELY(!OK(status)))
                                 return status;
                             at_indent(s, buf, "]");
                             break;
@@ -497,16 +497,16 @@ namespace basecode::cxx::serializer {
 
                 bin_op_done:
                 status = process_expr(s, buf, rhs_cursor);
-                if (unlikely(!OK(status)))
+                if (UNLIKELY(!OK(status)))
                     return status;
                 break;
             }
             case expression_type_t::assignment: {
                 auto rhs = DICTV(dict, element::field::rhs);
-                if (unlikely(!bass::seek_record(store, rhs, rhs_cursor)))
+                if (UNLIKELY(!bass::seek_record(store, rhs, rhs_cursor)))
                     return status_t::rhs_not_found;
                 status = process_expr(s, buf, lhs_cursor);
-                if (unlikely(!OK(status)))
+                if (UNLIKELY(!OK(status)))
                     return status;
                 auto op_type = (assignment_type_t) SUB_TYPE(type_field);
                 at_indent(s,
@@ -522,14 +522,14 @@ namespace basecode::cxx::serializer {
                     case initializer_type_t::list:
                         at_indent(s, buf, "{{");
                         status = process_list(s, buf, lhs_cursor);
-                        if (unlikely(!OK(status)))
+                        if (UNLIKELY(!OK(status)))
                             return status;
                         at_indent(s, buf, "}}");
                         break;
                     case initializer_type_t::direct:
                         at_indent(s, buf, " = ");
                         status = process_expr(s, buf, lhs_cursor);
-                        if (unlikely(!OK(status)))
+                        if (UNLIKELY(!OK(status)))
                             return status;
                         break;
                 }
@@ -571,7 +571,7 @@ namespace basecode::cxx::serializer {
             case statement_type_t::raw: {
                 const auto intern_id = DICTV(dict, element::field::intern);
                 auto interned = string::interned::get(intern_id);
-                if (unlikely(!OK(interned.status)))
+                if (UNLIKELY(!OK(interned.status)))
                     return status_t::intern_not_found;
                 at_indent(s, buf, "{}", interned.slice);
                 break;
@@ -580,7 +580,7 @@ namespace basecode::cxx::serializer {
                 at_indent(s, buf, "if (");
                 cursor_t expr_cursor{};
                 auto lhs = DICTV(dict, element::field::lhs);
-                if (unlikely(!bass::seek_record(store, lhs, expr_cursor)))
+                if (UNLIKELY(!bass::seek_record(store, lhs, expr_cursor)))
                     return status_t::lhs_not_found;
                 status = process_expr(s, buf, expr_cursor);
                 at_indent(s, buf, ") ");
@@ -695,11 +695,11 @@ namespace basecode::cxx::serializer {
                                 if (lhs_cursor.header->type != element::header::type)
                                     return status_t::lhs_not_found;
                                 status = process_expr(s, buf, lhs_cursor);
-                                if (unlikely(!OK(status)))
+                                if (UNLIKELY(!OK(status)))
                                     return status;
                                 at_indent(s, buf, " ");
                                 status = process_expr(s, buf, expr_cursor);
-                                if (unlikely(!OK(status)))
+                                if (UNLIKELY(!OK(status)))
                                     return status;
                                 auto rhs = DICTV(type_dict, element::field::rhs);
                                 if (!bass::seek_record(store, rhs, rhs_cursor))
@@ -871,11 +871,11 @@ namespace basecode::cxx::serializer {
                         if (!bass::seek_record(store, lhs, lhs_cursor))
                             return status_t::lhs_not_found;
                         status = process_expr(s, buf, lhs_cursor);
-                        if (unlikely(!OK(status)))
+                        if (UNLIKELY(!OK(status)))
                             return status;
                         at_indent(s, buf, " ");
                         status = process_expr(s, buf, expr_cursor);
-                        if (unlikely(!OK(status)))
+                        if (UNLIKELY(!OK(status)))
                             return status;
                         if (!bass::seek_record(store, rhs, rhs_cursor))
                             return status_t::rhs_not_found;
@@ -894,7 +894,7 @@ namespace basecode::cxx::serializer {
                         const auto agg_token = s_aggregate_type_tokens[(u32) agg_type];
                         at_indent(s, buf, "{} ", agg_token);
                         status = process_expr(s, buf, expr_cursor);
-                        if (unlikely(!OK(status)))
+                        if (UNLIKELY(!OK(status)))
                             return status;
                         if ((flags & aggregate::final_) == aggregate::final_)
                             at_indent(s, buf, " final ");
@@ -903,7 +903,7 @@ namespace basecode::cxx::serializer {
                             cursor_t list_cursor{};
                             bass::seek_record(store, inheritance_list_id, list_cursor);
                             status = process_list(s, buf, list_cursor);
-                            if (unlikely(!OK(status)))
+                            if (UNLIKELY(!OK(status)))
                                 return status;
                         }
                         auto block_id = DICTV(dict, element::field::tbranch);
@@ -942,14 +942,14 @@ namespace basecode::cxx::serializer {
         auto& store = *s.store;
 
         u32 parent_scope_id{};
-        if (unlikely(!bass::next_field(cursor, parent_scope_id, element::field::scope)))
+        if (UNLIKELY(!bass::next_field(cursor, parent_scope_id, element::field::scope)))
             return status_t::scope_not_found;
 
         u32 id{};
-        if (unlikely(!bass::next_field(cursor, id, element::field::list)))
+        if (UNLIKELY(!bass::next_field(cursor, id, element::field::list)))
             return status_t::list_not_found;
 
-        if (likely(parent_scope_id)) {
+        if (LIKELY(parent_scope_id)) {
             at_indent(s, buf, "{{");
             newline(s, buf);
             tab(s);
@@ -958,10 +958,10 @@ namespace basecode::cxx::serializer {
         cursor_t list_cursor{};
         bass::seek_record(store, id, list_cursor);
         auto status = process_list(s, buf, list_cursor);
-        if (unlikely(!OK(status)))
+        if (UNLIKELY(!OK(status)))
             return status;
 
-        if (likely(parent_scope_id)) {
+        if (LIKELY(parent_scope_id)) {
             untab(s);
             at_indent(s, buf, "}}");
         }
@@ -1002,13 +1002,13 @@ namespace basecode::cxx::serializer {
     static status_t cpp20(serializer_t& s, str_buf_t& buf, cursor_t& cursor) {
         auto& store = *s.store;
         u32 id{};
-        if (unlikely(!bass::next_field(cursor, id, element::field::child)))
+        if (UNLIKELY(!bass::next_field(cursor, id, element::field::child)))
             return status_t::child_not_found;
         cursor_t scope_cursor{};
         if (!bass::seek_record(store, id, scope_cursor))
             return status_t::element_not_found;
         auto status = process_scope(s, buf, scope_cursor);
-        if (unlikely(!OK(status)))
+        if (UNLIKELY(!OK(status)))
             return status;
         return status_t::ok;
     }
@@ -1033,7 +1033,7 @@ namespace basecode::cxx::serializer {
             auto lit_dict = bass::dict::make(lit_cursor);
             const auto intern_id = DICTV(lit_dict, element::field::intern);
             auto interned = GET_INTERN(intern_id);
-            if (unlikely(!OK(interned.status)))
+            if (UNLIKELY(!OK(interned.status)))
                 return status_t::intern_not_found;
             filename = interned.slice;
         }

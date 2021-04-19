@@ -20,7 +20,6 @@
 
 #include <fmt/format.h>
 #include <fmt/chrono.h>
-#include <basecode/core/memory/std_alloc.h>
 
 #define FORMAT_TYPE(Type, Code)                                                     \
     template <>                                                                     \
@@ -45,11 +44,15 @@
     }
 
 namespace basecode {
+    template <typename T> class std_alloc_t;
+
     using fmt_ctx_t         = fmt::format_context;
     using fmt_str_t         = fmt::string_view;
     using fmt_arg_t         = fmt::basic_format_arg<fmt_ctx_t>;
     using fmt_args_t        = fmt::format_args;
     using fmt_alloc_t       = std_alloc_t<char>;
+    using fmt_buf_t         = fmt::basic_memory_buffer<char,
+                                                      fmt::inline_buffer_size,
+                                                      fmt_alloc_t>;
     using fmt_dyn_args_t    = fmt::dynamic_format_arg_store<fmt_ctx_t>;
-    using fmt_buf_t         = fmt::basic_memory_buffer<char, fmt::inline_buffer_size, fmt_alloc_t>;
 }

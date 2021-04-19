@@ -44,10 +44,7 @@ namespace basecode::alloc_window {
                 ImGui::Text("%s", "(none)");
             }
             ImGui::TableSetColumnIndex(2);
-            str::reset(win.scratch);
-            str::append(win.scratch,
-                        memory::type_name(info->tracked->system->type));
-            ImGui::Text("%s", str::c_str(win.scratch));
+            ImGui::Text("%s", memory::type_name(info->tracked->system->type));
             ImGui::TableSetColumnIndex(3);
             str::reset(win.scratch); {
                 str_buf_t buf(&win.scratch);

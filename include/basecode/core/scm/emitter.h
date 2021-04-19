@@ -125,7 +125,7 @@ namespace basecode::scm::emitter {
         inline var_version_t* read(emitter_t& e,
                                    var_version_t* curr,
                                    u32 inst_id) {
-            assert(curr && "virtual_var: cannot read a null var_version_t!");
+            BC_ASSERT(curr && "virtual_var: cannot read a null var_version_t!");
             if (curr->accesses.size == 0) {
                 auto& ac = array::append(curr->accesses);
                 ac.type    = var_access_type_t::def;
@@ -174,7 +174,7 @@ namespace basecode::scm::emitter {
         var_version_t* declare(emitter_t& e, const T& name) {
             var_t* var{};
             if (symtab::find(e.vartab, name, var))
-                assert(false && "virtual_var: ssa var can only be declared once!");
+                BC_ASSERT(false && "virtual_var: ssa var can only be declared once!");
             var = &stable_array::append(e.vars);
             var->symbol  = name;
             auto first = &stable_array::append(e.versions);

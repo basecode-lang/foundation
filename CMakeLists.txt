@@ -48,6 +48,7 @@ if (MSVC)
             -Wno-deprecated-declarations
             -Wno-documentation-unknown-command
             -Wno-c99-designator
+            -Wno-missing-braces
     )
     add_compile_options(
             "$<$<COMPILE_LANGUAGE:C,CXX>:${CXX_FLAGS}>"

@@ -20,6 +20,36 @@
 
 #include <basecode/core/scm/scm.h>
 
+#define REQ(name, type)         basecode::scm::kernel::proc_param_t{            \
+    name##_ss,                                                                  \
+    TYPE_DECL_REF(type)}
+#define REST(name, type)        basecode::scm::kernel::proc_param_t{            \
+    name##_ss,                                                                  \
+    TYPE_DECL_REF(type),                                                        \
+    .is_rest = true}
+#define OPT(name, type, v)      basecode::scm::kernel::proc_param_t{            \
+    name##_ss,                                                                  \
+    TYPE_DECL_REF(type),                                                        \
+    .default_value.qw = u64(v),                                                 \
+    .has_default = true}
+#define OVERLOAD(fn, type, ...)                                                 \
+    proc_overload_t{(u0*) fn,                                                   \
+    #fn##_ss,                                                                   \
+    TYPE_DECL_REF(type),                                                        \
+    u32(VA_COUNT(__VA_ARGS__)),                                                 \
+    __VA_ARGS__ }
+#define TYPE_DECL_KINDS         TYPE_DECL_KIND(b8)                              \
+                                TYPE_DECL_KIND(u8)                              \
+                                TYPE_DECL_KIND(u0)                              \
+                                TYPE_DECL_KIND(u16)                             \
+                                TYPE_DECL_KIND(u32)                             \
+                                TYPE_DECL_KIND(f32)                             \
+                                TYPE_DECL_KIND(obj_ptr)                         \
+                                TYPE_DECL_KIND(list_ptr)                        \
+                                TYPE_DECL_KIND(slice_ptr)
+
+#define TYPE_DECL_REF(k)        (u32(basecode::scm::kernel::type_decl_kind_t::Kind_##k))
+
 namespace basecode::scm::kernel {
     using type_decl_id          = u32;
 
@@ -27,6 +57,13 @@ namespace basecode::scm::kernel {
         param_cls_t             cls;
         param_size_t            size;
         ffi_type_t              user;
+    };
+
+    enum class type_decl_kind_t : u32 {
+#define TYPE_DECL_KIND(k)       Kind_##k,
+        TYPE_DECL_KINDS
+#undef TYPE_DECL
+        Kind_Count
     };
 
     struct proc_param_t final {
@@ -51,19 +88,6 @@ namespace basecode::scm::kernel {
         u32                     num_overloads   {};
         proc_overload_t         overloads[16]   {};
     };
-
-    namespace type_decl {
-        constexpr u32 b8_       = 0;
-        constexpr u32 u8_       = 1;
-        constexpr u32 u0_       = 2;
-        constexpr u32 u32_      = 3;
-        constexpr u32 f32_      = 4;
-        constexpr u32 obj_ptr   = 5;
-        constexpr u32 list_ptr  = 6;
-        constexpr u32 slice_ptr = 7;
-        constexpr u32 u16_      = 8;
-        constexpr u32 max       = 9;
-    }
 
     u0 create_common_types();
 

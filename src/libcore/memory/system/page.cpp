@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <cassert>
+#include <basecode/core/assert.h>
 #include <basecode/core/memory/system/page.h>
 
 namespace basecode::memory::page {
@@ -59,7 +59,7 @@ namespace basecode::memory::page {
         alloc->backing = cfg->backing;
         auto page_size = memory::system::os_alloc_granularity();
         sc->page_size  = (page_size * sc->num_pages) - sizeof(page_header_t);
-        assert(alloc->backing);
+        BC_ASSERT_NOT_NULL(alloc->backing);
     }
 
     static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
@@ -104,7 +104,8 @@ namespace basecode::memory::page {
 
     u0 reset(alloc_t* alloc) {
         auto a = unwrap(alloc);
-        assert(a && a->system->type == alloc_type_t::page);
+        BC_ASSERT_MSG(a && a->system->type == alloc_type_t::page,
+                      "expected a non-null page allocator");
         auto sc = &a->subclass.page;
         sc->cursor = sc->tail;
     }

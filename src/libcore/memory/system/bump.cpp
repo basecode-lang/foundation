@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <cassert>
+#include <basecode/core/assert.h>
 #include <basecode/core/memory/system/bump.h>
 
 namespace basecode::memory::bump {
@@ -36,7 +36,7 @@ namespace basecode::memory::bump {
                 break;
             case bump_type_t::allocator:
                 alloc->backing  = cfg->backing.alloc;
-                assert(alloc->backing);
+                BC_ASSERT_NOT_NULL(alloc->backing);
                 break;
         }
         sc->offset = sc->end_offset = {};
@@ -74,7 +74,8 @@ namespace basecode::memory::bump {
 
     u0 reset(alloc_t* alloc) {
         auto a = unwrap(alloc);
-        assert(a && a->system->type == alloc_type_t::bump);
+        BC_ASSERT_MSG(a && a->system->type == alloc_type_t::bump,
+                      "expected a non-null bump allocator");
         auto sc = &a->subclass.bump;
         sc->buf    = {};
         sc->offset = sc->end_offset = {};
@@ -82,7 +83,8 @@ namespace basecode::memory::bump {
 
     u0 buf(alloc_t* alloc, u0* buf, u32 size) {
         auto a = unwrap(alloc);
-        assert(a && a->system->type == alloc_type_t::bump);
+        BC_ASSERT_MSG(a && a->system->type == alloc_type_t::bump,
+                      "expected a non-null bump allocator");
         auto sc = &a->subclass.bump;
         sc->buf        = buf;
         sc->offset     = {};

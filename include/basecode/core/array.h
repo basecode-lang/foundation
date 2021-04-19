@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include <cassert>
 #include <basecode/core/types.h>
 #include <basecode/core/slice.h>
+#include <basecode/core/assert.h>
 #include <basecode/core/memory.h>
+#include <basecode/core/context.h>
 #include <basecode/core/array_common.h>
 
 namespace basecode {
@@ -124,7 +125,7 @@ namespace basecode {
                   b8 Is_Static = T::Is_Static::value>
         auto& append(T& array) {
             if constexpr (Is_Static) {
-                assert(array.size + 1 < array.capacity);
+                BC_ASSERT(array.size + 1 < array.capacity);
             } else {
                 if (array.size + 1 > array.capacity)
                     grow(array);
@@ -155,7 +156,7 @@ namespace basecode {
                   b8 Is_Static = T::Is_Static::value>
         u0 append(T& array, auto&& value) {
             if constexpr (Is_Static) {
-                assert(array.size + 1 < array.capacity);
+                BC_ASSERT(array.size + 1 < array.capacity);
             } else {
                 if (array.size + 1 > array.capacity)
                     grow(array);
@@ -198,7 +199,7 @@ namespace basecode {
                   b8 Is_Static = T::Is_Static::value>
         u0 append(T& array, const auto& value) {
             if constexpr (Is_Static) {
-                assert(array.size + 1 < array.capacity);
+                BC_ASSERT(array.size + 1 < array.capacity);
             } else {
                 if (array.size + 1 > array.capacity)
                     grow(array);
@@ -231,7 +232,7 @@ namespace basecode {
                 static_assert("array::append array-to-array only supported between equivalent types");
             }
             if constexpr (Dst_Is_Static) {
-                assert(dst.size + src.size < dst.capacity);
+                BC_ASSERT(dst.size + src.size < dst.capacity);
             } else {
                 const auto new_size = dst.size + src.size;
                 if (new_size > dst.capacity)
@@ -278,7 +279,7 @@ namespace basecode {
                   typename Value_Type = typename T::Value_Type>
         u0 insert(T& array, u32 index, auto&& value) {
             if constexpr (Is_Static) {
-                assert(array.size + 1 < array.capacity);
+                BC_ASSERT(array.size + 1 < array.capacity);
             } else {
                 if (array.size + 1 > array.capacity)
                     grow(array);
@@ -297,7 +298,7 @@ namespace basecode {
                   typename Value_Type = typename T::Value_Type>
         u0 insert(T& array, u32 index, const auto& value) {
             if constexpr (Is_Static) {
-                assert(array.size + 1 < array.capacity);
+                BC_ASSERT(array.size + 1 < array.capacity);
             } else {
                 if (array.size + 1 > array.capacity)
                     grow(array);

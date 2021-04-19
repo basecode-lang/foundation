@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/assert.h>
 #include <basecode/core/memory/system/stack.h>
 
 namespace basecode::memory::stack {
@@ -49,7 +50,8 @@ namespace basecode::memory::stack {
 
     static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
         auto sc = &alloc->subclass.stack;
-        assert(size < sc->max_size);
+        BC_ASSERT_MSG(size < sc->max_size,
+                      "attempt to allocate more memory than available");
         mem_result_t r{};
         u32 align_adjust{};
         r.mem    = memory::system::align_forward(sc->free,
@@ -62,7 +64,8 @@ namespace basecode::memory::stack {
 
     static mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
         auto sc = &alloc->subclass.stack;
-        assert(size < sc->max_size);
+        BC_ASSERT_MSG(size < sc->max_size,
+                      "attempt to realloc more memory than available");
         mem_result_t r{};
         if (mem) {
             const auto old_size = uintptr_t(sc->free) - uintptr_t(mem);

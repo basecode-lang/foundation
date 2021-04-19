@@ -102,7 +102,7 @@ namespace basecode {
                 static_assert("array::copy only supported between equivalent types");
             }
             if constexpr (Dst_Is_Static) {
-                assert(src.size <= dst.capacity);
+                BC_ASSERT(src.size <= dst.capacity);
             } else {
                 if (src.size > dst.capacity)
                     grow(dst);

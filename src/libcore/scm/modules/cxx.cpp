@@ -734,1307 +734,656 @@ namespace basecode::scm::module::cxx {
                                                radix);
     }
 
+#define EXPORTS EXPORT_PROC("cxx/make-program",                                 \
+                    OVERLOAD(make_program, obj_ptr))                            \
+                                                                                \
+                EXPORT_PROC("cxx/serialize",                                    \
+                    OVERLOAD(serialize, u32,                                    \
+                        REQ("ser_usr", obj_ptr)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/finalize-program",                             \
+                    OVERLOAD(finalize_program, obj_ptr,                         \
+                        REQ("pgm_usr", obj_ptr)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/make-serializer",                              \
+                    OVERLOAD(make_serializer, obj_ptr,                          \
+                        REQ("pgm_usr", obj_ptr),                                \
+                        OPT("width", u16, 160),                                 \
+                        OPT("tab-width", u16, 4)))                              \
+                                                                                \
+                EXPORT_PROC("size-in-bits",                                     \
+                    OVERLOAD(size_in_bits, u32,                                 \
+                        REQ("name", slice_ptr)))                                \
+                                                                                \
+                EXPORT_PROC("size-in-bytes",                                    \
+                    OVERLOAD(size_in_bytes, u32,                                \
+                        REQ("name", slice_ptr)))                                \
+                                                                                \
+                EXPORT_PROC("cxx/get-scope",                                    \
+                    OVERLOAD(get_scope, obj_ptr,                                \
+                        REQ("mod_usr", obj_ptr),                                \
+                        REQ("id", u32)))                                        \
+                                                                                \
+                EXPORT_PROC("cxx/get-module",                                   \
+                    OVERLOAD(get_module, obj_ptr,                               \
+                        REQ("pgm_usr", obj_ptr),                                \
+                        REQ("id", u32)))                                        \
+                                                                                \
+                EXPORT_PROC("cxx/add-module",                                   \
+                    OVERLOAD(add_module, obj_ptr,                               \
+                        REQ("pgm_usr", obj_ptr),                                \
+                        REQ("file_name", slice_ptr),                            \
+                        REQ("revision", slice_ptr)))                            \
+                                                                                \
+                EXPORT_PROC("cxx/pop-scope",                                    \
+                    OVERLOAD(pop_scope, u0,                                     \
+                        REQ("scope_usr", obj_ptr)))                             \
+                                                                                \
+                EXPORT_PROC("cxx/push-scope",                                   \
+                    OVERLOAD(push_scope, u32,                                   \
+                        REQ("scope_usr", obj_ptr)))                             \
+                                                                                \
+                EXPORT_PROC("cxx/make-label",                                   \
+                    OVERLOAD(make_label, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("name", slice_ptr)))                                \
+                                                                                \
+                EXPORT_PROC("cxx/type/*",                                       \
+                    OVERLOAD(type_ptr, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("type_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/type/&",                                       \
+                    OVERLOAD(type_ref, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("type_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/type/u0",                                      \
+                    OVERLOAD(type_u0, u32,                                      \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/u8",                                      \
+                    OVERLOAD(type_u8, u32,                                      \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/s8",                                      \
+                    OVERLOAD(type_s8, u32,                                      \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/b8",                                      \
+                    OVERLOAD(type_b8, u32,                                      \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/u16",                                     \
+                    OVERLOAD(type_u16, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/s16",                                     \
+                    OVERLOAD(type_s16, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/u32",                                     \
+                    OVERLOAD(type_u32, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/s32",                                     \
+                    OVERLOAD(type_s32, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/u64",                                     \
+                    OVERLOAD(type_u64, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/s64",                                     \
+                    OVERLOAD(type_s64, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/f32",                                     \
+                    OVERLOAD(type_f32, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/f64",                                     \
+                    OVERLOAD(type_f64, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32)))                                  \
+                                                                                \
+                EXPORT_PROC("cxx/type/bit-field",                               \
+                    OVERLOAD(type_bit_field, u32,                               \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("type_id", u32),                                    \
+                        REQ("size", u32)))                                      \
+                                                                                \
+                EXPORT_PROC("cxx/type/array",                                   \
+                    OVERLOAD(type_array, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("type_id", u32),                                    \
+                        REQ("size", u32)))                                      \
+                                                                                \
+                EXPORT_PROC("cxx/type/enum",                                    \
+                    OVERLOAD(type_enum, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("block_id", u32),                                   \
+                        REQ("ident_id", u32),                                   \
+                        OPT("flags", u8, 0)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/type/class",                                   \
+                    OVERLOAD(type_class, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("block_id", u32),                                   \
+                        REQ("ident_id", u32),                                   \
+                        OPT("flags", u8, 0)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/type/union",                                   \
+                    OVERLOAD(type_union, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("block_id", u32),                                   \
+                        REQ("ident_id", u32),                                   \
+                        OPT("flags", u8, 0)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/type/struct",                                  \
+                    OVERLOAD(type_struct, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("block_id", u32),                                   \
+                        REQ("ident_id", u32),                                   \
+                        OPT("flags", u8, 0)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/type/enum-class",                              \
+                    OVERLOAD(type_enum_class, u32,                              \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("block_id", u32),                                   \
+                        REQ("ident_id", u32),                                   \
+                        OPT("flags", u8, 0)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/type/function",                                \
+                    OVERLOAD(type_func, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ret_type_id", u32),                                \
+                        REQ("ident_id", u32),                                   \
+                        OPT("params_list_id", u32, 0)))                         \
+                                                                                \
+                EXPORT_PROC("cxx/unary/!",                                      \
+                    OVERLOAD(unary_not, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/unary/~",                                      \
+                    OVERLOAD(unary_binary_not, u32,                             \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/unary/*",                                      \
+                    OVERLOAD(unary_deref, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/unary/-",                                      \
+                    OVERLOAD(unary_negate, u32,                                 \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/unary/&",                                      \
+                    OVERLOAD(unary_address_of, u32,                             \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/unary/&&",                                     \
+                    OVERLOAD(unary_address_of_label, u32,                       \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/unary/++",                                     \
+                    OVERLOAD(unary_increment, u32,                              \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32),                                    \
+                        REQ("placement", slice_ptr)))                           \
+                                                                                \
+                EXPORT_PROC("cxx/unary/--",                                     \
+                    OVERLOAD(unary_decrement, u32,                              \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32),                                    \
+                        REQ("placement", slice_ptr)))                           \
+                                                                                \
+                EXPORT_PROC("cxx/init/=",                                       \
+                    OVERLOAD(init_assign, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/init/{}",                                      \
+                    OVERLOAD(init_list, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REST("rest", obj_ptr)))                                 \
+                                                                                \
+                EXPORT_PROC("cxx/assign/=",                                     \
+                    OVERLOAD(assign_direct, u32,                                \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/assign/+=",                                    \
+                    OVERLOAD(assign_sum, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/assign/<<=",                                   \
+                    OVERLOAD(assign_shl, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/assign/>>=",                                   \
+                    OVERLOAD(assign_shr, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/assign/|=",                                    \
+                    OVERLOAD(assign_bor, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/assign/&=",                                    \
+                    OVERLOAD(assign_band, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/assign/^=",                                    \
+                    OVERLOAD(assign_bxor, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/assign/-=",                                    \
+                    OVERLOAD(assign_diff, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/assign/*=",                                    \
+                    OVERLOAD(assign_product, u32,                               \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/assign//=",                                    \
+                    OVERLOAD(assign_quotient, u32,                              \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/assign/%=",                                    \
+                    OVERLOAD(assign_remainder, u32,                             \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/==",                                    \
+                    OVERLOAD(binary_eq, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/!=",                                    \
+                    OVERLOAD(binary_neq, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/<",                                     \
+                    OVERLOAD(binary_lt, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/<=",                                    \
+                    OVERLOAD(binary_lte, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/>",                                     \
+                    OVERLOAD(binary_gt, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/>=",                                    \
+                    OVERLOAD(binary_gte, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/+",                                     \
+                    OVERLOAD(binary_add, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/-",                                     \
+                    OVERLOAD(binary_sub, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/*",                                     \
+                    OVERLOAD(binary_mul, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary//",                                     \
+                    OVERLOAD(binary_div, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/%",                                     \
+                    OVERLOAD(binary_mod, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/^",                                     \
+                    OVERLOAD(binary_bxor, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/<<",                                    \
+                    OVERLOAD(binary_shl, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/>>",                                    \
+                    OVERLOAD(binary_shr, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/|",                                     \
+                    OVERLOAD(binary_bor, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/&",                                     \
+                    OVERLOAD(binary_band, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/&&",                                    \
+                    OVERLOAD(binary_land, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/||",                                    \
+                    OVERLOAD(binary_lor, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/:",                                     \
+                    OVERLOAD(binary_range, u32,                                 \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/::",                                    \
+                    OVERLOAD(binary_scope_res, u32,                             \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/.",                                     \
+                    OVERLOAD(binary_member, u32,                                \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/,",                                     \
+                    OVERLOAD(binary_comma, u32,                                 \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/cast",                                  \
+                    OVERLOAD(binary_cast, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/binary/subscript",                             \
+                    OVERLOAD(binary_subscript, u32,                             \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("lhs", u32),                                        \
+                        REQ("rhs", u32)))                                       \
+                                                                                \
+                EXPORT_PROC("cxx/lit/char",                                     \
+                    OVERLOAD(lit_char, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("value", u8)))                                      \
+                                                                                \
+                EXPORT_PROC("cxx/lit/string",                                   \
+                    OVERLOAD(lit_str, u32,                                      \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("value", slice_ptr)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/lit/float",                                    \
+                    OVERLOAD(lit_float, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("value", f32),                                      \
+                        REQ("size", slice_ptr)))                                \
+                                                                                \
+                EXPORT_PROC("cxx/lit/signed",                                   \
+                    OVERLOAD(lit_signed, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("value", u32),                                      \
+                        REQ("size", slice_ptr)))                                \
+                                                                                \
+                EXPORT_PROC("cxx/lit/unsigned",                                 \
+                    OVERLOAD(lit_unsigned, u32,                                 \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("value", u32),                                      \
+                        REQ("size", slice_ptr)))                                \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/raw-pragma",                              \
+                    OVERLOAD(pragma_raw, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("value", slice_ptr)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/include",                                 \
+                    OVERLOAD(pragma_include_local, u32,                         \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("value", slice_ptr)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/include<>",                               \
+                    OVERLOAD(pragma_include_system, u32,                        \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("value", slice_ptr)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/raw",                                     \
+                    OVERLOAD(stmt_raw, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("source", slice_ptr)))                              \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/public",                                  \
+                    OVERLOAD(stmt_public, u32,                                  \
+                        REQ("scope_usr", obj_ptr)))                             \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/private",                                 \
+                    OVERLOAD(stmt_private, u32,                                 \
+                        REQ("scope_usr", obj_ptr)))                             \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/protected",                               \
+                    OVERLOAD(stmt_protected, u32,                               \
+                        REQ("scope_usr", obj_ptr)))                             \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/line-comment",                            \
+                    OVERLOAD(stmt_comment_line, u32,                            \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("value", slice_ptr)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/block-comment",                           \
+                    OVERLOAD(stmt_comment_block, u32,                           \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("value", slice_ptr)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/expr/raw",                                     \
+                    OVERLOAD(make_raw, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("source", slice_ptr)))                              \
+                                                                                \
+                EXPORT_PROC("cxx/expr/var",                                     \
+                    OVERLOAD(make_var, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("type_id", u32),                                    \
+                        REQ("ident_id", u32),                                   \
+                        OPT("init", u32, 0),                                    \
+                        OPT("flags", u8, 0)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/expr/ident",                                   \
+                    OVERLOAD(make_ident, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("source", slice_ptr)))                              \
+                                                                                \
+                EXPORT_PROC("cxx/expr/list",                                    \
+                    OVERLOAD(make_list, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REST("rest", obj_ptr)))                                 \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/if",                                      \
+                    OVERLOAD(stmt_if, u32,                                      \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("predicate_id", u32),                               \
+                        REQ("true_id", u32),                                    \
+                        OPT("false_id", u32, 0),                                \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/for",                                     \
+                    OVERLOAD(stmt_for, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("predicate_id", u32),                               \
+                        REQ("expr_id", u32),                                    \
+                        OPT("init_id", u32, 0),                                 \
+                        OPT("post_id", u32, 0),                                 \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/do",                                      \
+                    OVERLOAD(stmt_do, u32,                                      \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("predicate_id", u32),                               \
+                        REQ("expr_id", u32),                                    \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/case",                                    \
+                    OVERLOAD(stmt_case, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("predicate_id", u32),                               \
+                        REQ("expr_id", u32),                                    \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/while",                                   \
+                    OVERLOAD(stmt_while, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("predicate_id", u32),                               \
+                        REQ("expr_id", u32),                                    \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/switch",                                  \
+                    OVERLOAD(stmt_switch, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("predicate_id", u32),                               \
+                        REQ("expr_id", u32),                                    \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/expr",                                    \
+                    OVERLOAD(stmt_expr, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32),                                    \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/decl",                                    \
+                    OVERLOAD(stmt_decl, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32),                                    \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/goto",                                    \
+                    OVERLOAD(stmt_goto, u32,                                    \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32),                                    \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/return",                                  \
+                    OVERLOAD(stmt_return, u32,                                  \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32),                                    \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/default",                                 \
+                    OVERLOAD(stmt_default, u32,                                 \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32),                                    \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/define",                                  \
+                    OVERLOAD(stmt_def, u32,                                     \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/using",                                   \
+                    OVERLOAD(stmt_using, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("ident_id", u32),                                   \
+                        REQ("type_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/using-namespace",                         \
+                    OVERLOAD(stmt_using_ns, u32,                                \
+                        REQ("scope_usr", obj_ptr),                              \
+                        REQ("expr_id", u32)))                                   \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/empty",                                   \
+                    OVERLOAD(stmt_empty, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/break",                                   \
+                    OVERLOAD(stmt_break, u32,                                   \
+                        REQ("scope_usr", obj_ptr),                              \
+                        OPT("label_id", u32, 0)))                               \
+                                                                                \
+                EXPORT_PROC("cxx/stmt/continue",                                \
+                    OVERLOAD(stmt_continue, u32,                                \
+                        REQ("scope_usr", obj_ptr),                              \
+                        OPT("label_id", u32, 0)))
+
     namespace system {
         namespace exports {
             using namespace scm::kernel;
 
             static proc_export_t s_exports[] = {
-                {"cxx/make-program"_ss, 1,
-                    {
-                        {(u0*) make_program, "make_program"_ss, type_decl::obj_ptr, 0}
-                    }
-                },
-
-                {"cxx/serialize"_ss, 1,
-                    {
-                        {(u0*) serialize, "serialize"_ss, type_decl::u32_, 1,
-                            {
-                                {"ser_usr"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/finalize-program"_ss, 1,
-                    {
-                        {(u0*) finalize_program, "finalize_program"_ss, type_decl::obj_ptr, 1,
-                            {
-                                {"pgm_usr"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/make-serializer"_ss, 1,
-                    {
-                        {(u0*) make_serializer, "make_serializer"_ss, type_decl::obj_ptr, 3,
-                            {
-                                {"pgm_usr"_ss, type_decl::obj_ptr},
-                                {"width"_ss, type_decl::u16_, .default_value.w = 160, .has_default = true},
-                                {"tab-width"_ss, type_decl::u16_, .default_value.w = 4, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/size-in-bits"_ss, 1,
-                    {
-                        {(u0*) size_in_bits, "size_in_bits"_ss, type_decl::u32_, 1,
-                            {
-                                {"name"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/size-in-bytes"_ss, 1,
-                    {
-                        {(u0*) size_in_bytes, "size_in_bytes"_ss, type_decl::u32_, 1,
-                            {
-                                {"name"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/get-scope"_ss, 1,
-                    {
-                        {(u0*) get_scope, "get_scope"_ss, type_decl::obj_ptr, 2,
-                            {
-                                {"mod_usr"_ss, type_decl::obj_ptr},
-                                {"id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/get-module"_ss, 1,
-                    {
-                        {(u0*) get_module, "get_module"_ss, type_decl::obj_ptr, 2,
-                            {
-                                {"pgm_usr"_ss, type_decl::obj_ptr},
-                                {"id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/add-module"_ss, 1,
-                    {
-                        {(u0*) add_module, "add_module"_ss, type_decl::obj_ptr, 3,
-                            {
-                                {"pgm_usr"_ss, type_decl::obj_ptr},
-                                {"file_name"_ss, type_decl::slice_ptr},
-                                {"revision"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/pop-scope"_ss, 1,
-                    {
-                        {(u0*) pop_scope, "pop_scope"_ss, type_decl::u0_, 1,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/push-scope"_ss, 1,
-                    {
-                        {(u0*) push_scope, "push_scope"_ss, type_decl::u32_, 1,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/make-label"_ss, 1,
-                    {
-                        {(u0*) make_label, "make-label"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"name"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/*"_ss, 1,
-                    {
-                        {(u0*) type_ptr, "type_ptr"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"type_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/&"_ss, 1,
-                    {
-                        {(u0*) type_ref, "type_ref"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"type_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/u0"_ss, 1,
-                    {
-                        {(u0*) type_u0, "type_u0"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/u8"_ss, 1,
-                    {
-                        {(u0*) type_u8, "type_u8"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/s8"_ss, 1,
-                    {
-                        {(u0*) type_s8, "type_s8"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/b8"_ss, 1,
-                    {
-                        {(u0*) type_b8, "type_b8"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/u16"_ss, 1,
-                    {
-                        {(u0*) type_u16, "type_u16"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/s16"_ss, 1,
-                    {
-                        {(u0*) type_s16, "type_s16"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/u32"_ss, 1,
-                    {
-                        {(u0*) type_u32, "type_u32"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/s32"_ss, 1,
-                    {
-                        {(u0*) type_s32, "type_s32"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/u64"_ss, 1,
-                    {
-                        {(u0*) type_u64, "type_u64"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/s64"_ss, 1,
-                    {
-                        {(u0*) type_s64, "type_s64"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/f32"_ss, 1,
-                    {
-                        {(u0*) type_f32, "type_f32"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/f64"_ss, 1,
-                    {
-                        {(u0*) type_f64, "type_f64"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/bit-field"_ss, 1,
-                    {
-                        {(u0*) type_bit_field, "type_bit_field"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"type_id"_ss, type_decl::u32_},
-                                {"size"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/array"_ss, 1,
-                    {
-                        {(u0*) type_array, "type_array"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"type_id"_ss, type_decl::u32_},
-                                {"size"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/enum"_ss, 1,
-                    {
-                        {(u0*) type_enum, "type_enum"_ss, type_decl::u32_, 4,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"block_id"_ss, type_decl::u32_},
-                                {"ident_id"_ss, type_decl::u32_},
-                                {"flags"_ss, type_decl::u8_, .default_value.b = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/class"_ss, 1,
-                    {
-                        {(u0*) type_class, "type_class"_ss, type_decl::u32_, 4,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"block_id"_ss, type_decl::u32_},
-                                {"ident_id"_ss, type_decl::u32_},
-                                {"flags"_ss, type_decl::u8_, .default_value.b = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/union"_ss, 1,
-                    {
-                        {(u0*) type_union, "type_union"_ss, type_decl::u32_, 4,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"block_id"_ss, type_decl::u32_},
-                                {"ident_id"_ss, type_decl::u32_},
-                                {"flags"_ss, type_decl::u8_, .default_value.b = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/struct"_ss, 1,
-                    {
-                        {(u0*) type_struct, "type_struct"_ss, type_decl::u32_, 4,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"block_id"_ss, type_decl::u32_},
-                                {"ident_id"_ss, type_decl::u32_},
-                                {"flags"_ss, type_decl::u8_, .default_value.b = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/enum-class"_ss, 1,
-                    {
-                        {(u0*) type_enum_class, "type_enum_class"_ss, type_decl::u32_, 4,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"block_id"_ss, type_decl::u32_},
-                                {"ident_id"_ss, type_decl::u32_},
-                                {"flags"_ss, type_decl::u8_, .default_value.b = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/type/func"_ss, 1,
-                    {
-                        {(u0*) type_func, "type_func"_ss, type_decl::u32_, 4,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ret_type_id"_ss, type_decl::u32_},
-                                {"ident_id"_ss, type_decl::u32_},
-                                {"params_list_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/unary/!"_ss, 1,
-                    {
-                        {(u0*) unary_not, "unary_not"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/unary/~"_ss, 1,
-                    {
-                        {(u0*) unary_binary_not, "unary_binary_not"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/unary/*"_ss, 1,
-                    {
-                        {(u0*) unary_deref, "unary_deref"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/unary/-"_ss, 1,
-                    {
-                        {(u0*) unary_negate, "unary_negate"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/unary/&"_ss, 1,
-                    {
-                        {(u0*) unary_address_of, "unary_address_of"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/unary/&&"_ss, 1,
-                    {
-                        {(u0*) unary_address_of_label, "unary_address_of_label"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/unary/++"_ss, 1,
-                    {
-                        {(u0*) unary_increment, "unary_increment"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                                {"placement"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/unary/--"_ss, 1,
-                    {
-                        {(u0*) unary_decrement, "unary_decrement"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                                {"placement"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/init/="_ss, 1,
-                    {
-                        {(u0*) init_assign, "init_assign"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/init/{}"_ss, 1,
-                    {
-                        {(u0*) init_list, "init_list"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"rest"_ss, type_decl::obj_ptr, .is_rest = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/assign/="_ss, 1,
-                    {
-                        {(u0*) assign_direct, "assign_direct"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/assign/+="_ss, 1,
-                    {
-                        {(u0*) assign_sum, "assign_sum"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/assign/<<="_ss, 1,
-                    {
-                        {(u0*) assign_shl, "assign_shl"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/assign/>>="_ss, 1,
-                    {
-                        {(u0*) assign_shl, "assign_shr"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/assign/|="_ss, 1,
-                    {
-                        {(u0*) assign_bor, "assign_bor"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/assign/^="_ss, 1,
-                    {
-                        {(u0*) assign_bor, "assign_xor"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/assign/-="_ss, 1,
-                    {
-                        {(u0*) assign_diff, "assign_diff"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/assign/*="_ss, 1,
-                    {
-                        {(u0*) assign_product, "assign_product"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/assign//="_ss, 1,
-                    {
-                        {(u0*) assign_quotient, "assign_quotient"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/assign/%="_ss, 1,
-                    {
-                        {(u0*) assign_remainder, "assign_remainder"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/expr/raw"_ss, 1,
-                    {
-                        {(u0*) make_raw, "make_raw"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"source"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/expr/var"_ss, 1,
-                    {
-                        {(u0*) make_var, "make_var"_ss, type_decl::u32_, 5,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"type"_ss, type_decl::u32_},
-                                {"ident"_ss, type_decl::u32_},
-                                {"init"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                                {"flags"_ss, type_decl::u8_, .default_value.b = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/expr/ident"_ss, 1,
-                    {
-                        {(u0*) make_ident, "make_ident"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"source"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/expr/list"_ss, 1,
-                    {
-                        {(u0*) make_list, "make_list"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"rest"_ss, type_decl::obj_ptr, .is_rest = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/=="_ss, 1,
-                    {
-                        {(u0*) binary_eq, "binary_eq"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/!="_ss, 1,
-                    {
-                        {(u0*) binary_neq, "binary_neq"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/<"_ss, 1,
-                    {
-                        {(u0*) binary_lt, "binary_lt"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/<="_ss, 1,
-                    {
-                        {(u0*) binary_lte, "binary_lte"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/>"_ss, 1,
-                    {
-                        {(u0*) binary_gt, "binary_gt"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/>="_ss, 1,
-                    {
-                        {(u0*) binary_gte, "binary_gte"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/+"_ss, 1,
-                    {
-                        {(u0*) binary_add, "binary_add"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/-"_ss, 1,
-                    {
-                        {(u0*) binary_sub, "binary_sub"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/*"_ss, 1,
-                    {
-                        {(u0*) binary_mul, "binary_mul"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary//"_ss, 1,
-                    {
-                        {(u0*) binary_div, "binary_div"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/%"_ss, 1,
-                    {
-                        {(u0*) binary_mod, "binary_mod"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/^"_ss, 1,
-                    {
-                        {(u0*) binary_bxor, "binary_bxor"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/<<"_ss, 1,
-                    {
-                        {(u0*) binary_shl, "binary_shl"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/>>"_ss, 1,
-                    {
-                        {(u0*) binary_shr, "binary_shr"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/|"_ss, 1,
-                    {
-                        {(u0*) binary_bor, "binary_bor"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/||"_ss, 1,
-                    {
-                        {(u0*) binary_lor, "binary_lor"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/&"_ss, 1,
-                    {
-                        {(u0*) binary_band, "binary_band"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/&&"_ss, 1,
-                    {
-                        {(u0*) binary_land, "binary_land"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/:"_ss, 1,
-                    {
-                        {(u0*) binary_range, "binary_range"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/::"_ss, 1,
-                    {
-                        {(u0*) binary_scope_res, "binary_scope_res"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/."_ss, 1,
-                    {
-                        {(u0*) binary_member, "binary_member"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/,"_ss, 1,
-                    {
-                        {(u0*) binary_comma, "binary_comma"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/binary/subscript"_ss, 1,
-                    {
-                        {(u0*) binary_subscript, "binary_subscript"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"lhs"_ss, type_decl::u32_},
-                                {"rhs"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/lit/char"_ss, 1,
-                    {
-                        {(u0*) lit_char, "lit_char"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"value"_ss, type_decl::u8_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/lit/string"_ss, 1,
-                    {
-                        {(u0*) lit_str, "lit_str"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"value"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/lit/float"_ss, 1,
-                    {
-                        {(u0*) lit_float, "lit_f32"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"value"_ss, type_decl::f32_},
-                                {"size"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/lit/signed"_ss, 1,
-                    {
-                        {(u0*) lit_signed, "lit_signed"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"value"_ss, type_decl::u32_},
-                                {"size"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/lit/unsigned"_ss, 1,
-                    {
-                        {(u0*) lit_unsigned, "lit_unsigned"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"value"_ss, type_decl::u32_},
-                                {"size"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/raw-pragma"_ss, 1,
-                    {
-                        {(u0*) pragma_raw, "pragma_raw"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"value"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/include"_ss, 1,
-                    {
-                        {(u0*) pragma_include_local, "pragma_include_local"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"path"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/include<>"_ss, 1,
-                    {
-                        {(u0*) pragma_include_system, "pragma_include_system"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"path"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/raw"_ss, 1,
-                    {
-                        {(u0*) stmt_raw, "stmt_raw"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"source"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/public"_ss, 1,
-                    {
-                        {(u0*) stmt_public, "stmt_public"_ss, type_decl::u32_, 1,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/private"_ss, 1,
-                    {
-                        {(u0*) stmt_private, "stmt_private"_ss, type_decl::u32_, 1,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/protected"_ss, 1,
-                    {
-                        {(u0*) stmt_protected, "stmt_protected"_ss, type_decl::u32_, 1,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/line-comment"_ss, 1,
-                    {
-                        {(u0*) stmt_comment_line, "stmt_comment_line"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"value"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/block-comment"_ss, 1,
-                    {
-                        {(u0*) stmt_comment_block, "stmt_comment_block"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"value"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/if"_ss, 1,
-                    {
-                        {(u0*) stmt_if, "stmt_if"_ss, type_decl::u32_, 5,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"predicate_id"_ss, type_decl::u32_},
-                                {"true_id"_ss, type_decl::u32_},
-                                {"false_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/for"_ss, 1,
-                    {
-                        {(u0*) stmt_for, "stmt_for"_ss, type_decl::u32_, 6,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"predicate_id"_ss, type_decl::u32_},
-                                {"expr_id"_ss, type_decl::u32_},
-                                {"init_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                                {"post_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/do"_ss, 1,
-                    {
-                        {(u0*) stmt_do, "stmt_do"_ss, type_decl::u32_, 4,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"predicate_id"_ss, type_decl::u32_},
-                                {"expr_id"_ss, type_decl::u32_},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/case"_ss, 1,
-                    {
-                        {(u0*) stmt_case, "stmt_case"_ss, type_decl::u32_, 4,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"predicate_id"_ss, type_decl::u32_},
-                                {"expr_id"_ss, type_decl::u32_},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/while"_ss, 1,
-                    {
-                        {(u0*) stmt_while, "stmt_while"_ss, type_decl::u32_, 4,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"predicate_id"_ss, type_decl::u32_},
-                                {"expr_id"_ss, type_decl::u32_},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/switch"_ss, 1,
-                    {
-                        {(u0*) stmt_switch, "stmt_switch"_ss, type_decl::u32_, 4,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"predicate_id"_ss, type_decl::u32_},
-                                {"expr_id"_ss, type_decl::u32_},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/expr"_ss, 1,
-                    {
-                        {(u0*) stmt_expr, "stmt_expr"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/decl"_ss, 1,
-                    {
-                        {(u0*) stmt_decl, "stmt_decl"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/goto"_ss, 1,
-                    {
-                        {(u0*) stmt_goto, "stmt_goto"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/return"_ss, 1,
-                    {
-                        {(u0*) stmt_goto, "stmt_goto"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/default"_ss, 1,
-                    {
-                        {(u0*) stmt_default, "stmt_default"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/define"_ss, 1,
-                    {
-                        {(u0*) stmt_def, "stmt_def"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/using"_ss, 1,
-                    {
-                        {(u0*) stmt_using, "stmt_using"_ss, type_decl::u32_, 3,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"ident_id"_ss, type_decl::u32_},
-                                {"type_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/using-namespace"_ss, 1,
-                    {
-                        {(u0*) stmt_using_ns, "stmt_using_ns"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"expr_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/empty"_ss, 1,
-                    {
-                        {(u0*) stmt_empty, "stmt_empty"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/break"_ss, 1,
-                    {
-                        {(u0*) stmt_break, "stmt_break"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
-                {"cxx/stmt/continue"_ss, 1,
-                    {
-                        {(u0*) stmt_continue, "stmt_continue"_ss, type_decl::u32_, 2,
-                            {
-                                {"scope_usr"_ss, type_decl::obj_ptr},
-                                {"label_id"_ss, type_decl::u32_, .default_value.dw = 0, .has_default = true},
-                            }
-                        }
-                    }
-                },
-
+#define EXPORT_PROC(n, ...)    basecode::scm::kernel::proc_export_t{    \
+    n##_ss, \
+    u32(VA_COUNT(__VA_ARGS__)), \
+    __VA_ARGS__},
+                EXPORTS
+#undef EXPORT_PROC
                 {str::slice_t{}},
            };
         }

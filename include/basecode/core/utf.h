@@ -20,6 +20,7 @@
 
 #include <utf8proc.h>
 #include <basecode/core/memory.h>
+#include <basecode/core/context.h>
 
 namespace basecode {
     template <typename T>

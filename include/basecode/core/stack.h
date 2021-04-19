@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cassert>
 #include <cstring>
 #include <algorithm>
 #include <basecode/core/types.h>

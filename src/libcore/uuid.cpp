@@ -16,9 +16,9 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <cassert>
 #include <basecode/core/uuid.h>
 #include <basecode/core/bits.h>
+#include <basecode/core/assert.h>
 #include <basecode/core/numbers.h>
 
 namespace basecode::uuid {
@@ -26,11 +26,7 @@ namespace basecode::uuid {
         uuid_t u{};
 #ifdef _MSC_VER
         auto hr = CoCreateGuid((GUID*) &u);
-#ifdef DEBUG
-        assert(!FAILED(hr));
-#else
-        UNUSED(hr);
-#endif
+        BC_ASSERT_MSG(!FAILED(hr), "CoCreateGuid return failure code");
 #else
         // XXX: *nix approach?
         //      find way to do this without libuuid

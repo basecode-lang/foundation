@@ -1248,7 +1248,7 @@ namespace basecode::scm {
         auto env = top_env(ctx);
         const auto str_id = FIXNUM(sym);
         const auto name = string::interned::get_slice(str_id);
-        assert(name && "string::interned::get_slice returned null");
+        BC_ASSERT_NOT_NULL(name);
         auto chain = ctx->handlers.chain;
         while (chain) {
             if (chain->define_enabled && chain->define) {
@@ -1312,7 +1312,7 @@ namespace basecode::scm {
     }
 
     obj_t* make_environment(ctx_t* ctx, obj_t* parent) {
-        assert(parent && "parent env cannot be null!");
+        BC_ASSERT_NOT_NULL(parent);
         env_t* env{};
         for (u32 i = 0; i < ctx->environments.size; ++i) {
             auto e = &ctx->environments[i];

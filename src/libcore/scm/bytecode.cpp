@@ -1053,7 +1053,7 @@ namespace basecode::scm::bytecode {
         auto ctx = c.ctx;
         auto sym = scm::to_string(c.ctx, c.obj);
         auto res = emitter::virtual_var::get(comp.emit, sym);
-        assert(res && "you may need to declare it");
+        BC_ASSERT_MSG(res, "virtual variable not found; delcare it");
         basic_block::encode(c.bb)
             .comment(format::format("symbol: {}", sym))
             .imm2()

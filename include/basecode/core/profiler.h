@@ -51,7 +51,7 @@ namespace basecode::profiler {
 
     f64 calibration_mult();
 
-    force_inline u64 get_time() {
+    FORCE_INLINE u64 get_time() {
         using namespace std::chrono;
 #ifdef HW_TIMER
 #  if TARGET_OS_IOS == 1

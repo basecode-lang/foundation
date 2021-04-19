@@ -18,23 +18,51 @@
 
 #include <basecode/core/scm/kernel.h>
 
+#define TYPE_DECLS  TYPE_DECL(u0, param_cls_t::void_, param_size_t::byte)       \
+                    TYPE_DECL_USER(b8,                                          \
+                                   param_cls_t::int_,                           \
+                                   param_size_t::byte,                          \
+                                   scm::ffi_type_t::boolean)                    \
+                    TYPE_DECL(u8,                                               \
+                              param_cls_t::int_,                                \
+                              param_size_t::byte)                               \
+                    TYPE_DECL(u16,                                              \
+                              param_cls_t::int_,                                \
+                              param_size_t::word)                               \
+                    TYPE_DECL(u32,                                              \
+                              param_cls_t::int_,                                \
+                              param_size_t::dword)                              \
+                    TYPE_DECL(f32,                                              \
+                              param_cls_t::float_,                              \
+                              param_size_t::dword)                              \
+                    TYPE_DECL_USER(obj_ptr,                                     \
+                                   param_cls_t::ptr,                            \
+                                   param_size_t::qword,                         \
+                                   scm::ffi_type_t::object)                     \
+                    TYPE_DECL_USER(list_ptr,                                    \
+                                   param_cls_t::ptr,                            \
+                                   param_size_t::qword,                         \
+                                   scm::ffi_type_t::list)                       \
+                    TYPE_DECL_USER(slice_ptr,                                   \
+                                   param_cls_t::ptr,                            \
+                                   param_size_t::qword,                         \
+                                   scm::ffi_type_t::string)
+#define TYPE_DECL(k, cls, size) TYPE_DECL_USER(k,                               \
+                                               cls,                             \
+                                               size,                            \
+                                               scm::ffi_type_t::none)
+
 namespace basecode::scm::kernel {
     static type_decl_t s_common_types[] = {
-        [type_decl::u0_]       = {param_cls_t::void_, param_size_t::none},
-        [type_decl::u32_]      = {param_cls_t::int_, param_size_t::dword},
-        [type_decl::f32_]      = {param_cls_t::float_, param_size_t::dword},
-        [type_decl::list_ptr]  = {param_cls_t::ptr, param_size_t::qword, scm::ffi_type_t::list},
-        [type_decl::obj_ptr]   = {param_cls_t::ptr, param_size_t::qword, scm::ffi_type_t::object},
-        [type_decl::slice_ptr] = {param_cls_t::ptr, param_size_t::qword, scm::ffi_type_t::string},
-        [type_decl::u8_]       = {param_cls_t::int_, param_size_t::byte},
-        [type_decl::b8_]       = {param_cls_t::int_, param_size_t::byte, scm::ffi_type_t::boolean},
-        [type_decl::u16_]      = {param_cls_t::int_, param_size_t::word},
+#define TYPE_DECL_USER(k, cls, size, user)  [TYPE_DECL_REF(k)] = {(cls), (size), (user)},
+        TYPE_DECLS
+#undef TYPE_DECL_USER
     };
 
-    static param_type_t s_types[type_decl::max] = {};
+    static param_type_t s_types[TYPE_DECL_REF(Count)] = {};
 
     u0 create_common_types() {
-        scm::kernel::create_types(s_common_types, type_decl::max);
+        scm::kernel::create_types(s_common_types, TYPE_DECL_REF(Count));
     }
 
     u0 create_types(type_decl_t* decls, u32 size) {

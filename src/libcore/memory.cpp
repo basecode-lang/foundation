@@ -46,23 +46,23 @@ namespace basecode::memory {
         usize                   os_alloc_granularity;
     };
 
-    static str::slice_t         s_status_names[] = {
-        "ok"_ss,
-        "invalid allocator"_ss,
-        "invalid default allocator"_ss,
-        "invalid allocation system"_ss,
+    static const s8*            s_status_names[] = {
+        "ok",
+        "invalid allocator",
+        "invalid default allocator",
+        "invalid allocation system",
     };
 
-    static str::slice_t         s_type_names[] = {
-        "default"_ss,
-        "bump"_ss,
-        "page"_ss,
-        "slab"_ss,
-        "proxy"_ss,
-        "trace"_ss,
-        "stack"_ss,
-        "buddy"_ss,
-        "dlmalloc"_ss,
+    static const s8*            s_type_names[] = {
+        "default",
+        "bump",
+        "page",
+        "slab",
+        "proxy",
+        "trace",
+        "stack",
+        "buddy",
+        "dlmalloc",
     };
 
     thread_local system_t       t_system{};
@@ -181,19 +181,21 @@ namespace basecode::memory {
 
     namespace internal {
         u32 fini(alloc_t* alloc) {
-            assert(alloc);
+            BC_ASSERT_NOT_NULL(alloc);
             auto sys = alloc->system;
             if (!sys || !sys->fini)
                 return 0;
             const auto size_freed = sys->fini(alloc);
             if (size_freed > alloc->total_allocated) {
-                format::print(stderr, "fini of {} allocator freed {} bytes vs {} in total_allocated!\n",
+                format::print(stderr,
+                              "fini of {} allocator freed {} bytes vs {} in total_allocated!\n",
                               type_name(alloc->system->type),
                               size_freed,
                               alloc->total_allocated);
             } else {
                 alloc->total_allocated -= size_freed;
-                assert(alloc->total_allocated == 0);
+                BC_ASSERT_MSG(alloc->total_allocated == 0,
+                              "allocator is leaking memory");
             }
             meta::system::untrack(alloc);
             alloc->backing = {};
@@ -201,7 +203,7 @@ namespace basecode::memory {
         }
 
         u32 size(alloc_t* alloc, u0* mem) {
-            assert(alloc && mem);
+            BC_ASSERT_NOT_NULL(alloc && mem);
             auto sys = alloc->system;
             if (!sys || !sys->size)
                 return 0;
@@ -220,7 +222,7 @@ namespace basecode::memory {
         }
 
         mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
-            assert(alloc);
+            BC_ASSERT_NOT_NULL(alloc);
             auto sys = alloc->system;
             if (!sys || !sys->alloc)
                 return {};
@@ -230,7 +232,7 @@ namespace basecode::memory {
         }
 
         mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
-            assert(alloc);
+            BC_ASSERT_NOT_NULL(alloc);
             auto sys = alloc->system;
             if (!sys || !sys->realloc)
                 return {};
@@ -246,11 +248,11 @@ namespace basecode::memory {
         return alloc;
     }
 
-    str::slice_t type_name(alloc_type_t type) {
+    const s8* type_name(alloc_type_t type) {
         return s_type_names[(u32) type];
     }
 
-    str::slice_t status_name(status_t status) {
+    const s8* status_name(status_t status) {
         return s_status_names[(u32) status];
     }
 

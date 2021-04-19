@@ -51,36 +51,29 @@ namespace basecode::config {
         return id;
     }
 
+#define EXPORTS EXPORT_PROC("localized-string",                                 \
+                    OVERLOAD(localized_string, u32,                             \
+                        REQ("id", u32),                                         \
+                        REQ("locale", slice_ptr),                               \
+                        REQ("value", slice_ptr)))                               \
+                EXPORT_PROC("localized-error",                                  \
+                    OVERLOAD(localized_error, u32,                              \
+                        REQ("id", u32),                                         \
+                        REQ("locale", slice_ptr),                               \
+                        REQ("code", slice_ptr),                                 \
+                        REQ("str_id", u32)))
+
     namespace system {
         namespace exports {
             using namespace scm::kernel;
 
             [[maybe_unused]] static proc_export_t s_exports[] = {
-                {"localized-string"_ss, 1,
-                    {
-                        {(u0*) localized_string, "localized_string"_ss, type_decl::u32_, 3,
-                            {
-                                {"id"_ss, type_decl::u32_},
-                                {"locale"_ss, type_decl::slice_ptr},
-                                {"value"_ss, type_decl::slice_ptr},
-                            }
-                        }
-                    }
-                },
-
-                {"localized-error"_ss, 1,
-                    {
-                        {(u0*) localized_error, "localized_error"_ss, type_decl::u32_, 4,
-                            {
-                                {"id"_ss, type_decl::u32_},
-                                {"locale"_ss, type_decl::slice_ptr},
-                                {"code"_ss, type_decl::slice_ptr},
-                                {"str_id"_ss, type_decl::u32_},
-                            }
-                        }
-                    }
-                },
-
+#define EXPORT_PROC(n, ...)    basecode::scm::kernel::proc_export_t{    \
+    n##_ss, \
+    u32(VA_COUNT(__VA_ARGS__)), \
+    __VA_ARGS__},
+                EXPORTS
+#undef EXPORT_PROC
                 {str::slice_t{}},
             };
         }

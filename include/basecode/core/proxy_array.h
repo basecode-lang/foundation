@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <cassert>
 #include <basecode/core/types.h>
 #include <basecode/core/iterator.h>
 #include <basecode/core/array_common.h>

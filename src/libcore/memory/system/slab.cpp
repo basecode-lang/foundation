@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <algorithm>
+#include <basecode/core/assert.h>
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode {
@@ -192,7 +193,8 @@ namespace basecode::memory::slab {
 
     u0 reset(alloc_t* alloc) {
         auto a = unwrap(alloc);
-        assert(a && a->system->type == alloc_type_t::slab);
+        BC_ASSERT_MSG(a && a->system->type == alloc_type_t::slab,
+                      "expected a non-null slab allocator");
         auto sc   = &a->subclass.slab;
         auto curr = sc->head;
         while (curr) {

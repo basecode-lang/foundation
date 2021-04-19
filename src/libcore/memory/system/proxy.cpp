@@ -42,7 +42,7 @@ namespace basecode::memory::proxy {
         auto proxy_config = (proxy_config_t*) config;
         alloc->backing = proxy_config->backing;
         sc->owner      = proxy_config->owner;
-        assert(alloc->backing);
+        BC_ASSERT_NOT_NULL(alloc->backing);
     }
 
     static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
@@ -135,7 +135,8 @@ namespace basecode::memory::proxy {
     }
 
     str::slice_t name(alloc_t* alloc) {
-        assert(alloc && alloc->system->type == alloc_type_t::proxy);
+        BC_ASSERT_MSG(alloc && alloc->system->type == alloc_type_t::proxy,
+                      "expected a non-null proxy allocator");
         return t_proxy_system.names[alloc->subclass.proxy.pair->name_id - 1];
     }
 
