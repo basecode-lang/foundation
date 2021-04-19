@@ -6,9 +6,9 @@
 // | |_)| (_| \__ \  __/ (_| (_) | (_| |  __/
 // |____/\__,_|___/\___|\___\___/ \__,_|\___|
 //
-// V I R T U A L  M A C H I N E  P R O J E C T
+//      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.

@@ -1,6 +1,5 @@
 HIGH
 ---------
-- legal: clean up all file headers
 - macro: text macro system
 - binfmt: one-pass cleanup & make task notes here
 - binfmt: rework test runner main.cpp to match core
@@ -45,6 +44,7 @@ LOW
 
 DONE
 ----
+- legal: clean up all file headers
 - libgfx: create test bed application within foundation project
 - memory: reimplement meta tracking
 - ffi: reimplement match_signature

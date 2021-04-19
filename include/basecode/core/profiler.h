@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -25,7 +25,14 @@
 #endif
 #include <basecode/core/types.h>
 
-#if defined _WIN32 || defined __CYGWIN__ || ((defined __i386 || defined _M_IX86 || defined __x86_64__ || defined _M_X64) && !defined __ANDROID__) || __ARM_ARCH >= 6
+#if defined _WIN32                                                              \
+    || defined __CYGWIN__                                                       \
+    || ((defined __i386                                                         \
+        || defined _M_IX86                                                      \
+        || defined __x86_64__                                                   \
+        || defined _M_X64)                                                      \
+    && !defined __ANDROID__)                                                    \
+    || __ARM_ARCH >= 6
 #  define HW_TIMER
 #endif
 

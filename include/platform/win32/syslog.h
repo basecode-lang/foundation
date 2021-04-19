@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -72,7 +72,11 @@ using namespace basecode;
 #define LOG_PERROR          0x20    /* log to stderr as well */
 
 extern u0 closelog();
+
 extern s32 setlogmask(s32);
+
 extern u0 openlog(const s8*, s32, s32);
+
 extern u0 syslog(s32, const s8*, ...);
+
 extern u0 vsyslog(s32, const s8*, va_list ap);
