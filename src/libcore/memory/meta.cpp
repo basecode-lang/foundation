@@ -45,7 +45,7 @@ namespace basecode::memory::meta {
             memory::fini(&t_meta_sys.info_slab);
         }
 
-        u0 update(u32 dt) {
+        u0 update(f32 dt) {
             for (auto info : t_meta_sys.infos) {
                 if (info->mode == plot_mode_t::none)
                     continue;
@@ -120,8 +120,7 @@ namespace basecode::memory::meta {
             hashtab::remove(t_meta_sys.infotab, (u0*) alloc);
         }
 
-        u0 stop_plot(alloc_t* alloc) {
-            auto info = hashtab::find(t_meta_sys.infotab, (u0*) alloc);
+        u0 stop_plot(alloc_info_t* info) {
             if (!info)
                 return;
             alloc_info::stop_plot(*info);
@@ -131,8 +130,7 @@ namespace basecode::memory::meta {
             return t_meta_sys.roots;
         }
 
-        u0 start_plot(alloc_t* alloc, plot_mode_t mode) {
-            auto info = hashtab::find(t_meta_sys.infotab, (u0*) alloc);
+        u0 start_plot(alloc_info_t* info, plot_mode_t mode) {
             if (!info)
                 return;
             alloc_info::start_plot(*info, mode);
@@ -174,10 +172,16 @@ namespace basecode::memory::meta {
                 return;
             switch (info.mode) {
                 case plot_mode_t::rolled:
-                    plot::rolled::append_point(info.plot.rolled, x, y);
+                    info.plot.rolled.time += x;
+                    plot::rolled::append_point(info.plot.rolled,
+                                               info.plot.rolled.time,
+                                               y);
                     break;
                 case plot_mode_t::scrolled:
-                    plot::scrolled::append_point(info.plot.scrolled, x, y);
+                    info.plot.scrolled.time += x;
+                    plot::scrolled::append_point(info.plot.scrolled,
+                                                 info.plot.scrolled.time,
+                                                 y);
                     break;
                 default:
                     break;
@@ -192,13 +196,13 @@ namespace basecode::memory::meta {
                 case plot_mode_t::rolled:
                     plot::rolled::init(info.plot.rolled,
                                        10.0f,
-                                       1000,
+                                       2000,
                                        info.alloc);
                     break;
                 case plot_mode_t::scrolled:
                     plot::scrolled::init(info.plot.scrolled,
                                          0,
-                                         1000,
+                                         2000,
                                          info.alloc);
                     break;
                 default:

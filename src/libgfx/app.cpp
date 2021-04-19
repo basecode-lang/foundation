@@ -145,7 +145,7 @@ namespace basecode::app {
             const auto ticks = profiler::get_time()
                                * profiler::calibration_mult();
             timer::update(ticks);
-            memory::meta::system::update(ticks);
+            memory::meta::system::update(io.DeltaTime);
 
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();

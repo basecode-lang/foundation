@@ -21,31 +21,22 @@
 #include <imgui.h>
 #include <basecode/gfx/gfx.h>
 #include <basecode/core/str.h>
+#include <basecode/gfx/implot/implot.h>
 
 namespace basecode {
-    using render_callback_t = std::function<b8 ()>;
-
-    struct app_t final {
+    struct alloc_window_t final {
         alloc_t*                alloc;
-        render_callback_t       on_render;
+        ImPlotContext*          ctx;
         str_t                   scratch;
-        window_t                window;
-        vector4_t               bg_color;
-        ImGuiID                 dock_root;
+        b8                      visible;
+        b8                      mem_editor;
     };
 
-    namespace app {
-        enum class status_t : u32 {
-            ok,
-            error,
-            gl3w_init_failure,
-            glfw_init_failure,
-        };
+    namespace alloc_window {
+        u0 free(alloc_window_t& win);
 
-        u0 free(app_t& app);
+        u0 draw(alloc_window_t& win);
 
-        status_t run(app_t& app);
-
-        status_t init(app_t& app, alloc_t* alloc = context::top()->alloc);
+        u0 init(alloc_window_t& win, alloc_t* alloc = context::top()->alloc);
     }
 }

@@ -30,6 +30,7 @@
 #include <basecode/core/profiler.h>
 #include <basecode/gfx/configure.h>
 #include <basecode/core/scm/system.h>
+#include <basecode/gfx/alloc_window.h>
 #include <basecode/core/scm/modules/cxx.h>
 #include <basecode/core/scm/modules/log.h>
 #include <basecode/core/scm/modules/basic.h>
@@ -176,6 +177,9 @@ basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
                    path::free(load_path));
 
     static MemoryEditor s_mem_edit;
+    static alloc_window_t s_alloc_win{};
+
+    alloc_window::init(s_alloc_win, alloc);
 
     app_t app{};
     app::init(app, alloc);
@@ -210,6 +214,7 @@ basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
         s_mem_edit.DrawWindow("Memory Editor",
                               &s_mem_edit,
                               sizeof(MemoryEditor));
+        alloc_window::draw(s_alloc_win);
         return true;
     };
 
@@ -217,6 +222,7 @@ basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
     s32 rc = !OK(status);
 
     app::free(app);
+    alloc_window::free(s_alloc_win);
 
     TIME_BLOCK("scm::module::cxx::system::fini"_ss,
                scm::module::cxx::system::fini());

@@ -152,9 +152,9 @@ endif()
 set(IMPLOT_SOURCES
 
     implot/implot.cpp
-    implot/implot.h
-    implot/implot_internal.h
     implot/implot_items.cpp
+    ${GFX_INC_DIR}/implot/implot.h
+    ${GFX_INC_DIR}/implot/implot_internal.h
 )
 
 set(IMGUI_SOURCES
@@ -193,17 +193,20 @@ set(GFX_SOURCES
     ${GFX_INC_DIR}/gfx.h
 
     app.cpp ${GFX_INC_DIR}/app.h
+
+    alloc_window.cpp ${GFX_INC_DIR}/alloc_window.h
+
     font.cpp ${GFX_INC_DIR}/font.h
 )
 
 add_library(
-
     ${LIBRARY_TARGET}
 
     ${GFX_SOURCES}
     ${CLIP_SOURCES}
     ${GL3W_SOURCES}
     ${IMGUI_SOURCES}
+    ${IMPLOT_SOURCES}
 )
 target_include_directories(
     ${LIBRARY_TARGET}

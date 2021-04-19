@@ -47,19 +47,19 @@ namespace basecode {
         namespace system {
             u0 fini();
 
-            u0 update(u32 dt);
+            u0 update(f32 dt);
 
             u0 track(alloc_t* alloc);
 
             u0 untrack(alloc_t* alloc);
 
-            u0 stop_plot(alloc_t* alloc);
+            u0 stop_plot(alloc_info_t* info);
 
             const alloc_info_array_t& roots();
 
-            u0 start_plot(alloc_t* alloc, plot_mode_t mode);
-
             u0 init(alloc_t* alloc = context::top()->alloc);
+
+            u0 start_plot(alloc_info_t* info, plot_mode_t mode);
         }
 
         namespace alloc_info {
