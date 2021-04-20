@@ -92,11 +92,11 @@ namespace basecode::binfmt::io {
     }
 
     namespace name_map {
-        u0 free(name_list_t& names) {
+        u0 free(name_array_t& names) {
             array::free(names);
         }
 
-        u0 add(name_list_t& names,
+        u0 add(name_array_t& names,
                section::type_t type,
                name_flags_t flags,
                str::slice_t name) {
@@ -107,16 +107,18 @@ namespace basecode::binfmt::io {
             entry->name      = string::interned::fold(name);
         }
 
-        u0 init(name_list_t& names, alloc_t* alloc) {
+        u0 init(name_array_t& names, alloc_t* alloc) {
             array::init(names, alloc);
         }
 
-        const name_map_t* find(const name_list_t& names,
+        const name_map_t* find(const name_array_t& names,
                                section::type_t type,
                                name_flags_t flags) {
             for (const auto& entry : names) {
                 if (entry.type == type
-                &&  std::memcmp(&entry.flags, &flags, sizeof(name_flags_t)) == 0) {
+                &&  std::memcmp(&entry.flags,
+                                &flags,
+                                sizeof(name_flags_t)) == 0) {
                     return &entry;
                 }
             }

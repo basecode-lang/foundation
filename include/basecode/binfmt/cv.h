@@ -21,19 +21,19 @@
 #include <basecode/core/uuid.h>
 #include <basecode/binfmt/io.h>
 
-#define LF_PAD(n) (0xf0 + (n))
+#define LF_PAD(n)               (0xf0 + (n))
 
 namespace basecode::binfmt::cv {
     using type_t                = u32;
     using item_id_t             = u32;
 
-    constexpr u32 CV_SIGNATURE_C6         = 0L;  // Actual signature is >64K
-    constexpr u32 CV_SIGNATURE_C7         = 1L;  // First explicit signature
-    constexpr u32 CV_SIGNATURE_C11        = 2L;  // C11 (vc5.x) 32-bit types
-    constexpr u32 CV_SIGNATURE_C13        = 4L;  // C13 (vc7.x) zero terminated names
-    constexpr u32 CV_SIGNATURE_RESERVED   = 5L;  // All signatures from 5 to 64K are reserved
+    constexpr u32 CV_SIGNATURE_C6       = 0L;  // Actual signature is >64K
+    constexpr u32 CV_SIGNATURE_C7       = 1L;  // First explicit signature
+    constexpr u32 CV_SIGNATURE_C11      = 2L;  // C11 (vc5.x) 32-bit types
+    constexpr u32 CV_SIGNATURE_C13      = 4L;  // C13 (vc7.x) zero terminated names
+    constexpr u32 CV_SIGNATURE_RESERVED = 5L;  // All signatures from 5 to 64K are reserved
 
-    enum class debug_subsection_type_t : u32 {
+    enum class dbg_subsection_type_t : u32 {
         ignore                  = 0x80000000,
         symbols                 = 0xf1,
         lines,
@@ -110,7 +110,7 @@ namespace basecode::binfmt::cv {
     };
 
     struct subsection_header_t final {
-        debug_subsection_type_t type;
+        dbg_subsection_type_t   type;
         s32                     len;
     };
 
@@ -266,46 +266,46 @@ namespace basecode::binfmt::cv {
         };
     };
 
-    constexpr u32 LF_ALIAS              = 0x150a;   // ok
-    constexpr u32 LF_BCLASS             = 0x1400;   // ok
-    constexpr u32 LF_BINTERFACE         = 0x151a;   // ok
-    constexpr u32 LF_VBCLASS            = 0x1401;   // ok
-    constexpr u32 LF_IVBCLASS           = 0x1402;   // ok
-    constexpr u32 LF_VFUNCTAB           = 0x1409;   // ok
-    constexpr u32 LF_STMEMBER           = 0x150e;   // ok
-    constexpr u32 LF_METHOD             = 0x150f;   // ok
-    constexpr u32 LF_MEMBER             = 0x150d;   // ok
-    constexpr u32 LF_NESTTYPE           = 0x1510;   // ok
-    constexpr u32 LF_ONEMETHOD          = 0x1511;   // ok
-    constexpr u32 LF_ENUMERATE          = 0x1502;   // ok
-    constexpr u32 LF_INDEX              = 0x1404;   // ok
-    constexpr u32 LF_POINTER            = 0x1002;   // ok
-    constexpr u32 LF_MODIFIER           = 0x1001;   // ok
-    constexpr u32 LF_PROCEDURE          = 0x1008;   // ok
-    constexpr u32 LF_MFUNCTION          = 0x1009;   // ok
-    constexpr u32 LF_LABEL              = 0x000e;   // ok
-    constexpr u32 LF_ARGLIST            = 0x1201;   // ok
-    constexpr u32 LF_FIELDLIST          = 0x1203;   // ok
-    constexpr u32 LF_ARRAY              = 0x1503;   // ok
-    constexpr u32 LF_CLASS              = 0x1504;   // ok
-    constexpr u32 LF_STRUCTURE          = 0x1505;   // ok
-    constexpr u32 LF_INTERFACE          = 0x1519;   // ok
-    constexpr u32 LF_UNION              = 0x1506;   // ok
-    constexpr u32 LF_ENUM               = 0x1507;   // ok
-    constexpr u32 LF_TYPESERVER2        = 0x1515;   // ok
-    constexpr u32 LF_VFTABLE            = 0x151d;   // ok
-    constexpr u32 LF_VTSHAPE            = 0x000a;   // ok
-    constexpr u32 LF_BITFIELD           = 0x1205;   // ok
-    constexpr u32 LF_FUNC_ID            = 0x1601;   // ok
-    constexpr u32 LF_MFUNC_ID           = 0x1602;   // ok
-    constexpr u32 LF_BUILDINFO          = 0x1603;   // ok
-    constexpr u32 LF_SUBSTR_LIST        = 0x1604;   // ok
-    constexpr u32 LF_STRING_ID          = 0x1605;   // ok
-    constexpr u32 LF_UDT_SRC_LINE       = 0x1606;   // ok
-    constexpr u32 LF_UDT_MOD_SRC_LINE   = 0x1607;   // ok
-    constexpr u32 LF_METHODLIST         = 0x1206;   // ok
-    constexpr u32 LF_PRECOMP            = 0x1509;   // ok
-    constexpr u32 LF_ENDPRECOMP         = 0x0014;   // ok
+    constexpr u32 LF_ALIAS                               = 0x150a;   // ok
+    constexpr u32 LF_BCLASS                              = 0x1400;   // ok
+    constexpr u32 LF_BINTERFACE                          = 0x151a;   // ok
+    constexpr u32 LF_VBCLASS                             = 0x1401;   // ok
+    constexpr u32 LF_IVBCLASS                            = 0x1402;   // ok
+    constexpr u32 LF_VFUNCTAB                            = 0x1409;   // ok
+    constexpr u32 LF_STMEMBER                            = 0x150e;   // ok
+    constexpr u32 LF_METHOD                              = 0x150f;   // ok
+    constexpr u32 LF_MEMBER                              = 0x150d;   // ok
+    constexpr u32 LF_NESTTYPE                            = 0x1510;   // ok
+    constexpr u32 LF_ONEMETHOD                           = 0x1511;   // ok
+    constexpr u32 LF_ENUMERATE                           = 0x1502;   // ok
+    constexpr u32 LF_INDEX                               = 0x1404;   // ok
+    constexpr u32 LF_POINTER                             = 0x1002;   // ok
+    constexpr u32 LF_MODIFIER                            = 0x1001;   // ok
+    constexpr u32 LF_PROCEDURE                           = 0x1008;   // ok
+    constexpr u32 LF_MFUNCTION                           = 0x1009;   // ok
+    constexpr u32 LF_LABEL                               = 0x000e;   // ok
+    constexpr u32 LF_ARGLIST                             = 0x1201;   // ok
+    constexpr u32 LF_FIELDLIST                           = 0x1203;   // ok
+    constexpr u32 LF_ARRAY                               = 0x1503;   // ok
+    constexpr u32 LF_CLASS                               = 0x1504;   // ok
+    constexpr u32 LF_STRUCTURE                           = 0x1505;   // ok
+    constexpr u32 LF_INTERFACE                           = 0x1519;   // ok
+    constexpr u32 LF_UNION                               = 0x1506;   // ok
+    constexpr u32 LF_ENUM                                = 0x1507;   // ok
+    constexpr u32 LF_TYPESERVER2                         = 0x1515;   // ok
+    constexpr u32 LF_VFTABLE                             = 0x151d;   // ok
+    constexpr u32 LF_VTSHAPE                             = 0x000a;   // ok
+    constexpr u32 LF_BITFIELD                            = 0x1205;   // ok
+    constexpr u32 LF_FUNC_ID                             = 0x1601;   // ok
+    constexpr u32 LF_MFUNC_ID                            = 0x1602;   // ok
+    constexpr u32 LF_BUILDINFO                           = 0x1603;   // ok
+    constexpr u32 LF_SUBSTR_LIST                         = 0x1604;   // ok
+    constexpr u32 LF_STRING_ID                           = 0x1605;   // ok
+    constexpr u32 LF_UDT_SRC_LINE                        = 0x1606;   // ok
+    constexpr u32 LF_UDT_MOD_SRC_LINE                    = 0x1607;   // ok
+    constexpr u32 LF_METHODLIST                          = 0x1206;   // ok
+    constexpr u32 LF_PRECOMP                             = 0x1509;   // ok
+    constexpr u32 LF_ENDPRECOMP                          = 0x0014;   // ok
 
     constexpr u32 S_PUB32                                = 0x110e;      // ok
     constexpr u32 S_GDATA32                              = 0x110d;      // ok
@@ -376,1006 +376,1006 @@ namespace basecode::binfmt::cv {
 
     namespace leaf {
         struct modifier_t final {
-            u16                     leaf;
-            cv::type_t              type;
-            cv::modifier_t          attr;
+            u16                 leaf;
+            cv::type_t          type;
+            cv::modifier_t      attr;
         };
 
         struct pointer_t final {
-            u16                     leaf;
-            type_t                  utype;
+            u16                 leaf;
+            type_t              utype;
             struct {
-                u32                 ptr_type:       5;
-                u32                 ptr_mode:       3;
-                u32                 is_flat_32:     1;
-                u32                 is_volatile:    1;
-                u32                 is_const:       1;
-                u32                 is_unaligned:   1;
-                u32                 is_restrict:    1;
-                u32                 size:           6;
-                u32                 is_mo_com:      1;
-                u32                 is_lref:        1;
-                u32                 is_rref:        1;
-                u32                 unused:         10;
-            }                       attr;
+                u32             ptr_type:       5;
+                u32             ptr_mode:       3;
+                u32             is_flat_32:     1;
+                u32             is_volatile:    1;
+                u32             is_const:       1;
+                u32             is_unaligned:   1;
+                u32             is_restrict:    1;
+                u32             size:           6;
+                u32             is_mo_com:      1;
+                u32             is_lref:        1;
+                u32             is_rref:        1;
+                u32             unused:         10;
+            }                   attr;
             union {
                 struct {
-                    type_t          pm_class;
-                    u16             pm_enum;
-                }                   pm;
-                u16                 bseg;
-                u8                  sym[1];
+                    type_t      pm_class;
+                    u16         pm_enum;
+                }               pm;
+                u16             bseg;
+                u8              sym[1];
                 struct {
-                    type_t          index;
-                    u8              name[1];
-                }                   btype;
+                    type_t      index;
+                    u8          name[1];
+                }               btype;
             };
         };
 
         struct array_t final {
-            u16                     leaf;
-            cv::type_t              elem_type;
-            cv::type_t              idx_type;
-            u8                      data[0];
+            u16                 leaf;
+            cv::type_t          elem_type;
+            cv::type_t          idx_type;
+            u8                  data[0];
         };
 
         struct strided_array_t final {
-            u16                     leaf;
-            cv::type_t              elem_type;
-            cv::type_t              idx_type;
-            u32                     stride;
-            u8                      data[0];
+            u16                 leaf;
+            cv::type_t          elem_type;
+            cv::type_t          idx_type;
+            u32                 stride;
+            u8                  data[0];
         };
 
         struct vector_t final {
-            u16                     leaf;
-            cv::type_t              elem_type;
-            u32                     count;
-            u8                      data[0];
+            u16                 leaf;
+            cv::type_t          elem_type;
+            u32                 count;
+            u8                  data[0];
         };
 
         struct matrix_t final {
-            u16                     leaf;
-            cv::type_t              elem_type;
-            u32                     rows;
-            u32                     cols;
-            u32                     major_stride;
-            cv::matrix_attr_t       mat_attr;
-            u8                      data[0];
+            u16                 leaf;
+            cv::type_t          elem_type;
+            u32                 rows;
+            u32                 cols;
+            u32                 major_stride;
+            cv::matrix_attr_t   mat_attr;
+            u8                  data[0];
         };
 
         struct class_t final {
-            u16                     leaf;
-            u16                     count;
-            cv::prop_t              property;
-            cv::type_t              field;
-            cv::type_t              derived;
-            cv::type_t              vshape;
-            u8                      data[0];
+            u16                 leaf;
+            u16                 count;
+            cv::prop_t          property;
+            cv::type_t          field;
+            cv::type_t          derived;
+            cv::type_t          vshape;
+            u8                  data[0];
         };
-        using struct_t           = class_t;
-        using interface_t        = class_t;
+        using struct_t          = class_t;
+        using interface_t       = class_t;
 
         struct union_t final {
-            u16                     leaf;
-            u16                     count;
-            cv::prop_t              property;
-            cv::type_t              field;
-            u8                      data[0];
+            u16                 leaf;
+            u16                 count;
+            cv::prop_t          property;
+            cv::type_t          field;
+            u8                  data[0];
         };
 
         struct alias_t final {
-            u16                     leaf;
-            cv::type_t              utype;
-            u8                      name[1];
+            u16                 leaf;
+            cv::type_t          utype;
+            u8                  name[1];
         };
 
         struct func_id_t final {
-            u16                     leaf;
-            cv::item_id_t           scope_id;
-            cv::type_t              type;
-            u8                      name[0];
+            u16                 leaf;
+            cv::item_id_t       scope_id;
+            cv::type_t          type;
+            u8                  name[0];
         };
 
         struct mfunc_id_t final {
-            u16                     leaf;
-            cv::type_t              parent_type;
-            cv::type_t              type;
-            u8                      name[0];
+            u16                 leaf;
+            cv::type_t          parent_type;
+            cv::type_t          type;
+            u8                  name[0];
         };
 
         struct string_id_t final {
-            u16                     leaf;
-            cv::item_id_t           id;
-            u8                      name[0];
+            u16                 leaf;
+            cv::item_id_t       id;
+            u8                  name[0];
         };
 
         struct udt_src_line_t final {
-            u16                     leaf;
-            cv::type_t              type;
-            cv::item_id_t           src;
-            u32                     line;
+            u16                 leaf;
+            cv::type_t          type;
+            cv::item_id_t       src;
+            u32                 line;
         };
 
         struct udt_mod_src_line_t final {
-            u16                     leaf;
-            cv::type_t              type;
-            cv::item_id_t           src;
-            u32                     line;
-            u16                     imod;
+            u16                 leaf;
+            cv::type_t          type;
+            cv::item_id_t       src;
+            u32                 line;
+            u16                 imod;
         };
 
         struct build_info_t final {
-            u16                     leaf;
-            u16                     count;
-            cv::item_id_t           arg[sizeof(cv::build_info_t)];
+            u16                 leaf;
+            u16                 count;
+            cv::item_id_t       arg[sizeof(cv::build_info_t)];
         };
 
         struct managed_t final {
-            u16                     leaf;
-            u8                      name[1];
+            u16                 leaf;
+            u8                  name[1];
         };
 
         struct enum_t final {
-            u16                     leaf;
-            u16                     count;
-            cv::prop_t              property;
-            cv::type_t              utype;
-            cv::type_t              field;
-            u8                      name[1];
+            u16                 leaf;
+            u16                 count;
+            cv::prop_t          property;
+            cv::type_t          utype;
+            cv::type_t          field;
+            u8                  name[1];
         };
 
         struct proc_t final {
-            u16                     leaf;
-            cv::type_t              rv_type;
-            u8                      call_type;
-            cv::func_attr_t         func_attr;
-            u16                     param_count;
-            cv::type_t              arg_list;
+            u16                 leaf;
+            cv::type_t          rv_type;
+            u8                  call_type;
+            cv::func_attr_t     func_attr;
+            u16                 param_count;
+            cv::type_t          arg_list;
         };
 
         struct mfunc_t final {
-            u16                     leaf;
-            cv::type_t              rv_type;
-            cv::type_t              class_type;
-            cv::type_t              this_type;
-            u8                      call_type;
-            cv::func_attr_t         func_attr;
-            u16                     param_count;
-            cv::type_t              arg_list;
-            s32                     this_adjust;
+            u16                 leaf;
+            cv::type_t          rv_type;
+            cv::type_t          class_type;
+            cv::type_t          this_type;
+            u8                  call_type;
+            cv::func_attr_t     func_attr;
+            u16                 param_count;
+            cv::type_t          arg_list;
+            s32                 this_adjust;
         };
 
         struct vt_shape_t final {
-            u16                     leaf;
-            u16                     count;
-            u8                      desc[0];
+            u16                 leaf;
+            u16                 count;
+            u8                  desc[0];
         };
 
         struct vf_table_t final {
-            u16                     leaf;
-            cv::type_t              type;
-            cv::type_t              base_vf_table;
-            u32                     offset_in_object_layout;
-            u32                     len;
-            u8                      names[1];
+            u16                 leaf;
+            cv::type_t          type;
+            cv::type_t          base_vf_table;
+            u32                 offset_in_object_layout;
+            u32                 len;
+            u8                  names[1];
         };
 
         struct label_t final {
-            u16                     leaf;
-            u16                     mode;
+            u16                 leaf;
+            u16                 mode;
         };
 
         struct vft_path final {
-            u16                     leaf;
-            u32                     count;
-            cv::type_t              base[1];
+            u16                 leaf;
+            u32                 count;
+            cv::type_t          base[1];
         };
 
         struct pre_comp_t final {
-            u16                     leaf;
-            u32                     start;
-            u32                     count;
-            u32                     signature;
-            u8                      name[0];
+            u16                 leaf;
+            u32                 start;
+            u32                 count;
+            u32                 signature;
+            u8                  name[0];
         };
 
         struct end_pre_comp_t final {
-            u16                     leaf;
-            u32                     signature;
+            u16                 leaf;
+            u32                 signature;
         };
 
         struct skip_t final {
-            u16                     leaf;
-            cv::type_t              type;
-            u8                      data[0];
+            u16                 leaf;
+            cv::type_t          type;
+            u8                  data[0];
         };
 
         struct arg_list_t final {
-            u16                     leaf;
-            u32                     count;
-            cv::type_t              arg[0];
+            u16                 leaf;
+            u32                 count;
+            cv::type_t          arg[0];
         };
-        using substr_list_t         = arg_list_t;
+        using substr_list_t     = arg_list_t;
 
         struct derived_t final {
-            u16                     leaf;
-            u32                     count;
-            cv::type_t              indices[0];
+            u16                 leaf;
+            u32                 count;
+            cv::type_t          indices[0];
         };
 
         struct default_arg_t final {
-            u16                     leaf;
-            cv::type_t              type;
-            u8                      expr[0];
+            u16                 leaf;
+            cv::type_t          type;
+            u8                  expr[0];
         };
 
         struct field_list_t final {
-            u16                     leaf;
-            u8                      data[0];
+            u16                 leaf;
+            u8                  data[0];
         };
 
         struct method_list_t final {
-            u16                     leaf;
-            u8                      ml_method[0];
+            u16                 leaf;
+            u8                  ml_method[0];
         };
 
         struct bit_field_t final {
-            u16                     leaf;
-            cv::type_t              type;
-            u8                      length;
-            u8                      position;
+            u16                 leaf;
+            cv::type_t          type;
+            u8                  length;
+            u8                  position;
         };
 
         struct ref_sym_t final {
-            u16                     leaf;
-            u8                      sym[1];
+            u16                 leaf;
+            u8                  sym[1];
         };
 
         struct hlsl_t final {
-            u16                     leaf;
-            cv::type_t              sub_type;
-            u16                     kind;
-            u16                     num_props:      4;
-            u16                     unused:         12;
-            u8                      data[0];
+            u16                 leaf;
+            cv::type_t          sub_type;
+            u16                 kind;
+            u16                 num_props:      4;
+            u16                 unused:         12;
+            u8                  data[0];
         };
 
         struct modifier_ex_t final {
-            u16                     leaf;
-            cv::type_t              type;
-            u16                     count;
-            u16                     mods[0];
+            u16                 leaf;
+            cv::type_t          type;
+            u16                 count;
+            u16                 mods[0];
         };
 
         struct s8_t final {
-            u16                     leaf;
-            s8                      val;
+            u16                 leaf;
+            s8                  val;
         };
 
         struct s16_t final {
-            u16                     leaf;
-            s16                     val;
+            u16                 leaf;
+            s16                 val;
         };
 
         struct u16_t final {
-            u16                     leaf;
-            u16                     val;
+            u16                 leaf;
+            u16                 val;
         };
 
         struct s32_t final {
-            u16                     leaf;
-            s32                     val;
+            u16                 leaf;
+            s32                 val;
         };
 
         struct u32_t final {
-            u16                     leaf;
-            u32                     val;
+            u16                 leaf;
+            u32                 val;
         };
 
         struct s64_t final {
-            u16                     leaf;
-            s64                     val;
+            u16                 leaf;
+            s64                 val;
         };
 
         struct u64_t final {
-            u16                     leaf;
-            u64                     val;
+            u16                 leaf;
+            u64                 val;
         };
 
         struct s128_t final {
-            u16                     leaf;
-            s128                    val;
+            u16                 leaf;
+            s128                val;
         };
 
         struct u128_t final {
-            u16                     leaf;
-            u128                    val;
+            u16                 leaf;
+            u128                val;
         };
 
         struct f32_t final {
-            u16                     leaf;
-            f32                     val;
+            u16                 leaf;
+            f32                 val;
         };
 
         struct f64_t final {
-            u16                     leaf;
-            f64                     val;
+            u16                 leaf;
+            f64                 val;
         };
 
         struct index_t final {
-            u16                     leaf;
-            u16                     pad0;
-            cv::type_t              index;
+            u16                 leaf;
+            u16                 pad0;
+            cv::type_t          index;
         };
 
         struct base_class_t final {
-            u16                     leaf;
-            cv::field_attr_t        attr;
-            cv::type_t              index;
-            u8                      offset[0];
+            u16                 leaf;
+            cv::field_attr_t    attr;
+            cv::type_t          index;
+            u8                  offset[0];
         };
-        using base_interface_t      = base_class_t;
+        using base_interface_t  = base_class_t;
 
         struct vbase_class_t final {
-            u16                     leaf;
-            cv::field_attr_t        attr;
-            cv::type_t              index;
-            cv::type_t              vb_ptr;
-            u8                      vb_ptr_off[0];
+            u16                 leaf;
+            cv::field_attr_t    attr;
+            cv::type_t          index;
+            cv::type_t          vb_ptr;
+            u8                  vb_ptr_off[0];
         };
-        using vbase_interface_t     = vbase_class_t;
+        using vbase_interface_t = vbase_class_t;
 
         struct friend_class_t final {
-            u16                     leaf;
-            u16                     pad0;
-            cv::type_t              index;
+            u16                 leaf;
+            u16                 pad0;
+            cv::type_t          index;
         };
 
         struct friend_func_t final {
-            u16                     leaf;
-            u16                     pad0;
-            cv::type_t              index;
-            u8                      name[1];
+            u16                 leaf;
+            u16                 pad0;
+            cv::type_t          index;
+            u8                  name[1];
         };
 
         struct member_t final {
-            u16                     leaf;
-            cv::field_attr_t        attr;
-            cv::type_t              index;
-            u8                      offset[0];
+            u16                 leaf;
+            cv::field_attr_t    attr;
+            cv::type_t          index;
+            u8                  offset[0];
         };
 
         struct static_member_t final {
-            u16                     leaf;
-            cv::field_attr_t        attr;
-            cv::type_t              index;
-            u8                      name[1];
+            u16                 leaf;
+            cv::field_attr_t    attr;
+            cv::type_t          index;
+            u8                  name[1];
         };
 
         struct vfunc_table_t final {
-            u16                     leaf;
-            u16                     pad0;
-            cv::type_t              type;
+            u16                 leaf;
+            u16                 pad0;
+            cv::type_t          type;
         };
 
         struct vfunc_offset_t final {
-            u16                     leaf;
-            u16                     pad0;
-            s32                     offset;
+            u16                 leaf;
+            u16                 pad0;
+            s32                 offset;
         };
 
         struct method_t final {
-            u16                     leaf;
-            u16                     count;
-            cv::type_t              method_idx;
-            u8                      name[1];
+            u16                 leaf;
+            u16                 count;
+            cv::type_t          method_idx;
+            u8                  name[1];
         };
 
         struct one_method_t final {
-            u16                     leaf;
-            cv::field_attr_t        attr;
-            cv::type_t              index;
-            u32                     vbase_offset[0];
+            u16                 leaf;
+            cv::field_attr_t    attr;
+            cv::type_t          index;
+            u32                 vbase_offset[0];
         };
 
         struct enumerate_t final {
-            u16                     leaf;
-            cv::field_attr_t        attr;
-            u8                      value[0];
+            u16                 leaf;
+            cv::field_attr_t    attr;
+            u8                  value[0];
         };
 
         struct nest_type_t final {
-            u16                     leaf;
-            u16                     pad0;
-            cv::type_t              index;
-            u8                      name[1];
+            u16                 leaf;
+            u16                 pad0;
+            cv::type_t          index;
+            u8                  name[1];
         };
 
         struct nest_type_ex_t final {
-            u16                     leaf;
-            cv::field_attr_t        attr;
-            cv::type_t              index;
-            u8                      name[1];
+            u16                 leaf;
+            cv::field_attr_t    attr;
+            cv::type_t          index;
+            u8                  name[1];
         };
 
         struct member_modify_t final {
-            u16                     leaf;
-            cv::field_attr_t        attr;
-            cv::type_t              index;
-            u8                      name[1];
+            u16                 leaf;
+            cv::field_attr_t    attr;
+            cv::type_t          index;
+            u8                  name[1];
         };
 
         struct type_server2_t final {
-            u16                     leaf;
-            uuid_t                  sig70;
-            u32                     age;
-            u8                      name[0];
+            u16                 leaf;
+            uuid_t              sig70;
+            u32                 age;
+            u8                  name[0];
         };
     }
 
     namespace sym {
         struct reg_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            u16                     reg;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            u16                 reg;
+            u8                  name[1];
         };
 
         struct attr_reg_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            lvar_attr_t             attr;
-            u16                     reg;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            lvar_attr_t         attr;
+            u16                 reg;
+            u8                  name[1];
         };
 
         struct many_reg_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            u8                      count;
-            u8                      reg[1];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            u8                  count;
+            u8                  reg[1];
         };
 
         struct many_reg2_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            u16                     count;
-            u16                     reg[1];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            u16                 count;
+            u16                 reg[1];
         };
 
         struct attr_many_reg_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            lvar_attr_t             attr;
-            u8                      count;
-            u8                      reg[1];
-            u8                      name[0];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            lvar_attr_t         attr;
+            u8                  count;
+            u8                  reg[1];
+            u8                  name[0];
         };
 
         struct attr_many_reg2_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            lvar_attr_t             attr;
-            u16                     count;
-            u16                     reg[1];
-            u8                      name[0];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            lvar_attr_t         attr;
+            u16                 count;
+            u16                 reg[1];
+            u8                  name[0];
         };
 
         struct const_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            u16                     value;
-            u8                      name[0];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            u16                 value;
+            u8                  name[0];
         };
 
         struct udt_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            u8                  name[1];
         };
 
         struct type_ref_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
         };
 
         struct search_t final {
-            u16                     len;
-            u16                     type;
-            u32                     start_sym;
-            u16                     seg;
+            u16                 len;
+            u16                 type;
+            u32                 start_sym;
+            u16                 seg;
         };
 
         struct cflag_t final {
-            u16                     len;
-            u16                     type;
-            u8                      machine;
+            u16                 len;
+            u16                 type;
+            u8                  machine;
             struct {
-                u8                  language:       8;
-                u8                  pcode:          1;
-                u8                  float_prec:     2;
-                u8                  float_pkg:      2;
-                u8                  amb_data:       3;
-                u8                  amb_code:       3;
-                u8                  mode32:         1;
-                u8                  pad:            4;
-            }                       flags;
-            u8                      ver[1];
+                u8              language:       8;
+                u8              pcode:          1;
+                u8              float_prec:     2;
+                u8              float_pkg:      2;
+                u8              amb_data:       3;
+                u8              amb_code:       3;
+                u8              mode32:         1;
+                u8              pad:            4;
+            }                   flags;
+            u8                  ver[1];
         };
 
         struct compile2_t final {
-            u16                     len;
-            u16                     type;
+            u16                 len;
+            u16                 type;
             struct {
-                u32                 language:       8;
-                u32                 ec:             1;
-                u32                 no_db_info:     1;
-                u32                 ltcg:           1;
-                u32                 no_data_align:  1;
-                u32                 managed_present:1;
-                u32                 security_chk:   1;
-                u32                 hot_patch:      1;
-                u32                 cvtcil:         1;
-                u32                 msil_module:    1;
-                u32                 pad:            15;
-            }                       flags;
-            u16                     machine;
-            u16                     ver_fe_major;
-            u16                     ver_fe_minor;
-            u16                     ver_fe_build;
-            u16                     ver_major;
-            u16                     ver_minor;
-            u16                     ver_build;
-            u8                      ver_str[1];
+                u32             language:       8;
+                u32             ec:             1;
+                u32             no_db_info:     1;
+                u32             ltcg:           1;
+                u32             no_data_align:  1;
+                u32             managed_present:1;
+                u32             security_chk:   1;
+                u32             hot_patch:      1;
+                u32             cvtcil:         1;
+                u32             msil_module:    1;
+                u32             pad:            15;
+            }                   flags;
+            u16                 machine;
+            u16                 ver_fe_major;
+            u16                 ver_fe_minor;
+            u16                 ver_fe_build;
+            u16                 ver_major;
+            u16                 ver_minor;
+            u16                 ver_build;
+            u8                  ver_str[1];
         };
 
         struct compile3_t final {
-            u16                     len;
-            u16                     type;
+            u16                 len;
+            u16                 type;
             struct {
-                u32                 language:       8;
-                u32                 ec:             1;
-                u32                 no_db_info:     1;
-                u32                 ltcg:           1;
-                u32                 no_data_align:  1;
-                u32                 managed_present:1;
-                u32                 security_chk:   1;
-                u32                 hot_patch:      1;
-                u32                 cvtcil:         1;
-                u32                 msil_module:    1;
-                u32                 sdl:            1;
-                u32                 pgo:            1;
-                u32                 exp:            1;
-                u32                 pad:            12;
-            }                       flags;
-            u16                     machine;
-            u16                     ver_fe_major;
-            u16                     ver_fe_minor;
-            u16                     ver_fe_build;
-            u16                     ver_major;
-            u16                     ver_minor;
-            u16                     ver_build;
-            u16                     ver_qfe;
-            s8                      ver_str[1];
+                u32             language:       8;
+                u32             ec:             1;
+                u32             no_db_info:     1;
+                u32             ltcg:           1;
+                u32             no_data_align:  1;
+                u32             managed_present:1;
+                u32             security_chk:   1;
+                u32             hot_patch:      1;
+                u32             cvtcil:         1;
+                u32             msil_module:    1;
+                u32             sdl:            1;
+                u32             pgo:            1;
+                u32             exp:            1;
+                u32             pad:            12;
+            }                   flags;
+            u16                 machine;
+            u16                 ver_fe_major;
+            u16                 ver_fe_minor;
+            u16                 ver_fe_build;
+            u16                 ver_major;
+            u16                 ver_minor;
+            u16                 ver_build;
+            u16                 ver_qfe;
+            s8                  ver_str[1];
         };
 
         struct env_block_t final {
-            u16                     len;
-            u16                     type;
+            u16                 len;
+            u16                 type;
             struct {
-                u8                  rev:            1;
-                u8                  pad:            7;
-            }                       flags;
-            u8                      str[1];
+                u8              rev:            1;
+                u8              pad:            7;
+            }                   flags;
+            u8                  str[1];
         };
 
         struct obj_name_t final {
-            u16                     len;
-            u16                     type;
-            u32                     signature;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u32                 signature;
+            u8                  name[1];
         };
 
         struct end_arg_t final {
-            u16                     len;
-            u16                     type;
+            u16                 len;
+            u16                 type;
         };
 
         struct return_t final {
-            u16                     len;
-            u16                     type;
-            generic_flag_t          flags;
-            u8                      style;
+            u16                 len;
+            u16                 type;
+            generic_flag_t      flags;
+            u8                  style;
         };
 
         struct entry_this_t final {
-            u16                     len;
-            u16                     type;
-            u8                      this_sym;
+            u16                 len;
+            u16                 type;
+            u8                  this_sym;
         };
 
         struct bp_rel_t final {
-            u16                     len;
-            u16                     type;
-            s32                     offset;
-            type_t                  type_index;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            s32                 offset;
+            type_t              type_index;
+            u8                  name[1];
         };
 
         struct frame_rel_t final {
-            u16                     len;
-            u16                     type;
-            s32                     offset;
-            type_t                  type_index;
-            lvar_attr_t             attr;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            s32                 offset;
+            type_t              type_index;
+            lvar_attr_t         attr;
+            u8                  name[1];
         };
 
         struct slot_t final {
-            u16                     len;
-            u16                     type;
-            u32                     slot;
-            type_t                  type_index;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u32                 slot;
+            type_t              type_index;
+            u8                  name[1];
         };
 
         struct attr_slot_t final {
-            u16                     len;
-            u16                     type;
-            u32                     slot;
-            type_t                  type_index;
-            lvar_attr_t             attr;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u32                 slot;
+            type_t              type_index;
+            lvar_attr_t         attr;
+            u8                  name[1];
         };
 
         struct annotation_t final {
-            u16                     len;
-            u16                     type;
-            u32                     offset;
-            u16                     seg;
-            u16                     csz;
-            u8                      str[1];
+            u16                 len;
+            u16                 type;
+            u32                 offset;
+            u16                 seg;
+            u16                 csz;
+            u8                  str[1];
         };
 
         struct data_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            u32                     offset;
-            u16                     seg;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            u32                 offset;
+            u16                 seg;
+            u8                  name[1];
         };
 
         struct public_t final {
-            u16                     len;
-            u16                     type;
-            pub_flags_t             flags;
-            u32                     offset;
-            u16                     seg;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            pub_flags_t         flags;
+            u32                 offset;
+            u16                 seg;
+            u8                  name[1];
         };
 
         struct proc_t final {
-            u16                     len;
-            u16                     type;
-            u32                     parent;
-            u32                     end;
-            u32                     next;
-            u32                     proc_len;
-            u32                     dbg_start;
-            u32                     dbg_end;
-            type_t                  type_index;
-            u32                     offset;
-            u16                     seg;
-            proc_flags_t            flags;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u32                 parent;
+            u32                 end;
+            u32                 next;
+            u32                 proc_len;
+            u32                 dbg_start;
+            u32                 dbg_end;
+            type_t              type_index;
+            u32                 offset;
+            u16                 seg;
+            proc_flags_t        flags;
+            u8                  name[1];
         };
 
         struct man_proc_t final {
-            u16                     len;
-            u16                     type;
-            u32                     parent;
-            u32                     end;
-            u32                     next;
-            u32                     proc_len;
-            u32                     dbg_start;
-            u32                     dbg_end;
-            u32                     token;
-            u32                     offset;
-            u16                     seg;
-            proc_flags_t            flags;
-            u16                     ret_reg;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u32                 parent;
+            u32                 end;
+            u32                 next;
+            u32                 proc_len;
+            u32                 dbg_start;
+            u32                 dbg_end;
+            u32                 token;
+            u32                 offset;
+            u16                 seg;
+            proc_flags_t        flags;
+            u16                 ret_reg;
+            u8                  name[1];
         };
 
         struct thunk_t final {
-            u16                     len;
-            u16                     type;
-            u32                     parent;
-            u32                     end;
-            u32                     next;
-            u32                     offset;
-            u16                     reg;
-            u16                     thunk_len;
-            u8                      ord;
-            u8                      name[1];
-            u8                      variant[0];
+            u16                 len;
+            u16                 type;
+            u32                 parent;
+            u32                 end;
+            u32                 next;
+            u32                 offset;
+            u16                 reg;
+            u16                 thunk_len;
+            u8                  ord;
+            u8                  name[1];
+            u8                  variant[0];
         };
 
         struct trampoline_t final {
-            u16                     len;
-            u16                     type;
-            u16                     tramp_type;
-            u16                     thunk_size;
-            u32                     thunk_offset;
-            u32                     thunk_target;
-            u16                     thunk_sect;
-            u16                     target_sect;
+            u16                 len;
+            u16                 type;
+            u16                 tramp_type;
+            u16                 thunk_size;
+            u32                 thunk_offset;
+            u32                 thunk_target;
+            u16                 thunk_sect;
+            u16                 target_sect;
         };
 
         struct label_t final {
-            u16                     len;
-            u16                     type;
-            u32                     parent;
-            u32                     end;
-            u32                     block_len;
-            u32                     offset;
-            u16                     seg;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u32                 parent;
+            u32                 end;
+            u32                 block_len;
+            u32                 offset;
+            u16                 seg;
+            u8                  name[1];
         };
 
         struct thread_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            u32                     offset;
-            u16                     seg;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            u32                 offset;
+            u16                 seg;
+            u8                  name[1];
         };
 
         struct ref2_t final {
-            u16                     len;
-            u16                     type;
-            u32                     sum_name;
-            u32                     offset;
-            u16                     module_idx;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u32                 sum_name;
+            u32                 offset;
+            u16                 module_idx;
+            u8                  name[1];
         };
 
         struct frame_proc_t final {
-            u16                     len;
-            u16                     type;
-            u32                     frame_size;
-            u32                     pad_size;
-            u32                     offset_pad;
-            u32                     save_reg_size;
-            u32                     except_handler_offset;
-            u16                     except_handler_sect;
+            u16                 len;
+            u16                 type;
+            u32                 frame_size;
+            u32                 pad_size;
+            u32                 offset_pad;
+            u32                 save_reg_size;
+            u32                 except_handler_offset;
+            u16                 except_handler_sect;
             struct {
-                u32                 has_alloca:     1;
-                u32                 has_set_jmp:    1;
-                u32                 has_long_jmp:   1;
-                u32                 has_inl_asm:    1;
-                u32                 has_eh:         1;
-                u32                 inl_spec:       1;
-                u32                 has_seh:        1;
-                u32                 naked:          1;
-                u32                 security_checks:1;
-                u32                 async_eh:       1;
-                u32                 gs_no_stack_ord:1;
-                u32                 was_inlined:    1;
-                u32                 gs_check:       1;
-                u32                 safe_buffers:   1;
-                u32                 enc_local_bp:   1;
-                u32                 enc_param_bp:   1;
-                u32                 pogo_on:        1;
-                u32                 valid_counts:   1;
-                u32                 opt_speed:      1;
-                u32                 guard_cf:       1;
-                u32                 guard_cfw:      1;
-                u32                 pad:            9;
-            }                       flags;
+                u32             has_alloca:     1;
+                u32             has_set_jmp:    1;
+                u32             has_long_jmp:   1;
+                u32             has_inl_asm:    1;
+                u32             has_eh:         1;
+                u32             inl_spec:       1;
+                u32             has_seh:        1;
+                u32             naked:          1;
+                u32             security_checks:1;
+                u32             async_eh:       1;
+                u32             gs_no_stack_ord:1;
+                u32             was_inlined:    1;
+                u32             gs_check:       1;
+                u32             safe_buffers:   1;
+                u32             enc_local_bp:   1;
+                u32             enc_param_bp:   1;
+                u32             pogo_on:        1;
+                u32             valid_counts:   1;
+                u32             opt_speed:      1;
+                u32             guard_cf:       1;
+                u32             guard_cfw:      1;
+                u32             pad:            9;
+            }                   flags;
         };
 
         struct block_t final {
-            u16                     len;
-            u16                     type;
-            u32                     parent;
-            u32                     end;
-            u32                     block_len;
-            u32                     offset;
-            u16                     seg;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u32                 parent;
+            u32                 end;
+            u32                 block_len;
+            u32                 offset;
+            u16                 seg;
+            u8                  name[1];
         };
 
         struct export_t final {
-            u16                     len;
-            u16                     type;
-            u16                     ordinal;
-            u16                     is_const:       1;
-            u16                     data:           1;
-            u16                     is_private:     1;
-            u16                     no_name:        1;
-            u16                     has_ordinal:    1;
-            u16                     forwarder:      1;
-            u16                     reserved:       10;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u16                 ordinal;
+            u16                 is_const:       1;
+            u16                 data:           1;
+            u16                 is_private:     1;
+            u16                 no_name:        1;
+            u16                 has_ordinal:    1;
+            u16                 forwarder:      1;
+            u16                 reserved:       10;
+            u8                  name[1];
         };
 
         struct inline_site_t final {
-            u16                     len;
-            u16                     type;
-            u32                     parent;
-            u32                     end;
-            item_id_t               inlinee;
-            u8                      data[0];
+            u16                 len;
+            u16                 type;
+            u32                 parent;
+            u32                 end;
+            item_id_t           inlinee;
+            u8                  data[0];
         };
 
         struct frame_cookie_t final {
-            u16                     len;
-            u16                     type;
-            s32                     offset;
-            u16                     reg;
-            cookie_type_t           cookie_type;
-            u8                      flags;
+            u16                 len;
+            u16                 type;
+            s32                 offset;
+            u16                 reg;
+            cookie_type_t       cookie_type;
+            u8                  flags;
         };
 
         struct heap_alloc_site_t final {
-            u16                     len;
-            u16                     type;
-            s32                     offset;
-            u16                     sect;
-            u16                     size;
-            type_t                  type_index;
+            u16                 len;
+            u16                 type;
+            s32                 offset;
+            u16                 sect;
+            u16                 size;
+            type_t              type_index;
         };
 
         struct call_site_info_t final {
-            u16                     len;
-            u16                     type;
-            s32                     offset;
-            u16                     sect;
-            u16                     size;
-            type_t                  type_index;
+            u16                 len;
+            u16                 type;
+            s32                 offset;
+            u16                 sect;
+            u16                 size;
+            type_t              type_index;
         };
 
         struct local_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  type_index;
-            lvar_flags_t            flags;
-            u8                      name[0];
+            u16                 len;
+            u16                 type;
+            type_t              type_index;
+            lvar_flags_t        flags;
+            u8                  name[0];
         };
 
         struct reg_rel_t final {
-            u16                     len;
-            u16                     type;
-            u32                     offset;
-            u16                     reg;
-            u16                     type_index;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u32                 offset;
+            u16                 reg;
+            u16                 type_index;
+            u8                  name[1];
         };
 
         struct section_t final {
-            u16                     len;
-            u16                     type;
-            u16                     sect_num;
-            u8                      align;
-            u8                      reserved;
-            u32                     rva;
-            u32                     size;
-            u32                     characteristics;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u16                 sect_num;
+            u8                  align;
+            u8                  reserved;
+            u32                 rva;
+            u32                 size;
+            u32                 characteristics;
+            u8                  name[1];
         };
 
         struct unamespace_t final {
-            u16                     len;
-            u16                     type;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u8                  name[1];
         };
 
         struct coff_group_t final {
-            u16                     len;
-            u16                     type;
-            u32                     size;
-            u32                     characteristics;
-            u32                     offset;
-            u16                     seg;
-            u8                      name[1];
+            u16                 len;
+            u16                 type;
+            u32                 size;
+            u32                 characteristics;
+            u32                 offset;
+            u16                 seg;
+            u8                  name[1];
         };
 
         struct file_static_t final {
-            u16                     len;
-            u16                     type;
-            type_t                  index;
-            u32                     module_offset;
-            lvar_flags_t            flags;
-            u8                      name[0];
+            u16                 len;
+            u16                 type;
+            type_t              index;
+            u32                 module_offset;
+            lvar_flags_t        flags;
+            u8                  name[0];
         };
 
         struct defrange_t final {
-            u16                     len;
-            u16                     type;
-            u32                     program;
-            lvar_addr_range_t       range;
-            lvar_addr_gap_t         gaps[0];
+            u16                 len;
+            u16                 type;
+            u32                 program;
+            lvar_addr_range_t   range;
+            lvar_addr_gap_t     gaps[0];
         };
 
         struct build_info_t final {
-            u16                     len;
-            u16                     type;
-            item_id_t               id;
+            u16                 len;
+            u16                 type;
+            item_id_t           id;
         };
 
         struct defrange_reg_t final {
-            u16                     len;
-            u16                     type;
-            u16                     reg;
-            range_attr_t            attr;
-            lvar_addr_range_t       range;
-            lvar_addr_gap_t         gaps[0];
+            u16                 len;
+            u16                 type;
+            u16                 reg;
+            range_attr_t        attr;
+            lvar_addr_range_t   range;
+            lvar_addr_gap_t     gaps[0];
         };
 
         struct defrange_reg_rel_t final {
-            u16                     len;
-            u16                     type;
-            u16                     base_reg;
-            u16                     spilled_udt_member: 1;
-            u16                     padding:            3;
-            u16                     offset_parent:      12;
-            s32                     offset_base_ptr;
-            lvar_addr_range_t       range;
-            lvar_addr_gap_t         gaps[0];
+            u16                 len;
+            u16                 type;
+            u16                 base_reg;
+            u16                 spilled_udt_member: 1;
+            u16                 padding:            3;
+            u16                 offset_parent:      12;
+            s32                 offset_base_ptr;
+            lvar_addr_range_t   range;
+            lvar_addr_gap_t     gaps[0];
         };
 
         struct defrange_subfield_t final {
-            u16                     len;
-            u16                     type;
-            u32                     program;
-            u32                     offset_parent;
-            lvar_addr_range_t       range;
-            lvar_addr_gap_t         gaps[0];
+            u16                 len;
+            u16                 type;
+            u32                 program;
+            u32                 offset_parent;
+            lvar_addr_range_t   range;
+            lvar_addr_gap_t     gaps[0];
         };
 
         struct defrange_frameptr_rel_t final {
-            u16                     len;
-            u16                     type;
-            s32                     offset;
-            lvar_addr_range_t       range;
-            lvar_addr_gap_t         gaps[0];
+            u16                 len;
+            u16                 type;
+            s32                 offset;
+            lvar_addr_range_t   range;
+            lvar_addr_gap_t     gaps[0];
         };
 
         struct defrange_subfield_reg_t final {
-            u16                     len;
-            u16                     type;
-            u16                     reg;
-            range_attr_t            attr;
-            u32                     offset_parent:  12;
-            u32                     pad:            20;
-            lvar_addr_range_t       range;
-            lvar_addr_gap_t         gaps[0];
+            u16                 len;
+            u16                 type;
+            u16                 reg;
+            range_attr_t        attr;
+            u32                 offset_parent:  12;
+            u32                 pad:            20;
+            lvar_addr_range_t   range;
+            lvar_addr_gap_t     gaps[0];
         };
 
         struct function_list_t final {
-            u16                     len;
-            u16                     type;
-            u32                     count;
-            type_t                  funcs[0];
+            u16                 len;
+            u16                 type;
+            u32                 count;
+            type_t              funcs[0];
         };
 
         struct defrange_frameptr_rel_full_scope_t final {
-            u16                     len;
-            u16                     type;
-            s32                     offset;
+            u16                 len;
+            u16                 type;
+            s32                 offset;
         };
 
         str::slice_t name(u16 type);
@@ -1394,15 +1394,21 @@ namespace basecode::binfmt::cv {
 
     str::slice_t sig_name(u32 sig);
 
+    status_t read_type_data(cv_t& cv,
+                            io::file_t& file,
+                            u32 offset,
+                            u32 size);
+
+    status_t read_symbol_data(cv_t& cv,
+                              io::file_t& file,
+                              u32 offset,
+                              u32 size);
+
     str::slice_t machine_name(u16 machine);
 
     str::slice_t language_name(u8 language);
 
+    str::slice_t debug_subsection_name(dbg_subsection_type_t type);
+
     status_t init(cv_t& cv, alloc_t* alloc = context::top()->alloc);
-
-    str::slice_t debug_subsection_name(debug_subsection_type_t type);
-
-    status_t read_type_data(cv_t& cv, io::file_t& file, u32 offset, u32 size);
-
-    status_t read_symbol_data(cv_t& cv, io::file_t& file, u32 offset, u32 size);
 }

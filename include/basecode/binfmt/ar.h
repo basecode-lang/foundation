@@ -23,6 +23,15 @@
 #include <basecode/binfmt/binfmt.h>
 
 namespace basecode::binfmt::ar {
+    struct ar_t;
+    struct member_t;
+
+    using symbol_table_t        = hashtab_t<str::slice_t, u32>;
+    using member_array_t        = array_t<member_t>;
+    using member_ptr_array_t    = array_t<member_t*>;
+
+    constexpr u32 header_size   = 60;
+
     struct member_t final {
         str::slice_t            name;
         str::slice_t            content;
@@ -36,15 +45,11 @@ namespace basecode::binfmt::ar {
         u32                     mode;
     };
 
-    using symbol_map_t       = hashtab_t<str::slice_t, u32>;
-    using member_list_t      = array_t<member_t>;
-    using member_ptr_list_t  = array_t<member_t*>;
-
     struct ar_t final {
         alloc_t*                alloc;
         buf_t                   buf;
-        member_list_t           members;
-        symbol_map_t            symbol_map;
+        member_array_t          members;
+        symbol_table_t          symbol_map;
         bitset_t                symbol_module_bitmap;
         struct {
             u8                  long_names;
@@ -53,8 +58,6 @@ namespace basecode::binfmt::ar {
             u8                  pad;
         }                       known;
     };
-
-    constexpr u32 header_size   = 60;
 
     u0 free(ar_t& ar);
 
@@ -68,5 +71,5 @@ namespace basecode::binfmt::ar {
 
     status_t init(ar_t& ar, alloc_t* alloc = context::top()->alloc);
 
-    u0 find_member(ar_t& ar, str::slice_t name, member_ptr_list_t& list);
+    u0 find_member(ar_t& ar, str::slice_t name, member_ptr_array_t& list);
 }

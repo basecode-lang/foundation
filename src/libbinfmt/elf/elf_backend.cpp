@@ -25,12 +25,12 @@
 namespace basecode::binfmt::io::elf {
     namespace internal {
         struct elf_system_t final {
-            alloc_t*                alloc;
-            name_list_t             section_names;
-            name_list_t             segment_names;
+            alloc_t*            alloc;
+            name_array_t        section_names;
+            name_array_t        segment_names;
         };
 
-        elf_system_t                g_elf_sys{};
+        elf_system_t            g_elf_sys{};
 
         static u0 fini() {
             name_map::free(g_elf_sys.section_names);
@@ -38,35 +38,32 @@ namespace basecode::binfmt::io::elf {
         }
 
         static status_t read(file_t& file) {
-            stopwatch_t timer{};
-            stopwatch::start(timer);
-
-            if (file.file_type != file_type_t::obj)
-                return status_t::invalid_input_type;
-
-            status_t status;
-
-            status = io::file::map_existing(file);
-            if (!OK(status))
-                return status;
-
-            opts_t opts{};
-            opts.file        = &file;
-            opts.alloc       = g_elf_sys.alloc;
-            opts.entry_point = {};
-
             elf_t elf{};
-            status = elf::init(elf, opts);
-            if (!OK(status))
-                return status;
-            defer(elf::free(elf));
 
-            status = read(elf, file);
-            if (!OK(status))
-                return status;
+            TIME_BLOCK(
+                "binfmt ELF read obj time"_ss,
+                if (file.file_type != file_type_t::obj)
+                    return status_t::invalid_input_type;
 
-            stopwatch::stop(timer);
-            stopwatch::print_elapsed("binfmt ELF read time"_ss, 40, timer);
+                status_t status;
+
+                status = io::file::map_existing(file);
+                if (!OK(status))
+                    return status;
+
+                opts_t opts{};
+                opts.file        = &file;
+                opts.alloc       = g_elf_sys.alloc;
+                opts.entry_point = {};
+
+                status = elf::init(elf, opts);
+                if (!OK(status))
+                    return status;
+                defer(elf::free(elf));
+
+                status = read(elf, file);
+                if (!OK(status))
+                    return status);
 
             return status_t::ok;
         }
@@ -110,12 +107,10 @@ namespace basecode::binfmt::io::elf {
                 return status;
 
             elf_t elf{};
-            defer(
-                elf::free(elf);
-                io::file::unmap(file);
-                stopwatch::stop(timer);
-                stopwatch::print_elapsed("binfmt ELF write time"_ss, 40, timer);
-                );
+            defer(elf::free(elf);
+                  io::file::unmap(file);
+                  stopwatch::stop(timer);
+                  stopwatch::print_elapsed("binfmt ELF write time"_ss, 40, timer));
 
             status = elf::init(elf, opts);
             if (!OK(status))
@@ -216,7 +211,8 @@ namespace basecode::binfmt::io::elf {
             auto msc = &section->module->subclass.object;
             if (!msc->strtab)
                 return status_t::cannot_map_section_name;
-            const auto str = binfmt::string_table::get(msc->strtab->subclass.strtab, section->name_offset);
+            const auto str = binfmt::string_table::get(msc->strtab->subclass.strtab,
+                                                       section->name_offset);
             name.data   = (const u8*) str;
             name.length = strlen(str);
             return status_t::ok;
@@ -239,12 +235,14 @@ namespace basecode::binfmt::io::elf {
                     break;
                 }
 
-                auto linked_section = binfmt::module::get_section(*module, section->info + 1);
+                auto linked_section = binfmt::module::get_section(*module,
+                                                                  section->info + 1);
                 if (!linked_section)
                     return status_t::missing_linked_section;
 
                 if (linked_section->type == section_type_t::custom) {
-                    name = string::interned::fold(format::format("{}.custom", entry->name));
+                    const auto tmp = format::format("{}.custom", entry->name);
+                    name = string::interned::fold(tmp);
                 } else {
                     flags.exec  = linked_section->flags.exec;
                     flags.write = linked_section->flags.write;
@@ -254,9 +252,10 @@ namespace basecode::binfmt::io::elf {
                     if (!linked_entry)
                         return status_t::cannot_map_section_name;
 
-                    name = string::interned::fold(format::format("{}{}",
-                                                                 entry->name,
-                                                                 linked_entry->name));
+                    const auto tmp = format::format("{}{}",
+                                                    entry->name,
+                                                    linked_entry->name);
+                    name = string::interned::fold(tmp);
                 }
                 break;
             }

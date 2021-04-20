@@ -38,15 +38,15 @@ namespace basecode::binfmt {
     using module_id             = u32;
     using member_id             = u32;
 
-    using id_list_t             = array_t<u32>;
-    using reloc_list_t          = array_t<reloc_t>;
-    using symbol_map_t          = hashtab_t<u32, symbol_t*>;
-    using group_list_t          = array_t<group_t>;
-    using import_list_t         = array_t<import_t>;
-    using member_list_t         = array_t<member_t>;
-    using symbol_ptr_list_t     = array_t<symbol_t*>;
-    using section_ptr_list_t    = array_t<section_t*>;
-    using symbol_offs_list_t    = array_t<symbol_offs_t>;
+    using id_array_t            = array_t<u32>;
+    using reloc_array_t         = array_t<reloc_t>;
+    using group_array_t         = array_t<group_t>;
+    using sym_hashtab_t         = hashtab_t<u32, symbol_t*>;
+    using import_array_t        = array_t<import_t>;
+    using member_array_t        = array_t<member_t>;
+    using sym_ptr_array_t       = array_t<symbol_t*>;
+    using sym_offs_array_t      = array_t<symbol_offs_t>;
+    using section_ptr_array_t   = array_t<section_t*>;
 
     enum class status_t : u32 {
         ok                      = 0,
@@ -332,7 +332,7 @@ namespace basecode::binfmt {
     };
 
     struct import_t final {
-        symbol_ptr_list_t       symbols;
+        sym_ptr_array_t         symbols;
         symbol_t*               module_symbol;
         section_t*              section;
         struct {
@@ -343,7 +343,7 @@ namespace basecode::binfmt {
 
     struct group_t final {
         u32                     flags;
-        id_list_t               sections;
+        id_array_t              sections;
     };
 
     struct reloc_t final {
@@ -358,8 +358,8 @@ namespace basecode::binfmt {
 
     struct symbol_table_t final {
         alloc_t*                alloc;
-        symbol_map_t            index;
-        symbol_ptr_list_t       symbols;
+        sym_hashtab_t           index;
+        sym_ptr_array_t         symbols;
 
         symbol_t* operator[](u32 idx) {
             return idx < symbols.size ? symbols[idx] : nullptr;
@@ -392,10 +392,10 @@ namespace basecode::binfmt {
     union section_subclass_t {
         const u8*               data;
         group_t                 group;
-        reloc_list_t            relocs;
+        reloc_array_t           relocs;
         string_table_t          strtab;
         symbol_table_t          symtab;
-        import_list_t           imports;
+        import_array_t          imports;
     };
 
     struct section_t final {
@@ -451,13 +451,13 @@ namespace basecode::binfmt {
 
     union module_subclass_t final {
         struct {
-            section_ptr_list_t  sections;
+            section_ptr_array_t sections;
             section_t*          strtab;
             section_t*          symtab;
         }                       object;
         struct {
-            member_list_t       members;
-            symbol_offs_list_t  offsets;
+            member_array_t      members;
+            sym_offs_array_t    offsets;
         }                       archive;
     };
 

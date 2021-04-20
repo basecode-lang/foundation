@@ -106,13 +106,11 @@ TEST_CASE("basecode::binfmt ELF round trip obj file") {
 
     auto source_obj_path = R"(C:\temp\test\elf\backend.cpp.o)"_path;
     auto dest_obj_path   = R"(backend.cpp.o)"_path;
-    defer(
-        path::free(source_obj_path);
-        path::free(dest_obj_path);
-        io::session::free(read_session);
-        io::session::free(write_session);
-        error::report::print_range(0, error::report::count());
-         );
+    defer(path::free(source_obj_path);
+          path::free(dest_obj_path);
+          io::session::free(read_session);
+          io::session::free(write_session);
+          error::report::print_range(0, error::report::count()));
 
     auto source_obj = io::session::add_file(read_session,
                                             source_obj_path,

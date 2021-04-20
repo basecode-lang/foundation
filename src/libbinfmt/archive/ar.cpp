@@ -35,6 +35,77 @@ namespace basecode::binfmt::ar {
         s8                      size[10];
     };
 
+    static status_t parse_headers(ar_t& ar, buf_crsr_t& c);
+
+    static status_t parse_symbol_table(ar_t& ar, buf_crsr_t& c);
+
+    static status_t parse_long_name_ref(ar_t& ar, member_t& member);
+
+    static status_t parse_ecoff_symbol_table(ar_t& ar, buf_crsr_t& c);
+
+    u0 free(ar_t& ar) {
+        buf::free(ar.buf);
+        array::free(ar.members);
+        hashtab::free(ar.symbol_map);
+        bitset::free(ar.symbol_module_bitmap);
+    }
+
+    u0 reset(ar_t& ar) {
+        buf::reset(ar.buf);
+        array::reset(ar.members);
+        hashtab::reset(ar.symbol_map);
+        bitset::reset(ar.symbol_module_bitmap);
+    }
+
+    status_t init(ar_t& ar, alloc_t* alloc) {
+        ar.alloc = alloc;
+        buf::init(ar.buf, ar.alloc);
+        array::init(ar.members, ar.alloc);
+        hashtab::init(ar.symbol_map, ar.alloc);
+        bitset::init(ar.symbol_module_bitmap, ar.alloc);
+        return status_t::ok;
+    }
+
+    status_t read(ar_t& ar, const path_t& path) {
+        if (!OK(buf::map_existing(ar.buf, path)))
+            return status_t::read_error;
+
+        buf_crsr_t c{};
+        buf::cursor::init(c, ar.buf);
+        defer(buf::cursor::free(c));
+
+        auto status = parse_headers(ar, c);
+        if (!OK(status))
+            return status;
+
+        for (u32 i = 0; i < ar.members.size; ++i) {
+            const auto& m = ar.members[i];
+            if (m.name[0] == '/' && m.name[1] == '/') {
+                ar.known.long_names = i + 1;
+                for (auto& member : ar.members) {
+                    status = parse_long_name_ref(ar, member);
+                    if (!OK(status))
+                        return status;
+                }
+                break;
+            }
+        }
+
+        status = parse_symbol_table(ar, c);
+        if (!OK(status))
+            return status;
+
+        return status_t::ok;
+    }
+
+    status_t write(ar_t& ar, const path_t& path) {
+        return status_t::ok;
+    }
+
+    u0 add_member(ar_t& ar, const member_t& member) {
+        array::append(ar.members, member);
+    }
+
     static status_t parse_headers(ar_t& ar, buf_crsr_t& c) {
         s8          marker[2];
         header_t    hdr{};
@@ -103,46 +174,6 @@ namespace basecode::binfmt::ar {
 
             while (CRSR_MORE(c) && CRSR_READ(c) == '\n')
                 CRSR_NEXT(c);
-        }
-
-        return status_t::ok;
-    }
-
-    // XXX: this isn't finished but m$ sucks so...there
-    static status_t parse_ecoff_symbol_table(ar_t& ar, buf_crsr_t& c) {
-        ar.known.ecoff_symbol_table = 2;
-
-        auto& symbol_table = ar.members[ar.known.ecoff_symbol_table - 1];
-        buf::cursor::push(c);
-        defer(buf::cursor::pop(c));
-
-        buf::cursor::seek(c, symbol_table.offset.data);
-
-        u32 num_members{};
-        if (!OK(buf::cursor::read<u32>(c, num_members)))
-            return status_t::read_error;
-
-        u32 mem_offsets[num_members];
-        for (u32 i = 0; i < num_members; ++i) {
-            if (!OK(buf::cursor::read<u32>(c, mem_offsets[i])))
-                return status_t::read_error;
-        }
-        u32 num_symbols{};
-
-        if (!OK(buf::cursor::read<u32>(c, num_symbols)))
-            return status_t::read_error;
-
-        u16 sym_indexes[num_symbols];
-        for (u32 i = 0; i < num_symbols; ++i) {
-            if (!OK(buf::cursor::read<u16>(c, sym_indexes[i])))
-                return status_t::read_error;
-        }
-        u8 ch{};
-        while (num_symbols) {
-            if (!OK(buf::cursor::read<u8>(c, ch)))
-                return status_t::read_error;
-            if (ch == 0)
-                --num_symbols;
         }
 
         return status_t::ok;
@@ -249,70 +280,47 @@ namespace basecode::binfmt::ar {
         return status_t::ok;
     }
 
-    u0 free(ar_t& ar) {
-        buf::free(ar.buf);
-        array::free(ar.members);
-        hashtab::free(ar.symbol_map);
-        bitset::free(ar.symbol_module_bitmap);
-    }
+    // XXX: this isn't finished but m$ sucks so...there
+    static status_t parse_ecoff_symbol_table(ar_t& ar, buf_crsr_t& c) {
+        ar.known.ecoff_symbol_table = 2;
 
-    u0 reset(ar_t& ar) {
-        buf::reset(ar.buf);
-        array::reset(ar.members);
-        hashtab::reset(ar.symbol_map);
-        bitset::reset(ar.symbol_module_bitmap);
-    }
+        auto& symbol_table = ar.members[ar.known.ecoff_symbol_table - 1];
+        buf::cursor::push(c);
+        defer(buf::cursor::pop(c));
 
-    status_t init(ar_t& ar, alloc_t* alloc) {
-        ar.alloc = alloc;
-        buf::init(ar.buf, ar.alloc);
-        array::init(ar.members, ar.alloc);
-        hashtab::init(ar.symbol_map, ar.alloc);
-        bitset::init(ar.symbol_module_bitmap, ar.alloc);
-        return status_t::ok;
-    }
+        buf::cursor::seek(c, symbol_table.offset.data);
 
-    status_t read(ar_t& ar, const path_t& path) {
-        if (!OK(buf::map_existing(ar.buf, path)))
+        u32 num_members{};
+        if (!OK(buf::cursor::read<u32>(c, num_members)))
             return status_t::read_error;
 
-        buf_crsr_t c{};
-        buf::cursor::init(c, ar.buf);
-        defer(buf::cursor::free(c));
+        u32 mem_offsets[num_members];
+        for (u32 i = 0; i < num_members; ++i) {
+            if (!OK(buf::cursor::read<u32>(c, mem_offsets[i])))
+                return status_t::read_error;
+        }
+        u32 num_symbols{};
 
-        auto status = parse_headers(ar, c);
-        if (!OK(status))
-            return status;
+        if (!OK(buf::cursor::read<u32>(c, num_symbols)))
+            return status_t::read_error;
 
-        for (u32 i = 0; i < ar.members.size; ++i) {
-            const auto& m = ar.members[i];
-            if (m.name[0] == '/' && m.name[1] == '/') {
-                ar.known.long_names = i + 1;
-                for (auto& member : ar.members) {
-                    status = parse_long_name_ref(ar, member);
-                    if (!OK(status))
-                        return status;
-                }
-                break;
-            }
+        u16 sym_indexes[num_symbols];
+        for (u32 i = 0; i < num_symbols; ++i) {
+            if (!OK(buf::cursor::read<u16>(c, sym_indexes[i])))
+                return status_t::read_error;
+        }
+        u8 ch{};
+        while (num_symbols) {
+            if (!OK(buf::cursor::read<u8>(c, ch)))
+                return status_t::read_error;
+            if (ch == 0)
+                --num_symbols;
         }
 
-        status = parse_symbol_table(ar, c);
-        if (!OK(status))
-            return status;
-
         return status_t::ok;
     }
 
-    status_t write(ar_t& ar, const path_t& path) {
-        return status_t::ok;
-    }
-
-    u0 add_member(ar_t& ar, const member_t& member) {
-        array::append(ar.members, member);
-    }
-
-    u0 find_member(ar_t& ar, str::slice_t name, member_ptr_list_t& list) {
+    u0 find_member(ar_t& ar, str::slice_t name, member_ptr_array_t& list) {
         for (auto& member : ar.members) {
             if (member.name == name)
                 array::append(list, &member);

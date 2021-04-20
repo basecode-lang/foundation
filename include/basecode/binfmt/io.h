@@ -26,8 +26,8 @@ namespace basecode::binfmt::io {
     struct session_t;
     struct name_map_t;
 
-    using name_list_t           = array_t<name_map_t>;
-    using file_list_t           = array_t<file_t>;
+    using name_array_t          = array_t<name_map_t>;
+    using file_array_t          = array_t<file_t>;
 
     enum class type_t : u8 {
         ar,
@@ -46,11 +46,11 @@ namespace basecode::binfmt::io {
     };
 
     struct name_flags_t final {
-        u32                 code:       1;
-        u32                 init:       1;
-        u32                 exec:       1;
-        u32                 write:      1;
-        u32                 pad:        28;
+        u32                     code:       1;
+        u32                     init:       1;
+        u32                     exec:       1;
+        u32                     write:      1;
+        u32                     pad:        28;
     };
 
     struct name_map_t final {
@@ -86,7 +86,7 @@ namespace basecode::binfmt::io {
 
     struct session_t final {
         alloc_t*                alloc;
-        file_list_t             files;
+        file_array_t            files;
     };
 
     namespace file {
@@ -104,16 +104,16 @@ namespace basecode::binfmt::io {
     }
 
     namespace name_map {
-        u0 add(name_list_t& names,
+        u0 add(name_array_t& names,
                section::type_t type,
                name_flags_t flags,
                str::slice_t name);
 
-        u0 free(name_list_t& names);
+        u0 free(name_array_t& names);
 
-        u0 init(name_list_t& names, alloc_t* alloc);
+        u0 init(name_array_t& names, alloc_t* alloc);
 
-        const name_map_t* find(const name_list_t& names,
+        const name_map_t* find(const name_array_t& names,
                                section::type_t type,
                                name_flags_t flags);
     }
@@ -151,7 +151,11 @@ namespace basecode::binfmt::io {
                         const String_Concept auto& path,
                         type_t bin_type,
                         file_type_t file_type) {
-            return add_file(s, (const s8*) path.data, bin_type, file_type, path.length);
+            return add_file(s,
+                            (const s8*) path.data,
+                            bin_type,
+                            file_type,
+                            path.length);
         }
 
         file_t* add_file(session_t& s,

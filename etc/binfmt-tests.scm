@@ -16,7 +16,7 @@
 ;;
 ;; ----------------------------------------------------------------------------
 
-(define binfmt-tests (fn ()
+(define binfmt-tests (lambda ()
     nil))
 
 (binfmt-tests)

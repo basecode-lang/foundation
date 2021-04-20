@@ -18,30 +18,29 @@
 
 #include <basecode/core/bits.h>
 #include <basecode/binfmt/coff.h>
-#include <basecode/core/string.h>
 #include <basecode/core/numbers.h>
 
 namespace basecode::binfmt::io::coff {
     namespace reloc {
         namespace type::x86_64 {
             static str::slice_t s_names[] = {
-                "IMAGE_REL_AMD64_ABSOLUTE"_ss,
-                "IMAGE_REL_AMD64_ADDR64"_ss,
-                "IMAGE_REL_AMD64_ADDR32"_ss,
-                "IMAGE_REL_AMD64_ADDR32NB"_ss,
-                "IMAGE_REL_AMD64_REL32"_ss,
-                "IMAGE_REL_AMD64_REL32_1"_ss,
-                "IMAGE_REL_AMD64_REL32_2"_ss,
-                "IMAGE_REL_AMD64_REL32_3"_ss,
-                "IMAGE_REL_AMD64_REL32_4"_ss,
-                "IMAGE_REL_AMD64_REL32_5"_ss,
-                "IMAGE_REL_AMD64_SECTION"_ss,
-                "IMAGE_REL_AMD64_SECREL"_ss,
-                "IMAGE_REL_AMD64_SECREL7"_ss,
-                "IMAGE_REL_AMD64_TOKEN"_ss,
-                "IMAGE_REL_AMD64_SREL32"_ss,
-                "IMAGE_REL_AMD64_PAIR"_ss,
-                "IMAGE_REL_AMD64_SSPAN32"_ss,
+                [absolute]              = "IMAGE_REL_AMD64_ABSOLUTE"_ss,
+                [addr64]                = "IMAGE_REL_AMD64_ADDR64"_ss,
+                [addr32]                = "IMAGE_REL_AMD64_ADDR32"_ss,
+                [addr32nb]              = "IMAGE_REL_AMD64_ADDR32NB"_ss,
+                [rel32]                 = "IMAGE_REL_AMD64_REL32"_ss,
+                [rel32_1]               = "IMAGE_REL_AMD64_REL32_1"_ss,
+                [rel32_2]               = "IMAGE_REL_AMD64_REL32_2"_ss,
+                [rel32_3]               = "IMAGE_REL_AMD64_REL32_3"_ss,
+                [rel32_4]               = "IMAGE_REL_AMD64_REL32_4"_ss,
+                [rel32_5]               = "IMAGE_REL_AMD64_REL32_5"_ss,
+                [section]               = "IMAGE_REL_AMD64_SECTION"_ss,
+                [section_rel]           = "IMAGE_REL_AMD64_SECREL"_ss,
+                [section_rel_7]         = "IMAGE_REL_AMD64_SECREL7"_ss,
+                [token]                 = "IMAGE_REL_AMD64_TOKEN"_ss,
+                [span_rel32_signed]     = "IMAGE_REL_AMD64_SREL32"_ss,
+                [pair]                  = "IMAGE_REL_AMD64_PAIR"_ss,
+                [span32_signed]         = "IMAGE_REL_AMD64_SSPAN32"_ss,
             };
 
             str::slice_t name(u16 type) {
@@ -51,22 +50,24 @@ namespace basecode::binfmt::io::coff {
 
         namespace type::aarch64 {
             static str::slice_t s_names[] = {
-                "IMAGE_REL_ARM64_ABSOLUTE"_ss,
-                "IMAGE_REL_ARM64_ADDR32"_ss,
-                "IMAGE_REL_ARM64_ADDR32NB"_ss,
-                "IMAGE_REL_ARM64_BRANCH26"_ss,
-                "IMAGE_REL_ARM64_PAGEBASE_REL21"_ss,
-                "IMAGE_REL_ARM64_REL21"_ss,
-                "IMAGE_REL_ARM64_PAGEOFFSET_12L"_ss,
-                "IMAGE_REL_ARM64_SECREL"_ss,
-                "IMAGE_REL_ARM64_SECREL_LOW12A"_ss,
-                "IMAGE_REL_ARM64_SECREL_HIGH12A"_ss,
-                "IMAGE_REL_ARM64_SECREL_LOW12L"_ss,
-                "IMAGE_REL_ARM64_TOKEN"_ss,
-                "IMAGE_REL_ARM64_ADDR64"_ss,
-                "IMAGE_REL_ARM64_BRANCH19"_ss,
-                "IMAGE_REL_ARM64_BRANCH14"_ss,
-                "IMAGE_REL_ARM64_REL32"_ss,
+                [absolute]              = "IMAGE_REL_ARM64_ABSOLUTE"_ss,
+                [addr32]                = "IMAGE_REL_ARM64_ADDR32"_ss,
+                [addr32nb]              = "IMAGE_REL_ARM64_ADDR32NB"_ss,
+                [branch26]              = "IMAGE_REL_ARM64_BRANCH26"_ss,
+                [page_base_rel_21]      = "IMAGE_REL_ARM64_PAGEBASE_REL21"_ss,
+                [rel_21]                = "IMAGE_REL_ARM64_REL21"_ss,
+                [page_offset_12a]       = "IMAGE_REL_ARM64_PAGEOFFSET_12L"_ss,
+                [page_offset_12l]       = "IMAGE_REL_ARM64_SECREL"_ss,
+                [section_rel]           = "IMAGE_REL_ARM64_SECREL_LOW12A"_ss,
+                [section_rel_low12a]    = "IMAGE_REL_ARM64_SECREL_HIGH12A"_ss,
+                [section_rel_high12a]   = "IMAGE_REL_ARM64_SECREL_LOW12L"_ss,
+                [section_rel_low12l]    = "IMAGE_REL_ARM64_TOKEN"_ss,
+                [token]                 = "IMAGE_REL_ARM64_ADDR64"_ss,
+                [section]               = "IMAGE_REL_ARM64_SECTION"_ss,
+                [addr64]                = "IMAGE_REL_ARM64_ADDR64"_ss,
+                [branch19]              = "IMAGE_REL_ARM64_BRANCH19"_ss,
+                [branch14]              = "IMAGE_REL_ARM64_BRANCH14"_ss,
+                [rel_32]                = "IMAGE_REL_ARM64_REL32"_ss,
             };
 
             str::slice_t name(u16 type) {
@@ -80,7 +81,8 @@ namespace basecode::binfmt::io::coff {
             if (idx > hdr.relocs.file.size)
                 return r;
 
-            auto p = coff.buf + hdr.relocs.file.offset + (idx * reloc::entry_size);
+            auto p = coff.buf + hdr.relocs.file.offset
+                     + (idx * reloc::entry_size);
             std::memcpy(&r.rva, p, sizeof(u32));
             p += sizeof(u32);
 
@@ -95,13 +97,13 @@ namespace basecode::binfmt::io::coff {
 
     namespace comdat {
         static str::slice_t s_names[] = {
-            "NONE"_ss,
-            "IMAGE_COMDAT_SELECT_NODUPLICATES"_ss,
-            "IMAGE_COMDAT_SELECT_ANY"_ss,
-            "IMAGE_COMDAT_SELECT_SAME_SIZE"_ss,
-            "IMAGE_COMDAT_SELECT_EXACT_MATCH"_ss,
-            "IMAGE_COMDAT_SELECT_ASSOCIATIVE"_ss,
-            "IMAGE_COMDAT_SELECT_LARGEST"_ss,
+            [select_none]               = "NONE"_ss,
+            [select_no_duplicates]      = "IMAGE_COMDAT_SELECT_NODUPLICATES"_ss,
+            [select_any]                = "IMAGE_COMDAT_SELECT_ANY"_ss,
+            [select_same_as]            = "IMAGE_COMDAT_SELECT_SAME_SIZE"_ss,
+            [select_exact_match]        = "IMAGE_COMDAT_SELECT_EXACT_MATCH"_ss,
+            [select_associative]        = "IMAGE_COMDAT_SELECT_ASSOCIATIVE"_ss,
+            [select_largest]            = "IMAGE_COMDAT_SELECT_LARGEST"_ss,
         };
 
         str::slice_t name(u32 sel) {
@@ -110,7 +112,10 @@ namespace basecode::binfmt::io::coff {
     }
 
     namespace unwind {
-        status_t get(const coff_t& coff, const header_t& hdr, u32 idx, unwind_t& u) {
+        status_t get(const coff_t& coff,
+                     const header_t& hdr,
+                     u32 idx,
+                     unwind_t& u) {
             const auto num_unwinds = hdr.file.size / unwind::entry_size;
             if (idx >= num_unwinds)
                 return status_t::section_entry_out_of_bounds;
@@ -147,13 +152,42 @@ namespace basecode::binfmt::io::coff {
         }
 
         const s8* get(coff_t& coff, u64 offset) {
-            return (const s8*) coff.buf + coff.strtab.file.offset + (offset >> u32(32));
+            return (const s8*) coff.buf
+                   + coff.strtab.file.offset
+                   + (offset >> u32(32));
         }
 
     }
 
+    namespace flags {
+        static str::slice_t s_names[] = {
+            [relocs_stripped]           = ""_ss,
+            [executable_type]           = ""_ss,
+            [line_nums_stripped]        = ""_ss,
+            [local_syms_stripped]       = ""_ss,
+            [aggressive_ws_trim]        = ""_ss,
+            [large_address_aware]       = ""_ss,
+            [reserved]                  = ""_ss,
+            [bytes_reversed_lo]         = ""_ss,
+            [machine_32bit]             = ""_ss,
+            [debug_stripped]            = ""_ss,
+            [removable_run_from_swap]   = ""_ss,
+            [net_run_from_swap]         = ""_ss,
+            [system_type]               = ""_ss,
+            [dll_type]                  = ""_ss,
+            [up_system_only]            = ""_ss,
+            [bytes_reversed_hi]         = ""_ss,
+        };
+
+        str::slice_t name(u32 flag) {
+            return s_names[flag];
+        }
+    }
+
     namespace symtab {
-        static status_t parse_ar_long_name(coff_t& coff, str::slice_t name, u32& offset) {
+        static status_t parse_ar_long_name(coff_t& coff,
+                                           str::slice_t name,
+                                           u32& offset) {
             if (name.length >= 2
             && (name[0] == '/' && isdigit(name[1]))) {
                 const auto os = slice::make(name.data + 1, 7);
@@ -290,9 +324,84 @@ namespace basecode::binfmt::io::coff {
             coff.symtab.file.size += entry_size;
             return aux;
         }
+
+        namespace sclass {
+            static str::slice_t s_names[] = {
+                [null_]                 = "NULL"_ss,
+                [auto_]                 = "AUTO"_ss,
+                [external_]             = "EXTERNAL"_ss,
+                [static_]               = "STATIC"_ss,
+                [register_]             = "REGISTER"_ss,
+                [extern_def]            = "EXTERN_DEF"_ss,
+                [label]                 = "LABEL"_ss,
+                [undef_label]           = "UNDEF_LABEL"_ss,
+                [member_of_struct]      = "MEMBER_OF_STRUCT"_ss,
+                [argument]              = "ARGUMENT"_ss,
+                [struct_tag]            = "STRUCT_TAG"_ss,
+                [member_of_union]       = "MEMBER_OF_UNION"_ss,
+                [union_tag]             = "UNION_TAG"_ss,
+                [type_def]              = "TYPE_DEF"_ss,
+                [undef_static]          = "UNDEF_STATIC"_ss,
+                [enum_tag]              = "ENUM_TAG"_ss,
+                [member_of_enum]        = "MEMBER_OF_ENUM"_ss,
+                [register_param]        = "REGISTER_PARAM"_ss,
+                [bit_field]             = "BIT_FIELD"_ss,
+                [block]                 = "BLOCK"_ss,
+                [function]              = "FUNCTION"_ss,
+                [end_of_struct]         = "END_OF_STRUCT"_ss,
+                [file]                  = "FILE"_ss,
+                [section]               = "SECTION"_ss,
+                [weak_external]         = "WEAK_EXTERNAL"_ss,
+                [clr_token]             = "CLR_TOKEN"_ss,
+                [end_of_function]       = "END_OF_FUNCTION"_ss,
+            };
+
+            str::slice_t name(u8 sclass) {
+                return s_names[u32(sclass)];
+            }
+        }
     }
 
     namespace section {
+        str::slice_t flag_name(u32 flag) {
+            switch (flag) {
+                case no_pad:                return "NO_PAD"_ss;
+                case content_code:          return "CONTENT_CODE"_ss;
+                case data_init:             return "DATA_INIT"_ss;
+                case data_uninit:           return "DATA_UNINIT"_ss;
+                case link_info:             return "LINK_INFO"_ss;
+                case link_remove:           return "LINK_REMOVE"_ss;
+                case link_comdat:           return "LINK_COMDAT"_ss;
+                case gp_relative:           return "GP_RELATIVE"_ss;
+                case memory_purgeable:      return "MEMORY_PURGEABLE"_ss;
+                case memory_locked:         return "MEMORY_LOCKED"_ss;
+                case memory_preload:        return "MEMORY_PRELOAD"_ss;
+                case memory_align_1:        return "MEMORY_ALIGN_1"_ss;
+                case memory_align_2:        return "MEMORY_ALIGN_2"_ss;
+                case memory_align_4:        return "MEMORY_ALIGN_4"_ss;
+                case memory_align_8:        return "MEMORY_ALIGN_8"_ss;
+                case memory_align_16:       return "MEMORY_ALIGN_16"_ss;
+                case memory_align_32:       return "MEMORY_ALIGN_32"_ss;
+                case memory_align_64:       return "MEMORY_ALIGN_64"_ss;
+                case memory_align_128:      return "MEMORY_ALIGN_128"_ss;
+                case memory_align_256:      return "MEMORY_ALIGN_256"_ss;
+                case memory_align_512:      return "MEMORY_ALIGN_512"_ss;
+                case memory_align_1024:     return "MEMORY_ALIGN_1024"_ss;
+                case memory_align_2048:     return "MEMORY_ALIGN_2048"_ss;
+                case memory_align_4096:     return "MEMORY_ALIGN_4096"_ss;
+                case memory_align_8192:     return "MEMORY_ALIGN_8192"_ss;
+                case link_reloc_overflow:   return "LINK_RELOC_OVERFLOW"_ss;
+                case memory_discard:        return "MEMORY_DISCARD"_ss;
+                case memory_not_cached:     return "MEMORY_NOT_CACHED"_ss;
+                case memory_not_paged:      return "MEMORY_NOT_PAGED"_ss;
+                case memory_shared:         return "MEMORY_SHARED"_ss;
+                case memory_execute:        return "MEMORY_EXECUTE"_ss;
+                case memory_read:           return "MEMORY_READ"_ss;
+                case memory_write:          return "MEMORY_WRITE"_ss;
+            }
+            return "UNKNOWN"_ss;
+        }
+
         sym_t* get_symbol(coff_t& coff, header_t& hdr) {
             if (!hdr.symbol) return nullptr;
             return &coff.symtab.list[hdr.symbol - 1];
@@ -306,7 +415,9 @@ namespace basecode::binfmt::io::coff {
             if (idx > hdr.line_nums.file.size)
                 return num;
 
-            auto p = coff.buf + hdr.line_nums.file.offset + (idx * line_num::entry_size);
+            auto p = coff.buf
+                     + hdr.line_nums.file.offset
+                     + (idx * line_num::entry_size);
             std::memcpy(&num.rva, p, sizeof(u32));
             p += sizeof(u32);
 
@@ -324,7 +435,8 @@ namespace basecode::binfmt::io::coff {
 
     u0 update_symbol_table(coff_t& coff) {
         coff.symtab.file.offset = coff.offset;
-        coff.strtab.file.offset = coff.symtab.file.offset + coff.symtab.file.size;
+        coff.strtab.file.offset = coff.symtab.file.offset
+                                  + coff.symtab.file.size;
     }
 
     u0 set_section_flags(file_t& file, header_t& hdr) {
@@ -339,9 +451,14 @@ namespace basecode::binfmt::io::coff {
         if (section->type == binfmt::section::type_t::text)
             hdr.flags |= section::content_code;
 
-        if (flags.alloc)    hdr.flags |= section::memory_read;
-        if (flags.write)    hdr.flags |= section::memory_write;
-        if (flags.exec)     hdr.flags |= section::memory_execute;
+        if (flags.alloc)
+            hdr.flags |= section::memory_read;
+
+        if (flags.write)
+            hdr.flags |= section::memory_write;
+
+        if (flags.exec)
+            hdr.flags |= section::memory_execute;
 
         if (file.file_type == file_type_t::obj) {
             switch (section->align) {
@@ -391,17 +508,6 @@ namespace basecode::binfmt::io::coff {
         }
     }
 
-    status_t write_header(file_t& file, coff_t& coff) {
-        FILE_WRITE(u16, coff.machine);
-        FILE_WRITE(u16, u16(coff.headers.size));
-        FILE_WRITE(u32, coff.timestamp);
-        FILE_WRITE(u32, coff.symtab.file.offset);
-        FILE_WRITE(u32, coff.symtab.file.size / symtab::entry_size);
-        FILE_WRITE(u16, coff.size.opt_hdr);
-        FILE_WRITE(u16, coff.flags.image);
-        return status_t::ok;
-    }
-
     status_t read_header(file_t& file, coff_t& coff) {
         u16 num_headers{};
 
@@ -415,8 +521,20 @@ namespace basecode::binfmt::io::coff {
 
         array::resize(coff.headers, num_headers);
         coff.symtab.file.size   = coff.symtab.num_symbols * symtab::entry_size;
-        coff.strtab.file.offset = coff.symtab.file.offset + coff.symtab.file.size;
+        coff.strtab.file.offset = coff.symtab.file.offset
+                                  + coff.symtab.file.size;
 
+        return status_t::ok;
+    }
+
+    status_t write_header(file_t& file, coff_t& coff) {
+        FILE_WRITE(u16, coff.machine);
+        FILE_WRITE(u16, u16(coff.headers.size));
+        FILE_WRITE(u32, coff.timestamp);
+        FILE_WRITE(u32, coff.symtab.file.offset);
+        FILE_WRITE(u32, coff.symtab.file.size / symtab::entry_size);
+        FILE_WRITE(u16, coff.size.opt_hdr);
+        FILE_WRITE(u16, coff.flags.image);
         return status_t::ok;
     }
 
@@ -540,14 +658,18 @@ namespace basecode::binfmt::io::coff {
             for (u32 i = 0; i < num_aux_recs; ++i) {
                 switch (sc->sclass) {
                     case symtab::sclass::file: {
-                        auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_file);
+                        auto aux = symtab::make_aux(coff,
+                                                    sym,
+                                                    sym_type_t::aux_file);
                         auto asc = &aux->subclass.aux_file;
                         FILE_READ(s8[18], asc->bytes);
                         break;
                     }
                     case symtab::sclass::static_: {
                         if (sc->type == 0) {
-                            auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_section);
+                            auto aux = symtab::make_aux(coff,
+                                                        sym,
+                                                        sym_type_t::aux_section);
                             auto asc = &aux->subclass.aux_section;
                             FILE_READ(u32, asc->len);
                             FILE_READ(u16, asc->num_relocs);
@@ -560,7 +682,9 @@ namespace basecode::binfmt::io::coff {
                         break;
                     }
                     case symtab::sclass::function: {
-                        auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_xf);
+                        auto aux = symtab::make_aux(coff,
+                                                    sym,
+                                                    sym_type_t::aux_xf);
                         auto asc = &aux->subclass.aux_xf;
                         FILE_SEEK_FWD(4);
                         FILE_READ(u16, asc->line_num);
@@ -570,26 +694,32 @@ namespace basecode::binfmt::io::coff {
                         break;
                     }
                     case symtab::sclass::external_: {
-                        if (sc->section == 0) {
-                            if (sc->value == 0 && sc->section == 0) {
-                                auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_weak_extern);
-                                auto asc = &aux->subclass.aux_weak_extern;
-                                FILE_READ(u32, asc->tag_idx);
-                                FILE_READ(u32, asc->flags);
-                                FILE_SEEK_FWD(10);
-                            } else if (sc->type == symtab::type::function) {
-                                auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_func_def);
-                                auto asc = &aux->subclass.aux_func_def;
-                                FILE_READ(u32, asc->tag_idx);
-                                FILE_READ(u32, asc->total_size);
-                                FILE_READ(u32, asc->ptr_next_func);
-                                FILE_SEEK_FWD(2);
-                            }
+                        if (sc->section != 0)
+                            break;
+                        if (sc->value == 0 && sc->section == 0) {
+                            auto aux_1 = symtab::make_aux(coff,
+                                                          sym,
+                                                          sym_type_t::aux_weak_extern);
+                            auto asc_1 = &aux_1->subclass.aux_weak_extern;
+                            FILE_READ(u32, asc_1->tag_idx);
+                            FILE_READ(u32, asc_1->flags);
+                            FILE_SEEK_FWD(10);
+                        } else if (sc->type == symtab::type::function) {
+                            auto aux_1 = symtab::make_aux(coff,
+                                                          sym,
+                                                          sym_type_t::aux_func_def);
+                            auto asc_1 = &aux_1->subclass.aux_func_def;
+                            FILE_READ(u32, asc_1->tag_idx);
+                            FILE_READ(u32, asc_1->total_size);
+                            FILE_READ(u32, asc_1->ptr_next_func);
+                            FILE_SEEK_FWD(2);
                         }
                         break;
                     }
                     case symtab::sclass::clr_token: {
-                        auto aux = symtab::make_aux(coff, sym, sym_type_t::aux_token_def);
+                        auto aux = symtab::make_aux(coff,
+                                                    sym,
+                                                    sym_type_t::aux_token_def);
                         auto asc = &aux->subclass.aux_token_def;
                         FILE_READ(u8, asc->aux_type);
                         FILE_SEEK_FWD(1);
@@ -676,8 +806,6 @@ namespace basecode::binfmt::io::coff {
     }
 
     status_t init(coff_t& coff, file_t& file, alloc_t* alloc) {
-//        using type_t = binfmt::section::type_t;
-
         coff.alloc = alloc;
         coff.buf   = file.buf.data;
 
@@ -716,14 +844,9 @@ namespace basecode::binfmt::io::coff {
             hdr.section = module_sc.sections[i];
 
             str::slice_t name{};
-            // XXX: FIXME!
-//            if (hdr.section->type == type_t::custom) {
-//                name = hdr.section->name;
-//            } else {
-//                status = coff::get_section_name(hdr.section, name);
-//                if (!OK(status))
-//                    return status;
-//            }
+            status = coff::get_section_name(hdr.section, name);
+            if (!OK(status))
+                return status;
 
             auto sym = coff::symtab::make_symbol(coff, name);
             {
@@ -815,17 +938,22 @@ namespace basecode::binfmt::io::coff {
                 coff.uninit_data.size += hdr.rva.size;
                 hdr.file.offset = 0;
                 hdr.file.size   = 0;
-                coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
-                coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
+                coff.size.image = align(coff.size.image + hdr.rva.size,
+                                        coff.align.section);
+                coff.rva        = align(coff.rva + hdr.rva.size,
+                                        coff.align.section);
                 break;
             case type_t::text:
                 if (!coff.code.base)
                     coff.code.base = hdr.rva.base;
                 coff.code.size += hdr.rva.size;
                 hdr.file.size   = align(hdr.rva.size, coff.align.file);
-                coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
-                coff.offset     = align(coff.offset + hdr.rva.size, coff.align.file);
-                coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
+                coff.size.image = align(coff.size.image + hdr.rva.size,
+                                        coff.align.section);
+                coff.offset     = align(coff.offset + hdr.rva.size,
+                                        coff.align.file);
+                coff.rva        = align(coff.rva + hdr.rva.size,
+                                        coff.align.section);
                 break;
             case type_t::data:
             case type_t::custom:
@@ -833,9 +961,12 @@ namespace basecode::binfmt::io::coff {
                     coff.init_data.base = hdr.rva.base;
                 coff.init_data.size += hdr.rva.size;
                 hdr.file.size   = align(hdr.rva.size, coff.align.file);
-                coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
-                coff.offset     = align(coff.offset + hdr.rva.size, coff.align.file);
-                coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
+                coff.size.image = align(coff.size.image + hdr.rva.size,
+                                        coff.align.section);
+                coff.offset     = align(coff.offset + hdr.rva.size,
+                                        coff.align.file);
+                coff.rva        = align(coff.rva + hdr.rva.size,
+                                        coff.align.section);
                 break;
             case type_t::reloc:
             case type_t::group:

@@ -26,7 +26,7 @@ namespace basecode::binfmt::io::coff {
     namespace internal {
         struct coff_system_t final {
             alloc_t*                alloc;
-            name_list_t             section_names;
+            name_array_t            section_names;
         };
 
         coff_system_t               g_coff_sys{};
@@ -63,14 +63,16 @@ namespace basecode::binfmt::io::coff {
                         format::print("   {:<16} {:08x} {:<32} ",
                                       "COFF line_num",
                                       0,
-                                      line_num.number == 0 ? "SYMBOL_TABLE_REF" : "FUNC_LINE_NUM");
+                                      line_num.number == 0 ? "SYMBOL_TABLE_REF" :
+                                      "FUNC_LINE_NUM");
                         format::print("\n");
                     }
                 }
                 if (hdr.relocs.file.size > 0) {
                     for (u32 i = 0; i < hdr.relocs.file.size; ++i) {
                         auto reloc = coff::reloc::get(coff, hdr, i);
-                        auto reloc_name = coff.machine == coff::machine::amd64 ? coff::reloc::type::x86_64::name(reloc.type) :
+                        auto reloc_name = coff.machine == coff::machine::amd64 ?
+                                          coff::reloc::type::x86_64::name(reloc.type) :
                                           coff::reloc::type::aarch64::name(reloc.type);
                         format::print("   {:<16} {:08x} {:<32} ",
                                       "COFF reloc",
@@ -83,7 +85,8 @@ namespace basecode::binfmt::io::coff {
                     format::print("\n");
                 }
                 if (hdr.name == ".drectve"_ss) {
-                    auto data = slice::make(coff.buf + hdr.file.offset, hdr.file.size);
+                    auto data = slice::make(coff.buf + hdr.file.offset,
+                                            hdr.file.size);
                     array_t<str::slice_t> args{};
                     array::init(args, coff.alloc);
                     defer(array::free(args));
@@ -105,30 +108,48 @@ namespace basecode::binfmt::io::coff {
                     format::print("\n");
                 } else if (hdr.name == ".xdata"_ss) {
                     format::print("    FREE FORMAT EXCEPTION DATA:\n");
-                    format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, true, 6);
+                    format::print_hex_dump(coff.buf + hdr.file.offset,
+                                           hdr.file.size,
+                                           false,
+                                           true,
+                                           6);
                     format::print("\n");
                 } else if (hdr.name == ".debug$S"_ss) {
                     format::print("    SYMBOLIC DEBUG DATA:\n");
-                    format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, true, 6);
+                    format::print_hex_dump(coff.buf + hdr.file.offset,
+                                           hdr.file.size,
+                                           false,
+                                           true,
+                                           6);
                     format::print("\n");
 
                     cv::cv_t cv{};
                     cv::init(cv, coff.alloc);
                     defer(cv::free(cv));
 
-                    if (!OK(cv::read_symbol_data(cv, file, hdr.file.offset, hdr.file.size))) {
+                    if (!OK(cv::read_symbol_data(cv,
+                                                 file,
+                                                 hdr.file.offset,
+                                                 hdr.file.size))) {
                         format::print("crap! reading symbols sucks\n");
                     }
                 } else if (hdr.name == ".debug$T"_ss || hdr.name == ".debug$P"_ss) {
                     format::print("    TYPE INFO DEBUG DATA:\n");
-                    format::print_hex_dump(coff.buf + hdr.file.offset, hdr.file.size, false, true, 6);
+                    format::print_hex_dump(coff.buf + hdr.file.offset,
+                                           hdr.file.size,
+                                           false,
+                                           true,
+                                           6);
                     format::print("\n");
 
                     cv::cv_t cv{};
                     cv::init(cv, coff.alloc);
                     defer(cv::free(cv));
 
-                    if (!OK(cv::read_type_data(cv, file, hdr.file.offset, hdr.file.size))) {
+                    if (!OK(cv::read_type_data(cv,
+                                               file,
+                                               hdr.file.offset,
+                                               hdr.file.size))) {
                         format::print("crap! reading types sucks\n");
                     }
                 }
@@ -191,12 +212,14 @@ namespace basecode::binfmt::io::coff {
                     }
                     case sym_type_t::aux_xf: {
                         auto sc = &sym.subclass.aux_xf;
-                        format::print("                           AUX    XF   {}\n", sc->line_num);
+                        format::print("                           AUX    XF   {}\n",
+                                      sc->line_num);
                         break;
                     }
                     case sym_type_t::aux_file: {
                         auto sc = &sym.subclass.aux_file;
-                        format::print("                           AUX    FILE {}\n", slice::make(sc->bytes, sizeof(sc->bytes)));
+                        format::print("                           AUX    FILE {}\n",
+                                      slice::make(sc->bytes, sizeof(sc->bytes)));
                         break;
                     }
                     case sym_type_t::aux_section: {
@@ -211,17 +234,20 @@ namespace basecode::binfmt::io::coff {
                     }
                     case sym_type_t::aux_func_def: {
                         auto sc = &sym.subclass.aux_func_def;
-                        format::print("                           AUX    FUNC {}\n", sc->tag_idx);
+                        format::print("                           AUX    FUNC {}\n",
+                                      sc->tag_idx);
                         break;
                     }
                     case sym_type_t::aux_token_def: {
                         auto sc = &sym.subclass.aux_token_def;
-                        format::print("                           AUX    TOKE {}\n", sc->symtab_idx);
+                        format::print("                           AUX    TOKE {}\n",
+                                      sc->symtab_idx);
                         break;
                     }
                     case sym_type_t::aux_weak_extern: {
                         auto sc = &sym.subclass.aux_weak_extern;
-                        format::print("                           AUX    WEAK {}\n", sc->tag_idx);
+                        format::print("                           AUX    WEAK {}\n",
+                                      sc->tag_idx);
                         break;
                     }
                 }
@@ -234,38 +260,35 @@ namespace basecode::binfmt::io::coff {
         }
 
         static status_t read(file_t& file) {
-            stopwatch_t timer{};
-            stopwatch::start(timer);
-
-            if (file.file_type != file_type_t::obj)
-                return status_t::invalid_input_type;
-
-            status_t status;
-
-            status = io::file::map_existing(file);
-            if (!OK(status))
-                return status_t::read_error;
-
             coff_t coff{};
-            status = coff::init(coff, file, g_coff_sys.alloc);
-            if (!OK(status))
-                return status;
-            defer(coff::free(coff));
 
-            status = coff::read_header(file, coff);
-            if (!OK(status))
-                return status_t::read_error;
+            TIME_BLOCK(
+                "binfmt read COFF obj"_ss,
+                if (file.file_type != file_type_t::obj)
+                    return status_t::invalid_input_type;
 
-            status = coff::read_symbol_table(file, coff);
-            if (!OK(status))
-                return status_t::read_error;
+                status_t status;
 
-            status = coff::read_section_headers(file, coff);
-            if (!OK(status))
-                return status_t::read_error;
+                status = io::file::map_existing(file);
+                if (!OK(status))
+                    return status_t::read_error;
 
-            stopwatch::stop(timer);
-            stopwatch::print_elapsed("binfmt read COFF obj time"_ss, 40, timer);
+                status = coff::init(coff, file, g_coff_sys.alloc);
+                if (!OK(status))
+                    return status;
+                defer(coff::free(coff));
+
+                status = coff::read_header(file, coff);
+                if (!OK(status))
+                    return status_t::read_error;
+
+                status = coff::read_symbol_table(file, coff);
+                if (!OK(status))
+                    return status_t::read_error;
+
+                status = coff::read_section_headers(file, coff);
+                if (!OK(status))
+                    return status_t::read_error);
 
             format_coff(coff, file);
 
@@ -283,17 +306,6 @@ namespace basecode::binfmt::io::coff {
             g_coff_sys.alloc = alloc;
 
             name_map::init(g_coff_sys.section_names, g_coff_sys.alloc);
-
-//            name_map::add(g_coff_sys.section_names,
-//                          type_t::tls,
-//                          {
-//                              .code = false,
-//                              .init = true,
-//                              .exec = false,
-//                              .write = true,
-//                              .alloc = true,
-//                          },
-//                          ".tls"_ss);
 
             name_map::add(g_coff_sys.section_names,
                           type_t::text,
@@ -367,6 +379,22 @@ namespace basecode::binfmt::io::coff {
                           },
                           ".pdata"_ss);
 
+            name_map::add(g_coff_sys.section_names,
+                          type_t::strtab,
+                          {
+                              .exec = false,
+                              .write = false,
+                          },
+                          ".strtab"_ss);
+
+            name_map::add(g_coff_sys.section_names,
+                          type_t::symtab,
+                          {
+                              .exec = false,
+                              .write = false,
+                          },
+                          ".symtab"_ss);
+
             return status_t::ok;
         }
 
@@ -383,12 +411,14 @@ namespace basecode::binfmt::io::coff {
         return &internal::g_coff_backend;
     }
 
-    status_t get_section_name(const binfmt::section_t* section, str::slice_t& name) {
+    status_t get_section_name(const binfmt::section_t* section,
+                              str::slice_t& name) {
         if (section->name_offset > 0) {
             auto msc = &section->module->subclass.object;
             if (!msc->strtab)
                 return status_t::cannot_map_section_name;
-            const auto str = binfmt::string_table::get(msc->strtab->subclass.strtab, section->name_offset);
+            const auto str = binfmt::string_table::get(msc->strtab->subclass.strtab,
+                                                       section->name_offset);
             name.data   = (const u8*) str;
             name.length = strlen(str);
             return status_t::ok;

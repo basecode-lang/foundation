@@ -29,31 +29,31 @@ namespace basecode::binfmt::io::pe {
     struct export_addr_t;
     struct import_module_t;
 
-    using reloc_list_t               = array_t<reloc_t>;
-    using res_data_list_t            = array_t<res_data_t>;
-    using res_entry_list_t           = array_t<res_entry_t>;
-    using name_hint_list_t           = array_t<name_hint_t>;
-    using export_addr_list_t         = array_t<export_addr_t>;
-    using tls_callback_list_t        = array_t<u64>;
-    using import_module_list_t       = array_t<import_module_t>;
+    using reloc_array_t         = array_t<reloc_t>;
+    using res_data_array_t      = array_t<res_data_t>;
+    using res_entry_array_t     = array_t<res_entry_t>;
+    using name_hint_array_t     = array_t<name_hint_t>;
+    using export_addr_array_t   = array_t<export_addr_t>;
+    using tls_callback_array_t  = array_t<u64>;
+    using import_module_array_t = array_t<import_module_t>;
 
     enum dir_type_t : u8 {
-        reserved                        = 15,
-        tls_table                       = 9,
-        com_header                      = 14,
-        debug_table                     = 6,
-        gp_register                     = 8,
-        export_table                    = 0,
-        import_table                    = 1,
-        resource_table                  = 2,
-        exception_table                 = 3,
-        base_reloc_table                = 5,
-        certificate_table               = 4,
-        load_config_table               = 10,
-        bound_import_table              = 11,
-        architecture_table              = 7,
-        import_address_table            = 12,
-        delay_import_descriptor         = 13,
+        reserved                = 15,
+        tls_table               = 9,
+        com_header              = 14,
+        debug_table             = 6,
+        gp_register             = 8,
+        export_table            = 0,
+        import_table            = 1,
+        resource_table          = 2,
+        exception_table         = 3,
+        base_reloc_table        = 5,
+        certificate_table       = 4,
+        load_config_table       = 10,
+        bound_import_table      = 11,
+        architecture_table      = 7,
+        import_address_table    = 12,
+        delay_import_descriptor = 13,
     };
     constexpr u32 max_dir_entry_count   = 16;
 
@@ -71,15 +71,15 @@ namespace basecode::binfmt::io::pe {
     };
 
     struct res_t final {
-        res_entry_list_t        entries;
-        res_data_list_t         blocks;
+        res_entry_array_t       entries;
+        res_data_array_t        blocks;
         u32                     flags;
         u32                     time_stamp;
         version_t               version;
     };
 
     struct tls_t final {
-        tls_callback_list_t     callbacks;
+        tls_callback_array_t    callbacks;
         struct {
             u64                 start_va;
             u64                 end_va;
@@ -176,9 +176,9 @@ namespace basecode::binfmt::io::pe {
     };
 
     struct import_t final {
-        import_module_list_t    modules;
+        import_module_array_t   modules;
         struct {
-            name_hint_list_t    list;
+            name_hint_array_t   list;
             coff::rva_t         rva;
         }                       name_hints;
     };
@@ -193,7 +193,7 @@ namespace basecode::binfmt::io::pe {
     };
 
     struct export_t final {
-        export_addr_list_t      exports;
+        export_addr_array_t     exports;
         u32                     flags;
         u32                     time_stamp;
         version_t               version;
@@ -218,7 +218,7 @@ namespace basecode::binfmt::io::pe {
     };
 
     struct base_reloc_t final {
-        reloc_list_t            relocs;
+        reloc_array_t           relocs;
         coff::rva_t             page;
     };
 
@@ -268,7 +268,7 @@ namespace basecode::binfmt::io::pe {
 
     namespace base_reloc {
         namespace type {
-            [[maybe_unused]] constexpr u8 unknown  = 0;
+            constexpr u8 unknown  = 0;
         }
     }
 

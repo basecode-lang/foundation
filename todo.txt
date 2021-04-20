@@ -1,8 +1,33 @@
 HIGH
 ---------
 - macro: text macro system
-- binfmt: one-pass cleanup & make task notes here
-- binfmt: rework test runner main.cpp to match core
+
+- binfmt: pe/coff backend is missing section name mapping; not sure
+          why but I had commented out looking up the section names with
+          a FIXME.
+- binfmt: slab allocator doesn't zero out memory; not sure if the allocator
+          was once calling memset and i took it out or if it changed moving
+          from macos to windows (probably this).  the section headers in the
+          elf backend were full of garbage as was the strtab in the coff backend.
+- binfmt(ar): write function needs to be written so archives
+          can be round tripped.
+- binfmt(ar): rework the read + static functions to use the FILE_PTR()
+          interface instead of directly using the buf_crsr_t.
+- binfmt(ar): parse_ecoff_symbol_table function is marked as not done.
+          need to review and finish.
+- binfmt(ar): add a hashtab_t to the ar_t struct to index member names
+          to their entries in the array (one-to-many).
+- binfmt(ar_backend): implement the backend and tests for it.
+- binfmt(coff): finish implementation of read & write
+- binfmt(coff_backend): move pretty printer into another file?
+- binfmt(coff_backend): implement write
+- binfmt(codeview): need to finish read/write functionality
+- binfmt(elf): finish read & write functionality
+- binfmt(elf_backend): review & clean up; overall, it looks close
+- binfmt(macho + backend): need to write
+- binfmt(pe): needs attention, several FIXME
+- binfmt(pe_backend): needs attention; read not implemented
+
 - scm: add a B instruction and change BR to be only reg1 encoded
 - scm: map out bytecode, closure, continuation, literal frame model
 - scm: compiler should wrap top-level expression in an anonymous lambda
@@ -21,6 +46,7 @@ HIGH
 
 MEDIUM
 ---------
+- binfmt: one-pass cleanup & make task notes here
 - filesys: implement glob function, which will also touch the init and fini functions for the
             filesys module.
 - filesys: need to open and read the xdg config file (if found) and put into a symtab_t or hashtab_t.
@@ -44,6 +70,7 @@ LOW
 
 DONE
 ----
+- binfmt: rework test runner main.cpp to match core
 - legal: clean up all file headers
 - libgfx: create test bed application within foundation project
 - memory: reimplement meta tracking

@@ -28,11 +28,11 @@ namespace basecode::binfmt::cv {
 //    }
 
     static str::slice_t s_sig_names[] = {
-        [CV_SIGNATURE_C6      ]   = "CV_SIGNATURE_C6"_ss,
-        [CV_SIGNATURE_C7      ]   = "CV_SIGNATURE_C7"_ss,
-        [CV_SIGNATURE_C11     ]   = "CV_SIGNATURE_C11"_ss,
-        [CV_SIGNATURE_C13     ]   = "CV_SIGNATURE_C13"_ss,
-        [CV_SIGNATURE_RESERVED]   = "CV_SIGNATURE_RESERVED"_ss,
+        [CV_SIGNATURE_C6      ] = "CV_SIGNATURE_C6"_ss,
+        [CV_SIGNATURE_C7      ] = "CV_SIGNATURE_C7"_ss,
+        [CV_SIGNATURE_C11     ] = "CV_SIGNATURE_C11"_ss,
+        [CV_SIGNATURE_C13     ] = "CV_SIGNATURE_C13"_ss,
+        [CV_SIGNATURE_RESERVED] = "CV_SIGNATURE_RESERVED"_ss,
     };
 
     static str::slice_t s_mach_names[] = {
@@ -430,14 +430,54 @@ namespace basecode::binfmt::cv {
         }
     }
 
-    static status_t read_ansi_symbols(cv_t& cv, io::file_t& file, u32 offset, u32 size) {
+    static status_t read_ansi_symbols(cv_t& cv,
+                                      io::file_t& file,
+                                      u32 offset,
+                                      u32 size);
+
+    static status_t read_utf8_symbols(cv_t& cv,
+                                      io::file_t& file,
+                                      u32 offset,
+                                      u32 size);
+
+    status_t free(cv_t& cv) {
+        UNUSED(cv);
+        return status_t::ok;
+    }
+
+    str::slice_t sig_name(u32 sig) {
+        return s_sig_names[sig];
+    }
+
+    str::slice_t machine_name(u16 machine) {
+        return s_mach_names[machine];
+    }
+
+    str::slice_t language_name(u8 language) {
+        return s_lang_names[language];
+    }
+
+    status_t init(cv_t& cv, alloc_t* alloc) {
+        cv.alloc = alloc;
+        cv.signature = {};
+        cv.flags     = {};
+        return status_t::ok;
+    }
+
+    static status_t read_ansi_symbols(cv_t& cv,
+                                      io::file_t& file,
+                                      u32 offset,
+                                      u32 size) {
         UNUSED(cv);
         UNUSED(file);
         UNUSED(size);
         return status_t::ok;
     }
 
-    static status_t read_utf8_symbols(cv_t& cv, io::file_t& file, u32 offset, u32 size) {
+    static status_t read_utf8_symbols(cv_t& cv,
+                                      io::file_t& file,
+                                      u32 offset,
+                                      u32 size) {
         u32 section_size = size;
         const auto section_end_pos = offset + section_size;
         while (true) {
@@ -460,7 +500,7 @@ namespace basecode::binfmt::cv {
 
             format::print("Debug Subsection: {}\n", debug_subsection_name(subsection_hdr->type));
             switch (subsection_hdr->type) {
-                case debug_subsection_type_t::symbols: {
+                case dbg_subsection_type_t::symbols: {
                     auto subsection_size = subsection_hdr->len;
                     while (subsection_size > 0) {
                         auto rec_hdr = (rec_header_t*) FILE_PTR();
@@ -566,14 +606,14 @@ namespace basecode::binfmt::cv {
                     }
                     break;
                 }
-                case debug_subsection_type_t::lines: {
+                case dbg_subsection_type_t::lines: {
                     auto subsection_size = subsection_hdr->len - sizeof(c13_lines_hdr_t);
                     auto lines_hdr = (c13_lines_hdr_t*) FILE_PTR();
                     format::print("    {:04x}:{:08x}-{:08x}, flags = {:04x}\n",
-                                    u32(lines_hdr->seg),
-                                    u32(lines_hdr->offset),
-                                    u32(lines_hdr->offset + lines_hdr->len),
-                                    u32(lines_hdr->flags));
+                                  u32(lines_hdr->seg),
+                                  u32(lines_hdr->offset),
+                                  u32(lines_hdr->offset + lines_hdr->len),
+                                  u32(lines_hdr->flags));
                     b8 has_column = (lines_hdr->flags & CV_LINES_HAVE_COLUMNS);
                     FILE_SEEK_FWD(sizeof(c13_lines_hdr_t));
                     while (subsection_size > 0) {
@@ -582,15 +622,20 @@ namespace basecode::binfmt::cv {
                         FILE_SEEK_FWD(block_hdr->len);
                         for (u32 i = 0; i < block_hdr->num_lines; ++i) {
                             const auto& line = block_hdr->lines[i];
-                            b8 special_line = line.line_num_start == 0xfeefee || line.line_num_start == 0xf00f00;
+                            b8 special_line = line.line_num_start == 0xfeefee
+                                              || line.line_num_start == 0xf00f00;
                             if (has_column) {
                                 format::print("has_column!\n");
                             } else {
                                 if ((i % 4) == 0) format::print("\n");
                                 if (special_line) {
-                                    format::print(" {:04x} {:08x}", line.line_num_start, line.offset + lines_hdr->offset);
+                                    format::print(" {:04x} {:08x}",
+                                                  line.line_num_start,
+                                                  line.offset + lines_hdr->offset);
                                 } else {
-                                    format::print("{:04x} {:08x}", line.line_num_start, line.offset + lines_hdr->offset);
+                                    format::print("{:04x} {:08x}",
+                                                  line.line_num_start,
+                                                  line.offset + lines_hdr->offset);
                                 }
                             }
                         }
@@ -598,7 +643,7 @@ namespace basecode::binfmt::cv {
                     }
                     break;
                 }
-                case debug_subsection_type_t::string_table: {
+                case dbg_subsection_type_t::string_table: {
                     s8* p = (s8*) FILE_PTR();
                     auto subsection_size = subsection_hdr->len;
                     u32 strtab_offset{};
@@ -613,20 +658,20 @@ namespace basecode::binfmt::cv {
                     FILE_SEEK_FWD(subsection_hdr->len);
                     break;
                 }
-                case debug_subsection_type_t::file_chksms: {
+                case dbg_subsection_type_t::file_chksms: {
                     // dumpsym7.cpp @ 1095
                     break;
                 }
                 // dumpsym7.cpp @ 1176
-                case debug_subsection_type_t::frame_data:
-                case debug_subsection_type_t::inlinee_lines:
-                case debug_subsection_type_t::cross_scope_imports:
-                case debug_subsection_type_t::cross_scope_exports:
-                case debug_subsection_type_t::il_lines:
-                case debug_subsection_type_t::func_mdtoken_map:
-                case debug_subsection_type_t::type_mdtoken_map:
-                case debug_subsection_type_t::merged_assembly_input:
-                case debug_subsection_type_t::coff_symbol_rva:
+                case dbg_subsection_type_t::frame_data:
+                case dbg_subsection_type_t::inlinee_lines:
+                case dbg_subsection_type_t::cross_scope_imports:
+                case dbg_subsection_type_t::cross_scope_exports:
+                case dbg_subsection_type_t::il_lines:
+                case dbg_subsection_type_t::func_mdtoken_map:
+                case dbg_subsection_type_t::type_mdtoken_map:
+                case dbg_subsection_type_t::merged_assembly_input:
+                case dbg_subsection_type_t::coff_symbol_rva:
                 default:
                     FILE_SEEK_FWD(subsection_hdr->len);
                     break;
@@ -636,59 +681,35 @@ namespace basecode::binfmt::cv {
         return status_t::ok;
     }
 
-    status_t free(cv_t& cv) {
-        UNUSED(cv);
-        return status_t::ok;
-    }
-
-    str::slice_t sig_name(u32 sig) {
-        return s_sig_names[sig];
-    }
-
-    str::slice_t machine_name(u16 machine) {
-        return s_mach_names[machine];
-    }
-
-    str::slice_t language_name(u8 language) {
-        return s_lang_names[language];
-    }
-
-    status_t init(cv_t& cv, alloc_t* alloc) {
-        cv.alloc = alloc;
-        cv.signature = {};
-        cv.flags     = {};
-        return status_t::ok;
-    }
-
-    str::slice_t debug_subsection_name(debug_subsection_type_t type) {
+    str::slice_t debug_subsection_name(dbg_subsection_type_t type) {
         switch (type) {
-            case debug_subsection_type_t::ignore:
+            case dbg_subsection_type_t::ignore:
                 return "IGNORE"_ss;
-            case debug_subsection_type_t::symbols:
+            case dbg_subsection_type_t::symbols:
                 return "SYMBOLS"_ss;
-            case debug_subsection_type_t::lines:
+            case dbg_subsection_type_t::lines:
                 return "LINES"_ss;
-            case debug_subsection_type_t::string_table:
+            case dbg_subsection_type_t::string_table:
                 return "STRING_TABLE"_ss;
-            case debug_subsection_type_t::file_chksms:
+            case dbg_subsection_type_t::file_chksms:
                 return "FILE_CHECKSMS"_ss;
-            case debug_subsection_type_t::frame_data:
+            case dbg_subsection_type_t::frame_data:
                 return "FRAME_DATA"_ss;
-            case debug_subsection_type_t::inlinee_lines:
+            case dbg_subsection_type_t::inlinee_lines:
                 return "INLINEE_LINES"_ss;
-            case debug_subsection_type_t::cross_scope_imports:
+            case dbg_subsection_type_t::cross_scope_imports:
                 return "CROSS_SCOPE_IMPORTS"_ss;
-            case debug_subsection_type_t::cross_scope_exports:
+            case dbg_subsection_type_t::cross_scope_exports:
                 return "CROSS_SCOPE_EXPORTS"_ss;
-            case debug_subsection_type_t::il_lines:
+            case dbg_subsection_type_t::il_lines:
                 return "IL_LINES"_ss;
-            case debug_subsection_type_t::func_mdtoken_map:
+            case dbg_subsection_type_t::func_mdtoken_map:
                 return "FUNC_MDTOKEN_MAP"_ss;
-            case debug_subsection_type_t::type_mdtoken_map:
+            case dbg_subsection_type_t::type_mdtoken_map:
                 return "TYPE_MDTOKEN_MAP"_ss;
-            case debug_subsection_type_t::merged_assembly_input:
+            case dbg_subsection_type_t::merged_assembly_input:
                 return "MERGED_ASSEMBLY_INPUT"_ss;
-            case debug_subsection_type_t::coff_symbol_rva:
+            case dbg_subsection_type_t::coff_symbol_rva:
                 "COFF_SYMBOL_RVA"_ss;
         }
         return "UNKNOWN DEBUG SUBSECTION"_ss;
@@ -882,9 +903,15 @@ namespace basecode::binfmt::cv {
         status_t status;
 
         if (cv.flags.utf8_symbols) {
-            status = read_utf8_symbols(cv, file, offset, size - sizeof(cv.signature));
+            status = read_utf8_symbols(cv,
+                                       file,
+                                       offset,
+                                       size - sizeof(cv.signature));
         } else {
-            status = read_ansi_symbols(cv, file, offset, size - sizeof(cv.signature));
+            status = read_ansi_symbols(cv,
+                                       file,
+                                       offset,
+                                       size - sizeof(cv.signature));
         }
 
         return status;

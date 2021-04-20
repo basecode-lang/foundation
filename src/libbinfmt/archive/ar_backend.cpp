@@ -22,6 +22,22 @@
 
 namespace basecode::binfmt::io::archive {
     namespace internal {
+        static u0 fini();
+
+        static status_t read(file_t& file);
+
+        static status_t write(file_t& file);
+
+        static status_t init(alloc_t* alloc);
+
+        system_t                    g_archive_backend {
+            .init                   = init,
+            .fini                   = fini,
+            .read                   = read,
+            .write                  = write,
+            .type                   = type_t::ar
+        };
+
         struct archive_system_t final {
             alloc_t*                alloc;
         };
@@ -43,14 +59,6 @@ namespace basecode::binfmt::io::archive {
             g_archive_sys.alloc = alloc;
             return status_t::ok;
         }
-
-        system_t                    g_archive_backend {
-            .init   = init,
-            .fini   = fini,
-            .read   = read,
-            .write  = write,
-            .type   = type_t::ar
-        };
     }
 
     system_t* system() {

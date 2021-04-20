@@ -64,7 +64,7 @@ namespace basecode::binfmt {
 
         u0 find_sections(const module_t& module,
                          str::slice_t name,
-                         section_ptr_list_t& list);
+                         section_ptr_array_t& list);
 
         section_t* make_section(module_t& module,
                                 section::type_t type,

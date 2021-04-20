@@ -234,6 +234,8 @@ set(
 
     ${CORE_INC_DIR}/symtab.h
 
+    ${CORE_INC_DIR}/test_suite.h
+
     timer.cpp ${CORE_INC_DIR}/timer.h
 
     term.cpp ${CORE_INC_DIR}/term.h

@@ -23,7 +23,7 @@
 #include <basecode/binfmt/binfmt.h>
 
 namespace basecode::binfmt::io::pe {
-    [[maybe_unused]] static u8 s_dos_stub[64] = {
+    static u8 s_dos_stub[64] = {
         0x0e, 0x1f, 0xba, 0x0e, 0x00, 0xb4, 0x09, 0xcd, 0x21, 0xb8, 0x01, 0x4c,
         0xcd, 0x21, 0x54, 0x68, 0x69, 0x73, 0x20, 0x70, 0x72, 0x6f, 0x67, 0x72,
         0x61, 0x6d, 0x20, 0x63, 0x61, 0x6e, 0x6e, 0x6f, 0x74, 0x20, 0x62, 0x65,
@@ -32,45 +32,44 @@ namespace basecode::binfmt::io::pe {
         0x00, 0x00, 0x00, 0x00
     };
 
-    [[maybe_unused]] constexpr u32 dos_header_size          = 0x40;
-    [[maybe_unused]] constexpr u32 pe_sig_size              = 0x04;
-
-    [[maybe_unused]] constexpr u16 pe32                     = 0x10b;
-    [[maybe_unused]] constexpr u16 pe64                     = 0x20b;
-    [[maybe_unused]] constexpr u16 rom                      = 0x107;
+     constexpr u32 dos_header_size         = 0x40;
+     constexpr u32 pe_sig_size             = 0x04;
+     constexpr u16 pe32                    = 0x10b;
+     constexpr u16 pe64                    = 0x20b;
+     constexpr u16 rom                     = 0x107;
 
     namespace name_table {
-        [[maybe_unused]] constexpr u32 entry_size           = 0x12;
+        constexpr u32 entry_size           = 0x12;
     }
 
     namespace import_dir_table {
-        [[maybe_unused]] constexpr u32 entry_size           = 0x14;
+        constexpr u32 entry_size           = 0x14;
     }
 
     namespace import_addr_table {
-        [[maybe_unused]] constexpr u32 entry_size           = 0x08;
+        constexpr u32 entry_size           = 0x08;
     }
 
     namespace import_lookup_table {
-        [[maybe_unused]] constexpr u32 entry_size           = 0x08;
+        constexpr u32 entry_size           = 0x08;
     }
 
     namespace subsystem {
-        [[maybe_unused]] constexpr u16 unknown              = 0;
-        [[maybe_unused]] constexpr u16 native               = 1;
-        [[maybe_unused]] constexpr u16 win_gui              = 2;
-        [[maybe_unused]] constexpr u16 win_cui              = 3;
-        [[maybe_unused]] constexpr u16 os2_cui              = 5;
-        [[maybe_unused]] constexpr u16 posix_cui            = 7;
-        [[maybe_unused]] constexpr u16 win_native           = 8;
-        [[maybe_unused]] constexpr u16 win_ce_gui           = 9;
-        [[maybe_unused]] constexpr u16 efi_app              = 10;
-        [[maybe_unused]] constexpr u16 efi_boot_svc_driver  = 11;
-        [[maybe_unused]] constexpr u16 efi_runtime_driver   = 12;
-        [[maybe_unused]] constexpr u16 efi_rom              = 13;
-        [[maybe_unused]] constexpr u16 xbox                 = 14;
-        [[maybe_unused]] constexpr u16 win_boot_app         = 16;
-        [[maybe_unused]] constexpr u16 xbox_code_catalog    = 17;
+        constexpr u16 unknown              = 0;
+        constexpr u16 native               = 1;
+        constexpr u16 win_gui              = 2;
+        constexpr u16 win_cui              = 3;
+        constexpr u16 os2_cui              = 5;
+        constexpr u16 posix_cui            = 7;
+        constexpr u16 win_native           = 8;
+        constexpr u16 win_ce_gui           = 9;
+        constexpr u16 efi_app              = 10;
+        constexpr u16 efi_boot_svc_driver  = 11;
+        constexpr u16 efi_runtime_driver   = 12;
+        constexpr u16 efi_rom              = 13;
+        constexpr u16 xbox                 = 14;
+        constexpr u16 win_boot_app         = 16;
+        constexpr u16 xbox_code_catalog    = 17;
     }
 
     namespace dir_entry {
@@ -150,7 +149,9 @@ namespace basecode::binfmt::io::pe {
     }
 
     u0 free(pe_t& pe) {
-        for (u32 dir_type = 0; dir_type < max_dir_entry_count; ++dir_type) {
+        for (u32 dir_type = 0;
+             dir_type < max_dir_entry_count;
+             ++dir_type) {
             dir_entry::free(pe, dir_type_t(dir_type));
         }
         coff::free(pe.coff);
@@ -163,16 +164,21 @@ namespace basecode::binfmt::io::pe {
 
         pe.opts          = {};
         pe.flags         = {};
-        pe.base_addr     = opts.base_addr == 0 ? 0x140000000 : opts.base_addr;
-        pe.reserve.heap  = opts.heap_reserve == 0 ? 0x100000 : opts.heap_reserve;
-        pe.reserve.stack = opts.stack_reserve == 0 ? 0x100000 : opts.stack_reserve;
+        pe.base_addr = opts.base_addr == 0 ? 0x140000000 :
+                       opts.base_addr;
+        pe.reserve.heap = opts.heap_reserve == 0 ? 0x100000 :
+                          opts.heap_reserve;
+        pe.reserve.stack = opts.stack_reserve == 0 ? 0x100000 :
+                           opts.stack_reserve;
         pe.size.dos_stub = dos_header_size + sizeof(s_dos_stub);
         pe.coff.offset   = pe.start_offset = align(pe.size.dos_stub, 8);
 
         // XXX: is this size constant for x64 images?
         pe.coff.size.opt_hdr = 0xf0;
 
-        for (u32 dir_type = 0; dir_type < max_dir_entry_count; ++dir_type) {
+        for (u32 dir_type = 0;
+             dir_type < max_dir_entry_count;
+             ++dir_type) {
             auto& dir_entry = pe.dirs[dir_type];
             dir_entry.rva  = {};
             dir_entry.init = false;
@@ -259,10 +265,12 @@ namespace basecode::binfmt::io::pe {
         FILE_WRITE(u16, file.versions.min_os.major);
         FILE_WRITE(u16, file.versions.min_os.minor);
         FILE_WRITE0(u32);
-        FILE_WRITE(u32, u32(align(coff.rva + coff.size.image, coff.align.section)));
+        FILE_WRITE(u32, u32(align(coff.rva + coff.size.image,
+                                  coff.align.section)));
         FILE_WRITE(u32, u32(align(coff.size.headers, pe.coff.align.file)));
         FILE_WRITE0(u32);
-        FILE_WRITE(u16, u16(file.flags.console ? subsystem::win_cui : subsystem::win_gui));
+        FILE_WRITE(u16, u16(file.flags.console ? subsystem::win_cui :
+                            subsystem::win_gui));
         FILE_WRITE(u16, pe.flags.dll);
         FILE_WRITE(u64, pe.reserve.stack);
         FILE_WRITE(u64, 0x1000ULL);
@@ -328,11 +336,13 @@ namespace basecode::binfmt::io::pe {
                 auto& import_table_entry = pe.dirs[dir_type_t::import_table];
                 auto& import_table       = import_table_entry.subclass.import;
                 import_table_entry.rva.base = coff.rva;
-                import_table_entry.rva.size = (imports.size + 1) * import_dir_table::entry_size;
+                import_table_entry.rva.size = (imports.size + 1)
+                                              * import_dir_table::entry_size;
 
                 u32 name_hint_offset{};
-                u32 size                    = import_dir_table::entry_size;
-                u32 lookup_rva              = import_table_entry.rva.base + import_table_entry.rva.size;
+                u32 size = import_dir_table::entry_size;
+                u32 lookup_rva = import_table_entry.rva.base
+                                 + import_table_entry.rva.size;
                 for (const auto& import : imports) {
                     auto& module = array::append(import_table.modules);
                     module.iat_rva = module.fwd_chain = module.time_stamp = {};
@@ -365,15 +375,18 @@ namespace basecode::binfmt::io::pe {
                         name_hint.name     = intern_rc.slice;
                         name_hint.rva.base = name_hint_offset;
                         name_hint.pad      = (name_hint_offset % 2) != 0;
-                        name_hint.rva.size = 2 + name_hint.name.length + 1 + (name_hint.pad ? 1 : 0);
+                        name_hint.rva.size = 2 + name_hint.name.length
+                                             + 1 + (name_hint.pad ? 1 : 0);
                         name_hint_offset += name_hint.rva.size;
                     }
                 }
 
                 iat_entry.rva.base = import_table_entry.rva.base + size;
-                iat_entry.rva.size = (import_table.name_hints.list.size + 1) * import_addr_table::entry_size;
+                iat_entry.rva.size = (import_table.name_hints.list.size + 1)
+                                     * import_addr_table::entry_size;
 
-                import_table.name_hints.rva.base = iat_entry.rva.base + iat_entry.rva.size;
+                import_table.name_hints.rva.base = iat_entry.rva.base
+                                                   + iat_entry.rva.size;
                 import_table.name_hints.rva.size = name_hint_offset;
 
                 for (auto& module : import_table.modules) {
@@ -385,13 +398,16 @@ namespace basecode::binfmt::io::pe {
                 }
 
                 hdr.rva.size = (import_table.name_hints.rva.base + import_table.name_hints.rva.size)
-                           - import_table_entry.rva.base;
+                               - import_table_entry.rva.base;
                 hdr.file.size = align(hdr.rva.size, coff.align.file);
 
                 coff.init_data.size += hdr.rva.size;
-                coff.size.image = align(coff.size.image + hdr.rva.size, coff.align.section);
-                coff.offset     = align(coff.offset + hdr.rva.size, coff.align.file);
-                coff.rva        = align(coff.rva + hdr.rva.size, coff.align.section);
+                coff.size.image = align(coff.size.image + hdr.rva.size,
+                                        coff.align.section);
+                coff.offset     = align(coff.offset + hdr.rva.size,
+                                        coff.align.file);
+                coff.rva        = align(coff.rva + hdr.rva.size,
+                                        coff.align.section);
 
                 break;
             }
@@ -425,9 +441,9 @@ namespace basecode::binfmt::io::pe {
                 return status_t::not_implemented;
             }
             case section::type_t::import: {
-                const auto     & iat_entry          = pe.dirs[dir_type_t::import_address_table];
-                const auto     & import_table_entry = pe.dirs[dir_type_t::import_table];
-                const auto     & import_table       = import_table_entry.subclass.import;
+                const auto& iat_entry          = pe.dirs[dir_type_t::import_address_table];
+                const auto& import_table_entry = pe.dirs[dir_type_t::import_table];
+                const auto& import_table       = import_table_entry.subclass.import;
                 for (const auto& module : import_table.modules) {
                     FILE_WRITE(u32, module.lookup_rva);
                     FILE_WRITE0(u64);

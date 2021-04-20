@@ -22,6 +22,8 @@
 #include <basecode/binfmt/binfmt.h>
 
 namespace basecode::binfmt::io::elf {
+    namespace bf = basecode::binfmt;
+
     enum section_map_status_t : u8 {
         ok,
         skip,
@@ -30,9 +32,9 @@ namespace basecode::binfmt::io::elf {
     };
 
     struct section_map_t final {
-        binfmt::section::flags_t    flags;
-        binfmt::section::type_t     type;
-        section_map_status_t        status;
+        bf::section::flags_t    flags;
+        bf::section::type_t     type;
+        section_map_status_t    status;
     };
 
     static section_map_t s_section_maps[64] = {
@@ -45,7 +47,7 @@ namespace basecode::binfmt::io::elf {
                 .write = true,
                 .alloc = true,
             },
-            .type = binfmt::section::type_t::data,
+            .type = bf::section::type_t::data,
             .status = section_map_status_t::ok,
         },
 
@@ -53,17 +55,17 @@ namespace basecode::binfmt::io::elf {
             .flags = {
                 .dynamic = false,
             },
-            .type = binfmt::section::type_t::symtab,
+            .type = bf::section::type_t::symtab,
             .status = section_map_status_t::ok
         },
 
         [section::type::strtab]         = {
-            .type = binfmt::section::type_t::strtab,
+            .type = bf::section::type_t::strtab,
             .status = section_map_status_t::ok
         },
 
         [section::type::rela]           = {
-            .type = binfmt::section::type_t::reloc,
+            .type = bf::section::type_t::reloc,
             .status = section_map_status_t::ok,
         },
 
@@ -76,7 +78,7 @@ namespace basecode::binfmt::io::elf {
         },
 
         [section::type::note]           = {
-            .type = binfmt::section::type_t::note,
+            .type = bf::section::type_t::note,
             .status = section_map_status_t::ok,
         },
 
@@ -85,7 +87,7 @@ namespace basecode::binfmt::io::elf {
                 .write = true,
                 .alloc = true,
             },
-            .type = binfmt::section::type_t::bss,
+            .type = bf::section::type_t::bss,
             .status = section_map_status_t::ok,
         },
 
@@ -101,7 +103,7 @@ namespace basecode::binfmt::io::elf {
             .flags = {
                 .dynamic = true,
             },
-            .type = binfmt::section::type_t::symtab,
+            .type = bf::section::type_t::symtab,
             .status = section_map_status_t::ok,
         },
 
@@ -110,7 +112,7 @@ namespace basecode::binfmt::io::elf {
                 .write = true,
                 .alloc = true,
             },
-            .type = binfmt::section::type_t::init,
+            .type = bf::section::type_t::init,
             .status = section_map_status_t::ok,
         },
 
@@ -119,7 +121,7 @@ namespace basecode::binfmt::io::elf {
                 .write = true,
                 .alloc = true,
             },
-            .type = binfmt::section::type_t::fini,
+            .type = bf::section::type_t::fini,
             .status = section_map_status_t::ok,
         },
 
@@ -128,12 +130,12 @@ namespace basecode::binfmt::io::elf {
                 .write = true,
                 .alloc = true,
             },
-            .type = binfmt::section::type_t::pre_init,
+            .type = bf::section::type_t::pre_init,
             .status = section_map_status_t::ok,
         },
 
         [section::type::group]          = {
-            .type = binfmt::section::type_t::group,
+            .type = bf::section::type_t::group,
             .status = section_map_status_t::ok,
         },
 
@@ -148,18 +150,18 @@ namespace basecode::binfmt::io::elf {
             .flags = {
                 .alloc = true,
             },
-            .type = binfmt::section::type_t::unwind,
+            .type = bf::section::type_t::unwind,
             .status = section_map_status_t::ok,
         },
 
         [31] = {
-            .type = binfmt::section::type_t::custom,
+            .type = bf::section::type_t::custom,
             .status = section_map_status_t::ok,
         }
     };
 
-    using r_arm64_t = binfmt::machine::aarch64::reloc::type_t;
-    using r_amd64_t = binfmt::machine::x86_64::reloc::type_t;
+    using r_arm64_t = bf::machine::aarch64::reloc::type_t;
+    using r_amd64_t = bf::machine::x86_64::reloc::type_t;
 
     static u32 s_arm64_to_elf_relocs[] = {
         [u32(r_arm64_t::none)]                        = relocs::aarch64::none,
@@ -371,7 +373,7 @@ namespace basecode::binfmt::io::elf {
         [u32(r_amd64_t::rex_got_pc_relx)]     = relocs::x86_64::rex_got_pc_relx,
     };
 
-    static binfmt::machine::x86_64::reloc::type_t s_elf_to_amd64_relocs[] = {
+    static bf::machine::x86_64::reloc::type_t s_elf_to_amd64_relocs[] = {
         [relocs::x86_64::none]                 = r_amd64_t::none,
         [relocs::x86_64::d64]                  = r_amd64_t::direct_64,
         [relocs::x86_64::pc32]                 = r_amd64_t::pc_rel_32,
@@ -441,46 +443,46 @@ namespace basecode::binfmt::io::elf {
 
     namespace file {
         static str::slice_t s_class_names[] = {
-            "None"_ss,
-            "ELF32"_ss,
-            "ELF64"_ss,
+            [0]         = "None"_ss,
+            [1]         = "ELF32"_ss,
+            [class_64]  = "ELF64"_ss,
         };
 
         static str::slice_t s_os_abi_names[] = {
-            "UNIX - System V"_ss,
-            "HPUX"_ss,
-            "NETBSD"_ss,
-            "GNU"_ss,
-            "LINUX/GNU"_ss,
-            "SOLARIS"_ss,
-            "AIX"_ss,
-            "IRIX"_ss,
-            "FREEBSD"_ss,
-            "TRU64"_ss,
-            "MODESTO"_ss,
-            "OPENBSD"_ss,
-            "ARM_EABI"_ss,
-            "ARM"_ss,
-            "STANDALONE"_ss,
+            [os_abi_sysv]       = "UNIX - System V"_ss,
+            [1]                 = "HPUX"_ss,
+            [os_abi_gnu]        = "GNU"_ss,
+            [4]                 = "NETBSD"_ss,
+            [5]                 = "LINUX/GNU"_ss,
+            [6]                 = "SOLARIS"_ss,
+            [7]                 = "AIX"_ss,
+            [8]                 = "IRIX"_ss,
+            [9]                 = "FREEBSD"_ss,
+            [10]                = "TRU64"_ss,
+            [11]                = "MODESTO"_ss,
+            [12]                = "OPENBSD"_ss,
+            [13]                = "ARM_EABI"_ss,
+            [14]                = "ARM"_ss,
+            [15]                = "STANDALONE"_ss,
         };
 
         static str::slice_t s_file_type_names[] = {
-            "None"_ss,
-            "REL (Relocatable file)"_ss,
-            "EXEC"_ss,
-            "DYN"_ss,
-            "CORE"_ss
+            [file::type::none]  = "None"_ss,
+            [file::type::rel]   = "REL (Relocatable file)"_ss,
+            [file::type::exec]  = "EXEC"_ss,
+            [file::type::dyn]   = "DYN"_ss,
+            [file::type::core]  = "CORE"_ss
         };
 
         static str::slice_t s_version_names[] = {
-            "None"_ss,
-            "Current"_ss,
+            [0]                 = "None"_ss,
+            [version_current]   = "Current"_ss,
         };
 
         static str::slice_t s_endianess_names[] = {
-            "None"_ss,
-            "Little endian"_ss,
-            "Big endian"_ss
+            [0]                 = "None"_ss,
+            [data_2lsb]         = "Little endian"_ss,
+            [data_2msb]         = "Big endian"_ss
         };
 
         str::slice_t class_name(u8 cls) {
@@ -568,7 +570,7 @@ namespace basecode::binfmt::io::elf {
             "Toyota ME16"_ss,
             "STM ST100"_ss,
             "Tinyj embedded"_ss,
-            "AMD x86-64 architecture"_ss,
+            [machine::x86_64] = "AMD x86-64 architecture"_ss,
             "Sony DSP"_ss,
             "????"_ss,
             "????"_ss,
@@ -605,13 +607,13 @@ namespace basecode::binfmt::io::elf {
 
         str::slice_t name(u16 type) {
             switch (type) {
-                case 183:
+                case machine::aarch64:
                     return "ARM AArch64"_ss;
-                case 188:
+                case machine::tilera_tile_pro:
                     return "Tilera TILEPro"_ss;
-                case 191:
+                case machine::tilera_tile_gx:
                     return "Tilera TILE-Gx"_ss;
-                case 243:
+                case machine::riscv:
                     return "RISC-V"_ss;
                 default:
                     break;
@@ -622,9 +624,9 @@ namespace basecode::binfmt::io::elf {
 
     namespace symtab {
         u64 hash_name(str::slice_t str) {
-            u64       h = 0, g;
+            u64 h = 0, g;
             for (auto ch : str) {
-                h      = (h << u32(4)) + ch;
+                h = (h << u32(4)) + ch;
                 if ((g = h & 0xf0000000))
                     h ^= g >> u32(24);
                 h &= u32(0x0fffffff);
@@ -637,7 +639,9 @@ namespace basecode::binfmt::io::elf {
                 return nullptr;
             const auto& hdr = elf.sections[sect_num];
             if (sym_idx < (hdr.size / hdr.entity_size)) {
-                return (sym_t*) (((u8*) elf.file_header) + hdr.offset + (sizeof(sym_t) * sym_idx));
+                return (sym_t*) (((u8*) elf.file_header)
+                                 + hdr.offset
+                                 + (sizeof(sym_t) * sym_idx));
             }
             return nullptr;
         }
@@ -690,9 +694,13 @@ namespace basecode::binfmt::io::elf {
                         return s_names[type];
                     default:
                         if (type >= low_os && type <= high_os) {
-                            return string::interned::fold(format::format("DT_LOOS+0x{:x}", type & 0x0fffffffU));
+                            const auto tmp = format::format("DT_LOOS+0x{:x}",
+                                                            type & 0x0fffffffU);
+                            return string::interned::fold(tmp);
                         } else if (type >= low_proc && type <= high_proc) {
-                            return string::interned::fold(format::format("DT_LOPROC+0x{:x}", type & 0x0fffffffU));
+                            const auto tmp = format::format("DT_LOPROC+0x{:x}",
+                                                            type & 0x0fffffffU);
+                            return string::interned::fold(tmp);
                         }
                         break;
                 }
@@ -704,25 +712,25 @@ namespace basecode::binfmt::io::elf {
     namespace section {
         namespace type {
             static str::slice_t s_names[] = {
-                "NULL"_ss,
-                "PROGBITS"_ss,
-                "SYMTAB"_ss,
-                "STRTAB"_ss,
-                "RELA"_ss,
-                "HASH"_ss,
-                "DYNAMIC"_ss,
-                "NOTE"_ss,
-                "NOBITS"_ss,
-                "REL"_ss,
-                "SHLIB"_ss,
-                "DYNSYM"_ss,
-                "????"_ss,
-                "????"_ss,
-                "INIT_ARRAY"_ss,
-                "FINI_ARRAY"_ss,
-                "PREINIT_ARRAY"_ss,
-                "GROUP"_ss,
-                "SYMTAB_SHNDX"_ss,
+                [section::type::null]           = "NULL"_ss,
+                [section::type::progbits]       = "PROGBITS"_ss,
+                [section::type::symtab]         = "SYMTAB"_ss,
+                [section::type::strtab]         = "STRTAB"_ss,
+                [section::type::rela]           = "RELA"_ss,
+                [section::type::hash]           = "HASH"_ss,
+                [section::type::dynamic]        = "DYNAMIC"_ss,
+                [section::type::note]           = "NOTE"_ss,
+                [section::type::nobits]         = "NOBITS"_ss,
+                [section::type::rel]            = "REL"_ss,
+                [section::type::shlib]          = "SHLIB"_ss,
+                [section::type::dynsym]         = "DYNSYM"_ss,
+                [12]                            = "????"_ss,
+                [13]                            = "????"_ss,
+                [section::type::init_array]     = "INIT_ARRAY"_ss,
+                [section::type::fini_array]     = "FINI_ARRAY"_ss,
+                [section::type::pre_init_array] = "PREINIT_ARRAY"_ss,
+                [section::type::group]          = "GROUP"_ss,
+                [section::type::symtab_shndx]   = "SYMTAB_SHNDX"_ss,
             };
 
             str::slice_t name(u32 type) {
@@ -742,11 +750,17 @@ namespace basecode::binfmt::io::elf {
                         return s_names[type];
                     default: {
                         if (type >= low_os && type <= high_os) {
-                            return string::interned::fold(format::format("LOOS+0x{:x}", type & 0x0fffffffU));
+                            const auto tmp = format::format("LOOS+0x{:x}",
+                                                            type & 0x0fffffffU);
+                            return string::interned::fold(tmp);
                         } else if (type >= low_proc && type <= high_proc) {
-                            return string::interned::fold(format::format("LOPROC+0x{:x}", type & 0x0fffffffU));
+                            const auto tmp = format::format("LOPROC+0x{:x}",
+                                                            type & 0x0fffffffU);
+                            return string::interned::fold(tmp);
                         } else if (type >= low_user && type <= high_user) {
-                            return string::interned::fold(format::format("LOUSER+0x{:x}", type & 0x0fffffffU));
+                            const auto tmp = format::format("LOUSER+0x{:x}",
+                                                            type & 0x0fffffffU);
+                            return string::interned::fold(tmp);
                         }
                         break;
                     }
@@ -807,7 +821,8 @@ namespace basecode::binfmt::io::elf {
             u0 names(u32 flags, const s8** names) {
                 u32 idx{};
                 for (u32 mask : s_flags) {
-                    names[idx++] = (flags & mask) == mask ? s_flag_names[idx] : nullptr;
+                    names[idx++] = (flags & mask) == mask ? s_flag_names[idx] :
+                                   nullptr;
                 }
             }
         }
@@ -816,9 +831,9 @@ namespace basecode::binfmt::io::elf {
     static status_t read_section(elf_t& elf,
                                  file_t& file,
                                  u8* buf,
-                                 binfmt::module_t* module,
+                                 bf::module_t* module,
                                  u32 num) {
-        auto section = binfmt::module::get_section(*module, num - 1);
+        auto section = bf::module::get_section(*module, num - 1);
         if (section->type != binfmt::section::type_t::none)
             return status_t::ok;
 
@@ -834,7 +849,7 @@ namespace basecode::binfmt::io::elf {
             return status_t::elf_unsupported_section;
 
         auto sect_type = map->type;
-        binfmt::section_opts_t sect_opts{};
+        bf::section_opts_t sect_opts{};
         sect_opts.info          = hdr.info;
         sect_opts.size          = hdr.size;
         sect_opts.flags         = map->flags;
@@ -851,55 +866,55 @@ namespace basecode::binfmt::io::elf {
         if (hdr.flags & section::flags::exec_instr) {
             sect_opts.flags.exec  = true;
             sect_opts.flags.write = false;
-            sect_type = binfmt::section::type_t::text;
+            sect_type = bf::section::type_t::text;
         }
 
-        if (sect_type == binfmt::section::type_t::strtab
-        || (sect_type == binfmt::section::type_t::data && sect_opts.flags.strings)) {
+        if (sect_type == bf::section::type_t::strtab
+        || (sect_type == bf::section::type_t::data && sect_opts.flags.strings)) {
             sect_opts.strtab.buf           = buf + hdr.offset;
             sect_opts.strtab.size_in_bytes = hdr.size;
         }
 
-        if (!OK(binfmt::section::init(section, sect_type, sect_opts)))
+        if (!OK(bf::section::init(section, sect_type, sect_opts)))
             return status_t::read_error;
 
         if (hdr.link > 0) {
             auto status = read_section(elf, file, buf, module, hdr.link);
             if (!OK(status))
                 return status;
-            section->link = binfmt::module::get_section(*module, hdr.link - 1);
+            section->link = bf::module::get_section(*module, hdr.link - 1);
         }
 
         auto msc = &module->subclass.object;
 
         switch (section->type) {
-            case binfmt::section::type_t::bss: {
+            case bf::section::type_t::bss: {
                 break;
             }
-            case binfmt::section::type_t::text: {
+            case bf::section::type_t::text: {
                 section->subclass.data = buf + hdr.offset;
                 break;
             }
-            case binfmt::section::type_t::data: {
+            case bf::section::type_t::data: {
                 if (!section->flags.strings) {
                     section->subclass.data = buf + hdr.offset;
                 }
                 break;
             }
-            case binfmt::section::type_t::init:
-            case binfmt::section::type_t::fini:
-            case binfmt::section::type_t::unwind:
-            case binfmt::section::type_t::pre_init: {
+            case bf::section::type_t::init:
+            case bf::section::type_t::fini:
+            case bf::section::type_t::unwind:
+            case bf::section::type_t::pre_init: {
                 section->subclass.data = buf + hdr.offset;
                 break;
             }
-            case binfmt::section::type_t::note: {
+            case bf::section::type_t::note: {
                 auto note_hdr = (note_header_t*) (buf + hdr.offset);
                 UNUSED(note_hdr);
                 // XXX: need to finish
                 break;
             }
-            case binfmt::section::type_t::reloc: {
+            case bf::section::type_t::reloc: {
                 auto& relocs = section->subclass.relocs;
                 auto rels = (rela_t*) (buf + hdr.offset);
                 auto num_rels = hdr.size / hdr.entity_size;
@@ -912,22 +927,23 @@ namespace basecode::binfmt::io::elf {
                     auto& reloc = relocs[j];
                     reloc.offset = rela.offset;
                     reloc.addend = rela.addend;
-                    reloc.symbol = binfmt::section::get_symbol(section->link, sym - 1);
+                    reloc.symbol = bf::section::get_symbol(section->link,
+                                                           sym - 1);
 
                     switch (file.machine) {
-                        case binfmt::machine::type_t::unknown:
+                        case bf::machine::type_t::unknown:
                             break;
-                        case binfmt::machine::type_t::x86_64:
+                        case bf::machine::type_t::x86_64:
                             reloc.x86_64_type = s_elf_to_amd64_relocs[type];
                             break;
-                        case binfmt::machine::type_t::aarch64:
+                        case bf::machine::type_t::aarch64:
                             reloc.aarch64_type = s_elf_to_arm64_relocs[type];
                             break;
                     }
                 }
                 break;
             }
-            case binfmt::section::type_t::group: {
+            case bf::section::type_t::group: {
                 auto gsc = &section->subclass.group;
                 auto group = (group_t*) (buf + hdr.offset);
                 auto num_groups = hdr.size / hdr.entity_size;
@@ -937,17 +953,17 @@ namespace basecode::binfmt::io::elf {
                     gsc->sections[j] = group->sect_hdr_indexes[j];
                 break;
             }
-            case binfmt::section::type_t::custom: {
+            case bf::section::type_t::custom: {
                 section->subclass.data = buf + hdr.offset;
                 section->ext_type      = hdr.type;
                 break;
             }
-            case binfmt::section::type_t::strtab: {
+            case bf::section::type_t::strtab: {
                 if (num == elf.file_header->strtab_ndx)
                     msc->strtab = section;
                 break;
             }
-            case binfmt::section::type_t::symtab: {
+            case bf::section::type_t::symtab: {
                 if (hdr.link > 0
                 &&  hdr.link == elf.file_header->strtab_ndx) {
                     msc->symtab = section;
@@ -956,11 +972,14 @@ namespace basecode::binfmt::io::elf {
                 for (u32 j = 1; j < symtab_count; ++j) {
                     auto sym = elf::symtab::get(elf, num, j);
 
-                    binfmt::symbol_opts_t opts{};
+                    bf::symbol_opts_t opts{};
                     opts.size    = sym->size;
                     opts.value   = sym->value;
-                    opts.section = binfmt::module::get_section(*module, sym->section_ndx - 1);
-                    auto symbol = binfmt::section::add_symbol(section, sym->name_offset, opts);
+                    opts.section = bf::module::get_section(*module,
+                                                           sym->section_ndx - 1);
+                    auto symbol = bf::section::add_symbol(section,
+                                                          sym->name_offset,
+                                                          opts);
 
                     switch (ELF64_ST_TYPE(sym->info)) {
                         default:
@@ -1018,11 +1037,11 @@ namespace basecode::binfmt::io::elf {
                 }
                 break;
             }
-            case binfmt::section::type_t::none:
-            case binfmt::section::type_t::rsrc:
-            case binfmt::section::type_t::debug:
-            case binfmt::section::type_t::import:
-            case binfmt::section::type_t::export_: {
+            case bf::section::type_t::none:
+            case bf::section::type_t::rsrc:
+            case bf::section::type_t::debug:
+            case bf::section::type_t::import:
+            case bf::section::type_t::export_: {
                 break;
             }
         }
@@ -1058,10 +1077,10 @@ namespace basecode::binfmt::io::elf {
 
         switch (elf.file_header->machine) {
             case elf::machine::x86_64:
-                file.machine = binfmt::machine::type_t::x86_64;
+                file.machine = bf::machine::type_t::x86_64;
                 break;
             case elf::machine::aarch64:
-                file.machine = binfmt::machine::type_t::aarch64;
+                file.machine = bf::machine::type_t::aarch64;
                 break;
             default:
                 return status_t::invalid_machine_type;
@@ -1075,14 +1094,14 @@ namespace basecode::binfmt::io::elf {
             elf.sections = (sect_header_t*) (buf + elf.file_header->sect_hdr_offset);
         }
 
-        file.module = binfmt::system::make_module(module_type_t::object);
+        file.module = bf::system::make_module(module_type_t::object);
         if (!file.module) {
             return status_t::read_error;
         }
 
         const auto num_sections = elf.file_header->sect_hdr_count;
 
-        if (!OK(binfmt::module::reserve_sections(*file.module, num_sections - 1))) {
+        if (!OK(bf::module::reserve_sections(*file.module, num_sections - 1))) {
             return status_t::read_error;
         }
 
@@ -1097,8 +1116,8 @@ namespace basecode::binfmt::io::elf {
     }
 
     status_t write(elf_t& elf, file_t& file) {
-        using machine_type_t = binfmt::machine::type_t;
-        using section_type_t = binfmt::section::type_t;
+        using machine_type_t = bf::machine::type_t;
+        using section_type_t = bf::section::type_t;
 
         auto buf = FILE_PTR();
         const auto& opts = *elf.opts;
@@ -1121,10 +1140,12 @@ namespace basecode::binfmt::io::elf {
         fh->header_size = file::header_size;
 
         b8 is_obj = file.file_type == file_type_t::obj;
-        if (!is_obj)
-            fh->entry_point = opts.entry_point == 0 ? 0x00400000 : opts.entry_point;
-        else
+        if (!is_obj) {
+            fh->entry_point = opts.entry_point == 0 ? 0x00400000 :
+                              opts.entry_point;
+        } else {
             fh->entry_point = 0;
+        }
 
         u32 num_segments = 0;
 
@@ -1138,7 +1159,8 @@ namespace basecode::binfmt::io::elf {
         if (num_segments > 0) {
             fh->pgm_hdr_count  = num_segments + 1;
             fh->pgm_hdr_size   = segment::header_size;
-            fh->pgm_hdr_offset = fh->sect_hdr_offset + (fh->sect_hdr_count * fh->sect_hdr_size);
+            fh->pgm_hdr_offset = fh->sect_hdr_offset
+                                 + (fh->sect_hdr_count * fh->sect_hdr_size);
             elf.segments = (pgm_header_t*) (buf + fh->pgm_hdr_offset);
         }
 
@@ -1209,7 +1231,9 @@ namespace basecode::binfmt::io::elf {
                 }
                 case section_type_t::data: {
                     if (section->flags.strings) {
-                        std::memcpy(data, section->subclass.strtab.buf.data, hdr.size);
+                        std::memcpy(data,
+                                    section->subclass.strtab.buf.data,
+                                    hdr.size);
                         hdr.type        = section::type::progbits;
                         hdr.entity_size = 1;
                         data_offset = align(data_offset + hdr.size, alignment);
@@ -1249,12 +1273,12 @@ namespace basecode::binfmt::io::elf {
                         const auto& reloc = section->subclass.relocs[j];
                         u32 type{};
                         switch (file.machine) {
-                            case binfmt::machine::type_t::unknown:
+                            case bf::machine::type_t::unknown:
                                 break;
-                            case binfmt::machine::type_t::x86_64:
+                            case bf::machine::type_t::x86_64:
                                 type = s_amd64_to_elf_relocs[u32(reloc.x86_64_type)];
                                 break;
-                            case binfmt::machine::type_t::aarch64:
+                            case bf::machine::type_t::aarch64:
                                 type = s_arm64_to_elf_relocs[u32(reloc.aarch64_type)];
                                 break;
                         }
@@ -1277,13 +1301,16 @@ namespace basecode::binfmt::io::elf {
                 }
                 case section_type_t::custom: {
                     std::memcpy(data, section->subclass.data, hdr.size);
-                    hdr.type = section->ext_type != 0 ? section->ext_type : section::type::progbits;
+                    hdr.type = section->ext_type != 0 ? section->ext_type :
+                               section::type::progbits;
                     data_offset = align(data_offset + hdr.size, alignment);
                     inc_vaddr   = !is_obj;
                     break;
                 }
                 case section_type_t::strtab: {
-                    std::memcpy(data, section->subclass.strtab.buf.data, hdr.size);
+                    std::memcpy(data,
+                                section->subclass.strtab.buf.data,
+                                hdr.size);
                     hdr.type        = section::type::strtab;
                     hdr.entity_size = 1;
                     if (fh->strtab_ndx == 0
@@ -1296,7 +1323,8 @@ namespace basecode::binfmt::io::elf {
                     break;
                 }
                 case section_type_t::symtab: {
-                    hdr.type        = section->flags.dynamic ? section::type::dynsym : section::type::symtab;
+                    hdr.type = section->flags.dynamic ? section::type::dynsym :
+                               section::type::symtab;
                     hdr.entity_size = symtab::entity_size;
 
                     auto sym_data = (sym_t*) (buf + hdr.offset);
@@ -1368,7 +1396,8 @@ namespace basecode::binfmt::io::elf {
                         sym.info        = ELF64_ST_INFO(scope, type);
                         sym.other       = ELF64_ST_VISIBILITY(vis);
                         sym.name_offset = symbol->name_offset;
-                        sym.section_ndx = symbol->section ? symbol->section->number + 1 : 0;
+                        sym.section_ndx = symbol->section ?
+                                          symbol->section->number + 1 : 0;
 
                         ++i;
                     }
@@ -1402,27 +1431,65 @@ namespace basecode::binfmt::io::elf {
         format::format_to(buf, "ELF Header:\n");
         format::format_to(buf, "  Magic:    ");
         format::format_hex_dump(buf, elf.file_header->magic, 16, false, false);
-        format::format_to(buf, "  Class:                             {}\n", elf::file::class_name(elf.file_header->magic[elf::file::magic_class]));
-        format::format_to(buf, "  Data:                              {}\n", elf::file::endianess_name(elf.file_header->magic[elf::file::magic_data]));
-        format::format_to(buf, "  Version:                           {}\n", elf::file::version_name(elf.file_header->magic[elf::file::magic_version]));
-        format::format_to(buf, "  OS/ABI:                            {}\n", elf::file::os_abi_name(elf.file_header->magic[elf::file::magic_os_abi]));
-        format::format_to(buf, "  ABI Version:                       {}\n", elf.file_header->magic[elf::file::magic_abi_version]);
-        format::format_to(buf, "  Type:                              {}\n", elf::file::file_type_name(elf.file_header->type));
-        format::format_to(buf, "  Machine:                           {}\n", elf::machine::name(elf.file_header->machine));
-        format::format_to(buf, "  Version:                           0x{:x}\n", elf.file_header->version);
-        format::format_to(buf, "  Entry point address:               0x{:x}\n", elf.file_header->entry_point);
-        format::format_to(buf, "  Start of program headers:          {} (bytes into file)\n", elf.file_header->pgm_hdr_offset);
-        format::format_to(buf, "  Start of section headers:          {} (bytes into file)\n", elf.file_header->sect_hdr_offset);
-        format::format_to(buf, "  Flags:                             0x{:x}\n", elf.file_header->flags);
-        format::format_to(buf, "  Size of this header:               {} (bytes)\n", file::header_size);
-        format::format_to(buf, "  Size of program headers:           {} (bytes)\n", elf.file_header->pgm_hdr_size);
-        format::format_to(buf, "  Number of program headers:         {}\n", elf.file_header->pgm_hdr_count);
-        format::format_to(buf, "  Size of section headers:           {} (bytes)\n", elf.file_header->sect_hdr_size);
-        format::format_to(buf, "  Number of section headers:         {}\n", elf.file_header->sect_hdr_count);
-        format::format_to(buf, "  Section header string table index: {}\n\n", elf.file_header->strtab_ndx);
+        format::format_to(buf,
+                          "  Class:                             {}\n",
+                          elf::file::class_name(elf.file_header->magic[elf::file::magic_class]));
+        format::format_to(buf,
+                          "  Data:                              {}\n",
+                          elf::file::endianess_name(elf.file_header->magic[elf::file::magic_data]));
+        format::format_to(buf,
+                          "  Version:                           {}\n",
+                          elf::file::version_name(elf.file_header->magic[elf::file::magic_version]));
+        format::format_to(buf,
+                          "  OS/ABI:                            {}\n",
+                          elf::file::os_abi_name(elf.file_header->magic[elf::file::magic_os_abi]));
+        format::format_to(buf,
+                          "  ABI Version:                       {}\n",
+                          elf.file_header->magic[elf::file::magic_abi_version]);
+        format::format_to(buf,
+                          "  Type:                              {}\n",
+                          elf::file::file_type_name(elf.file_header->type));
+        format::format_to(buf,
+                          "  Machine:                           {}\n",
+                          elf::machine::name(elf.file_header->machine));
+        format::format_to(buf,
+                          "  Version:                           0x{:x}\n",
+                          elf.file_header->version);
+        format::format_to(buf,
+                          "  Entry point address:               0x{:x}\n",
+                          elf.file_header->entry_point);
+        format::format_to(buf,
+                          "  Start of program headers:          {} (bytes into file)\n",
+                          elf.file_header->pgm_hdr_offset);
+        format::format_to(buf,
+                          "  Start of section headers:          {} (bytes into file)\n",
+                          elf.file_header->sect_hdr_offset);
+        format::format_to(buf,
+                          "  Flags:                             0x{:x}\n",
+                          elf.file_header->flags);
+        format::format_to(buf,
+                          "  Size of this header:               {} (bytes)\n",
+                          file::header_size);
+        format::format_to(buf,
+                          "  Size of program headers:           {} (bytes)\n",
+                          elf.file_header->pgm_hdr_size);
+        format::format_to(buf,
+                          "  Number of program headers:         {}\n",
+                          elf.file_header->pgm_hdr_count);
+        format::format_to(buf,
+                          "  Size of section headers:           {} (bytes)\n",
+                          elf.file_header->sect_hdr_size);
+        format::format_to(buf,
+                          "  Number of section headers:         {}\n",
+                          elf.file_header->sect_hdr_count);
+        format::format_to(buf,
+                          "  Section header string table index: {}\n\n",
+                          elf.file_header->strtab_ndx);
         format::format_to(buf, "Section Headers:\n");
-        format::format_to(buf, "  [Nr] Name              Type             Address           Offset\n");
-        format::format_to(buf, "       Size              EntSize          Flags  Link  Info  Align\n");
+        format::format_to(buf,
+                          "  [Nr] Name              Type             Address           Offset\n");
+        format::format_to(buf,
+                          "       Size              EntSize          Flags  Link  Info  Align\n");
 
         s8 name[17];
         name[16] = '\0';
@@ -1459,8 +1526,12 @@ namespace basecode::binfmt::io::elf {
 
         const auto symtab_size = symtab_sect->size / symtab_sect->entity_size;
 
-        format::format_to(buf, "\nSymbol table '{}' contains {} entries:\n", ".symtab", symtab_size);
-        format::format_to(buf, "  Num:     Value         Size Type     Bind   Vis       Ndx Name\n");
+        format::format_to(buf,
+                          "\nSymbol table '{}' contains {} entries:\n",
+                          ".symtab",
+                          symtab_size);
+        format::format_to(buf,
+                          "  Num:     Value         Size Type     Bind   Vis       Ndx Name\n");
         for (u32 i = 0; i < symtab_size; ++i) {
             auto sym = elf::symtab::get(elf, symtab_ndx, i);
             std::memcpy(name, strtab + sym->name_offset, 16);
@@ -1474,8 +1545,8 @@ namespace basecode::binfmt::io::elf {
         }
     }
 
-    u32 section_alignment(const binfmt::section_t* section) {
-        using section_type_t = binfmt::section::type_t;
+    u32 section_alignment(const bf::section_t* section) {
+        using section_type_t = bf::section::type_t;
         u32 alignment = section->align;
         if (alignment == 0) {
             switch (section->type) {
@@ -1502,8 +1573,8 @@ namespace basecode::binfmt::io::elf {
         return alignment;
     }
 
-    u32 section_file_size(const binfmt::section_t* section) {
-        using section_type_t = binfmt::section::type_t;
+    u32 section_file_size(const bf::section_t* section) {
+        using section_type_t = bf::section::type_t;
 
         u32 size = section->size;
         if (size == 0) {
@@ -1513,15 +1584,18 @@ namespace basecode::binfmt::io::elf {
                     break;
                 }
                 case section_type_t::symtab: {
-                    size = (section->subclass.symtab.symbols.size + 1) * elf::symtab::entity_size;
+                    size = (section->subclass.symtab.symbols.size + 1)
+                           * elf::symtab::entity_size;
                     break;
                 }
                 case section_type_t::group: {
-                    size = (section->subclass.group.sections.size + 1) * elf::group::entity_size;
+                    size = (section->subclass.group.sections.size + 1)
+                           * elf::group::entity_size;
                     break;
                 }
                 case section_type_t::reloc: {
-                    size = (section->subclass.relocs.size) * elf::relocs::entity_size;
+                    size = (section->subclass.relocs.size)
+                           * elf::relocs::entity_size;
                     break;
                 }
                 default:

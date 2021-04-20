@@ -24,22 +24,22 @@
     do {                                                                        \
         stopwatch_t timer{};                                                    \
         stopwatch::start(timer);                                                \
+        defer(stopwatch::stop(timer);                                           \
+              stopwatch::print_elapsed(                                         \
+                  (alloc) ? (alloc) : memory::system::default_alloc(),          \
+                  stdout,                                                       \
+                  slug,                                                         \
+                  60,                                                           \
+                  timer));                                                      \
         __VA_ARGS__;                                                            \
-        stopwatch::stop(timer);                                                 \
-        stopwatch::print_elapsed(                                               \
-            (alloc) ? (alloc) : memory::system::default_alloc(),                \
-            stdout,                                                             \
-            slug,                                                               \
-            60,                                                                 \
-            timer);                                                             \
     } while (false)
 #define TIME_BLOCK(slug, ...)                                                   \
     do {                                                                        \
         stopwatch_t timer{};                                                    \
         stopwatch::start(timer);                                                \
+        defer(stopwatch::stop(timer);                                           \
+              stopwatch::print_elapsed(slug, 60, timer));                       \
         __VA_ARGS__;                                                            \
-        stopwatch::stop(timer);                                                 \
-        stopwatch::print_elapsed(slug, 60, timer);                              \
     } while (false)
 
 namespace basecode {
