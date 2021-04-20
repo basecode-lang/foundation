@@ -32,6 +32,7 @@
 #define IM_MIN(A, B)            (((A) < (B)) ? (A) : (B))
 #define IM_MAX(A, B)            (((A) >= (B)) ? (A) : (B))
 #define IM_CLAMP(V, MN, MX)     ((V) < (MN) ? (MN) : (V) > (MX) ? (MX) : (V))
+#define PT_TO_PX(pt)            ((pt) * 1.3281472327365263157894736842105)
 
 struct GLFWwindow;
 
@@ -85,6 +86,7 @@ namespace basecode {
         s32                     maximized   = 0;
         s32                     min_width   = 800;
         s32                     min_height  = 600;
+        b8                      focused     {};
     };
 
     namespace gfx {

@@ -29,7 +29,7 @@
             s8 Slice[s.length + 1];                                 \
             std::memcpy(Slice, s.data, s.length);                   \
             Slice[s.length] = '\0';                                 \
-            Code                                                    \
+            Code;                                                   \
         }(Slice)                                                    \
 
 namespace basecode {

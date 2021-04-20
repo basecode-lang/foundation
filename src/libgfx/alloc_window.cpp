@@ -116,7 +116,8 @@ namespace basecode::alloc_window {
         const auto region_size = ImGui::GetContentRegionAvail();
         win.height = region_size.y;
         if ((win.table_size == 0 && win.graph_size == 0)
-        ||  (win.table_size + win.graph_size < region_size.x)) {
+        ||  (win.table_size + win.graph_size < region_size.x)
+        ||  (win.table_size + win.graph_size > region_size.x)) {
             win.table_size = region_size.x * .5;
             win.graph_size = region_size.x * .5;
         }

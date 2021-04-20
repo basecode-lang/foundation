@@ -20,13 +20,18 @@
 
 #include <basecode/gfx/gfx.h>
 #include <basecode/core/str.h>
+#include <basecode/core/path.h>
 
 namespace basecode {
-    using render_callback_t = std::function<b8 ()>;
+    struct app_t;
+
+    using render_callback_t = std::function<b8 (app_t&)>;
 
     struct app_t final {
         alloc_t*                alloc;
         render_callback_t       on_render;
+        str::slice_t            short_name;
+        str::slice_t            title;
         str_t                   scratch;
         window_t                window;
         vector4_t               bg_color;
@@ -37,6 +42,8 @@ namespace basecode {
         enum class status_t : u32 {
             ok,
             error,
+            load_config_error,
+            save_config_error,
             gl3w_init_failure,
             glfw_init_failure,
         };
@@ -44,6 +51,10 @@ namespace basecode {
         u0 free(app_t& app);
 
         status_t run(app_t& app);
+
+        status_t save_config(app_t& app);
+
+        status_t load_config(app_t& app);
 
         status_t init(app_t& app,
                       alloc_t* alloc = context::top()->alloc.main);

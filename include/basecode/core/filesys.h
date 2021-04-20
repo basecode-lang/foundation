@@ -27,7 +27,8 @@ namespace basecode {
         glob_t                  buf;
         array_t<str_t>          paths;
     };
-    static_assert(sizeof(glob_result_t) <= 112, "glob_result_t is now bigger than 112 bytes!");
+    static_assert(sizeof(glob_result_t) <= 112,
+                  "glob_result_t is now bigger than 112 bytes!");
 
     namespace filesys {
         enum class status_t : u8 {
@@ -50,6 +51,7 @@ namespace basecode {
             cannot_modify_root              = 131,
             unexpected_empty_path           = 132,
             cannot_rename_to_existing_file  = 133,
+            no_home_path                    = 134,
         };
 
         namespace glob {
@@ -57,14 +59,16 @@ namespace basecode {
 
             u0 reset(glob_result_t& r);
 
+            status_t find(glob_result_t& r,
+                          str::slice_t pattern,
+                          u32 flags = {});
+
             inline u32 size(const glob_result_t& r) {
                 return r.paths.size;
             }
 
             u0 init(glob_result_t& r,
                     alloc_t* alloc = context::top()->alloc.main);
-
-            status_t find(glob_result_t& r, str::slice_t pattern, u32 flags = {});
         }
 
         namespace places {

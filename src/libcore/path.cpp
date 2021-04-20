@@ -170,8 +170,10 @@ namespace basecode::path {
 
 #ifdef _WIN32
     str::slice_t drive_name(const path_t& path) {
-        if (empty(path))            return {};
-        auto drive_name_idx = find_mark_index(path, path::marks::drive_name);
+        if (empty(path))
+            return {};
+        auto drive_name_idx = find_mark_index(path,
+                                              path::marks::drive_name);
         if (drive_name_idx == -1)
             return {};
         return slice::make(path.str.data, drive_name_idx);
@@ -180,9 +182,12 @@ namespace basecode::path {
 #endif
 
     status_t append(path_t& lhs, const path_t& rhs) {
-        if (empty(rhs))                                         return status_t::ok;
-        if (absolute(rhs))                                      return status_t::expected_relative_path;
-        if ((lhs.str.length + rhs.str.length + 2) > PATH_MAX)   return status_t::path_too_long;
+        if (empty(rhs))
+            return status_t::ok;
+        if (absolute(rhs))
+            return status_t::expected_relative_path;
+        if ((lhs.str.length + rhs.str.length + 2) > PATH_MAX)
+            return status_t::path_too_long;
         const auto ch = lhs.str[lhs.str.length - 1];
         if (ch != '/' && ch != '\\') {
             str::append(lhs.str, path_sep);

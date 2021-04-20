@@ -197,6 +197,12 @@ set(GFX_SOURCES
     alloc_window.cpp ${GFX_INC_DIR}/alloc_window.h
 
     font.cpp ${GFX_INC_DIR}/font.h
+    ${GFX_INC_DIR}/fonts/IconsKenney.h
+    ${GFX_INC_DIR}/fonts/IconsFontaudio.h
+    ${GFX_INC_DIR}/fonts/IconsForkAwesome.h
+    ${GFX_INC_DIR}/fonts/IconsFontAwesome4.h
+    ${GFX_INC_DIR}/fonts/IconsFontAwesome5.h
+    ${GFX_INC_DIR}/fonts/IconsFontAwesome5Brands.h
 )
 
 add_library(

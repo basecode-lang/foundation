@@ -21,15 +21,19 @@
 #include <GLFW/glfw3.h>
 #include <imgui_freetype.h>
 #include <basecode/gfx/app.h>
+#include <basecode/core/log.h>
 #include <basecode/core/timer.h>
+#include <basecode/core/filesys.h>
 #include <basecode/core/profiler.h>
+#include <basecode/core/scm/types.h>
+#include <basecode/core/scm/system.h>
 #include <basecode/core/memory/meta.h>
+#include <basecode/core/scm/modules/config.h>
 #include <basecode/gfx/imgui/imgui_impl_glfw.h>
 #include <basecode/gfx/imgui/imgui_impl_opengl3.h>
 
 #ifdef _WIN32
 #   include <shellscalingapi.h>
-
 #endif
 
 namespace basecode::app {
@@ -47,9 +51,13 @@ namespace basecode::app {
 
     static u0 glfw_win_focus(GLFWwindow* window, s32 focused);
 
+    static status_t get_config_path(app_t& app, path_t& path);
+
     static u0 glfw_win_iconify(GLFWwindow* window, s32 iconified);
 
     static u0 glfw_win_maximize(GLFWwindow* window, s32 maximized);
+
+    static status_t get_config_file_path(app_t& app, path_t& path);
 
     static u0 glfw_win_resize(GLFWwindow* window, s32 width, s32 height);
 
@@ -58,9 +66,15 @@ namespace basecode::app {
     }
 
     status_t run(app_t& app) {
+        if (!OK(load_config(app))) {
+            log::error("load_config failed");
+            return status_t::load_config_error;
+        }
+
 #ifdef _WIN32
         SetProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE);
 #endif
+
         glfwSetErrorCallback(glfw_error);
         if (!glfwInit())
             return status_t::glfw_init_failure;
@@ -82,7 +96,7 @@ namespace basecode::app {
         glfwWindowHint(GLFW_MAXIMIZED, app.window.maximized != 0);
         app.window.backing = glfwCreateWindow(app.window.width,
                                               app.window.height,
-                                              "Temp Name",
+                                              (const s8*) app.title.data,
                                               {},
                                               {});
         if (!app.window.backing)
@@ -112,7 +126,20 @@ namespace basecode::app {
 
         ImGui::StyleColorsClassic();
         auto& io = ImGui::GetIO();
-        //io.IniFilename = _ini_path.string().c_str();
+
+        {
+            path_t config_path{};
+            path::init(config_path);
+            if (OK(get_config_path(app, config_path))) {
+                path_t ini_file{};
+                path::init(ini_file, "imgui.ini"_ss);
+                path::append(config_path, ini_file);
+                io.IniFilename = path::c_str(config_path);
+                path::free(ini_file);
+            }
+            path::free(config_path);
+        }
+
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
@@ -128,7 +155,7 @@ namespace basecode::app {
         ImGui_ImplOpenGL3_Init(glsl_version);
 
         io.FontDefault = io.Fonts->AddFontFromFileTTF("../share/fonts/SEGOEUI.TTF",
-                                                      24);
+                                                      PT_TO_PX(18));
         ImGuiFreeType::BuildFontAtlas(io.Fonts);
 
         s32 dw{};
@@ -151,7 +178,7 @@ namespace basecode::app {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
             if (app.on_render) {
-                if (!app.on_render())
+                if (!app.on_render(app))
                     break;
             }
             ImGui::Render();
@@ -179,6 +206,10 @@ namespace basecode::app {
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
 
+        if (!OK(save_config(app))) {
+            log::error("save_config failed");
+        }
+
         glfwDestroyWindow(app.window.backing);
         glfwTerminate();
 
@@ -205,39 +236,134 @@ namespace basecode::app {
         return status_t::ok;
     }
 
+    status_t load_config(app_t& app) {
+        path_t path{};
+        path::init(path);
+        defer(path::free(path)); {
+            auto status = get_config_file_path(app, path);
+            if (!OK(status))
+                return status;
+        }
+        auto ctx = scm::system::global_ctx();
+        scm::obj_t* obj{};
+        auto status = scm::system::eval(path, &obj);
+        if (!OK(status))
+            return status_t::load_config_error;
+        cvar_t* var{};
+        if (OK(config::cvar::get("*gfx-win-x*"_ss, &var))) {
+            app.window.x = var->value.integer;
+        }
+        if (OK(config::cvar::get("*gfx-win-y*"_ss, &var))) {
+            app.window.y = var->value.integer;
+        }
+        if (OK(config::cvar::get("*gfx-win-width*"_ss, &var))) {
+            app.window.width = var->value.integer;
+        }
+        if (OK(config::cvar::get("*gfx-win-height*"_ss, &var))) {
+            app.window.height = var->value.integer;
+        }
+        if (OK(config::cvar::get("*gfx-win-maximized*"_ss, &var))) {
+            app.window.maximized = var->value.flag;
+        }
+        if (OK(config::cvar::get("*gfx-win-min-width*"_ss, &var))) {
+            app.window.min_width = var->value.integer;
+        }
+        if (OK(config::cvar::get("*gfx-win-min-height*"_ss, &var))) {
+            app.window.min_height = var->value.integer;
+        }
+        return status_t::ok;
+    }
+
+    status_t save_config(app_t& app) {
+        path_t path{};
+        path::init(path);
+        defer(path::free(path));
+        auto status = get_config_file_path(app, path);
+        if (!OK(status))
+            return status;
+        auto source = format::format(R"(
+    (begin
+        (define *gfx-win-x*             {})
+        (define *gfx-win-y*             {})
+        (define *gfx-win-width*         {})
+        (define *gfx-win-height*        {})
+        (define *gfx-win-maximized*     {})
+        (define *gfx-win-min-width*     {})
+        (define *gfx-win-min-height*    {}))
+)",
+        app.window.x,
+        app.window.y,
+        app.window.width,
+        app.window.height,
+        app.window.maximized ? "#t" : "#f",
+        app.window.min_width,
+        app.window.min_height);
+        auto file = fopen(path::c_str(path), "w");
+        defer(fclose(file));
+        format::print(file, "{}", source);
+        return status_t::ok;
+    }
+
     static u0 glfw_win_close(GLFWwindow* window) {
-        UNUSED(window);
+        log::info("glfw window close");
     }
 
     static u0 glfw_error(s32 error, const s8* description) {
-        UNUSED(error);
-        UNUSED(description);
+        log::error("glfw error: {} ({})", description, error);
     }
 
     static u0 glfw_win_pos(GLFWwindow* window, s32 x, s32 y) {
-        UNUSED(window);
-        UNUSED(x);
-        UNUSED(y);
+        auto win = (window_t*) glfwGetWindowUserPointer(window);
+        win->x = x;
+        win->y = y;
     }
 
     static u0 glfw_win_focus(GLFWwindow* window, s32 focused) {
-        UNUSED(window);
-        UNUSED(focused);
+        auto win = (window_t*) glfwGetWindowUserPointer(window);
+        win->focused = true;
+    }
+
+    static status_t get_config_path(app_t& app, path_t& path) {
+        auto status = filesys::places::user::config(path);
+        if (!OK(status))
+            return status_t::save_config_error;
+        path_t product_path{};
+        path::init(product_path, app.short_name);
+        path::append(path, product_path);
+        path::free(product_path);
+        if (!OK(filesys::exists(path))) {
+            if (!OK(filesys::_mkdir(path, true)))
+                return status_t::save_config_error;
+        }
+        return status_t::ok;
     }
 
     static u0 glfw_win_iconify(GLFWwindow* window, s32 iconified) {
-        UNUSED(window);
-        UNUSED(iconified);
+        auto win = (window_t*) glfwGetWindowUserPointer(window);
+        win->focused   = false;
+        win->iconified = true;
     }
 
     static u0 glfw_win_maximize(GLFWwindow* window, s32 maximized) {
-        UNUSED(window);
-        UNUSED(maximized);
+        auto win = (window_t*) glfwGetWindowUserPointer(window);
+        win->maximized = true;
+        win->iconified = false;
+    }
+
+    static status_t get_config_file_path(app_t& app, path_t& path) {
+        auto status = get_config_path(app, path);
+        if (!OK(status))
+            return status;
+        path_t config_file{};
+        path::init(config_file, "gfx.scm"_ss);
+        path::append(path, config_file);
+        path::free(config_file);
+        return status_t::ok;
     }
 
     static u0 glfw_win_resize(GLFWwindow* window, s32 width, s32 height) {
-        UNUSED(window);
-        UNUSED(width);
-        UNUSED(height);
+        auto win = (window_t*) glfwGetWindowUserPointer(window);
+        win->width = width;
+        win->height = height;
     }
 }
