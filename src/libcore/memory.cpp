@@ -163,18 +163,21 @@ namespace basecode::memory {
             auto sys_cfg = (system_config_t*) cfg;
             BC_ASSERT_NOT_NULL(sys_cfg->main);
             memory::init(&t_system.main, sys_cfg->main);
+            meta::system::init(&t_system.main);
+            meta::system::track(&t_system.main);
 
             if (sys_cfg->temp) {
                 sys_cfg->temp->backing.alloc = &t_system.main;
                 memory::init(&t_system.temp, sys_cfg->temp);
+                meta::system::track(&t_system.temp);
             }
 
             if (sys_cfg->scratch) {
                 sys_cfg->scratch->backing.alloc = &t_system.main;
                 memory::init(&t_system.scratch, sys_cfg->scratch);
+                meta::system::track(&t_system.scratch);
             }
 
-            meta::system::init(&t_system.main);
             array::init(t_system.allocators, &t_system.main);
 
             slab_config_t slab_config{};

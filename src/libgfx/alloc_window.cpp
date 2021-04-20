@@ -27,7 +27,7 @@ namespace basecode::alloc_window {
                               const alloc_info_array_t& roots) {
 
         str_t scratch{};
-        str::init(scratch, context::top()->scratch_alloc);
+        str::init(scratch, context::top()->alloc.scratch);
         str::reserve(scratch, 64);
         defer(str::free(scratch));
         u32 row{};

@@ -33,6 +33,7 @@
 #include <basecode/gfx/alloc_window.h>
 #include <basecode/core/scm/modules/cxx.h>
 #include <basecode/core/scm/modules/log.h>
+#include <basecode/core/memory/system/dl.h>
 #include <basecode/core/scm/modules/basic.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
@@ -53,8 +54,21 @@ basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
     if (!OK(profiler::init()))
         return 1;
 
-    alloc_t* alloc; {
-        auto status = memory::system::init(alloc_type_t::dlmalloc);
+    alloc_t* main_alloc;
+    alloc_t* temp_alloc;
+    alloc_t* scratch_alloc; {
+        dl_config_t dl_cfg{};
+        dl_cfg.heap_size = 32 * 1024 * 1024;
+
+        scratch_config_t scratch_cfg{};
+        scratch_cfg.buf_size = 256 * 1024;
+
+        system_config_t sys_cfg{};
+        sys_cfg.main    = &dl_cfg;
+        sys_cfg.temp    = {};
+        sys_cfg.scratch = &scratch_cfg;
+
+        auto status = memory::system::init(&sys_cfg);
         if (!OK(status)) {
             fmt::print(stderr,
                        "memory::system::init error: {}\n",
@@ -62,18 +76,15 @@ basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
             return (s32) status;
         }
 
-        alloc = memory::system::default_alloc();
+        main_alloc    = memory::system::main_alloc();
+        temp_alloc    = memory::system::temp_alloc();
+        scratch_alloc = memory::system::scratch_alloc();
     }
 
-    alloc_t scratch_alloc{}; {
-        scratch_config_t cfg{};
-        cfg.backing  = alloc;
-        cfg.buf_size = 256 * 1024;
-        memory::init(&scratch_alloc, alloc_type_t::scratch, &cfg);
-    }
-
-    auto ctx = context::make(argc, argv, alloc);
-    ctx.scratch_alloc = &scratch_alloc;
+    auto ctx = context::make(argc, argv);
+    ctx.alloc.main    = main_alloc;
+    ctx.alloc.temp    = temp_alloc;
+    ctx.alloc.scratch = scratch_alloc;
     context::push(&ctx);
 
     TIME_BLOCK("memory::proxy::init"_ss,
@@ -87,7 +98,7 @@ basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
                    auto status = log::system::init(logger_type_t::default_,
                                                    &dft_config,
                                                    log_level_t::debug,
-                                                   memory::system::default_alloc());
+                                                   main_alloc);
                    if (!OK(status)) {
                        format::print(stderr,
                                      "log::system::init error: {}\n",
@@ -188,10 +199,10 @@ basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
     static MemoryEditor s_mem_edit;
     static alloc_window_t s_alloc_win{};
 
-    alloc_window::init(s_alloc_win, alloc);
+    alloc_window::init(s_alloc_win, main_alloc);
 
     app_t app{};
-    app::init(app, alloc);
+    app::init(app, main_alloc);
 
     app.on_render = [&]() -> b8 {
         if (ImGui::BeginMainMenuBar()) {
@@ -256,10 +267,9 @@ basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
     TIME_BLOCK("log::system::fini"_ss,                  log::system::fini());
     TIME_BLOCK("term::system::fini"_ss,                 term::system::fini());
     TIME_BLOCK("event::system::fini"_ss,                event::system::fini());
-    TIME_BLOCK("free scratch allocator"_ss,             memory::fini(&scratch_alloc));
     TIME_BLOCK("memory::proxy::fini"_ss,                memory::proxy::fini());
     TIME_BLOCK("memory::system::fini"_ss,               memory::system::fini());
-    TIME_BLOCK_ALLOC("context::pop"_ss,                 alloc, context::pop());
+    TIME_BLOCK_ALLOC("context::pop"_ss,                 main_alloc, context::pop());
 
     profiler::fini();
 
