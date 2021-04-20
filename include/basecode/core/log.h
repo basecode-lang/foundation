@@ -124,7 +124,7 @@ namespace basecode {
             status_t init(logger_type_t type,
                           logger_config_t* config = {},
                           log_level_t mask = log_level_t::debug,
-                          alloc_t* alloc = context::top()->alloc);
+                          alloc_t* alloc = context::top()->alloc.main);
         }
 
         u0 fini(logger_t* logger);
@@ -138,7 +138,7 @@ namespace basecode {
                       logger_type_t type,
                       logger_config_t* config = {},
                       log_level_t mask = log_level_t::debug,
-                      alloc_t* alloc = context::top()->alloc);
+                      alloc_t* alloc = context::top()->alloc.main);
 
         str::slice_t status_name(status_t status);
 

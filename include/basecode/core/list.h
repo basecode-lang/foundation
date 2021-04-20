@@ -228,7 +228,7 @@ namespace basecode {
         }
 
         template <Linked_List T>
-        u0 init(T& list, alloc_t* alloc = context::top()->alloc) {
+        u0 init(T& list, alloc_t* alloc = context::top()->alloc.main) {
             list.alloc = alloc;
             list.head  = list.tail = list.size = {};
             array::init(list.nodes, list.alloc);

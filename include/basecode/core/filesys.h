@@ -61,7 +61,8 @@ namespace basecode {
                 return r.paths.size;
             }
 
-            u0 init(glob_result_t& r, alloc_t* alloc = context::top()->alloc);
+            u0 init(glob_result_t& r,
+                    alloc_t* alloc = context::top()->alloc.main);
 
             status_t find(glob_result_t& r, str::slice_t pattern, u32 flags = {});
         }
@@ -142,7 +143,7 @@ namespace basecode {
 
         status_t mkdir(const path_t& path, b8 recursive = {});
 
-        status_t init(alloc_t* alloc = context::top()->alloc);
+        status_t init(alloc_t* alloc = context::top()->alloc.main);
 
         status_t equivalent(const path_t& path1, const path_t& path2);
 

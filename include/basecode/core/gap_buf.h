@@ -73,6 +73,10 @@ namespace basecode {
 
         u0 reserve(gap_buf_t& buf, u32 new_capacity);
 
+        status_t init(gap_buf_t& buf,
+                      u32 gap_size = 16,
+                      alloc_t* alloc = context::top()->alloc.main);
+
         u0 caret_insert(gap_buf_t& buf, const String_Concept auto& value) {
             gap_to_caret(buf);
             auto length = value.length;
@@ -82,7 +86,5 @@ namespace basecode {
             while (i < length)
                 caret_put(buf, value[i++]);
         }
-
-        status_t init(gap_buf_t& buf, u32 gap_size = 16, alloc_t* alloc = context::top()->alloc);
     }
 }

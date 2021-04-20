@@ -119,7 +119,7 @@ TEST_CASE("basecode::cxx example program") {
     alloc_t     region_alloc{};
     dl_config_t region_config{};
     region_config.heap_size = 512 * 1024;
-    memory::init(&region_alloc, alloc_type_t::dlmalloc, &region_config);
+    memory::init(&region_alloc, &region_config);
 
     alloc_t* alloc = &region_alloc;
 

@@ -313,7 +313,7 @@ namespace basecode {
         }
 
         template <Directed_Graph T>
-        status_t init(T& graph, alloc_t* alloc = context::top()->alloc) {
+        status_t init(T& graph, alloc_t* alloc = context::top()->alloc.main) {
             graph.alloc = alloc;
             graph.id    = {};
             array::init(graph.nodes, graph.alloc);
@@ -322,18 +322,18 @@ namespace basecode {
             array::init(graph.incoming, graph.alloc);
 
             slab_config_t node_cfg{};
-            node_cfg.backing   = graph.alloc;
-            node_cfg.buf_size  = digraph_t<T>::Node_Size;
-            node_cfg.buf_align = digraph_t<T>::Node_Align;
-            node_cfg.num_pages = DEFAULT_NUM_PAGES;
-            graph.node_slab = memory::system::make(alloc_type_t::slab, &node_cfg);
+            node_cfg.buf_size      = digraph_t<T>::Node_Size;
+            node_cfg.buf_align     = digraph_t<T>::Node_Align;
+            node_cfg.num_pages     = DEFAULT_NUM_PAGES;
+            node_cfg.backing.alloc = graph.alloc;
+            graph.node_slab = memory::system::make(&node_cfg);
 
             slab_config_t edge_cfg{};
-            edge_cfg.backing   = graph.alloc;
-            edge_cfg.buf_size  = digraph_t<T>::Edge_Size;
-            edge_cfg.buf_align = digraph_t<T>::Edge_Align;
-            edge_cfg.num_pages = DEFAULT_NUM_PAGES;
-            graph.edge_slab    = memory::system::make(alloc_type_t::slab, &edge_cfg);
+            edge_cfg.buf_size      = digraph_t<T>::Edge_Size;
+            edge_cfg.buf_align     = digraph_t<T>::Edge_Align;
+            edge_cfg.num_pages     = DEFAULT_NUM_PAGES;
+            edge_cfg.backing.alloc = graph.alloc;
+            graph.edge_slab    = memory::system::make(&edge_cfg);
 
             return status_t::ok;
         }

@@ -22,8 +22,10 @@
 #include <basecode/core/queue.h>
 #include <basecode/core/thread.h>
 #include <basecode/core/string.h>
+#include <basecode/core/memory/system/dl.h>
 #include <basecode/core/memory/system/slab.h>
 #include <basecode/core/memory/system/proxy.h>
+#include <basecode/core/memory/system/scratch.h>
 
 namespace basecode::job {
     struct worker_t final {
@@ -74,12 +76,23 @@ namespace basecode::job {
         }
 
         static u0 run(worker_t& worker) {
-            memory::system::init(alloc_type_t::dlmalloc,
-                                 4 * 1024 * 1024);
+            dl_config_t dl_cfg{};
+            dl_cfg.heap_size = 4 * 1024 * 1024;
+
+            scratch_config_t scratch_cfg{};
+            scratch_cfg.buf_size = 256 * 1024;
+
+            system_config_t sys_cfg{};
+            sys_cfg.main = &dl_cfg;
+            sys_cfg.scratch = &scratch_cfg;
+
+            memory::system::init(&sys_cfg);
             auto ctx = context::make(worker.parent_ctx->argc,
-                                     worker.parent_ctx->argv,
-                                     memory::system::default_alloc(),
-                                     worker.parent_ctx->logger);
+                                     worker.parent_ctx->argv);
+            ctx.logger        = worker.parent_ctx->logger;
+            ctx.alloc.main    = memory::system::main_alloc();
+            ctx.alloc.temp    = memory::system::temp_alloc();
+            ctx.alloc.scratch = memory::system::scratch_alloc();
             context::push(&ctx);
             memory::proxy::init();
             array::init(worker.active);
@@ -154,11 +167,11 @@ namespace basecode::job {
             g_job_sys.worker_idx  = {};
 
             slab_config_t slab_config{};
-            slab_config.backing   = g_job_sys.alloc;
-            slab_config.buf_size  = job_task_buffer_size;
-            slab_config.buf_align = alignof(job_task_base_t*);
-            slab_config.num_pages = DEFAULT_NUM_PAGES;
-            g_job_sys.task_pool = memory::system::make(alloc_type_t::slab, &slab_config);
+            slab_config.buf_size      = job_task_buffer_size;
+            slab_config.buf_align     = alignof(job_task_base_t*);
+            slab_config.num_pages     = DEFAULT_NUM_PAGES;
+            slab_config.backing.alloc = g_job_sys.alloc;
+            g_job_sys.task_pool = memory::system::make(&slab_config);
 
             mutex::init(g_job_sys.jobs_mutex);
             stable_array::init(g_job_sys.jobs, g_job_sys.alloc);
@@ -166,7 +179,8 @@ namespace basecode::job {
             g_job_sys.num_cores   = thread::system::num_cores();
             g_job_sys.num_workers = std::max<s32>(g_job_sys.num_cores - 2, 2);
             array::reserve(g_job_sys.workers, g_job_sys.num_workers);
-            log::debug("job::system, number of worker threads: {}", g_job_sys.num_workers);
+            log::debug("job::system, number of worker threads: {}",
+                       g_job_sys.num_workers);
             str_t temp{};
             str::init(temp, g_job_sys.alloc);
             str::reserve(temp, 32);
@@ -205,7 +219,8 @@ namespace basecode::job {
             job->task  = task;
             job->state = job_state_t::queued;
             g_job_sys.worker_idx++;
-            auto& worker = g_job_sys.workers[g_job_sys.worker_idx % g_job_sys.num_workers];
+            const auto worker_idx = g_job_sys.worker_idx % g_job_sys.num_workers;
+            auto& worker = g_job_sys.workers[worker_idx];
             scoped_lock_t pending_lock(&worker.pending_mutex);
             event::wait(worker.started);
             array::append(worker.pending, id);
@@ -224,7 +239,8 @@ namespace basecode::job {
             }
             intern::result_t ir{};
             if (label) {
-                ir = string::interned::fold_for_result(slice::make(label, len));
+                ir = string::interned::fold_for_result(slice::make(label,
+                                                                   len));
                 if (!OK(ir.status))
                     return status_t::label_intern_failure;
             }
@@ -265,7 +281,8 @@ namespace basecode::job {
             return {};
         const auto& job = g_job_sys.jobs[id - 1];
         auto result = string::interned::get(job.label_id);
-        return OK(result.status) ? result.slice : string::localized::status_name(result.status);
+        return OK(result.status) ? result.slice :
+               string::localized::status_name(result.status);
     }
 
     u0 all(array_t<const job_t*>& list) {
@@ -292,7 +309,8 @@ namespace basecode::job {
             const auto& job = g_job_sys.jobs[id - 1];
             e = job.finished;
         }
-        return OK(event::wait(e, timeout)) ? status_t::ok : status_t::busy;
+        return OK(event::wait(e, timeout)) ? status_t::ok :
+               status_t::busy;
     }
 
     str::slice_t state_name(job_state_t state) {

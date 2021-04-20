@@ -40,7 +40,7 @@ namespace basecode::memory::proxy {
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto sc           = &alloc->subclass.proxy;
         auto proxy_config = (proxy_config_t*) config;
-        alloc->backing = proxy_config->backing;
+        alloc->backing = proxy_config->backing.alloc;
         sc->owner      = proxy_config->owner;
         BC_ASSERT_NOT_NULL(alloc->backing);
     }
@@ -159,9 +159,9 @@ namespace basecode::memory::proxy {
         auto unique_name = t_proxy_system.names[t_proxy_system.names.size - 1];
 
         proxy_config_t config{};
-        config.owner   = owner;
-        config.backing = backing;
-        auto proxy    = system::make(alloc_type_t::proxy, &config);
+        config.owner         = owner;
+        config.backing.alloc = backing;
+        auto proxy    = system::make(&config);
         auto psc      = &proxy->subclass.proxy;
         auto new_pair = &stable_array::append(t_proxy_system.pairs);
         new_pair->alloc   = proxy;

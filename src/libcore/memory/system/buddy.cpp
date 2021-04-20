@@ -116,7 +116,7 @@ namespace basecode::memory::buddy {
         auto cfg = (buddy_config_t*) config;
         auto sc  = &alloc->subclass.buddy;
         sc->size       = cfg->heap_size;
-        alloc->backing = cfg->backing;
+        alloc->backing = cfg->backing.alloc;
 
         auto r = memory::internal::alloc(alloc->backing,
                                          sc->size,
@@ -133,7 +133,9 @@ namespace basecode::memory::buddy {
                                    alignof(buddy_block_t));
         u8* initial_metadata = (heap + sc->size) - sc->metadata_size;
         auto initial_free_blocks = (buddy_block_t*) initial_metadata;
-        auto initial_block_index = (u32*) (initial_metadata + (sizeof(buddy_block_t) * (sc->max_level + 1)));
+        auto initial_block_index = (u32*) (initial_metadata
+                                           + (sizeof(buddy_block_t)
+                                              * (sc->max_level + 1)));
         sc->free_blocks = initial_free_blocks;
         sc->block_index = initial_block_index;
 
@@ -141,21 +143,24 @@ namespace basecode::memory::buddy {
             list_init(&sc->free_blocks[i]);
         }
 
-        const auto max_indexes = (sc->max_indexes + (BUDDY_NUM_BITS - 1)) / BUDDY_NUM_BITS;
+        const auto max_indexes = (sc->max_indexes + (BUDDY_NUM_BITS - 1))
+                                 / BUDDY_NUM_BITS;
         for (u32 i = 0; i < max_indexes; ++i) {
             sc->block_index[i] = 0;
         }
 
         list_add(&sc->free_blocks[0], (buddy_block_t*) heap);
 
-        const auto num_blocks = (sc->metadata_size + (BUDDY_MIN_LEAF_SIZE - 1)) / BUDDY_MIN_LEAF_SIZE;
+        const auto num_blocks = (sc->metadata_size + (BUDDY_MIN_LEAF_SIZE - 1))
+                                / BUDDY_MIN_LEAF_SIZE;
         for (u32 i = 0; i < num_blocks; ++i) {
             r = buddy_alloc_from_level(alloc, sc->max_level);
             alloc->total_allocated += r.size;
         }
 
         sc->free_blocks = (buddy_block_t*) heap;
-        sc->block_index = (u32*) (heap + (sizeof(buddy_block_t) * (sc->max_level + 1)));
+        sc->block_index = (u32*) (heap + (sizeof(buddy_block_t)
+                                          * (sc->max_level + 1)));
 
         for (u32 i = 0; i < max_indexes; ++i)
             sc->block_index[i] = initial_block_index[i];
@@ -294,7 +299,9 @@ namespace basecode::memory::buddy {
                 bit_array_set(sc->block_index, split_index(alloc, index));
                 if (block_at_level > 0)
                     bit_array_not(sc->block_index, free_index(alloc, index));
-                buddy_block_ptr = (buddy_block_t*) to_buddy(alloc, block_ptr, block_at_level + 1);
+                buddy_block_ptr = (buddy_block_t*) to_buddy(alloc,
+                                                            block_ptr,
+                                                            block_at_level + 1);
                 list_add(&sc->free_blocks[block_at_level + 1], buddy_block_ptr);
                 index = (u32(index) << 1U) + 1;
                 ++block_at_level;

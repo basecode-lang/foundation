@@ -74,7 +74,7 @@ namespace basecode {
             scm::ctx_t* context();
 
             status_t init(const config_settings_t& settings,
-                          alloc_t* alloc = context::top()->alloc);
+                          alloc_t* alloc = context::top()->alloc.main);
         }
 
         namespace cvar {

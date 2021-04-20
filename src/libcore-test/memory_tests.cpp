@@ -28,10 +28,10 @@ TEST_CASE("basecode::memory scratch allocator") {
     alloc_t scratch_alloc{};
 
     scratch_config_t cfg{};
-    cfg.backing = context::top()->alloc;
-    cfg.buf_size = 256 * 1024;
+    cfg.buf_size      = 256 * 1024;
+    cfg.backing.alloc = context::top()->alloc.main;
 
-    memory::init(&scratch_alloc, alloc_type_t::scratch, &cfg);
+    memory::init(&scratch_alloc, &cfg);
     defer(memory::fini(&scratch_alloc));
 
     auto p1 = (u8*) memory::alloc(&scratch_alloc, 10 * 1024);
@@ -70,10 +70,10 @@ TEST_CASE("basecode::memory stack allocator") {
     alloc_t stack_alloc{};
 
     stack_config_t cfg{};
-    cfg.backing  = context::top()->alloc;
-    cfg.max_size = 4096;
+    cfg.max_size      = 4096;
+    cfg.backing.alloc = context::top()->alloc.main;
 
-    memory::init(&stack_alloc, alloc_type_t::stack, &cfg);
+    memory::init(&stack_alloc, &cfg);
     defer(memory::fini(&stack_alloc));
 
     array_t<u32> items{};

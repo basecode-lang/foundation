@@ -22,7 +22,8 @@
 
 namespace basecode {
     struct stack_config_t : alloc_config_t {
-        alloc_t*                backing;
+        stack_config_t() : alloc_config_t(alloc_type_t::stack) {}
+
         u32                     max_size;
     };
 

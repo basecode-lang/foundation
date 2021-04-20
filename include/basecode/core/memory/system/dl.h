@@ -22,7 +22,8 @@
 
 namespace basecode {
     struct dl_config_t : alloc_config_t {
-        u0*                     base;
+        dl_config_t() : alloc_config_t(alloc_type_t::dlmalloc) {}
+
         u32                     heap_size;
     };
 

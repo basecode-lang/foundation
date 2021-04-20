@@ -88,13 +88,19 @@ namespace basecode {
         template <Symbol_Table T>
         u0 reserve(T& table, u32 capacity);
 
+        template <Symbol_Table T,
+                  typename Pair_Array = typename T::Pair_Array>
+        u0 find_prefix(const T& table,
+                       Pair_Array& pairs,
+                       str::slice_t prefix = {});
+
         template <Symbol_Table T, typename Node_Type = typename T::Node_Type>
         b8 has_children(const T& table,
                         const Node_Type* node,
                         const Node_Type* end_node = {});
 
         template <Symbol_Table T>
-        u0 init(T& table, alloc_t* alloc = context::top()->alloc);
+        u0 init(T& table, alloc_t* alloc = context::top()->alloc.main);
 
         template <Symbol_Table T, typename Node_Type = typename T::Node_Type>
         std::pair<Node_Type*, b8> find_level_node(const T& table,
@@ -106,10 +112,6 @@ namespace basecode {
 
         template <Symbol_Table T, typename Node_Type = typename T::Node_Type>
         Node_Type* insert_key(T& table, str::slice_t key, Node_Type* root);
-
-        template <Symbol_Table T,
-                  typename Pair_Array = typename T::Pair_Array>
-        u0 find_prefix(const T& table, Pair_Array& pairs, str::slice_t prefix = {});
 
         template <Symbol_Table T,
                   b8 Is_Pointer = std::is_pointer_v<typename T::Value_Type>,

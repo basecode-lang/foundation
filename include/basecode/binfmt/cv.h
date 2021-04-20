@@ -1410,5 +1410,5 @@ namespace basecode::binfmt::cv {
 
     str::slice_t debug_subsection_name(dbg_subsection_type_t type);
 
-    status_t init(cv_t& cv, alloc_t* alloc = context::top()->alloc);
+    status_t init(cv_t& cv, alloc_t* alloc = context::top()->alloc.main);
 }

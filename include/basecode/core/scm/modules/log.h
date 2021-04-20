@@ -31,6 +31,7 @@ namespace basecode::scm::module::log {
     namespace system {
         u0 fini();
 
-        status_t init(scm::ctx_t* ctx, alloc_t* alloc = context::top()->alloc);
+        status_t init(scm::ctx_t* ctx,
+                      alloc_t* alloc = context::top()->alloc.main);
     }
 }

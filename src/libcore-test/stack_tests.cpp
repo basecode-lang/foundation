@@ -59,7 +59,7 @@ TEST_CASE("basecode::stack basics") {
 
 TEST_CASE("basecode::stack force grow multiple times") {
     basecode::stack_t<s32> numbers{};
-    stack::init(numbers, context::top()->alloc);
+    stack::init(numbers, context::top()->alloc.main);
     defer(stack::free(numbers));
 
     if (!stack::empty(numbers))
@@ -118,7 +118,7 @@ TEST_CASE("basecode::stack force grow multiple times") {
 
 TEST_CASE("basecode::stack insert") {
     basecode::stack_t<s32> numbers{};
-    stack::init(numbers, context::top()->alloc);
+    stack::init(numbers, context::top()->alloc.main);
     defer(stack::free(numbers));
 
     REQUIRE(stack::empty(numbers));

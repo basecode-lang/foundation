@@ -36,7 +36,8 @@ namespace basecode {
 
     namespace queue {
         namespace internal {
-            template <typename T> u0 increase_capacity(queue_t<T>& queue, u32 new_capacity) {
+            template <typename T>
+            u0 increase_capacity(queue_t<T>& queue, u32 new_capacity) {
                 u32 end = queue.items.size;
                 array::resize(queue.items, new_capacity);
                 if (queue.offset + queue.size > end) {
@@ -48,36 +49,44 @@ namespace basecode {
                 }
             }
 
-            template <typename T> u0 grow(queue_t<T>& queue, u32 min_capacity = {}) {
-                const auto new_capacity = std::max<u32>(queue.items.size * 2 + 8, min_capacity);
+            template <typename T>
+            u0 grow(queue_t<T>& queue, u32 min_capacity = {}) {
+                const auto new_capacity = std::max<u32>(queue.items.size * 2 + 8,
+                                                        min_capacity);
                 increase_capacity(queue, new_capacity);
             }
         }
 
-        template <typename T> u0 free(queue_t<T>& queue) {
+        template <typename T>
+        u0 free(queue_t<T>& queue) {
             array::free(queue.items);
             queue.size = queue.offset = {};
         }
 
-        template <typename T> u0 clear(queue_t<T>& queue) {
+        template <typename T>
+        u0 clear(queue_t<T>& queue) {
             free(queue);
         }
 
-        template <typename T> T* front(queue_t<T>& queue) {
+        template <typename T>
+        T* front(queue_t<T>& queue) {
             return queue.items.data + queue.offset;
         }
 
-        template <typename T> u0 reset(queue_t<T>& queue) {
+        template <typename T>
+        u0 reset(queue_t<T>& queue) {
             array::reset(queue.items);
             queue.size = queue.offset = {};
         }
 
-        template <typename T> u0 pop_back(queue_t<T>& queue) {
+        template <typename T>
+        u0 pop_back(queue_t<T>& queue) {
             if (queue.size == 0) return;
             --queue.size;
         }
 
-        template <typename T> auto pop_front(queue_t<T>& queue) {
+        template <typename T>
+        auto pop_front(queue_t<T>& queue) {
             if (queue.size == 0) return (T) {};
             auto value = (T) queue.items[queue.offset];
             queue.offset = (queue.offset + 1) % queue.items.size;
@@ -85,40 +94,48 @@ namespace basecode {
             return value;
         }
 
-        template <typename T> u0 reserve(queue_t<T>& queue, u32 size) {
+        template <typename T>
+        u0 reserve(queue_t<T>& queue, u32 size) {
             if (size > queue.size)
                 internal::increase_capacity(queue, size);
         }
 
-        template <typename T> inline b8 empty(const queue_t<T>& queue) {
+        template <typename T>
+        inline b8 empty(const queue_t<T>& queue) {
             return queue.size == 0;
         }
 
-        template <typename T> u0 consume(queue_t<T>& queue, u32 count) {
+        template <typename T>
+        u0 consume(queue_t<T>& queue, u32 count) {
             if (queue.size == 0 || queue.offset < count) return;
             queue.offset = (queue.offset + count) % queue.items.size;
             queue.offset -= count;
         }
 
-        template <typename T> inline u32 space(const queue_t<T>& queue) {
+        template <typename T>
+        inline u32 space(const queue_t<T>& queue) {
             return queue.items.size - queue.size;
         }
 
-        template <typename T> u0 push_back(queue_t<T>& queue, const T& value) {
+        template <typename T>
+        u0 push_back(queue_t<T>& queue, const T& value) {
             if (!space(queue))
                 internal::grow(queue);
             queue[queue.size++] = value;
         }
 
-        template <typename T> u0 push_front(queue_t<T>& queue, const T& value) {
+        template <typename T>
+        u0 push_front(queue_t<T>& queue, const T& value) {
             if (!space(queue))
                 internal::grow(queue);
-            queue.offset = (queue.offset - 1 + queue.items.size) % queue.items.size;
+            queue.offset = (queue.offset - 1 + queue.items.size)
+                           % queue.items.size;
             ++queue.size;
             queue[0] = value;
         }
 
-        template <typename T> u0 push(queue_t<T>& queue, const T* items, u32 count) {
+        template <typename T>
+        u0 push(queue_t<T>& queue, const T* items, u32 count) {
             if (space(queue) < count)
                 internal::grow(queue, queue.size + count);
             const u32 size = queue.items.size;
@@ -134,7 +151,8 @@ namespace basecode {
             queue.size += count;
         }
 
-        template <typename T> u0 init(queue_t<T>& queue, alloc_t* alloc = context::top()->alloc) {
+        template <typename T>
+        u0 init(queue_t<T>& queue, alloc_t* alloc = context::top()->alloc.main) {
             array::init(queue.items, alloc);
             queue.size = queue.offset = {};
         }

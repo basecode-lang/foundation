@@ -57,9 +57,9 @@ namespace basecode {
 
             const alloc_info_array_t& roots();
 
-            u0 init(alloc_t* alloc = context::top()->alloc);
-
             u0 start_plot(alloc_info_t* info, plot_mode_t mode);
+
+            u0 init(alloc_t* alloc = context::top()->alloc.main);
         }
 
         namespace alloc_info {

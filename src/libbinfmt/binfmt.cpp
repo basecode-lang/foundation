@@ -23,21 +23,21 @@
 #include <basecode/core/stable_array.h>
 
 namespace basecode::binfmt {
-    using module_map_t          = hashtab_t<module_id, module_t*>;
+    using module_table_t        = hashtab_t<module_id, module_t*>;
     using module_array_t        = stable_array_t<module_t>;
     using symbol_array_t        = stable_array_t<symbol_t>;
     using section_array_t       = stable_array_t<section_t>;
 
     struct system_t final {
         alloc_t*                alloc;
+        module_table_t          modtab;
         module_array_t          modules;
-        module_map_t            module_map;
-        section_array_t         sections;
         symbol_array_t          symbols;
+        section_array_t         sections;
         module_id               id;
     };
 
-    system_t                    g_binfmt_sys;
+    system_t                    g_binfmt_sys{};
 
     namespace system {
         u0 fini() {
@@ -48,13 +48,13 @@ namespace basecode::binfmt {
             stable_array::free(g_binfmt_sys.modules);
             stable_array::free(g_binfmt_sys.symbols);
             stable_array::free(g_binfmt_sys.sections);
-            hashtab::free(g_binfmt_sys.module_map);
+            hashtab::free(g_binfmt_sys.modtab);
             io::fini();
         }
 
         status_t init(alloc_t* alloc) {
             g_binfmt_sys.alloc = alloc;
-            hashtab::init(g_binfmt_sys.module_map, g_binfmt_sys.alloc);
+            hashtab::init(g_binfmt_sys.modtab, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.modules, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.symbols, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.sections, g_binfmt_sys.alloc);
@@ -62,13 +62,13 @@ namespace basecode::binfmt {
         }
 
         u0 free_module(module_t* mod) {
-            hashtab::remove(g_binfmt_sys.module_map, mod->id);
+            hashtab::remove(g_binfmt_sys.modtab, mod->id);
             module::free(*mod);
             stable_array::erase(g_binfmt_sys.modules, mod);
         }
 
         module_t* get_module(module_id id) {
-            return hashtab::find(g_binfmt_sys.module_map, id);
+            return hashtab::find(g_binfmt_sys.modtab, id);
         }
 
         module_t* make_module(module_type_t type) {
@@ -82,7 +82,7 @@ namespace basecode::binfmt {
                 error::report::add(status, error_report_level_t::error);
                 return nullptr;
             }
-            hashtab::insert(g_binfmt_sys.module_map, id, new_mod);
+            hashtab::insert(g_binfmt_sys.modtab, id, new_mod);
             return new_mod;
         }
     }

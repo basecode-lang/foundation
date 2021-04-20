@@ -63,13 +63,11 @@ namespace basecode::memory::meta {
             hashtab::init(t_meta_sys.infotab, t_meta_sys.alloc);
 
             slab_config_t slab_config{};
-            slab_config.backing   = t_meta_sys.alloc;
-            slab_config.buf_size  = sizeof(alloc_info_t);
-            slab_config.buf_align = alignof(alloc_info_t);
-            slab_config.num_pages = DEFAULT_NUM_PAGES;
-            memory::init(&t_meta_sys.info_slab,
-                         alloc_type_t::slab,
-                         &slab_config);
+            slab_config.buf_size      = sizeof(alloc_info_t);
+            slab_config.buf_align     = alignof(alloc_info_t);
+            slab_config.num_pages     = DEFAULT_NUM_PAGES;
+            slab_config.backing.alloc = t_meta_sys.alloc;
+            memory::init(&t_meta_sys.info_slab, &slab_config);
 
             track(alloc);
         }

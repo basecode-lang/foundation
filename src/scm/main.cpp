@@ -24,7 +24,6 @@
 #include <basecode/core/getopt.h>
 #include <basecode/core/locale.h>
 #include <basecode/core/thread.h>
-#include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/network.h>
 #include <basecode/core/buf_pool.h>
@@ -33,6 +32,7 @@
 #include <basecode/core/scm/system.h>
 #include <basecode/core/scm/modules/cxx.h>
 #include <basecode/core/scm/modules/log.h>
+#include <basecode/core/memory/system/dl.h>
 #include <basecode/core/scm/modules/basic.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
@@ -188,26 +188,36 @@ s32 main(s32 argc, const s8** argv) {
     if (!OK(profiler::init()))
         return 1;
 
-    alloc_t* alloc; {
-        auto status = memory::system::init(alloc_type_t::dlmalloc);
+    alloc_t* main_alloc;
+    alloc_t* temp_alloc;
+    alloc_t* scratch_alloc; {
+        dl_config_t dl_cfg{};
+        dl_cfg.heap_size = 32 * 1024 * 1024;
+
+        scratch_config_t scratch_cfg{};
+        scratch_cfg.buf_size = 256 * 1024;
+
+        system_config_t sys_cfg{};
+        sys_cfg.main = &dl_cfg;
+        sys_cfg.scratch = &scratch_cfg;
+
+        auto status = memory::system::init(&sys_cfg);
         if (!OK(status)) {
             fmt::print(stderr,
                        "memory::system::init error: {}\n",
                        memory::status_name(status));
-            return s32(status);
+            return (s32) status;
         }
 
-        alloc = memory::system::default_alloc();
+        main_alloc    = memory::system::main_alloc();
+        temp_alloc    = memory::system::temp_alloc();
+        scratch_alloc = memory::system::scratch_alloc();
     }
 
-    alloc_t scratch_alloc{}; {
-        scratch_config_t cfg{};
-        cfg.backing  = alloc;
-        cfg.buf_size = 256 * 1024;
-        memory::init(&scratch_alloc, alloc_type_t::scratch, &cfg);
-    }
-    auto ctx = context::make(argc, argv, alloc);
-    ctx.scratch_alloc = &scratch_alloc;
+    auto ctx = context::make(argc, argv);
+    ctx.alloc.main    = main_alloc;
+    ctx.alloc.temp    = temp_alloc;
+    ctx.alloc.scratch = scratch_alloc;
     context::push(&ctx);
 
     {
@@ -217,7 +227,7 @@ s32 main(s32 argc, const s8** argv) {
         auto status = log::system::init(logger_type_t::default_,
                                         &dft_config,
                                         log_level_t::debug,
-                                        memory::system::default_alloc());
+                                        main_alloc);
         if (!OK(status)) {
             format::print(stderr,
                           "log::system::init error: {}\n",
@@ -310,7 +320,6 @@ s32 main(s32 argc, const s8** argv) {
     log::system::fini();
     term::system::fini();
     event::system::fini();
-    memory::fini(&scratch_alloc);
     memory::proxy::fini();
     memory::system::fini();
     context::pop();

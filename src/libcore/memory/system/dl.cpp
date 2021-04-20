@@ -33,10 +33,10 @@ namespace basecode::memory::dl {
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto sc        = &alloc->subclass.dl;
         auto dl_config = (dl_config_t*) config;
-        if (dl_config->base) {
-            sc->base = dl_config->base;
+        if (dl_config->backing.buf) {
+            sc->base = dl_config->backing.buf;
             sc->size = dl_config->heap_size;
-            sc->heap = create_mspace_with_base(dl_config->base,
+            sc->heap = create_mspace_with_base(dl_config->backing.buf,
                                                dl_config->heap_size,
                                                0);
         } else {

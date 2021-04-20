@@ -48,23 +48,31 @@ TEST_CASE("basecode::binfmt ar read test") {
     stopwatch::stop(timer);
 
     str_t s{};
-    str::init(s);
-    {
+    str::init(s); {
         str_buf_t buf(&s);
         for (const auto& member : ar.members) {
-            format::format_to(buf, "file . . . . . . . {}\n", member.name);
-            format::format_to(buf, "header offset  . . {}\n", member.offset.header);
-            format::format_to(buf, "data offset  . . . {}\n", member.offset.data);
+            format::format_to(buf, "file . . . . . . . {}\n",
+                              member.name);
+            format::format_to(buf, "header offset  . . {}\n",
+                              member.offset.header);
+            format::format_to(buf, "data offset  . . . {}\n",
+                              member.offset.data);
             format::format_to(buf, "size . . . . . . . ");
             format::unitized_byte_size(buf, member.content.length);
-            format::format_to(buf, "\ndate . . . . . . . {:%Y-%m-%d %H:%M:%S}\n", fmt::localtime(member.date));
+            format::format_to(buf, "\ndate . . . . . . . {:%Y-%m-%d %H:%M:%S}\n",
+                              fmt::localtime(member.date));
             format::format_to(buf, "user id  . . . . . {}\n", member.uid);
             format::format_to(buf, "group id . . . . . {}\n", member.gid);
             format::format_to(buf, "mode . . . . . . . {}\n\n", member.mode);
-            format::format_hex_dump(buf, member.content.data, 128, false);
+            format::format_hex_dump(buf,
+                                    member.content.data,
+                                    std::min<u32>(member.content.length, 64),
+                                    false);
             format::format_to(buf, "\n----\n\n");
         }
 
+        // FIXME
+        // there's some out whack in memory here
         for (const auto& pair : ar.symbol_map) {
             format::format_to(buf, "symbol . . . . . . . {}\n", pair.key);
             format::format_to(buf, "bitmap offset  . . . {}\n", pair.value);
@@ -72,13 +80,14 @@ TEST_CASE("basecode::binfmt ar read test") {
             for (u32 i = 0; i < ar.members.size; ++i) {
                 if (bitset::read(ar.symbol_module_bitmap, pair.value + i)) {
                     const auto& member = ar.members[i];
-                    format::format_to(buf, "  {:>04}: {}\n", i, member.name);
+//                    format::format_to(buf, "  {:>04}: {}\n", i, member.name);
                 }
             }
             format::format_to(buf, "\n");
         }
     }
     format::print("{}", s);
+    str::free(s);
 
     stopwatch::print_elapsed("binfmt ar read time"_ss, 40, timer);
 }

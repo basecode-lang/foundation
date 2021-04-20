@@ -163,17 +163,16 @@ namespace basecode {
                         memory::proxy::make(storage.alloc, "bass::index"_ss));
 
             page_config_t page_config{};
-            page_config.num_pages = num_pages;
-            page_config.backing   = storage.alloc;
-            storage.page_alloc    = memory::proxy::make(memory::system::make(alloc_type_t::page,
-                                                                             &page_config),
-                                                        "bass::page"_ss,
-                                                        true);
+            page_config.num_pages     = num_pages;
+            page_config.backing.alloc = storage.alloc;
+            storage.page_alloc = memory::proxy::make(memory::system::make(&page_config),
+                                                     "bass::page"_ss,
+                                                     true);
 
             bump_config_t bump_config{};
             bump_config.type          = bump_type_t::allocator;
             bump_config.backing.alloc = storage.page_alloc;
-            storage.bump_alloc        = memory::system::make(alloc_type_t::bump, &bump_config);
+            storage.bump_alloc        = memory::system::make(&bump_config);
         }
 
         b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor) {

@@ -20,6 +20,12 @@
 
 #include <basecode/core/memory.h>
 
-namespace basecode::memory::default_ {
-    alloc_system_t* system();
+namespace basecode {
+    struct base_config_t : alloc_config_t {
+        base_config_t() : alloc_config_t(alloc_type_t::base) {}
+    };
+
+    namespace memory::base {
+        alloc_system_t* system();
+    }
 }

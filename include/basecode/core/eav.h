@@ -105,7 +105,9 @@ namespace basecode {
                                 data.list.alloc = other.data.list.alloc;
                             const auto n = other.data.list.size;
                             array::grow(data.list, n);
-                            std::memcpy(data.list.data, other.data.list.data, n * sizeof(entity_t));
+                            std::memcpy(data.list.data,
+                                        other.data.list.data,
+                                        n * sizeof(entity_t));
                             data.list.size = n;
                         }
                         break;
@@ -205,25 +207,37 @@ namespace basecode {
 
             value_t entity(entity_t value);
 
-            value_t list(alloc_t* alloc = context::top()->alloc);
+            u0 list(value_t& value,
+                    const entity_t* data,
+                    u32 len,
+                    alloc_t* alloc = context::top()->alloc.main);
 
-            value_t string(alloc_t* alloc = context::top()->alloc);
+            u0 string(value_t& value,
+                      const s8* data,
+                      u32 len,
+                      alloc_t* alloc = context::top()->alloc.main);
 
-            u0 string(value_t& value, const s8* data, u32 len, alloc_t* alloc = context::top()->alloc);
+            value_t list(alloc_t* alloc = context::top()->alloc.main);
 
-            value_t string(const String_Concept auto& str, alloc_t* alloc = context::top()->alloc) {
+            value_t string(alloc_t* alloc = context::top()->alloc.main);
+
+            value_t string(const String_Concept auto& str,
+                           alloc_t* alloc = context::top()->alloc.main) {
                 value_t value(value_type_t::string);
                 string(value, (const s8*) str.data, str.length, alloc);
                 return value;
             }
-
-            u0 list(value_t& value, const entity_t* data, u32 len, alloc_t* alloc = context::top()->alloc);
         }
 
         namespace tuple {
             u0 free(tuple_t& tuple);
 
             tuple_t nil(entity_t attr);
+
+            status_t get(txn_t& txn,
+                         entity_t id,
+                         entity_t attr,
+                         tuple_t& tuple);
 
             tuple_t boolean(entity_t attr, b8 value);
 
@@ -243,30 +257,41 @@ namespace basecode {
 
             status_t get(txn_t& txn, entity_t id, tuple_list_t& tuples);
 
-            status_t get(txn_t& txn, entity_t id, entity_t attr, tuple_t& tuple);
-
-            tuple_t string(entity_t attr, const String_Concept auto& str, alloc_t* alloc = context::top()->alloc) {
-                return tuple_t{.attr = attr, .value = value::string(str, alloc)};
+            tuple_t string(entity_t attr,
+                           const String_Concept auto& str,
+                           alloc_t* alloc = context::top()->alloc.main) {
+                return tuple_t{.attr = attr,
+                               .value = value::string(str, alloc)};
             }
         }
 
         namespace symbol {
+            status_t find(txn_t& txn,
+                          const s8* name,
+                          s32 len,
+                          entity_t& id);
+
+            status_t bind(txn_t& txn,
+                          const s8* name,
+                          s32 len,
+                          entity_t id);
+
+            status_t bind(txn_t& txn,
+                          const String_Concept auto& name,
+                          entity_t id) {
+                return bind(txn, (const s8*) name.data, name.length, id);
+            }
+
+            status_t find(txn_t& txn,
+                          const String_Concept auto& name,
+                          entity_t& id) {
+                return find(txn, (const s8*) name.data, name.length, id);
+            }
+
             status_t unbind(txn_t& txn, const s8* name, s32 len);
 
             status_t unbind(txn_t& txn, const String_Concept auto& name) {
                 return unbind(txn, (const s8*) name.data, name.length);
-            }
-
-            status_t bind(txn_t& txn, const s8* name, s32 len, entity_t id);
-
-            status_t find(txn_t& txn, const s8* name, s32 len, entity_t& id);
-
-            status_t bind(txn_t& txn, const String_Concept auto& name, entity_t id) {
-                return bind(txn, (const s8*) name.data, name.length, id);
-            }
-
-            status_t find(txn_t& txn, const String_Concept auto& name, entity_t& id) {
-                return find(txn, (const s8*) name.data, name.length, id);
             }
         }
 
@@ -276,21 +301,26 @@ namespace basecode {
                 [[maybe_unused]] constexpr u8 live          = 1;
             }
 
+            status_t find(txn_t& txn,
+                          entity_t id,
+                          entity_t& type_id,
+                          u8& status);
+
             status_t remove(txn_t& txn, entity_t id);
 
             status_t make(txn_t& txn, entity_t type_id, entity_t& id);
-
-            status_t find(txn_t& txn, entity_t id, entity_t& type_id, u8& status);
         }
 
         u0 free(db_t& db);
 
         str::slice_t intern_label(db_t& db, u32 id);
 
+        status_t init(db_t& db,
+                      const path_t& path,
+                      alloc_t* alloc = context::top()->alloc.main);
+
         str::slice_t intern_str(db_t& db, const String_Concept auto& value) {
             return string::interned::fold(value);
         }
-
-        status_t init(db_t& db, const path_t& path, alloc_t* alloc = context::top()->alloc);
     }
 }

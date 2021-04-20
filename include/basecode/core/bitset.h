@@ -70,8 +70,6 @@ namespace basecode {
 
         u0 difference_of(bitset_t& lhs, const bitset_t& rhs);
 
-        bitset_t make(alloc_t* alloc = context::top()->alloc);
-
         b8 disjoint(const bitset_t& lhs, const bitset_t& rhs);
 
         u0 intersection_of(bitset_t& lhs, const bitset_t& rhs);
@@ -80,15 +78,17 @@ namespace basecode {
 
         u32 union_count(const bitset_t& lhs, const bitset_t& rhs);
 
-        b8 intersection_of(const bitset_t& lhs, const bitset_t& rhs);
+        bitset_t make(alloc_t* alloc = context::top()->alloc.main);
 
-        u0 init(bitset_t& set, alloc_t* alloc = context::top()->alloc);
+        b8 intersection_of(const bitset_t& lhs, const bitset_t& rhs);
 
         u0 symmetric_difference_of(bitset_t& lhs, const bitset_t& rhs);
 
         u32 difference_count(const bitset_t& lhs, const bitset_t& rhs);
 
         u32 intersection_count(const bitset_t& lhs, const bitset_t& rhs);
+
+        u0 init(bitset_t& set, alloc_t* alloc = context::top()->alloc.main);
 
         u0 resize(bitset_t& set, u32 new_capacity, b8 pad_with_zeros = true);
 

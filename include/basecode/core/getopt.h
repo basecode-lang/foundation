@@ -121,11 +121,6 @@ namespace basecode {
             option_builder_t& description(str::slice_t description);
         };
 
-        status_t init(getopt_t& opt,
-                      s32 argc,
-                      const s8** argv,
-                      alloc_t* alloc = context::top()->alloc);
-
         u0 free(getopt_t& opt);
 
         u0 format(getopt_t& opt);
@@ -139,6 +134,11 @@ namespace basecode {
         arg_t* find_arg(getopt_t& opt, s8 short_name);
 
         arg_t* find_arg(getopt_t& opt, str::slice_t long_name);
+
+        status_t init(getopt_t& opt,
+                      s32 argc,
+                      const s8** argv,
+                      alloc_t* alloc = context::top()->alloc.main);
 
         u0 program_description(getopt_t& opt, str::slice_t description);
     }

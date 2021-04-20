@@ -46,6 +46,7 @@ namespace basecode {
 
         status_t run(app_t& app);
 
-        status_t init(app_t& app, alloc_t* alloc = context::top()->alloc);
+        status_t init(app_t& app,
+                      alloc_t* alloc = context::top()->alloc.main);
     }
 }

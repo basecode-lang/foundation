@@ -23,10 +23,10 @@ using namespace basecode;
 
 extern "C" {
     void dyn_free(void* mem) {
-        memory::free(context::top()->alloc, mem);
+        memory::free(context::top()->alloc.main, mem);
     }
 
     void* dyn_alloc(size_t size) {
-        return memory::alloc(context::top()->alloc, size);
+        return memory::alloc(context::top()->alloc.main, size);
     }
 }

@@ -173,7 +173,8 @@ namespace basecode::binfmt::io {
                             path.length);
         }
 
-        status_t init(session_t& s, alloc_t* alloc = context::top()->alloc);
+        status_t init(session_t& s,
+                      alloc_t* alloc = context::top()->alloc.main);
     }
 
     using fini_callback_t       = u0 (*)();

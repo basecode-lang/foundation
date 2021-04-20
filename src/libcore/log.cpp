@@ -84,11 +84,11 @@ namespace basecode::log {
             array::init(g_log_system.loggers, g_log_system.alloc);
 
             slab_config_t slab_config{};
-            slab_config.backing   = g_log_system.alloc;
-            slab_config.buf_size  = sizeof(logger_t);
-            slab_config.buf_align = alignof(logger_t);
-            slab_config.num_pages = DEFAULT_NUM_PAGES;
-            memory::init(&g_log_system.slab_alloc, alloc_type_t::slab, &slab_config);
+            slab_config.buf_size      = sizeof(logger_t);
+            slab_config.buf_align     = alignof(logger_t);
+            slab_config.num_pages     = DEFAULT_NUM_PAGES;
+            slab_config.backing.alloc = g_log_system.alloc;
+            memory::init(&g_log_system.slab_alloc, &slab_config);
 
             return make(&g_log_system.default_logger, type, config, mask);
         }

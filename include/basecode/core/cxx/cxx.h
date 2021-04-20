@@ -637,7 +637,7 @@ namespace basecode::cxx {
                 module_t* module,
                 scope_t& scope,
                 scope_t* parent,
-                alloc_t* alloc = context::top()->alloc);
+                alloc_t* alloc = context::top()->alloc.main);
 
         u0 pop(scope_t& scope);
 
@@ -656,7 +656,7 @@ namespace basecode::cxx {
             program_t& pgm,
             str::slice_t& filename,
             cxx::revision_t rev,
-            alloc_t* alloc = context::top()->alloc);
+            alloc_t* alloc = context::top()->alloc.main);
 
         u0 free(module_t& module);
 
@@ -669,7 +669,7 @@ namespace basecode::cxx {
         u0 free(program_t& pgm);
 
         u0 init(program_t& pgm,
-                alloc_t* alloc = context::top()->alloc,
+                alloc_t* alloc = context::top()->alloc.main,
                 u32 num_modules = 16);
 
         status_t finalize(program_t& pgm);
@@ -694,7 +694,7 @@ namespace basecode::cxx {
 
         u0 init(serializer_t& s,
                 program_t& pgm,
-                alloc_t* alloc = context::top()->alloc,
+                alloc_t* alloc = context::top()->alloc.main,
                 u16 margin = 160,
                 u16 tab_width = 4);
 

@@ -100,7 +100,7 @@ namespace basecode::scm::module::basic {
         if (IS_NIL(g_basic_sys.current_alloc)) {
             g_basic_sys.current_alloc = scm::make_user_ptr(
                 ctx,
-                context::top()->alloc);
+                context::top()->alloc.main);
         }
         return g_basic_sys.current_alloc;
     }

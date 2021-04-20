@@ -43,7 +43,7 @@ namespace basecode {
             BC_ASSERT_NOT_NULL(backing);
         }
 
-        explicit std_alloc_t(alloc_t* alloc = context::top()->alloc) noexcept
+        explicit std_alloc_t(alloc_t* alloc = context::top()->alloc.main) noexcept
             : backing(alloc) {
             BC_ASSERT_NOT_NULL(backing);
         }

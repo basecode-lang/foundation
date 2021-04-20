@@ -56,18 +56,18 @@ namespace basecode {
 
         status_t init(integer_t& num,
                       s64 value,
-                      alloc_t* alloc = context::top()->alloc);
+                      alloc_t* alloc = context::top()->alloc.main);
 
         status_t init(integer_t& num,
                       const s8* data,
                       u32 len,
                       u32 radix,
-                      alloc_t* alloc = context::top()->alloc);
+                      alloc_t* alloc = context::top()->alloc.main);
 
         status_t init(integer_t& num,
                       const String_Concept auto& value,
                       Radix_Concept auto radix,
-                      alloc_t* alloc = context::top()->alloc) {
+                      alloc_t* alloc = context::top()->alloc.main) {
             return init(num,
                         (const s8*) value.data,
                         value.length,

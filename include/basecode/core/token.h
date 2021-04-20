@@ -91,21 +91,25 @@ namespace basecode {
 
             u0 seek_first(token_cache_t& cache);
 
+            token_id_t append(token_cache_t& cache,
+                              token_type_t type,
+                              const source_info_t& loc);
+
             const token_t& current(token_cache_t& cache);
+
+            u0 init(token_cache_t& cache,
+                    alloc_t* alloc = context::top()->alloc.main);
 
             const token_t& get(token_cache_t& cache, token_id_t id);
 
             const token_t& peek(token_cache_t& cache, u32 count = 1);
 
             token_id_t append(token_cache_t& cache, token_type_t type);
-
-            u0 init(token_cache_t& cache, alloc_t* alloc = context::top()->alloc);
-
-            token_id_t append(token_cache_t& cache, token_type_t type, const source_info_t& loc);
         }
 
         str::slice_t span(const token_t& token, const Buffer_Concept auto& buf) {
-            return slice::make(buf.data + token.loc.pos.start, (token.loc.pos.end - token.loc.pos.start) + 1);
+            return slice::make(buf.data + token.loc.pos.start,
+                               (token.loc.pos.end - token.loc.pos.start) + 1);
         }
     }
 

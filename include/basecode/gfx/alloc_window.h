@@ -36,6 +36,7 @@ namespace basecode {
 
         u0 draw(alloc_window_t& win);
 
-        u0 init(alloc_window_t& win, alloc_t* alloc = context::top()->alloc);
+        u0 init(alloc_window_t& win,
+                alloc_t* alloc = context::top()->alloc.main);
     }
 }

@@ -69,7 +69,7 @@ namespace basecode::binfmt::ar {
 
     u0 add_member(ar_t& ar, const member_t& member);
 
-    status_t init(ar_t& ar, alloc_t* alloc = context::top()->alloc);
+    status_t init(ar_t& ar, alloc_t* alloc = context::top()->alloc.main);
 
     u0 find_member(ar_t& ar, str::slice_t name, member_ptr_array_t& list);
 }

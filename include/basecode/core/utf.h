@@ -77,7 +77,8 @@ namespace basecode {
             str.length = length;
         }
 
-        u0 init(Utf_String_Concept auto& str, alloc_t* alloc = context::top()->alloc) {
+        u0 init(Utf_String_Concept auto& str,
+                alloc_t* alloc = context::top()->alloc.main) {
             str.alloc  = alloc;
             str.data   = {};
             str.length = {};

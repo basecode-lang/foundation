@@ -94,6 +94,16 @@ namespace basecode {
         str::slice_t drive_name(const path_t& path);
 #endif
 
+        template <String_Concept S>
+        status_t set(path_t& path, const S& value) {
+            if (value.length > PATH_MAX)
+                return status_t::path_too_long;
+            str::reset(path.str);
+            str::append(path.str, value);
+            tokenize(path);
+            return status_t::ok;
+        }
+
         status_t append(path_t& lhs, const path_t& rhs);
 
         s32 find_mark_index(const path_t& path, u8 type);
@@ -102,32 +112,25 @@ namespace basecode {
 
         s32 find_last_mark_index(const path_t& path, u8 type);
 
-        status_t set(path_t& path, const s8* value, s32 len = -1);
-
-        status_t parent_path(const path_t& path, path_t& new_path);
-
-        status_t set(path_t& path, const String_Concept auto& value) {
-            if (value.length > PATH_MAX)    return status_t::path_too_long;
-            str::reset(path.str);
-            str::append(path.str, value);
-            tokenize(path);
-            return status_t::ok;
-        }
-
-        status_t init(path_t& path, alloc_t* alloc = context::top()->alloc);
-
-        status_t replace_extension(path_t& path, const String_Concept auto& ext) {
-            if (ext.length == 0)    return status_t::unexpected_empty_extension;
-            const auto ext_idx = find_mark_index(path, path::marks::extension);
+        template <String_Concept S>
+        status_t replace_extension(path_t& path, const S& ext) {
+            if (ext.length == 0)
+                return status_t::unexpected_empty_extension;
+            const auto ext_idx = find_mark_index(path,
+                                                 path::marks::extension);
             b8 ext_has_dot = ext[0] == '.';
             if (ext_idx == -1) {
-                if (!ext_has_dot)   str::append(path.str, ".");
+                if (!ext_has_dot)
+                    str::append(path.str, ".");
                 str::append(path.str, ext);
             } else {
-                if (ext_idx + ext.length > PATH_MAX)  return status_t::path_too_long;
+                if (ext_idx + ext.length > PATH_MAX)
+                    return status_t::path_too_long;
                 if (ext_idx + ext.length > path.str.capacity)
                     str::reserve(path.str, ext_idx + ext.length);
-                std::memcpy(path.str.data + ext_idx + 1, ext.data + ext_has_dot, ext.length - ext_has_dot);
+                std::memcpy(path.str.data + ext_idx + 1,
+                            ext.data + ext_has_dot,
+                            ext.length - ext_has_dot);
                 const auto diff = s32(ext.length - (path.str.length - ext_idx));
                 path.str.length += diff;
             }
@@ -135,7 +138,17 @@ namespace basecode {
             return status_t::ok;
         }
 
-        status_t init(path_t& path, const String_Concept auto& value, alloc_t* alloc = context::top()->alloc) {
+        status_t set(path_t& path, const s8* value, s32 len = -1);
+
+        status_t parent_path(const path_t& path, path_t& new_path);
+
+        status_t init(path_t& path,
+                      alloc_t* alloc = context::top()->alloc.main);
+
+        template <String_Concept S>
+        status_t init(path_t& path,
+                      const S& value,
+                      alloc_t* alloc = context::top()->alloc.main) {
             str::init(path.str, alloc);
             array::init(path.marks, alloc);
             return set(path, value);

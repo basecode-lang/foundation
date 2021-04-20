@@ -64,7 +64,7 @@ namespace basecode {
         namespace system {
             u0 fini();
 
-            status_t init(alloc_t* alloc = context::top()->alloc);
+            status_t init(alloc_t* alloc = context::top()->alloc.main);
         }
 
         namespace report {

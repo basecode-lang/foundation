@@ -24,7 +24,8 @@
 
 namespace basecode {
     struct proxy_config_t : alloc_config_t {
-        alloc_t*                backing;
+        proxy_config_t() : alloc_config_t(alloc_type_t::proxy) {}
+
         b8                      owner;
     };
 
@@ -58,7 +59,7 @@ namespace basecode {
 
         str::slice_t name(alloc_t* alloc);
 
-        status_t init(alloc_t* alloc = context::top()->alloc);
+        status_t init(alloc_t* alloc = context::top()->alloc.main);
 
         alloc_t* make(alloc_t* backing, str::slice_t name, b8 owner = false);
     }

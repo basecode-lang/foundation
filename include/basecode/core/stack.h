@@ -96,13 +96,14 @@ namespace basecode {
         u0 grow(stack_t<T>& stack, u32 min_capacity = 16);
 
         template <typename T>
-        stack_t<T> make(alloc_t* alloc = context::top()->alloc);
-
-        template <Stack T>
-        u0 init(T& stack, alloc_t* alloc = context::top()->alloc);
+        stack_t<T> make(alloc_t* alloc = context::top()->alloc.main);
 
         template <typename T>
-        stack_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc);
+        stack_t<T> make(std::initializer_list<T> elements,
+                        alloc_t* alloc = context::top()->alloc.main);
+
+        template <Stack T>
+        u0 init(T& stack, alloc_t* alloc = context::top()->alloc.main);
 
         template <Stack T,
                   typename Value_Type = typename T::Value_Type>
@@ -119,9 +120,11 @@ namespace basecode {
         template <Stack T, typename Value_Type, b8 Is_Pointer>
         inline auto top(T& stack) {
             if constexpr (Is_Pointer) {
-                return (stack.size == 0 ? nullptr : stack.data[stack.size - 1]);
+                return (stack.size == 0 ?
+                        nullptr : stack.data[stack.size - 1]);
             } else {
-                return (stack.size == 0 ? nullptr : &stack.data[stack.size - 1]);
+                return (stack.size == 0 ?
+                        nullptr : &stack.data[stack.size - 1]);
             }
         }
 
@@ -195,9 +198,11 @@ namespace basecode {
         template <Stack T, typename Value_Type, b8 Is_Pointer>
         inline auto top(const T& stack) {
             if constexpr (Is_Pointer) {
-                return (const Value_Type) (stack.size == 0 ? nullptr : stack.data[stack.size - 1]);
+                return (const Value_Type) (stack.size == 0 ?
+                                           nullptr : stack.data[stack.size - 1]);
             } else {
-                return (const Value_Type*) (stack.size == 0 ? nullptr : &stack.data[stack.size - 1]);
+                return (const Value_Type*) (stack.size == 0 ?
+                                            nullptr : &stack.data[stack.size - 1]);
             }
         }
 
@@ -233,7 +238,8 @@ namespace basecode {
                 new_capacity * sizeof(Value_Type),
                 alignof(Value_Type));
             const auto data          = stack.data + stack.size;
-            const auto size_to_clear = new_capacity > stack.capacity ? new_capacity - stack.capacity : 0;
+            const auto size_to_clear = new_capacity > stack.capacity ?
+                                       new_capacity - stack.capacity : 0;
             std::memset(data, 0, size_to_clear * sizeof(Value_Type));
             stack.capacity = new_capacity;
         }

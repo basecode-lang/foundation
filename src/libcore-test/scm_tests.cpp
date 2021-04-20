@@ -63,7 +63,7 @@ TEST_CASE("basecode::scm::vm instructions") {
     namespace op = scm::vm::instruction;
 
     const auto heap_size = 64 * 1024;
-    auto alloc = memory::system::default_alloc();
+    auto alloc = memory::system::main_alloc();
 
     auto ctx = (scm::ctx_t*) memory::alloc(alloc, heap_size, alignof(u0*));
     scm::init(ctx, heap_size, alloc);
@@ -300,7 +300,7 @@ TEST_CASE("basecode::scm::vm instructions") {
 
 TEST_CASE("basecode::scm bytecode emitter", "[scm]") {
     const auto heap_size = 64 * 1024;
-    auto alloc = memory::system::default_alloc();
+    auto alloc = memory::system::main_alloc();
 
     auto ctx = (scm::ctx_t*) memory::alloc(alloc, heap_size, alignof(u0*));
     scm::init(ctx, heap_size, alloc);

@@ -115,7 +115,7 @@ namespace basecode::memory::slab {
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto sc  = &alloc->subclass.slab;
         auto cfg = (slab_config_t*) config;
-        alloc->backing    = cfg->backing;
+        alloc->backing    = cfg->backing.alloc;
         sc->count         = {};
         sc->head          = sc->tail = {};
         sc->num_pages     = std::max<u8>(cfg->num_pages, 1);

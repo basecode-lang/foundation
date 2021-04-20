@@ -25,11 +25,12 @@ using namespace basecode;
 
 TEST_CASE("basecode::memory::buddy basics") {
     buddy_config_t config{};
-    config.backing = context::top()->alloc;
-    config.heap_size = 256 * 1024;
+    config.heap_size     = 256 * 1024;
+    config.backing.alloc = context::top()->alloc.main;
 
-    auto buddy_alloc = memory::system::make(alloc_type_t::buddy, &config);
-    const auto working_heap_size = buddy_alloc->subclass.buddy.size - buddy_alloc->subclass.buddy.metadata_size;
+    auto buddy_alloc = memory::system::make(&config);
+    const auto working_heap_size = buddy_alloc->subclass.buddy.size
+                                   - buddy_alloc->subclass.buddy.metadata_size;
 
     // N.B. catch is *slow*!  i want to time allocating the blocks
     //      from the buddy allocator without adding any unnecessary overhead.
@@ -39,9 +40,9 @@ TEST_CASE("basecode::memory::buddy basics") {
     const auto num_blocks = working_heap_size / block_size;
     u0* blocks[num_blocks];
     TIME_BLOCK("buddy alloc time"_ss,
-                   for (u32 i = 0; i < num_blocks; ++i) {
-                       blocks[i] = memory::alloc(buddy_alloc, block_size);
-                   });
+               for (u32 i = 0; i < num_blocks; ++i) {
+                   blocks[i] = memory::alloc(buddy_alloc, block_size);
+               });
     format::print("buddy alloc: heap_size = {}, block size = {}, # blocks = {}\n",
                   working_heap_size,
                   block_size,

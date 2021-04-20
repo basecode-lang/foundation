@@ -246,6 +246,10 @@ namespace basecode::scm {
         return make_keyword(ctx, (const s8*) str.data, str.length);
     }
 
+    ctx_t* init(u0* ptr,
+                u32 size,
+                alloc_t* alloc = context::top()->alloc.main);
+
     u0 set_next_handler(ctx_t* ctx, chained_handler_t* handler);
 
     obj_t* make_error(ctx_t* ctx, obj_t* args, obj_t* call_stack);
@@ -258,8 +262,6 @@ namespace basecode::scm {
     obj_t* error(ctx_t* ctx, fmt_str_t fmt_msg, const Args&... args) {
         return raise_error(ctx, fmt_msg, fmt::make_format_args(args...));
     }
-
-    ctx_t* init(u0* ptr, u32 size, alloc_t* alloc = context::top()->alloc);
 }
 
 FORMAT_TYPE(basecode::scm::printable_t, basecode::scm::format_object(data, ctx));

@@ -27,7 +27,8 @@ namespace basecode {
     };
 
     struct page_config_t : alloc_config_t {
-        alloc_t*                backing;
+        page_config_t() : alloc_config_t(alloc_type_t::page) {}
+
         u8                      num_pages;
     };
 

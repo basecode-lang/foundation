@@ -22,7 +22,8 @@
 
 namespace basecode {
     struct scratch_config_t : alloc_config_t {
-        alloc_t*            backing;
+        scratch_config_t() : alloc_config_t(alloc_type_t::scratch) {}
+
         u32                 buf_size;
     };
 

@@ -27,7 +27,8 @@ namespace basecode {
     };
 
     struct buddy_config_t : alloc_config_t {
-        alloc_t*                backing;
+        buddy_config_t() : alloc_config_t(alloc_type_t::buddy) {}
+
         u32                     heap_size;
     };
 

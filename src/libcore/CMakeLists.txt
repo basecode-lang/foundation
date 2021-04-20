@@ -160,7 +160,6 @@ set(
     macro.cpp ${CORE_INC_DIR}/macro.h
 
     memory.cpp ${CORE_INC_DIR}/memory.h
-
     memory/meta.cpp ${CORE_INC_DIR}/memory/meta.h
     memory/dyn_alloc.cpp ${CORE_INC_DIR}/memory/dyn_alloc.h
     memory/std_alloc.cpp ${CORE_INC_DIR}/memory/std_alloc.h
@@ -168,13 +167,14 @@ set(
     memory/system/page.cpp ${CORE_INC_DIR}/memory/system/page.h
     memory/system/slab.cpp ${CORE_INC_DIR}/memory/system/slab.h
     memory/system/bump.cpp ${CORE_INC_DIR}/memory/system/bump.h
+    memory/system/base.cpp ${CORE_INC_DIR}/memory/system/base.h
     memory/system/trace.cpp ${CORE_INC_DIR}/memory/system/trace.h
     memory/system/proxy.cpp ${CORE_INC_DIR}/memory/system/proxy.h
     memory/system/stack.cpp ${CORE_INC_DIR}/memory/system/stack.h
     memory/system/buddy.cpp ${CORE_INC_DIR}/memory/system/buddy.h
     memory/system/scratch.cpp ${CORE_INC_DIR}/memory/system/scratch.h
-    memory/system/default.cpp ${CORE_INC_DIR}/memory/system/default.h
-    memory/system/dlmalloc.c ${CORE_INC_DIR}/memory/system/dlmalloc.h ${CORE_INC_DIR}/memory/system/dlmalloc_config.h
+    memory/system/dlmalloc.c ${CORE_INC_DIR}/memory/system/dlmalloc.h
+                             ${CORE_INC_DIR}/memory/system/dlmalloc_config.h
 
     mutex.cpp ${CORE_INC_DIR}/mutex.h
 

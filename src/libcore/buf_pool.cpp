@@ -56,14 +56,13 @@ namespace basecode::buf_pool {
             hashtab::init(g_system.leases, g_system.alloc);
 
             slab_config_t slab_config{};
-            slab_config.backing   = g_system.alloc;
-            slab_config.num_pages = DEFAULT_NUM_PAGES;
-            slab_config.buf_align = alignof(u0*);
+            slab_config.num_pages     = DEFAULT_NUM_PAGES;
+            slab_config.buf_align     = alignof(u0*);
+            slab_config.backing.alloc = g_system.alloc;
 
             for (u32 i = 0; i < max_pool_count; ++i) {
                 slab_config.buf_size = s_pool_sizes[i];
-                g_system.pools[i] = memory::system::make(alloc_type_t::slab,
-                                                         &slab_config);
+                g_system.pools[i] = memory::system::make(&slab_config);
             }
 
             return status_t::ok;

@@ -107,7 +107,7 @@ namespace basecode {
             u0 init(socket_t& sock,
                     u32 buf_size = 2 * 1024,
                     socket_close_callback_t close_cb = {},
-                    alloc_t* alloc = context::top()->alloc);
+                    alloc_t* alloc = context::top()->alloc.main);
 
             u0 free(socket_t& sock);
 

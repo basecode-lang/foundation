@@ -61,7 +61,8 @@ namespace basecode {
         namespace expr {
             u0 free(postfix_expr_t& expr);
 
-            u0 init(postfix_expr_t& expr, alloc_t* alloc = context::top()->alloc);
+            u0 init(postfix_expr_t& expr,
+                    alloc_t* alloc = context::top()->alloc.main);
         }
 
         u0 free(postfix_t& postfix);
@@ -70,6 +71,8 @@ namespace basecode {
 
         postfix_expr_t* add_expr(postfix_t& postfix);
 
-        status_t init(postfix_t& postfix, token_cache_t* tokens, alloc_t* alloc = context::top()->alloc);
+        status_t init(postfix_t& postfix,
+                      token_cache_t* tokens,
+                      alloc_t* alloc = context::top()->alloc.main);
     }
 }

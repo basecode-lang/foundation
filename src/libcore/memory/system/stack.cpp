@@ -39,7 +39,7 @@ namespace basecode::memory::stack {
         auto sc  = &alloc->subclass.stack;
         auto cfg = (stack_config_t*) config;
         sc->max_size   = cfg->max_size;
-        alloc->backing = cfg->backing;
+        alloc->backing = cfg->backing.alloc;
 
         auto r = memory::internal::alloc(alloc->backing,
                                          sc->max_size,

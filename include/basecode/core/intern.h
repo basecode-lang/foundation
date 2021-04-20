@@ -67,6 +67,10 @@ namespace basecode {
 
         u0 reset(intern_t& pool);
 
+        u0 init(intern_t& pool,
+                alloc_t* alloc = context::top()->alloc.main,
+                f32 load_factor = .75f);
+
         b8 remove(intern_t& pool, intern_id id);
 
         u0 reserve(intern_t& pool, u32 capacity);
@@ -75,15 +79,13 @@ namespace basecode {
 
         str::slice_t* get_slice(intern_t& pool, intern_id id);
 
-        intern_t make(alloc_t* alloc = context::top()->alloc);
+        intern_t make(alloc_t* alloc = context::top()->alloc.main);
 
         result_t fold(intern_t& pool, const s8* data, s32 len = -1);
 
         result_t fold(intern_t& pool, const String_Concept auto& value) {
             return fold(pool, (const s8*) value.data, value.length);
         }
-
-        u0 init(intern_t& pool, alloc_t* alloc = context::top()->alloc, f32 load_factor = .75f);
     }
 }
 

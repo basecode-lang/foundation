@@ -43,7 +43,9 @@ namespace basecode {
             return slice::make(buf.data + idx.offset, idx.length);
         }
     };
-    static_assert(sizeof(str_array_t) <= 40, "str_array_t is now greater than 40 bytes!");
+
+    static_assert(sizeof(str_array_t) <= 40,
+                  "str_array_t is now greater than 40 bytes!");
 
     namespace str_array {
         u0 free(str_array_t& array);
@@ -53,6 +55,9 @@ namespace basecode {
         b8 empty(const str_array_t& array);
 
         u0 erase(str_array_t& array, u32 index);
+
+        u0 init(str_array_t& array,
+                alloc_t* alloc = context::top()->alloc.main);
 
         u0 reserve_data(str_array_t& array, u32 new_capacity);
 
@@ -65,8 +70,10 @@ namespace basecode {
         u0 append(str_array_t& array, const s8* str, s32 len = -1);
 
         u0 append(str_array_t& array, const String_Concept auto& str) {
-            if (array.size + 1 > array.capacity)                        grow_index(array);
-            if (array.buf.size + (str.length + 1) > array.buf.capacity) grow_data(array, str.length + 1);
+            if (array.size + 1 > array.capacity)
+                grow_index(array);
+            if (array.buf.size + (str.length + 1) > array.buf.capacity)
+                grow_data(array, str.length + 1);
             auto& idx = array.index[array.size++];
             idx.offset = array.buf.size;
             idx.length = str.length;
@@ -74,8 +81,6 @@ namespace basecode {
             array.buf.size += str.length;
             array.buf.data[array.buf.size++] = '\0';
         }
-
-        u0 init(str_array_t& array, alloc_t* alloc = context::top()->alloc);
     }
 }
 

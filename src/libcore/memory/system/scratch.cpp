@@ -94,7 +94,7 @@ namespace basecode::memory::scratch {
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
         auto sc  = &alloc->subclass.scratch;
         auto cfg = (scratch_config_t*) config;
-        alloc->backing = cfg->backing;
+        alloc->backing = cfg->backing.alloc;
         sc->size = cfg->buf_size;
         const auto r  = memory::internal::alloc(alloc->backing,
                                                 sc->size,

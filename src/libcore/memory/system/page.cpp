@@ -56,7 +56,7 @@ namespace basecode::memory::page {
         sc->head       = {};
         sc->cursor     = {};
         sc->num_pages  = cfg->num_pages;
-        alloc->backing = cfg->backing;
+        alloc->backing = cfg->backing.alloc;
         auto page_size = memory::system::os_alloc_granularity();
         sc->page_size  = (page_size * sc->num_pages) - sizeof(page_header_t);
         BC_ASSERT_NOT_NULL(alloc->backing);

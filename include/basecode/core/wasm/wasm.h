@@ -577,10 +577,13 @@ namespace basecode {
 
         u0 free(wasm_t& wasm);
 
+        module_t* load_module(wasm_t& wasm,
+                              str::slice_t name,
+                              const u8* data, u32 size);
+
         module_t* load_module(wasm_t& wasm, const path_t& path);
 
-        status_t init(wasm_t& wasm, alloc_t* alloc = context::top()->alloc);
-
-        module_t* load_module(wasm_t& wasm, str::slice_t name, const u8* data, u32 size);
+        status_t init(wasm_t& wasm,
+                      alloc_t* alloc = context::top()->alloc.main);
     }
 }

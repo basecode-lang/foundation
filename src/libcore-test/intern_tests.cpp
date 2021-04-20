@@ -83,7 +83,7 @@ TEST_CASE("basecode::intern") {
         str::reset(temp);
     }
 
-    const auto allocated_before = context::top()->alloc->total_allocated;
+    const auto allocated_before = context::top()->alloc.main->total_allocated;
 
     TIME_BLOCK(
         "intern: total time"_ss,
@@ -95,7 +95,8 @@ TEST_CASE("basecode::intern") {
             array::append(interned_list, r);
         });
 
-    const auto memory_used = context::top()->alloc->total_allocated - allocated_before;
+    const auto memory_used = context::top()->alloc.main->total_allocated
+                             - allocated_before;
     format::print("memory_used = {}\n", memory_used);
 
     REQUIRE(interned_list.size == expected_intern_count);

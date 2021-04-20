@@ -86,12 +86,13 @@ namespace basecode {
         template <Dynamic_Array_Concept T>
         u0 grow(T& array, u32 new_capacity = 8);
 
+        template <typename T>
+        array_t<T> make(std::initializer_list<T> elements,
+                        alloc_t* alloc = context::top()->alloc.main);
+
         template <Array_Concept T,
                   b8 Is_Static = T::Is_Static::value>
-        u0 init(T& array, alloc_t* alloc = context::top()->alloc);
-
-        template <typename T>
-        array_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc);
+        u0 init(T& array, alloc_t* alloc = context::top()->alloc.main);
 
         template <Array_Concept T, b8 Is_Static>
         u0 free(T& array) {

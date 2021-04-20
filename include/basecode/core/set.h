@@ -103,16 +103,22 @@ namespace basecode {
     static_assert(sizeof(set_t<s32>) <= 56, "set_t<T> is now larger than 56 bytes!");
 
     namespace set {
+        template <Hash_Set T>
+        u0 init(T& set,
+                alloc_t* alloc = context::top()->alloc.main,
+                f32 load_factor = .75f);
+
+        template <Hash_Set T,
+                  typename Value_Type = typename T::Value_Type>
+        b8 find_value(T& set,
+                      u32 start,
+                      u64 hash,
+                      const Value_Type& value,
+                      u32* found);
+
         template <Hash_Set T,
                   typename Value_Type = typename T::Value_Type>
         u0 rehash(T& set, s32 new_capacity = -1);
-
-        template <Hash_Set T,
-                  typename Value_Type = typename T::Value_Type>
-        b8 find_value(T& set, u32 start, u64 hash, const Value_Type& value, u32* found);
-
-        template <Hash_Set T>
-        u0 init(T& set, alloc_t* alloc = context::top()->alloc, f32 load_factor = .75f);
 
         template <Hash_Set T,
                   typename Value_Type = typename T::Value_Type>
@@ -180,8 +186,32 @@ namespace basecode {
         }
 
         template <Hash_Set T, typename Value_Type>
+        b8 find_value(T& set,
+                      u32 start,
+                      u64 hash,
+                      const Value_Type& value,
+                      u32* found) {
+            for (u32 i = start; i < set.capacity; ++i) {
+                if (!hash_common::read_flag(set.flags, i)) return false;
+                if (hash == set.hashes[i] && value == set.values[i]) {
+                    *found = i;
+                    return true;
+                }
+            }
+            for (u32 i = 0; i < start; ++i) {
+                if (!hash_common::read_flag(set.flags, i)) return false;
+                if (hash == set.hashes[i] && value == set.values[i]) {
+                    *found = i;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        template <Hash_Set T, typename Value_Type>
         u0 rehash(T& set, s32 new_capacity) {
-            s32 idx = new_capacity == -1 ? set.cap_idx : hash_common::find_nearest_prime_capacity(new_capacity);
+            s32 idx = new_capacity == -1 ? set.cap_idx :
+                      hash_common::find_nearest_prime_capacity(new_capacity);
             f32 lf;
             do {
                 new_capacity = hash_common::prime_capacity(idx++);
@@ -190,7 +220,9 @@ namespace basecode {
             set.cap_idx = idx;
 
             const auto buf_size = size_of_buffer(set, new_capacity);
-            auto buf = (u8*) memory::alloc(set.alloc, buf_size.total_size, alignof(u64));
+            auto buf = (u8*) memory::alloc(set.alloc,
+                                           buf_size.total_size,
+                                           alignof(u64));
             std::memset(buf, 0, buf_size.total_size);
 
             u32  align{};
@@ -206,8 +238,11 @@ namespace basecode {
 
             for (u32 i = 0; i < set.capacity; ++i) {
                 if (!hash_common::read_flag(set.flags, i)) continue;
-                u32 bucket_index = hash_common::range_reduction(set.hashes[i], new_capacity);
-                b8  found = hash_common::find_free_bucket2(new_flags, new_capacity, bucket_index);
+                u32 bucket_index = hash_common::range_reduction(set.hashes[i],
+                                                                new_capacity);
+                b8  found = hash_common::find_free_bucket2(new_flags,
+                                                           new_capacity,
+                                                           bucket_index);
                 if (found) {
                     hash_common::write_flag(new_flags, bucket_index, true);
                     new_hashes[bucket_index] = set.hashes[i];
@@ -284,12 +319,17 @@ namespace basecode {
             if (v)
                 return v;
 
-            if (hash_common::requires_rehash(set.size, set.capacity, set.load_factor))
+            if (hash_common::requires_rehash(set.size,
+                                             set.capacity,
+                                             set.load_factor)) {
                 rehash(set);
+            }
 
             u64 hash         = hash::hash64(value);
             u32 bucket_index = hash_common::range_reduction(hash, set.capacity);
-            b8  found        = hash_common::find_free_bucket2(set.flags, set.capacity, bucket_index);
+            b8  found        = hash_common::find_free_bucket2(set.flags,
+                                                              set.capacity,
+                                                              bucket_index);
             if (found) {
                 hash_common::write_flag(set.flags, bucket_index, true);
                 set.hashes[bucket_index] = hash;
@@ -303,25 +343,6 @@ namespace basecode {
             }
 
             return (Value_Type_Base*) nullptr;
-        }
-
-        template <Hash_Set T, typename Value_Type>
-        b8 find_value(T& set, u32 start, u64 hash, const Value_Type& value, u32* found) {
-            for (u32 i = start; i < set.capacity; ++i) {
-                if (!hash_common::read_flag(set.flags, i)) return false;
-                if (hash == set.hashes[i] && value == set.values[i]) {
-                    *found = i;
-                    return true;
-                }
-            }
-            for (u32 i = 0; i < start; ++i) {
-                if (!hash_common::read_flag(set.flags, i)) return false;
-                if (hash == set.hashes[i] && value == set.values[i]) {
-                    *found = i;
-                    return true;
-                }
-            }
-            return false;
         }
     }
 }

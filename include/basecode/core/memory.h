@@ -29,21 +29,44 @@ namespace basecode {
     struct proxy_pair_t;
     struct buddy_block_t;
     struct page_header_t;
-    struct alloc_config_t {};
-
     using mspace                    = u0*;
 
     enum class alloc_type_t : u8 {
-        default_,
+        none,
+        base,
         bump,
         page,
         slab,
+        temp,
         proxy,
         trace,
         stack,
         buddy,
         scratch,
         dlmalloc,
+    };
+
+    struct alloc_config_t {
+        alloc_config_t(alloc_type_t _type) : backing(),
+                                             type(_type) {}
+
+        union {
+            u0*                 buf;
+            alloc_t*            alloc;
+        }                       backing;
+        alloc_type_t            type;
+    };
+
+    struct system_config_t : alloc_config_t {
+        system_config_t() : alloc_config_t(alloc_type_t::none),
+                            temp(),
+                            main(),
+                            scratch() {
+        }
+
+        alloc_config_t*         temp;
+        alloc_config_t*         main;
+        alloc_config_t*         scratch;
     };
 
     struct mem_result_t final {
@@ -138,11 +161,8 @@ namespace basecode {
         alloc_subclass_t            subclass;
         u32                         total_allocated;
         u32                         pad;
-
-        std::weak_ordering operator<=>(const alloc_t& other) const {
-            return std::weak_ordering::equivalent;
-        }
     };
+    static_assert(sizeof(alloc_t) <= 80, "alloc_t is now larger than 80 bytes!");
 
     namespace memory {
         enum class status_t : u8 {
@@ -159,15 +179,19 @@ namespace basecode {
 
             u0 print_allocators();
 
-            alloc_t* default_alloc();
+            alloc_t* temp_alloc();
+
+            alloc_t* main_alloc();
+
+            alloc_t* scratch_alloc();
 
             u32 free(alloc_t* alloc);
 
             usize os_alloc_granularity();
 
-            status_t init(alloc_type_t type,
-                          u32 heap_size = 32 * 1024 * 1024,
-                          u0* base = {});
+            status_t init(alloc_config_t* cfg);
+
+            alloc_t* make(alloc_config_t* config);
 
             b8 set_page_executable(u0* ptr, usize size);
 
@@ -177,8 +201,6 @@ namespace basecode {
                 adjust = aligned - pi;
                 return (u0*) aligned;
             }
-
-            alloc_t* make(alloc_type_t type, alloc_config_t* config = {});
         }
 
         namespace internal {
@@ -215,16 +237,14 @@ namespace basecode {
             return internal::free(alloc, mem);
         }
 
-        status_t init(alloc_t* alloc,
-                      alloc_type_t type,
-                      alloc_config_t* config = {});
-
         inline u0* realloc(alloc_t* alloc,
                            u0* mem,
                            u32 size,
                            u32 align = sizeof(u64)) {
             return internal::realloc(alloc, mem, size, align).mem;
         }
+
+        status_t init(alloc_t* alloc, alloc_config_t* config);
 
         inline u0* alloc(alloc_t* alloc, u32 size, u32 align = sizeof(u64)) {
             return internal::alloc(alloc, size, align).mem;

@@ -97,7 +97,7 @@ namespace basecode {
         u0 free(bass_t& storage);
 
         u0 init(bass_t& storage,
-                alloc_t* alloc = context::top()->alloc,
+                alloc_t* alloc = context::top()->alloc.main,
                 u8 num_pages = DEFAULT_NUM_PAGES);
 
         b8 format_record(bass_t& ast,

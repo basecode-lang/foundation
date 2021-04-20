@@ -126,11 +126,11 @@ namespace basecode::error {
             hashtab::init(g_err_sys.errors, g_err_sys.alloc);
             mutex::init(g_err_sys.lock);
             slab_config_t slab_config{};
-            slab_config.backing   = g_err_sys.alloc;
-            slab_config.buf_size  = sizeof(error_def_t);
-            slab_config.buf_align = alignof(error_def_t);
-            slab_config.num_pages = DEFAULT_NUM_PAGES;
-            g_err_sys.error_slab = memory::system::make(alloc_type_t::slab, &slab_config);
+            slab_config.buf_size      = sizeof(error_def_t);
+            slab_config.buf_align     = alignof(error_def_t);
+            slab_config.num_pages     = DEFAULT_NUM_PAGES;
+            slab_config.backing.alloc = g_err_sys.alloc;
+            g_err_sys.error_slab = memory::system::make(&slab_config);
             term::init(g_err_sys.term, g_err_sys.alloc);
             return status_t::ok;
         }

@@ -150,7 +150,7 @@ namespace basecode {
         namespace system {
             u0 fini();
 
-            status_t init(alloc_t* alloc = context::top()->alloc,
+            status_t init(alloc_t* alloc = context::top()->alloc.main,
                           u8 num_pages = DEFAULT_NUM_PAGES);
         }
 
@@ -271,7 +271,7 @@ namespace basecode {
 
         status_t init(ffi_t& ffi,
                       u32 heap_size = 2 * 1024,
-                      alloc_t* alloc = context::top()->alloc);
+                      alloc_t* alloc = context::top()->alloc.main);
 
         status_t call(ffi_t& ffi, const overload_t* ol, param_alias_t& ret);
     }

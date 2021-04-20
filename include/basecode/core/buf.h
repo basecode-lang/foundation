@@ -226,21 +226,21 @@ namespace basecode {
 
         status_t load(buf_t& buf, const path_t& path);
 
-        buf_t make(alloc_t* alloc = context::top()->alloc);
-
         status_t load(buf_t& buf, const u8* data, u32 size);
 
         status_t map_existing(buf_t& buf, const path_t& path);
 
-        b8 each_line(const buf_t& buf, const line_callback_t& cb);
+        buf_t make(alloc_t* alloc = context::top()->alloc.main);
 
-        u0 init(buf_t& buf, alloc_t* alloc = context::top()->alloc);
+        b8 each_line(const buf_t& buf, const line_callback_t& cb);
 
         status_t map_new(buf_t& buf, const path_t& path, usize size);
 
         status_t load(buf_t& buf, const String_Concept auto& value) {
             return load(buf, value.data, value.length);
         }
+
+        u0 init(buf_t& buf, alloc_t* alloc = context::top()->alloc.main);
 
         status_t save(buf_t& buf, const path_t& path, u32 offset = {}, u32 length = {});
     }

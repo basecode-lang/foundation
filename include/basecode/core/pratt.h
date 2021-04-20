@@ -71,19 +71,32 @@ namespace basecode {
         namespace grammar {
             u0 free(grammar_t& grammar);
 
+            rule_t* infix(grammar_t& grammar,
+                          token_type_t type,
+                          u32 bp,
+                          led_t led);
+
+            rule_t* infixr(grammar_t& grammar,
+                           token_type_t type,
+                           u32 bp,
+                           led_t led);
+
+            rule_t* postfix(grammar_t& grammar,
+                            token_type_t type,
+                            u32 bp,
+                            led_t led);
+
+            rule_t* terminal(grammar_t& grammar,
+                             token_type_t type,
+                             u32 bp = 0);
+
+            u0 init(grammar_t& grammar,
+                    u32* operator_types,
+                    alloc_t* alloc = context::top()->alloc.main);
+
             rule_t* stmt(grammar_t& grammar, token_type_t type, std_t std);
 
             rule_t* prefix(grammar_t& grammar, token_type_t type, nud_t nud);
-
-            rule_t* terminal(grammar_t& grammar, token_type_t type, u32 bp = 0);
-
-            rule_t* infix(grammar_t& grammar, token_type_t type, u32 bp, led_t led);
-
-            rule_t* infixr(grammar_t& grammar, token_type_t type, u32 bp, led_t led);
-
-            rule_t* postfix(grammar_t& grammar, token_type_t type, u32 bp, led_t led);
-
-            u0 init(grammar_t& grammar, u32* operator_types, alloc_t* alloc = context::top()->alloc);
         }
     }
 }

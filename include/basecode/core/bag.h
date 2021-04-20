@@ -118,6 +118,11 @@ namespace basecode {
     static_assert(sizeof(bag_t<s32>) <= 56, "bag_t<T> is now larger than 56 bytes!");
 
     namespace bag {
+        template <Hash_Bag T>
+        u0 init(T& bag,
+                alloc_t* alloc = context::top()->alloc.main,
+                f32 load_factor = .75f);
+
         template <Hash_Bag T,
                   typename Value_Type = typename T::Value_Type>
         u0 rehash(T& bag, s32 new_capacity = -1);
@@ -125,9 +130,6 @@ namespace basecode {
         template <Hash_Bag T,
                   typename Value_Type = typename T::Value_Type>
         b8 find_value(T& bag, u32 start, u64 hash, const Value_Type& value, u32* found);
-
-        template <Hash_Bag T>
-        u0 init(T& bag, alloc_t* alloc = context::top()->alloc, f32 load_factor = .75f);
 
         template <Hash_Bag T,
                   typename Value_Type = typename T::Value_Type>

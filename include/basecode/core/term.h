@@ -178,7 +178,8 @@ namespace basecode {
 
             u0 enabled(b8 enabled);
 
-            status_t init(b8 enabled, alloc_t* alloc = context::top()->alloc);
+            status_t init(b8 enabled,
+                          alloc_t* alloc = context::top()->alloc.main);
         }
 
         u0 free(term_t& term);
@@ -242,6 +243,6 @@ namespace basecode {
 
         u0 cursor_horz_vert_pos(term_t& term, cursor_pos_t pos);
 
-        u0 init(term_t& term, alloc_t* alloc = context::top()->alloc);
+        u0 init(term_t& term, alloc_t* alloc = context::top()->alloc.main);
     }
 }

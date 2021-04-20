@@ -16,9 +16,9 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/memory/system/default.h>
+#include <basecode/core/memory/system/base.h>
 
-namespace basecode::memory::default_ {
+namespace basecode::memory::base {
     constexpr u32 pad_value     = 0xffffffffu;
 
     struct header_t final {
@@ -101,7 +101,7 @@ namespace basecode::memory::default_ {
         .free       = free,
         .alloc      = alloc,
         .realloc    = realloc,
-        .type       = alloc_type_t::default_,
+        .type       = alloc_type_t::base,
     };
 
     alloc_system_t* system() {

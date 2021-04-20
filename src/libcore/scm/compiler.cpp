@@ -90,7 +90,7 @@ namespace basecode::scm::compiler {
 
         {
             str_t str{};
-            str::init(str, context::top()->scratch_alloc);
+            str::init(str, context::top()->alloc.scratch);
             str::reserve(str, 32 * 1024);
             {
                 str_buf_t buf{&str};

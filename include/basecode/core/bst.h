@@ -264,24 +264,24 @@ namespace basecode {
 
         template <Binary_Tree T,
                   typename Node_Type = typename T::Node_Type>
-        u0 init(T& tree, alloc_t* alloc = context::top()->alloc) {
+        u0 init(T& tree, alloc_t* alloc = context::top()->alloc.main) {
             tree.size  = {};
             tree.root  = {};
             tree.alloc = alloc;
 
             slab_config_t node_cfg{};
-            node_cfg.backing   = tree.alloc;
-            node_cfg.buf_size  = bst_t<T>::Node_Type_Size;
-            node_cfg.buf_align = bst_t<T>::Node_Type_Align;
-            node_cfg.num_pages = DEFAULT_NUM_PAGES;
-            tree.node_slab = memory::system::make(alloc_type_t::slab, &node_cfg);
+            node_cfg.buf_size      = bst_t<T>::Node_Type_Size;
+            node_cfg.buf_align     = bst_t<T>::Node_Type_Align;
+            node_cfg.num_pages     = DEFAULT_NUM_PAGES;
+            node_cfg.backing.alloc = tree.alloc;
+            tree.node_slab = memory::system::make(&node_cfg);
 
             slab_config_t value_cfg{};
-            value_cfg.backing   = tree.alloc;
             value_cfg.buf_size  = bst_t<T>::Value_Type_Size;
             value_cfg.buf_align = bst_t<T>::Value_Type_Align;
             value_cfg.num_pages = DEFAULT_NUM_PAGES;
-            tree.value_slab = memory::system::make(alloc_type_t::slab, &value_cfg);
+            value_cfg.backing.alloc = tree.alloc;
+            tree.value_slab = memory::system::make(&value_cfg);
         }
     }
 }

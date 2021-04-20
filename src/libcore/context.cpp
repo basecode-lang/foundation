@@ -40,13 +40,11 @@ namespace basecode::context {
         t_stack[--t_index] = ctx;
     }
 
-    context_t make(s32 argc, const s8** argv, alloc_t* alloc, logger_t* logger) {
+    context_t make(s32 argc, const s8** argv) {
         context_t ctx{};
         ctx.user   = {};
         ctx.argc   = argc;
         ctx.argv   = argv;
-        ctx.alloc  = alloc;
-        ctx.logger = logger;
         return ctx;
     }
 }

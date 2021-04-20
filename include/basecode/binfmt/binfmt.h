@@ -30,9 +30,9 @@ namespace basecode::binfmt {
 
         module_t* make_module(module_type_t type);
 
-        status_t init(alloc_t* alloc = context::top()->alloc);
-
         module_t* make_module(module_type_t type, module_id id);
+
+        status_t init(alloc_t* alloc = context::top()->alloc.main);
     }
 
     namespace import {

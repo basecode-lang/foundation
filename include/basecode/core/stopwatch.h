@@ -26,7 +26,7 @@
         stopwatch::start(timer);                                                \
         defer(stopwatch::stop(timer);                                           \
               stopwatch::print_elapsed(                                         \
-                  (alloc) ? (alloc) : memory::system::default_alloc(),          \
+                  (alloc) ? (alloc) : memory::system::main_alloc(),             \
                   stdout,                                                       \
                   slug,                                                         \
                   60,                                                           \
@@ -81,16 +81,19 @@ namespace basecode {
             }
         }
 
-        u0 print_elapsed(const String_Concept auto& label, s32 width, stopwatch_t& w) {
-            print_elapsed(context::top()->alloc, stdout, label, width, w);
+        u0 print_elapsed(const String_Concept auto& label,
+                         s32 width,
+                         stopwatch_t& w) {
+            print_elapsed(context::top()->alloc.scratch, stdout, label, width, w);
         }
 
-        s32 time_block(const String_Concept auto& slug, const timed_block_callable_t& cb, alloc_t* alloc = {}) {
+        s32 time_block(const String_Concept auto& slug,
+                       const timed_block_callable_t& cb, alloc_t* alloc = {}) {
             stopwatch_t timer{};
             start(timer);
             auto rc = cb();
             stop(timer);
-            print_elapsed(alloc ? alloc : memory::system::default_alloc(),
+            print_elapsed(alloc ? alloc : memory::system::scratch_alloc(),
                           stdout,
                           slug,
                           60,

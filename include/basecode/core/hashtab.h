@@ -127,7 +127,7 @@ namespace basecode {
 
         template <Hash_Table T>
         u0 init(T& table,
-                alloc_t* alloc = context::top()->alloc,
+                alloc_t* alloc = context::top()->alloc.main,
                 f32 load_factor = .75f);
 
         template<Hash_Table T, typename Key_Type = typename T::Key_Type>

@@ -22,9 +22,9 @@
 
 #define WITH_ALLOC(Alloc, Code)                                     \
         do {                                                        \
-            if (context::top()->alloc != Alloc) {                   \
+            if (context::top()->alloc.main != Alloc) {              \
                 auto ctx = *context::top();                         \
-                ctx.alloc = Alloc;                                  \
+                ctx.alloc.main = Alloc;                             \
                 context::push(&ctx);                                \
                 Code                                                \
                 context::pop();                                     \
@@ -49,15 +49,13 @@ namespace basecode {
     struct alloc_t;
     struct logger_t;
 
-    namespace scm {
-        struct ctx_t;
-    }
-
     struct context_t {
-        alloc_t*            alloc;
-        alloc_t*            scratch_alloc;
+        struct {
+            alloc_t*        main;
+            alloc_t*        temp;
+            alloc_t*        scratch;
+        }                   alloc;
         logger_t*           logger;
-        scm::ctx_t*         scm_ctx;
         u0*                 user;
         const s8**          argv;
         s32                 argc;
@@ -70,6 +68,6 @@ namespace basecode {
 
         u0 push(context_t* ctx);
 
-        context_t make(s32 argc, const s8** argv, alloc_t* alloc, logger_t* logger = {});
+        context_t make(s32 argc, const s8** argv);
     }
 }

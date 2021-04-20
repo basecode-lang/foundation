@@ -121,7 +121,7 @@ namespace basecode {
 
             status_t join(thread_t& thread, u0** ret);
 
-            status_t init(alloc_t* alloc = context::top()->alloc);
+            status_t init(alloc_t* alloc = context::top()->alloc.main);
         }
 
         thread_t& self();

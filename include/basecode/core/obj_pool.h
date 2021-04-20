@@ -75,11 +75,11 @@ namespace basecode {
             auto [type, is_new] = hashtab::emplace2(pool.slabs, type_id);
             if (is_new) {
                 slab_config_t cfg{};
-                cfg.backing     = pool.alloc;
-                cfg.buf_size    = sizeof(T);
-                cfg.buf_align   = alignof(T);
-                cfg.num_pages   = DEFAULT_NUM_PAGES;
-                type->alloc     = memory::system::make(alloc_type_t::slab, &cfg);
+                cfg.backing.alloc = pool.alloc;
+                cfg.buf_size      = sizeof(T);
+                cfg.buf_align     = alignof(T);
+                cfg.num_pages     = DEFAULT_NUM_PAGES;
+                type->alloc       = memory::system::make(&cfg);
                 type->type_id   = type_id;
                 type->type_name = typeid(T).name();
                 if constexpr (std::is_destructible_v<T>) {
@@ -105,6 +105,7 @@ namespace basecode {
 
         u0 free(obj_pool_t& pool, b8 skip_storage = true);
 
-        status_t init(obj_pool_t& pool, alloc_t* alloc = context::top()->alloc);
+        status_t init(obj_pool_t& pool,
+                      alloc_t* alloc = context::top()->alloc.main);
     }
 }

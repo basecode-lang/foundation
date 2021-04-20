@@ -171,7 +171,7 @@ namespace basecode {
         }
 
         template <typename V>
-        u0 init(assoc_array_t<V>& array, alloc_t* alloc = context::top()->alloc) {
+        u0 init(assoc_array_t<V>& array, alloc_t* alloc = context::top()->alloc.main) {
             array.alloc     = alloc;
             array.values    = {};
             array.index     = {};

@@ -253,5 +253,5 @@ namespace basecode::scm::vm {
 
     status_t step(vm_t& vm, ctx_t* ctx, s32 cycles = -1);
 
-    status_t init(vm_t& vm, alloc_t* alloc = context::top()->alloc);
+    status_t init(vm_t& vm, alloc_t* alloc = context::top()->alloc.main);
 }

@@ -124,7 +124,7 @@ namespace basecode {
 
             status_t start(job_id id, job_task_base_t* task);
 
-            status_t init(alloc_t* alloc = context::top()->alloc);
+            status_t init(alloc_t* alloc = context::top()->alloc.main);
 
             status_t make(const s8* label, s32 len, job_id& id, job_id parent_id = {});
         }

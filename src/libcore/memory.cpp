@@ -31,18 +31,22 @@
 #include <basecode/core/memory/system/page.h>
 #include <basecode/core/memory/system/bump.h>
 #include <basecode/core/memory/system/slab.h>
+#include <basecode/core/memory/system/base.h>
 #include <basecode/core/memory/system/proxy.h>
 #include <basecode/core/memory/system/trace.h>
 #include <basecode/core/memory/system/stack.h>
 #include <basecode/core/memory/system/buddy.h>
 #include <basecode/core/memory/system/scratch.h>
-#include <basecode/core/memory/system/default.h>
 
 namespace basecode::memory {
+    using alloc_array_t         = array_t<alloc_t*>;
+
     struct system_t final {
-        alloc_t                 default_alloc;
+        alloc_t                 temp;
+        alloc_t                 main;
+        alloc_t                 scratch;
         alloc_t                 slab_alloc;
-        array_t<alloc_t*>       allocators;
+        alloc_array_t           allocators;
         usize                   os_page_size;
         usize                   os_alloc_granularity;
     };
@@ -55,10 +59,12 @@ namespace basecode::memory {
     };
 
     static const s8*            s_type_names[] = {
-        "default",
+        "none",
+        "base",
         "bump",
         "page",
         "slab",
+        "temp",
         "proxy",
         "trace",
         "stack",
@@ -78,11 +84,21 @@ namespace basecode::memory {
             array::free(t_system.allocators);
             memory::internal::fini(&t_system.slab_alloc);
             meta::system::fini();
-            memory::internal::fini(&t_system.default_alloc);
+            memory::internal::fini(&t_system.temp);
+            memory::internal::fini(&t_system.scratch);
+            memory::internal::fini(&t_system.main);
         }
 
         usize os_page_size() {
             return t_system.os_page_size;
+        }
+
+        alloc_t* temp_alloc() {
+            return &t_system.temp;
+        }
+
+        alloc_t* main_alloc() {
+            return &t_system.main;
         }
 
         u0 print_allocators() {
@@ -95,8 +111,8 @@ namespace basecode::memory {
             }
         }
 
-        alloc_t* default_alloc() {
-            return &t_system.default_alloc;
+        alloc_t* scratch_alloc() {
+            return &t_system.scratch;
         }
 
         u32 free(alloc_t* alloc) {
@@ -113,6 +129,15 @@ namespace basecode::memory {
             return t_system.os_alloc_granularity;
         }
 
+        alloc_t* make(alloc_config_t* config) {
+            BC_ASSERT_NOT_NULL(config);
+            auto r = memory::internal::alloc(&t_system.slab_alloc, 0, 0);
+            auto alloc = (alloc_t*) r.mem;
+            memory::init(alloc, config);
+            array::append(t_system.allocators, alloc);
+            return alloc;
+        }
+
         b8 set_page_executable(u0* ptr, usize size) {
             const auto page_size = t_system.os_page_size;
             u64 start, end;
@@ -125,15 +150,7 @@ namespace basecode::memory {
                 PROT_READ | PROT_WRITE | PROT_EXEC) == 0;
         }
 
-        alloc_t* make(alloc_type_t type, alloc_config_t* config) {
-            auto r = memory::internal::alloc(&t_system.slab_alloc, 0, 0);
-            auto alloc = (alloc_t*) r.mem;
-            memory::init(alloc, type, config);
-            array::append(t_system.allocators, alloc);
-            return alloc;
-        }
-
-        status_t init(alloc_type_t type, u32 heap_size, u0* base) {
+        status_t init(alloc_config_t* cfg) {
 #ifdef _WIN32
             SYSTEM_INFO system_info;
             GetSystemInfo(&system_info);
@@ -143,39 +160,29 @@ namespace basecode::memory {
             t_system.os_page_size         = sysconf(_SC_PAGE_SIZE);
             t_system.os_alloc_granularity = t_system.os_page_size;
 #endif
-            switch (type) {
-                case alloc_type_t::default_: {
-                    auto status = memory::init(&t_system.default_alloc,
-                                               alloc_type_t::default_);
-                    if (!OK(status))
-                        return status;
-                    break;
-                }
-                case alloc_type_t::dlmalloc: {
-                    dl_config_t dl_config{};
-                    dl_config.base = base;
-                    dl_config.heap_size = heap_size;
-                    auto status = memory::init(&t_system.default_alloc,
-                                               alloc_type_t::dlmalloc,
-                                               &dl_config);
-                    if (!OK(status))
-                        return status;
-                    break;
-                }
-                default: {
-                    return status_t::invalid_default_allocator;
-                }
+            auto sys_cfg = (system_config_t*) cfg;
+            BC_ASSERT_NOT_NULL(sys_cfg->main);
+            memory::init(&t_system.main, sys_cfg->main);
+
+            if (sys_cfg->temp) {
+                sys_cfg->temp->backing.alloc = &t_system.main;
+                memory::init(&t_system.temp, sys_cfg->temp);
             }
 
-            meta::system::init(&t_system.default_alloc);
-            array::init(t_system.allocators, &t_system.default_alloc);
+            if (sys_cfg->scratch) {
+                sys_cfg->scratch->backing.alloc = &t_system.main;
+                memory::init(&t_system.scratch, sys_cfg->scratch);
+            }
+
+            meta::system::init(&t_system.main);
+            array::init(t_system.allocators, &t_system.main);
 
             slab_config_t slab_config{};
-            slab_config.backing   = &t_system.default_alloc;
-            slab_config.buf_size  = sizeof(alloc_t);
-            slab_config.buf_align = alignof(alloc_t);
-            slab_config.num_pages = DEFAULT_NUM_PAGES;
-            memory::init(&t_system.slab_alloc, alloc_type_t::slab, &slab_config);
+            slab_config.buf_size      = sizeof(alloc_t);
+            slab_config.buf_align     = alignof(alloc_t);
+            slab_config.num_pages     = DEFAULT_NUM_PAGES;
+            slab_config.backing.alloc = &t_system.main;
+            memory::init(&t_system.slab_alloc, &slab_config);
 
             return status_t::ok;
         }
@@ -259,19 +266,21 @@ namespace basecode::memory {
         return s_status_names[(u32) status];
     }
 
-    status_t init(alloc_t* alloc, alloc_type_t type, alloc_config_t* config) {
-        if (!alloc)
-            return status_t::invalid_allocator;
-        switch (type) {
+    status_t init(alloc_t* alloc, alloc_config_t* config) {
+        BC_ASSERT_NOT_NULL(alloc);
+        BC_ASSERT_NOT_NULL(config);
+        switch (config->type) {
+            case alloc_type_t::none:        break;
             case alloc_type_t::bump:        alloc->system = bump::system();     break;
+            case alloc_type_t::base:        alloc->system = base::system();     break;
             case alloc_type_t::slab:        alloc->system = slab::system();     break;
+            case alloc_type_t::temp:        break;
             case alloc_type_t::page:        alloc->system = page::system();     break;
             case alloc_type_t::proxy:       alloc->system = proxy::system();    break;
             case alloc_type_t::trace:       alloc->system = trace::system();    break;
             case alloc_type_t::stack:       alloc->system = stack::system();    break;
             case alloc_type_t::buddy:       alloc->system = buddy::system();    break;
             case alloc_type_t::scratch:     alloc->system = scratch::system();  break;
-            case alloc_type_t::default_:    alloc->system = default_::system(); break;
             case alloc_type_t::dlmalloc:    alloc->system = dl::system();       break;
         }
         alloc->backing         = {};

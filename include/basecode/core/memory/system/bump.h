@@ -27,10 +27,8 @@ namespace basecode {
     };
 
     struct bump_config_t : alloc_config_t {
-        union {
-            alloc_t*            alloc;
-            u0*                 buf;
-        }                       backing;
+        bump_config_t() : alloc_config_t(alloc_type_t::bump) {}
+
         bump_type_t             type;
     };
 

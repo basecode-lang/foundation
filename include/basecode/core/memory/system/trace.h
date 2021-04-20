@@ -22,6 +22,7 @@
 
 namespace basecode {
     struct trace_config_t : alloc_config_t {
+        trace_config_t() : alloc_config_t(alloc_type_t::trace) {}
     };
 
     namespace memory::trace {
@@ -30,4 +31,3 @@ namespace basecode {
         alloc_t* make(alloc_t* backing, str::slice_t name);
     }
 }
-

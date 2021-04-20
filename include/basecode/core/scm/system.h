@@ -42,5 +42,5 @@ namespace basecode::scm::system {
         return eval(source.data, source.length, obj);
     }
 
-    status_t init(u32 heap_size, alloc_t* alloc = context::top()->alloc);
+    status_t init(u32 heap_size, alloc_t* alloc = context::top()->alloc.main);
 }

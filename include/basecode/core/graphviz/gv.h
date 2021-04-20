@@ -1299,11 +1299,13 @@ namespace basecode::graphviz {
 
         u0 set(attr_set_t& set, attr_type_t type, color_t value);
 
+        status_t init(attr_set_t& set,
+                      component_type_t type,
+                      alloc_t* alloc = context::top()->alloc.main);
+
         u0 set(attr_set_t& set, attr_type_t type, viewport_t value);
 
         u0 set(attr_set_t& set, attr_type_t type, str::slice_t value);
-
-        status_t init(attr_set_t& set, component_type_t type, alloc_t* alloc = context::top()->alloc);
     }
 
     namespace node {
@@ -1405,7 +1407,10 @@ namespace basecode::graphviz {
 
         u0 set_field_label(node_t& n, u32 id, str::slice_t label);
 
-        status_t init(node_t& n, u32 id, str::slice_t name, alloc_t* alloc = context::top()->alloc);
+        status_t init(node_t& n,
+                      u32 id,
+                      str::slice_t name,
+                      alloc_t* alloc = context::top()->alloc.main);
     }
 
     namespace edge {
@@ -1529,11 +1534,13 @@ namespace basecode::graphviz {
 
         u0 serialize(graph_t& g, const edge_t& e, mem_buf_t& mb);
 
+        status_t init(edge_t& e,
+                      u32 id,
+                      alloc_t* alloc = context::top()->alloc.main);
+
         u0 label_font_name(edge_t& e, const String_Concept auto& v) {
             attr_set::set(e.attrs, attr_type_t::label_font_name, v);
         }
-
-        status_t init(edge_t& e, u32 id, alloc_t* alloc = context::top()->alloc);
     }
 
     namespace graph {
@@ -1623,11 +1630,6 @@ namespace basecode::graphviz {
 
         u0 search_size(graph_t& g, u32 v);
 
-        status_t init(graph_t& g,
-                      graph_type_t type,
-                      str::slice_t name,
-                      alloc_t* alloc = context::top()->alloc);
-
         u0 rank(graph_t& g, rank_type_t v);
 
         u0 bg_color(graph_t& g, color_t v);
@@ -1704,6 +1706,11 @@ namespace basecode::graphviz {
             UNUSED(g);
             UNUSED(v);
         }
+
+        status_t init(graph_t& g,
+                      graph_type_t type,
+                      str::slice_t name,
+                      alloc_t* alloc = context::top()->alloc.main);
 
         u0 layers_select(graph_t& g, const String_Concept auto& v) {
             UNUSED(g);

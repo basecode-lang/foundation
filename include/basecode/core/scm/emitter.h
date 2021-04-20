@@ -23,7 +23,7 @@
 namespace basecode::scm::emitter {
     u0 init(emitter_t& e,
             vm_t* vm,
-            alloc_t* alloc = context::top()->alloc);
+            alloc_t* alloc = context::top()->alloc.main);
 
     u0 free(emitter_t& e);
 

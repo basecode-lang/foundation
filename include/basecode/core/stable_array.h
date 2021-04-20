@@ -214,7 +214,8 @@ namespace basecode {
                                                        new_capacity * sizeof(Value_Type*),
                                                        alignof(Value_Type*));
             const auto data = array.data + array.size;
-            const auto size_to_clear = new_capacity > array.capacity ? new_capacity - array.capacity : 0;
+            const auto size_to_clear = new_capacity > array.capacity ?
+                                       new_capacity - array.capacity : 0;
             std::memset(data, 0, size_to_clear * sizeof(Value_Type*));
             array.capacity = new_capacity;
         }
@@ -242,18 +243,18 @@ namespace basecode {
         template <Stable_Array T,
                   typename Value_Type = typename T::Value_Type>
         u0 init(T& array,
-                alloc_t* alloc = context::top()->alloc,
+                alloc_t* alloc = context::top()->alloc.main,
                 u8 num_pages = DEFAULT_NUM_PAGES) {
             array.data  = {};
             array.alloc = alloc;
             array.size  = array.capacity = {};
 
             slab_config_t slab_config{};
-            slab_config.backing   = array.alloc;
-            slab_config.buf_size  = sizeof(Value_Type);
-            slab_config.buf_align = alignof(Value_Type);
-            slab_config.num_pages = num_pages;
-            array.slab            = memory::system::make(alloc_type_t::slab, &slab_config);
+            slab_config.buf_size      = sizeof(Value_Type);
+            slab_config.buf_align     = alignof(Value_Type);
+            slab_config.num_pages     = num_pages;
+            slab_config.backing.alloc = array.alloc;
+            array.slab                = memory::system::make(&slab_config);
         }
 
         template <Stable_Array T,
@@ -289,14 +290,15 @@ namespace basecode {
         }
 
         template <typename T>
-        stable_array_t<T> make(alloc_t* alloc = context::top()->alloc) {
+        stable_array_t<T> make(alloc_t* alloc = context::top()->alloc.main) {
             stable_array_t<T> array;
             init(array, alloc);
             return array;
         }
 
         template <typename T>
-        stable_array_t<T> make(std::initializer_list<T> elements, alloc_t* alloc = context::top()->alloc) {
+        stable_array_t<T> make(std::initializer_list<T> elements,
+                               alloc_t* alloc = context::top()->alloc.main) {
             stable_array_t<T> array;
             init(array, alloc);
             reserve(array, elements.size());

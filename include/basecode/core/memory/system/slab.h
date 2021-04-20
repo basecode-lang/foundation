@@ -22,7 +22,8 @@
 
 namespace basecode {
     struct slab_config_t : alloc_config_t {
-        alloc_t*            backing;
+        slab_config_t() : alloc_config_t(alloc_type_t::slab) {}
+
         u32                 buf_size;
         u8                  buf_align;
         u8                  num_pages = 1;
