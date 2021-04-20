@@ -37,6 +37,7 @@
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
+#include <basecode/core/memory/system/scratch.h>
 
 using namespace basecode;
 
@@ -187,7 +188,7 @@ s32 main(s32 argc, const s8** argv) {
     if (!OK(profiler::init()))
         return 1;
 
-    {
+    alloc_t* alloc; {
         auto status = memory::system::init(alloc_type_t::dlmalloc);
         if (!OK(status)) {
             fmt::print(stderr,
@@ -195,11 +196,19 @@ s32 main(s32 argc, const s8** argv) {
                        memory::status_name(status));
             return s32(status);
         }
-        auto ctx = context::make(argc,
-                                 argv,
-                                 memory::system::default_alloc());
-        context::push(&ctx);
+
+        alloc = memory::system::default_alloc();
     }
+
+    alloc_t scratch_alloc{}; {
+        scratch_config_t cfg{};
+        cfg.backing  = alloc;
+        cfg.buf_size = 256 * 1024;
+        memory::init(&scratch_alloc, alloc_type_t::scratch, &cfg);
+    }
+    auto ctx = context::make(argc, argv, alloc);
+    ctx.scratch_alloc = &scratch_alloc;
+    context::push(&ctx);
 
     {
         default_config_t dft_config{};
@@ -301,6 +310,7 @@ s32 main(s32 argc, const s8** argv) {
     log::system::fini();
     term::system::fini();
     event::system::fini();
+    memory::fini(&scratch_alloc);
     memory::proxy::fini();
     memory::system::fini();
     context::pop();

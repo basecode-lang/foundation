@@ -26,6 +26,10 @@ namespace basecode::alloc_window {
     static u0 draw_allocators(alloc_window_t& win,
                               const alloc_info_array_t& roots) {
 
+        str_t scratch{};
+        str::init(scratch, context::top()->scratch_alloc);
+        str::reserve(scratch, 64);
+        defer(str::free(scratch));
         u32 row{};
         for (auto info : roots) {
             ImGui::TableNextRow();
@@ -36,22 +40,22 @@ namespace basecode::alloc_window {
                                              (u64) info->tracked);
             ImGui::TableSetColumnIndex(1);
             if (IS_PROXY(info->tracked)) {
-                str::reset(win.scratch);
-                str::append(win.scratch,
+                str::reset(scratch);
+                str::append(scratch,
                             memory::proxy::name(info->tracked));
-                ImGui::Text("%s", str::c_str(win.scratch));
+                ImGui::Text("%s", str::c_str(scratch));
             } else {
                 ImGui::Text("%s", "(none)");
             }
             ImGui::TableSetColumnIndex(2);
             ImGui::Text("%s", memory::type_name(info->tracked->system->type));
             ImGui::TableSetColumnIndex(3);
-            str::reset(win.scratch); {
-                str_buf_t buf(&win.scratch);
+            str::reset(scratch); {
+                str_buf_t buf(&scratch);
                 format::unitized_byte_size(buf,
                                            info->tracked->total_allocated);
             }
-            ImGui::Text("%s", str::c_str(win.scratch));
+            ImGui::Text("%s", str::c_str(scratch));
             ++row;
             if (node_open) {
                 s_selected = info;
@@ -70,7 +74,6 @@ namespace basecode::alloc_window {
     }
 
     u0 free(alloc_window_t& win) {
-        str::free(win.scratch);
         ImPlot::DestroyContext(win.ctx);
     }
 
@@ -129,7 +132,5 @@ namespace basecode::alloc_window {
         win.alloc      = alloc;
         win.visible    = true;
         win.mem_editor = false;
-        str::init(win.scratch, win.alloc);
-        str::reserve(win.scratch, 64);
     }
 }

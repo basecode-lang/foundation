@@ -20,8 +20,43 @@
 #include <basecode/core/defer.h>
 #include <basecode/core/array.h>
 #include <basecode/core/memory/system/stack.h>
+#include <basecode/core/memory/system/scratch.h>
 
 using namespace basecode;
+
+TEST_CASE("basecode::memory scratch allocator") {
+    alloc_t scratch_alloc{};
+
+    scratch_config_t cfg{};
+    cfg.backing = context::top()->alloc;
+    cfg.buf_size = 256 * 1024;
+
+    memory::init(&scratch_alloc, alloc_type_t::scratch, &cfg);
+    defer(memory::fini(&scratch_alloc));
+
+    auto p1 = (u8*) memory::alloc(&scratch_alloc, 10 * 1024);
+    REQUIRE(p1);
+    REQUIRE(memory::size(&scratch_alloc, p1) == 10 * 1024);
+
+    u8* p2[100];
+    for (s32 i = 0; i < 100; ++i)
+        p2[i] = (u8*) memory::alloc(&scratch_alloc, 1024);
+    for (s32 i = 0; i < 100; ++i) {
+        REQUIRE(p2[i]);
+        REQUIRE(memory::size(&scratch_alloc, p2[i]) == 1024);
+        REQUIRE(memory::free(&scratch_alloc, p2[i]) == 1032);
+    }
+
+    REQUIRE(memory::free(&scratch_alloc, p1) == (10 * 1024) + 8);
+
+    for (s32 i = 0; i < 50; ++i)
+        p2[i] = (u8*) memory::alloc(&scratch_alloc, 4096);
+    for (s32 i = 0; i < 50; ++i) {
+        REQUIRE(p2[i]);
+        REQUIRE(memory::size(&scratch_alloc, p2[i]) == 4096);
+        REQUIRE(memory::free(&scratch_alloc, p2[i]) == 4104);
+    }
+}
 
 TEST_CASE("basecode::memory stack allocator") {
     alloc_t stack_alloc{};

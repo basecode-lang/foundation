@@ -18,24 +18,18 @@
 
 #pragma once
 
-#include <imgui.h>
-#include <basecode/gfx/gfx.h>
-#include <basecode/core/str.h>
-#include <basecode/gfx/implot/implot.h>
+#include <basecode/core/memory.h>
 
 namespace basecode {
-    struct alloc_window_t final {
-        alloc_t*                alloc;
-        ImPlotContext*          ctx;
-        b8                      visible;
-        b8                      mem_editor;
+    struct scratch_config_t : alloc_config_t {
+        alloc_t*            backing;
+        u32                 buf_size;
     };
 
-    namespace alloc_window {
-        u0 free(alloc_window_t& win);
+    namespace memory::scratch {
+        u0 reset(alloc_t* alloc);
 
-        u0 draw(alloc_window_t& win);
-
-        u0 init(alloc_window_t& win, alloc_t* alloc = context::top()->alloc);
+        alloc_system_t* system();
     }
 }
+

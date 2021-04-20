@@ -37,6 +37,7 @@
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
+#include <basecode/core/memory/system/scratch.h>
 #include <basecode/gfx/imgui/imgui_memory_editor.h>
 
 basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
@@ -64,7 +65,15 @@ basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
         alloc = memory::system::default_alloc();
     }
 
+    alloc_t scratch_alloc{}; {
+        scratch_config_t cfg{};
+        cfg.backing  = alloc;
+        cfg.buf_size = 256 * 1024;
+        memory::init(&scratch_alloc, alloc_type_t::scratch, &cfg);
+    }
+
     auto ctx = context::make(argc, argv, alloc);
+    ctx.scratch_alloc = &scratch_alloc;
     context::push(&ctx);
 
     TIME_BLOCK("memory::proxy::init"_ss,
@@ -247,6 +256,7 @@ basecode::s32 main(basecode::s32 argc, const basecode::s8** argv) {
     TIME_BLOCK("log::system::fini"_ss,                  log::system::fini());
     TIME_BLOCK("term::system::fini"_ss,                 term::system::fini());
     TIME_BLOCK("event::system::fini"_ss,                event::system::fini());
+    TIME_BLOCK("free scratch allocator"_ss,             memory::fini(&scratch_alloc));
     TIME_BLOCK("memory::proxy::fini"_ss,                memory::proxy::fini());
     TIME_BLOCK("memory::system::fini"_ss,               memory::system::fini());
     TIME_BLOCK_ALLOC("context::pop"_ss,                 alloc, context::pop());

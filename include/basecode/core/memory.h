@@ -42,6 +42,7 @@ namespace basecode {
         trace,
         stack,
         buddy,
+        scratch,
         dlmalloc,
     };
 
@@ -83,6 +84,13 @@ namespace basecode {
             u0*                     free;
             u32                     max_size;
         }                           stack;
+        struct {
+            u8*                     begin;
+            u8*                     end;
+            u8*                     alloc;
+            u8*                     free;
+            u32                     size;
+        }                           scratch;
         struct {
             u0*                     buf;
             u32                     offset;

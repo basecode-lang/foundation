@@ -35,6 +35,7 @@
 #include <basecode/core/memory/system/trace.h>
 #include <basecode/core/memory/system/stack.h>
 #include <basecode/core/memory/system/buddy.h>
+#include <basecode/core/memory/system/scratch.h>
 #include <basecode/core/memory/system/default.h>
 
 namespace basecode::memory {
@@ -62,6 +63,7 @@ namespace basecode::memory {
         "trace",
         "stack",
         "buddy",
+        "scratch",
         "dlmalloc",
     };
 
@@ -195,7 +197,8 @@ namespace basecode::memory {
             } else {
                 alloc->total_allocated -= size_freed;
                 BC_ASSERT_MSG(alloc->total_allocated == 0,
-                              "allocator is leaking memory");
+                              "allocator is leaking memory: {}",
+                              alloc->total_allocated);
             }
             meta::system::untrack(alloc);
             alloc->backing = {};
@@ -267,6 +270,7 @@ namespace basecode::memory {
             case alloc_type_t::trace:       alloc->system = trace::system();    break;
             case alloc_type_t::stack:       alloc->system = stack::system();    break;
             case alloc_type_t::buddy:       alloc->system = buddy::system();    break;
+            case alloc_type_t::scratch:     alloc->system = scratch::system();  break;
             case alloc_type_t::default_:    alloc->system = default_::system(); break;
             case alloc_type_t::dlmalloc:    alloc->system = dl::system();       break;
         }

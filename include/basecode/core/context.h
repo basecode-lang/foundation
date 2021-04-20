@@ -55,6 +55,7 @@ namespace basecode {
 
     struct context_t {
         alloc_t*            alloc;
+        alloc_t*            scratch_alloc;
         logger_t*           logger;
         scm::ctx_t*         scm_ctx;
         u0*                 user;
