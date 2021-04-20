@@ -22,13 +22,13 @@
 namespace basecode::memory::scratch {
     constexpr u32 pad_value     = 0x7FFF0000u;
 
-    struct alloc_header_t final {
+    struct header_t final {
         u32                     free:   1;
         u32                     size:   31;
     };
 
-    inline static alloc_header_t* header(u0* data) {
-        auto p = (alloc_header_t*) data;
+    inline static header_t* header(u0* data) {
+        auto p = (header_t*) data;
         while (true) {
             auto t = p - 1;
             if (t->size != pad_value)
@@ -38,13 +38,9 @@ namespace basecode::memory::scratch {
         return p - 1;
     }
 
-    inline static u32 size_with_padding(u32 size, u32 align) {
-        return size + align + sizeof(alloc_header_t);
-    }
-
-    inline static u0 fill(alloc_header_t* header, u0* data, u32 size) {
+    inline static u0 fill(header_t* header, u0* data, u32 size) {
         header->size = size;
-        auto p = (alloc_header_t*) header + 1;
+        auto p = (header_t*) header + 1;
         while (p < data) {
             p->free = false;
             p->size = pad_value;
@@ -52,7 +48,7 @@ namespace basecode::memory::scratch {
         }
     }
 
-    inline static u0* data_pointer(alloc_header_t* header, u32 align) {
+    inline static u0* data_pointer(header_t* header, u32 align) {
         u0* p = header + 1;
         u32 adjust{};
         return memory::system::align_forward(p, align, adjust);
@@ -85,7 +81,7 @@ namespace basecode::memory::scratch {
         auto freed_size = h->size;
         h->free = true;
         while (sc->free != sc->alloc) {
-            h = (alloc_header_t*) sc->free;
+            h = (header_t*) sc->free;
             if (!h->free)
                 break;
             sc->free += h->size;
@@ -111,13 +107,12 @@ namespace basecode::memory::scratch {
 
     static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
         auto sc = &alloc->subclass.scratch;
-        mem_result_t    r       {};
-        u32             adjust  {};
+        mem_result_t r  {};
 
         size = ((size + (align - 1)) / align) * align;
 
         auto p = sc->alloc;
-        auto h = (alloc_header_t*) p;
+        auto h = (header_t*) p;
         auto data = (u8*) data_pointer(h, align);
         p = data + size;
 
@@ -126,7 +121,7 @@ namespace basecode::memory::scratch {
             h->size = (sc->end - (u8*)h);
 
             p = sc->begin;
-            h = (alloc_header_t*) p;
+            h = (header_t*) p;
             data = (u8*) data_pointer(h, align);
             p = data + size;
         }

@@ -30,6 +30,23 @@ namespace basecode::scm::compiler {
         emitter::reset(comp.emit);
     }
 
+    context_t make_context(bb_t& bb,
+                           ctx_t* ctx,
+                           obj_t* obj,
+                           obj_t* env,
+                           b8 top_level) {
+        context_t c{};
+        c.bb        = &bb;
+        c.ctx       = ctx;
+        c.obj       = obj;
+        c.env       = env;
+        c.sym       = ctx->nil;
+        c.target    = {};
+        c.is_macro  = false;
+        c.top_level = top_level;
+        return c;
+    }
+
     u0 init(compiler_t& comp, vm_t* vm, alloc_t* alloc) {
         comp.vm = vm;
         emitter::init(comp.emit, vm, alloc);
@@ -71,13 +88,16 @@ namespace basecode::scm::compiler {
 
         emitter::format_liveliness_intervals(comp.emit);
 
-        str_t str{};
-        str::init(str, ctx->alloc);
         {
-            str_buf_t buf{&str};
-            emitter::disassemble(comp.emit, bb, buf);
+            str_t str{};
+            str::init(str, context::top()->scratch_alloc);
+            str::reserve(str, 32 * 1024);
+            {
+                str_buf_t buf{&str};
+                emitter::disassemble(comp.emit, bb, buf);
+            }
+            format::print("{}\n", str);
         }
-        format::print("{}\n", str);
 
         auto dot_file = "eval2.dot"_path;
         if (!OK(emitter::create_dot(ctx->compiler.emit, dot_file))) {
@@ -95,41 +115,36 @@ namespace basecode::scm::compiler {
                 auto ctx = c.ctx;
                 obj_t* sym  = CAR(c.obj);
                 obj_t* args = CDR(c.obj);
-                obj_t* form = TYPE(sym) == obj_type_t::symbol ? get(ctx, sym) : sym;
+                obj_t* form = TYPE(sym) == obj_type_t::symbol ?
+                              get(ctx, sym) : sym;
 
                 auto cl = cons(ctx, c.obj, ctx->call_list);
                 ctx->call_list = cl;
                 defer(ctx->call_list = CDR(cl));
 
                 switch (TYPE(form)) {
-                    case obj_type_t::ffi:   return bytecode::ffi(comp, c, sym, form, args);
-                    case obj_type_t::prim:  return bytecode::prim(comp,
-                                                                  c,
-                                                                  sym,
-                                                                  form,
-                                                                  args,
-                                                                  PRIM(form));
-                    case obj_type_t::proc:  return bytecode::apply(comp, c, sym, form, args);
-                    case obj_type_t::cfunc: return bytecode::call_back(comp, c, sym, form, args);
-                    default:                error(ctx, "tried to call non-callable value");
+                    case obj_type_t::ffi:
+                        return bytecode::ffi(comp, c, sym, form, args);
+                    case obj_type_t::prim:
+                        return bytecode::prim(comp,
+                                              c,
+                                              sym,
+                                              form,
+                                              args,
+                                              PRIM(form));
+                    case obj_type_t::proc:
+                        return bytecode::apply(comp, c, sym, form, args);
+                    case obj_type_t::cfunc:
+                        return bytecode::call_back(comp, c, sym, form, args);
+                    default:
+                        error(ctx, "tried to call non-callable value");
                 }
                 return {c.bb, 0};
             }
-            case obj_type_t::symbol:    return bytecode::lookup(comp, c);
-            default:                    return bytecode::self_eval(comp, c);
+            case obj_type_t::symbol:
+                return bytecode::lookup(comp, c);
+            default:
+                return bytecode::self_eval(comp, c);
         }
-    }
-
-    context_t make_context(bb_t& bb, ctx_t* ctx, obj_t* obj, obj_t* env, b8 top_level) {
-        context_t c{};
-        c.bb        = &bb;
-        c.ctx       = ctx;
-        c.obj       = obj;
-        c.env       = env;
-        c.sym       = ctx->nil;
-        c.target    = {};
-        c.is_macro  = false;
-        c.top_level = top_level;
-        return c;
     }
 }

@@ -42,9 +42,13 @@ TEST_CASE("basecode::memory scratch allocator") {
     for (s32 i = 0; i < 100; ++i)
         p2[i] = (u8*) memory::alloc(&scratch_alloc, 1024);
     for (s32 i = 0; i < 100; ++i) {
-        REQUIRE(p2[i]);
-        REQUIRE(memory::size(&scratch_alloc, p2[i]) == 1024);
-        REQUIRE(memory::free(&scratch_alloc, p2[i]) == 1032);
+        if (!p2[i]) REQUIRE(p2[i]);
+        auto size = memory::size(&scratch_alloc, p2[i]);
+        if (size != 1024)
+            REQUIRE(size == 1024);
+        auto freed = memory::free(&scratch_alloc, p2[i]);
+        if (freed != 1032)
+            REQUIRE(freed == 1032);
     }
 
     REQUIRE(memory::free(&scratch_alloc, p1) == (10 * 1024) + 8);
@@ -52,9 +56,13 @@ TEST_CASE("basecode::memory scratch allocator") {
     for (s32 i = 0; i < 50; ++i)
         p2[i] = (u8*) memory::alloc(&scratch_alloc, 4096);
     for (s32 i = 0; i < 50; ++i) {
-        REQUIRE(p2[i]);
-        REQUIRE(memory::size(&scratch_alloc, p2[i]) == 4096);
-        REQUIRE(memory::free(&scratch_alloc, p2[i]) == 4104);
+        if (!p2[i]) REQUIRE(p2[i]);
+        auto size = memory::size(&scratch_alloc, p2[i]);
+        if (size != 4096)
+            REQUIRE(size == 4096);
+        auto freed = memory::free(&scratch_alloc, p2[i]);
+        if (freed != 4104)
+            REQUIRE(freed == 4104);
     }
 }
 

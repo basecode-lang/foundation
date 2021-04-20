@@ -19,31 +19,31 @@
 #include <basecode/core/memory/system/default.h>
 
 namespace basecode::memory::default_ {
-    constexpr u32 header_pad_value = 0xffffffffu;
+    constexpr u32 pad_value     = 0xffffffffu;
 
-    struct alloc_header_t final {
+    struct header_t final {
         u32                     size;
     };
 
-    inline static alloc_header_t* header(u0* data) {
+    inline static header_t* header(u0* data) {
         auto p = static_cast<u32*>(data);
-        while (p[-1] == header_pad_value)
+        while (p[-1] == pad_value)
             --p;
-        return reinterpret_cast<alloc_header_t*>(p - 1);
+        return reinterpret_cast<header_t*>(p - 1);
     }
 
     inline static u32 size_with_padding(u32 size, u32 align) {
-        return size + align + sizeof(alloc_header_t);
+        return size + align + sizeof(header_t);
     }
 
-    inline static u0 fill(alloc_header_t* header, u0* data, u32 size) {
+    inline static u0 fill(header_t* header, u0* data, u32 size) {
         header->size = size;
         auto p = (u32*) header + 1;
         while (p < data)
-            *p++ = header_pad_value;
+            *p++ = pad_value;
     }
 
-    inline static u0* data_pointer(alloc_header_t* header, u32 align) {
+    inline static u0* data_pointer(header_t* header, u32 align) {
         u0* p = header + 1;
         u32 adjust{};
         return memory::system::align_forward(p, align, adjust);
@@ -71,7 +71,7 @@ namespace basecode::memory::default_ {
         UNUSED(alloc);
         mem_result_t r{};
         r.size = size_with_padding(size, align);
-        auto h = (alloc_header_t*) std::malloc(r.size);
+        auto h = (header_t*) std::malloc(r.size);
         r.mem = data_pointer(h, align);
         fill(h, r.mem, r.size);
         return r;
@@ -79,7 +79,7 @@ namespace basecode::memory::default_ {
 
     static mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
         UNUSED(alloc);
-        alloc_header_t* h{};
+        header_t* h{};
         auto old_size = 0;
         if (mem) {
             h = header(mem);
@@ -87,7 +87,7 @@ namespace basecode::memory::default_ {
         }
         mem_result_t r{};
         r.size = size_with_padding(size, align);
-        h = (alloc_header_t*) std::realloc(h, r.size);
+        h = (header_t*) std::realloc(h, r.size);
         r.mem = data_pointer(h, align);
         fill(h, r.mem, r.size);
         r.size = s32(r.size - old_size);
