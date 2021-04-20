@@ -18,10 +18,43 @@
 
 #include <basecode/core/memory/meta.h>
 #include <basecode/gfx/alloc_window.h>
+#include <basecode/gfx/implot/implot.h>
+#include <basecode/gfx/imgui/imgui_internal.h>
 #include <basecode/core/memory/system/proxy.h>
+
+namespace ImGui {
+    bool Splitter(bool split_vertically,
+                  float thickness,
+                  float* size1,
+                  float* size2,
+                  float min_size1,
+                  float min_size2,
+                  float splitter_long_axis_size = -1.0f) {
+        ImGuiContext& g = *GImGui;
+        ImGuiWindow* window = g.CurrentWindow;
+        ImGuiID id = window->GetID("##Splitter");
+        ImRect bb;
+        bb.Min = window->DC.CursorPos
+                 + (split_vertically ? ImVec2(*size1, 0.0f) : ImVec2(0.0f, *size1));
+        bb.Max = bb.Min + ImGui::CalcItemSize(split_vertically ?
+                                              ImVec2(thickness, splitter_long_axis_size) :
+                                              ImVec2(splitter_long_axis_size, thickness),
+                                              0.0f,
+                                              0.0f);
+        return ImGui::SplitterBehavior(bb,
+                                       id,
+                                       split_vertically ? ImGuiAxis_X : ImGuiAxis_Y,
+                                       size1,
+                                       size2,
+                                       min_size1,
+                                       min_size2,
+                                       0.0f);
+    }
+}
 
 namespace basecode::alloc_window {
     static alloc_info_t* s_selected{};
+
 
     static u0 draw_allocators(alloc_window_t& win,
                               const alloc_info_array_t& roots) {
@@ -30,6 +63,7 @@ namespace basecode::alloc_window {
         str::init(scratch, context::top()->alloc.scratch);
         str::reserve(scratch, 64);
         defer(str::free(scratch));
+
         u32 row{};
         for (auto info : roots) {
             ImGui::TableNextRow();
@@ -79,6 +113,23 @@ namespace basecode::alloc_window {
 
     u0 draw(alloc_window_t& win) {
         ImGui::Begin("Allocators", &win.visible);
+        const auto region_size = ImGui::GetContentRegionAvail();
+        win.height = region_size.y;
+        if ((win.table_size == 0 && win.graph_size == 0)
+        ||  (win.table_size + win.graph_size < region_size.x)) {
+            win.table_size = region_size.x * .5;
+            win.graph_size = region_size.x * .5;
+        }
+        ImGui::Splitter(true,
+                        8.0f,
+                        &win.table_size,
+                        &win.graph_size,
+                        8,
+                        8,
+                        win.height);
+        ImGui::BeginChild("Allocators",
+                          ImVec2(win.table_size, win.height),
+                          true);
         if (ImGui::BeginTable("Allocators",
                               4,
                               ImGuiTableFlags_Borders
@@ -86,7 +137,7 @@ namespace basecode::alloc_window {
                               | ImGuiTableFlags_Resizable
                               | ImGuiTableFlags_PreciseWidths
                               | ImGuiTableFlags_NoBordersInBody,
-                              ImVec2(ImGui::GetContentRegionAvailWidth() * .5, -1))) {
+                              ImVec2(ImGui::GetContentRegionAvailWidth(), -1))) {
             ImGui::TableSetupColumn("Allocator");
             ImGui::TableSetupColumn("Name");
             ImGui::TableSetupColumn("Type");
@@ -95,7 +146,11 @@ namespace basecode::alloc_window {
             draw_allocators(win, memory::meta::system::roots());
             ImGui::EndTable();
         }
+        ImGui::EndChild();
         ImGui::SameLine();
+        ImGui::BeginChild("Graph",
+                          ImVec2(win.graph_size, win.height),
+                          true);
         if (s_selected) {
             const ImPlotAxisFlags rt_axis = ImPlotAxisFlags_NoTickLabels;
             auto plot = &s_selected->plot.scrolled;
@@ -124,13 +179,17 @@ namespace basecode::alloc_window {
                 ImPlot::EndPlot();
             }
         }
+        ImGui::EndChild();
         ImGui::End();
     }
 
     u0 init(alloc_window_t& win, alloc_t* alloc) {
         win.ctx        = ImPlot::CreateContext();
         win.alloc      = alloc;
+        win.height     = {};
         win.visible    = true;
         win.mem_editor = false;
+        win.table_size = {};
+        win.graph_size = {};
     }
 }

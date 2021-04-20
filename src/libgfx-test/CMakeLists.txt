@@ -5,6 +5,7 @@ add_executable(
     ${PROJECT_NAME}
 
     main.cpp
+    app.cpp app.h
 )
 target_link_libraries(${PROJECT_NAME} basecode-core basecode-gfx)
 if (NOT MSVC)

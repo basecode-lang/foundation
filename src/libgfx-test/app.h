@@ -18,28 +18,8 @@
 
 #pragma once
 
-#include <basecode/gfx/gfx.h>
-#include <basecode/core/str.h>
-
-struct ImPlotContext;
+#include <basecode/core/types.h>
 
 namespace basecode {
-    struct alloc_window_t final {
-        alloc_t*                alloc;
-        ImPlotContext*          ctx;
-        f32                     table_size;
-        f32                     graph_size;
-        f32                     height;
-        b8                      visible;
-        b8                      mem_editor;
-    };
-
-    namespace alloc_window {
-        u0 free(alloc_window_t& win);
-
-        u0 draw(alloc_window_t& win);
-
-        u0 init(alloc_window_t& win,
-                alloc_t* alloc = context::top()->alloc.main);
-    }
+    s32 run(s32 argc, const s8** argv);
 }

@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <imgui.h>
 #include <basecode/gfx/gfx.h>
 #include <basecode/core/str.h>
 
@@ -31,7 +30,7 @@ namespace basecode {
         str_t                   scratch;
         window_t                window;
         vector4_t               bg_color;
-        ImGuiID                 dock_root;
+        s32                     dock_root;
     };
 
     namespace app {
