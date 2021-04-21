@@ -29,6 +29,7 @@ namespace basecode {
     struct buddy_config_t : alloc_config_t {
         buddy_config_t() : alloc_config_t(alloc_type_t::buddy) {}
 
+        u0*                     metadata;
         u32                     heap_size;
     };
 

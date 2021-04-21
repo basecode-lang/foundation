@@ -271,18 +271,15 @@ TEST_CASE("basecode::cxx example program") {
 
     REQUIRE(OK(status));
 
-    memory::proxy::proxy_array_t proxies{};
-    array::init(proxies);
-    defer(array::free(proxies));
-    memory::proxy::active(proxies);
+    const auto& proxies = memory::proxy::active();
 
     str_t buf{};
     str::init(buf);
     {
         str_buf_t fmt_buf(&buf);
         for (auto proxy : proxies) {
-            format::format_to(fmt_buf, "{:<40} ", memory::proxy::name(proxy->alloc));
-            format::unitized_byte_size(fmt_buf, proxy->alloc->total_allocated);
+            format::format_to(fmt_buf, "{:<40} ", memory::proxy::name(proxy));
+            format::unitized_byte_size(fmt_buf, proxy->total_allocated);
             format::format_to(fmt_buf, "\n");
         }
     }

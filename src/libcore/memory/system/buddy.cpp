@@ -20,19 +20,20 @@
 #include <basecode/core/assert.h>
 #include <basecode/core/memory/system/buddy.h>
 
-#define BIT_ARRAY_NUM_BITS                              (u32(8 * sizeof(u32)))
-#define BIT_ARRAY_INDEX_SHIFT                           (u32(__builtin_ctzl(BIT_ARRAY_NUM_BITS)))
-#define BIT_ARRAY_INDEX_MASK                            (BIT_ARRAY_NUM_BITS - 1UL)
+#define BIT_NUM_BITS                (u32(8 * sizeof(u32)))
+#define BIT_INDEX_MASK              (BIT_NUM_BITS - 1UL)
+#define BIT_INDEX_SHIFT             (u32(__builtin_ctzl(BIT_NUM_BITS)))
 
-#define BUDDY_ILOG2(value)                              (u32(BUDDY_NUM_BITS - 1UL) - __builtin_clz(value))
-#define BUDDY_NUM_BITS                                  (u32(8 * sizeof(u32)))
-#define BUDDY_MIN_LEAF_SIZE                             (sizeof(u0*) << 1UL)
-#define BUDDY_LEAF_LEVEL_OFFSET                         (BUDDY_ILOG2(BUDDY_MIN_LEAF_SIZE))
-#define BUDDY_MAX_LEVELS(total_size, min_size)          (BUDDY_ILOG2(total_size) - BUDDY_ILOG2(min_size))
-#define BUDDY_MAX_INDEXES(total_size, min_size)         (1UL << (BUDDY_MAX_LEVELS(total_size, min_size) + 1))
-#define BUDDY_BLOCK_INDEX_SIZE(total_size, min_size)    ((BUDDY_MAX_INDEXES(total_size, min_size) + (BUDDY_NUM_BITS - 1)) / BUDDY_NUM_BITS)
-#define BUDDY_SIZEOF_METADATA(total_size, min_size)     ((sizeof(buddy_block_t) * (BUDDY_MAX_LEVELS(total_size, min_size) + 1)) + \
-                                                        BUDDY_BLOCK_INDEX_SIZE(total_size, min_size) * (BUDDY_NUM_BITS >> 3U))
+#define NUM_BITS                    (u32(8 * sizeof(u32)))
+#define ILOG2(v)                    (u32(NUM_BITS - 1UL) - __builtin_clz((v)))
+#define MIN_LEAF_SIZE               (sizeof(u0*) << 1UL)
+#define MAX_LEVELS(ts, ms)          (ILOG2(ts) - ILOG2(ms))
+#define MAX_INDEXES(ts, ms)         (1UL << (MAX_LEVELS(ts, ms) + 1))
+#define BLOCK_INDEX_SIZE(ts, ms)    ((MAX_INDEXES(ts, ms)                       \
+                                     + (NUM_BITS - 1)) / NUM_BITS)
+#define SIZEOF_METADATA(ts, ms)     ((sizeof(buddy_block_t)                     \
+                                     * (MAX_LEVELS(ts, ms) + 1))                \
+                                    + BLOCK_INDEX_SIZE(ts, ms) * (NUM_BITS >> 3U))
 
 namespace basecode::memory::buddy {
     static inline u0 list_init(buddy_block_t* list);
@@ -124,12 +125,11 @@ namespace basecode::memory::buddy {
         u8* heap = (u8*) r.mem;
         sc->heap = heap;
 
-        sc->extra_metadata = nullptr;
-        sc->min_allocation = BUDDY_MIN_LEAF_SIZE;
-        sc->total_levels   = BUDDY_ILOG2(sc->size);
-        sc->max_indexes    = BUDDY_MAX_INDEXES(sc->size, sc->min_allocation);
-        sc->max_level      = BUDDY_MAX_LEVELS(sc->size, sc->min_allocation);
-        sc->metadata_size  = align(BUDDY_SIZEOF_METADATA(sc->size, BUDDY_MIN_LEAF_SIZE),
+        sc->min_allocation = MIN_LEAF_SIZE;
+        sc->total_levels   = ILOG2(sc->size);
+        sc->max_indexes    = MAX_INDEXES(sc->size, sc->min_allocation);
+        sc->max_level      = MAX_LEVELS(sc->size, sc->min_allocation);
+        sc->metadata_size  = align(SIZEOF_METADATA(sc->size, MIN_LEAF_SIZE),
                                    alignof(buddy_block_t));
         u8* initial_metadata = (heap + sc->size) - sc->metadata_size;
         auto initial_free_blocks = (buddy_block_t*) initial_metadata;
@@ -143,16 +143,15 @@ namespace basecode::memory::buddy {
             list_init(&sc->free_blocks[i]);
         }
 
-        const auto max_indexes = (sc->max_indexes + (BUDDY_NUM_BITS - 1))
-                                 / BUDDY_NUM_BITS;
+        const auto max_indexes = (sc->max_indexes + (NUM_BITS - 1)) / NUM_BITS;
         for (u32 i = 0; i < max_indexes; ++i) {
             sc->block_index[i] = 0;
         }
 
         list_add(&sc->free_blocks[0], (buddy_block_t*) heap);
 
-        const auto num_blocks = (sc->metadata_size + (BUDDY_MIN_LEAF_SIZE - 1))
-                                / BUDDY_MIN_LEAF_SIZE;
+        const auto num_blocks = (sc->metadata_size + (MIN_LEAF_SIZE - 1))
+                                / MIN_LEAF_SIZE;
         for (u32 i = 0; i < num_blocks; ++i) {
             r = buddy_alloc_from_level(alloc, sc->max_level);
             alloc->total_allocated += r.size;
@@ -178,12 +177,12 @@ namespace basecode::memory::buddy {
     }
 
     static inline u0 bit_array_set(u32* bit_array, u32 index) {
-        bit_array[index >> BIT_ARRAY_INDEX_SHIFT] |= (1UL << (index & BIT_ARRAY_INDEX_MASK));
+        bit_array[index >> BIT_INDEX_SHIFT] |= (1UL << (index & BIT_INDEX_MASK));
     }
 
     static inline u0 bit_array_not(u32* bit_array, u32 index) {
-        u32 array_index = index >> BIT_ARRAY_INDEX_SHIFT;
-        u32 bit_value   = (1UL << (index & BIT_ARRAY_INDEX_MASK));
+        u32 array_index = index >> BIT_INDEX_SHIFT;
+        u32 bit_value   = (1UL << (index & BIT_INDEX_MASK));
 
         if (bit_array[array_index] & bit_value)
             bit_array[array_index] &= ~bit_value;
@@ -201,7 +200,7 @@ namespace basecode::memory::buddy {
     }
 
     static inline u0 bit_array_clear(u32* bit_array, u32 index) {
-        bit_array[index >> BIT_ARRAY_INDEX_SHIFT] &= ~(1UL << (index & BIT_ARRAY_INDEX_MASK));
+        bit_array[index >> BIT_INDEX_SHIFT] &= ~(1UL << (index & BIT_INDEX_MASK));
     }
 
     static inline u32 free_index(const alloc_t* alloc, u32 index) {
@@ -220,7 +219,8 @@ namespace basecode::memory::buddy {
     }
 
     static inline b8 bit_array_is_set(const u32* bit_array, u32 index) {
-        return (bit_array[index >> BIT_ARRAY_INDEX_SHIFT] & (1UL << (index & BIT_ARRAY_INDEX_MASK))) != 0;
+        return (bit_array[index >> BIT_INDEX_SHIFT]
+                & (1UL << (index & BIT_INDEX_MASK))) != 0;
     }
 
     static inline u32 size_to_level(const alloc_t* alloc, size_t size) {
@@ -229,9 +229,9 @@ namespace basecode::memory::buddy {
         if (size < sc->min_allocation)
             return sc->max_level;
 
-        size = 1U << (BUDDY_NUM_BITS - __builtin_clzl(size - 1));
+        size = 1U << (NUM_BITS - __builtin_clzl(size - 1));
 
-        return sc->total_levels - BUDDY_ILOG2(size);
+        return sc->total_levels - ILOG2(size);
     }
 
     static inline u0 list_add(buddy_block_t* list, buddy_block_t* node) {

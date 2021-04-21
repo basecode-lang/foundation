@@ -26,9 +26,9 @@
 namespace basecode {
     struct slab_t;
     struct alloc_t;
-    struct proxy_pair_t;
     struct buddy_block_t;
     struct page_header_t;
+
     using mspace                    = u0*;
 
     enum class alloc_type_t : u8 {
@@ -123,9 +123,9 @@ namespace basecode {
             slab_t*                 tail;
             slab_t*                 head;
             u32                     count;
-            u32                     buf_size;
             u32                     page_size;
-            u32                     buf_max_count;
+            u16                     buf_size;
+            u16                     buf_max_count;
             u8                      num_pages;
             u8                      buf_align;
         }                           slab;
@@ -133,25 +133,24 @@ namespace basecode {
             page_header_t*          cursor;
             page_header_t*          tail;
             page_header_t*          head;
-            u32                     page_size;
             u32                     count;
-            u8                      num_pages;
+            u16                     page_size;
+            u16                     num_pages;
         }                           page;
         struct {
-            proxy_pair_t*           pair;
-            b8                      owner;
+            u32                     owner:      1;
+            u32                     name_id:    31;
         }                           proxy;
         struct buddy_t {
             u0*                     heap;
-            u0*                     extra_metadata;
             u32*                    block_index;
             buddy_block_t*          free_blocks;
             u32                     size;
-            u32                     max_level;
             u32                     max_indexes;
-            u32                     total_levels;
             u32                     metadata_size;
             u32                     min_allocation;
+            u16                     max_level;
+            u16                     total_levels;
         }                           buddy;
     };
 
@@ -162,7 +161,8 @@ namespace basecode {
         u32                         total_allocated;
         u32                         pad;
     };
-    static_assert(sizeof(alloc_t) <= 80, "alloc_t is now larger than 80 bytes!");
+    static_assert(sizeof(alloc_t) <= 72,
+                  "alloc_t is now larger than 72 bytes!");
 
     namespace memory {
         enum class status_t : u8 {
