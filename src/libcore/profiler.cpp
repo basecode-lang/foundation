@@ -34,18 +34,29 @@ namespace basecode::profiler {
 #ifdef HW_TIMER
 #   if !defined TARGET_OS_IOS && __ARM_ARCH >= 6
         return 1.0f;
-#   elif defined(_WIN32)
+#   elif defined(TSC_USING_QPC)
         LARGE_INTEGER li{};
         QueryPerformanceFrequency(&li);
-        return li.QuadPart / 100000;
+        return f64(li.QuadPart) / f64(100000);
 #   else
         using namespace std::chrono;
 
+        _mm_mfence();
         const auto t0 = high_resolution_clock::now();
         const auto r0 = get_time();
-        std::this_thread::sleep_for(milliseconds(200));
+        _mm_lfence();
+
+#   ifdef _WIN32
+        HANDLE mutex = CreateEventEx(0, 0, 0, EVENT_ALL_ACCESS);
+        WaitForSingleObjectEx(mutex, 50, FALSE);
+#   else
+        std::this_thread::sleep_for(milliseconds(50));
+#   endif
+
+        _mm_mfence();
         const auto t1 = high_resolution_clock::now();
         const auto r1 = get_time();
+        _mm_lfence();
 
         const auto dt = duration_cast<std::chrono::nanoseconds>(t1 - t0).count();
         const auto dr = r1 - r0;

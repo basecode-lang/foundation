@@ -59,16 +59,14 @@ namespace basecode::profiler {
                                             .time_since_epoch())
                                          .count();
 #    endif
-#  elif defined _WIN32 || defined __CYGWIN__
+#  elif defined TSC_USING_QPC
         LARGE_INTEGER li{};
         QueryPerformanceCounter(&li);
         return li.QuadPart;
-#  elif defined __i386 || defined _M_IX86 || defined __x86_64__ || defined _M_X64
-        u32 eax, edx;
-        _mm_mfence();
-        asm volatile ( "rdtscp" : "=a" (eax), "=d" (edx)::"%ecx" );
+#  elif defined __i386      || defined _M_IX86 \
+     || defined __x64_64__  || defined _M_X64
         _mm_lfence();
-        return (u64(edx) << (u8) 32) + u64(eax);
+        return __rdtsc();
 #  endif
 #else
         return duration_cast<nanoseconds>(high_resolution_clock::now()
