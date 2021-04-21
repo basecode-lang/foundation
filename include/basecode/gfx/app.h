@@ -21,6 +21,7 @@
 #include <basecode/gfx/gfx.h>
 #include <basecode/core/str.h>
 #include <basecode/core/path.h>
+#include <basecode/gfx/fonts/IconsFontAwesome5.h>
 
 namespace basecode {
     struct app_t;

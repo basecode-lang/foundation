@@ -33,14 +33,14 @@ namespace basecode {
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("View")) {
-                ImGui::MenuItem("Tool Windows", nullptr, nullptr, true);
+                ImGui::MenuItem(ICON_FA_TOOLS "  Tool Windows", nullptr, nullptr, true);
                 ImGui::EndMenu();
             }
             const auto size = ImGui::GetContentRegionAvail();
             str::reset(app.scratch); {
                 str_buf_t buf(&app.scratch);
                 format::format_to(buf,
-                                  "| app average {:> 2.2f} ms/frame ({:> 3.2f} FPS)",
+                                  ICON_FA_CHART_BAR "  app average {:> 2.2f} ms/frame ({:> 3.2f} FPS)",
                                   1000.0f / io.Framerate,
                                   io.Framerate);
             }

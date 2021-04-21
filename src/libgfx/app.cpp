@@ -154,8 +154,20 @@ namespace basecode::app {
         ImGui_ImplGlfw_InitForOpenGL(app.window.backing, true);
         ImGui_ImplOpenGL3_Init(glsl_version);
 
-        io.FontDefault = io.Fonts->AddFontFromFileTTF("../share/fonts/SEGOEUI.TTF",
-                                                      PT_TO_PX(18));
+        io.FontDefault = io.Fonts->AddFontFromFileTTF(
+            "../share/fonts/SEGOEUI.TTF",
+            PT_TO_PX(18));
+
+        ImWchar icons_range[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
+        ImFontConfig icons_config;
+        icons_config.MergeMode  = true;
+        icons_config.PixelSnapH = true;
+        io.Fonts->AddFontFromFileTTF(
+            "../share/fonts/" FONT_ICON_FILE_NAME_FAS,
+            PT_TO_PX(18),
+            &icons_config,
+            icons_range);
+
         ImGuiFreeType::BuildFontAtlas(io.Fonts);
 
         s32 dw{};
@@ -244,7 +256,6 @@ namespace basecode::app {
             if (!OK(status))
                 return status;
         }
-        auto ctx = scm::system::global_ctx();
         scm::obj_t* obj{};
         auto status = scm::system::eval(path, &obj);
         if (!OK(status))

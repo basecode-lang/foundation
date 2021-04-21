@@ -21,6 +21,7 @@
 #include <basecode/gfx/implot/implot.h>
 #include <basecode/gfx/imgui/imgui_internal.h>
 #include <basecode/core/memory/system/proxy.h>
+#include <basecode/gfx/fonts/IconsFontAwesome5.h>
 
 namespace ImGui {
     bool Splitter(bool split_vertically,
@@ -112,7 +113,7 @@ namespace basecode::alloc_window {
     }
 
     u0 draw(alloc_window_t& win) {
-        ImGui::Begin("Allocators", &win.visible);
+        ImGui::Begin(ICON_FA_MEMORY "  Allocators", &win.visible);
         const auto region_size = ImGui::GetContentRegionAvail();
         win.height = region_size.y;
         if ((win.table_size == 0 && win.graph_size == 0)
