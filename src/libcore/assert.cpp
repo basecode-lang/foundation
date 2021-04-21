@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/assert.h>
 #include <basecode/core/format.h>
 
 namespace basecode {
@@ -24,7 +25,7 @@ namespace basecode {
                      const s8* file,
                      s32 line,
                      const s8* msg,
-                     fmt_args_t args) {
+                     const fmt_args_t& args) {
         str_t buf{};
         str::init(buf); {
             str_buf_t sb(&buf);

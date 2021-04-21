@@ -16,6 +16,9 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/path.h>
+#include <basecode/core/format.h>
+#include <basecode/core/string.h>
 #include <basecode/core/graphviz/gv.h>
 
 namespace basecode::graphviz {

@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/format.h>
 #include <basecode/core/wasm/formatter.h>
 
 namespace basecode::wasm {

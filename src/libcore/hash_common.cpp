@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/format.h>
 #include <basecode/core/hash_common.h>
 
 namespace basecode::hash_common {

@@ -5,6 +5,7 @@ add_library(ffi-test-kernel SHARED ffi_kernel.cpp)
 target_compile_options(ffi-test-kernel PRIVATE -march=native)
 get_target_property(BASECODE_CORE_INCLUDE_DIRS basecode-core INTERFACE_INCLUDE_DIRECTORIES)
 target_include_directories(ffi-test-kernel PRIVATE ${BASECODE_CORE_INCLUDE_DIRS})
+target_link_libraries(ffi-test-kernel fmt)
 
 add_executable(
     ${PROJECT_NAME}

@@ -18,17 +18,10 @@
 
 #pragma once
 
-#include <basecode/core/family.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode {
-    struct obj_type_t;
-
-    using obj_array_t           = array_t<u0*>;
-    using slab_table_t          = hashtab_t<u32, obj_type_t>;
-    using destroy_callback_t    = u0 (*)(const u0*);
-
     struct obj_type_t final {
         alloc_t*                alloc;
         destroy_callback_t      destroyer;
@@ -42,13 +35,10 @@ namespace basecode {
         slab_table_t            slabs;
         u32                     size;
     };
-    static_assert(sizeof(obj_pool_t) <= 72, "obj_pool_t is now larger than 72 bytes!");
+    static_assert(sizeof(obj_pool_t) <= 72,
+                  "obj_pool_t is now larger than 72 bytes!");
 
     namespace obj_pool {
-        enum class status_t : u32 {
-            ok                  = 0,
-        };
-
         u0 reset(obj_pool_t& pool);
 
         template <typename T>

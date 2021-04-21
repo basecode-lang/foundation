@@ -20,26 +20,10 @@
 
 #include <basecode/core/array.h>
 #include <basecode/core/memory.h>
-#include <basecode/core/hashable.h>
 #include <basecode/core/iterator.h>
 #include <basecode/core/hash_common.h>
 
 namespace basecode {
-    template <typename T>
-    concept Hash_Set = hash::Hashable<T> && requires(const T& t) {
-        typename                T::Value_Type;
-        typename                T::Is_Pointer;
-        typename                T::Value_Type_Base;
-
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.flags}               -> same_as<u64*>;
-        {t.hashes}              -> same_as<u64*>;
-        {t.values}              -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
-        {t.load_factor}         -> same_as<f32>;
-    };
-
     struct set_buf_size_t final {
         u32                     total_size;
         u32                     size_of_flags;
@@ -100,7 +84,8 @@ namespace basecode {
         };
         DECL_ITERS(set_t, Value_Type, iterator_state_t);
     };
-    static_assert(sizeof(set_t<s32>) <= 56, "set_t<T> is now larger than 56 bytes!");
+    static_assert(sizeof(set_t<s32>) <= 56,
+                  "set_t<T> is now larger than 56 bytes!");
 
     namespace set {
         template <Hash_Set T>

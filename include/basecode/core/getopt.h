@@ -22,15 +22,6 @@
 #include <basecode/core/array.h>
 
 namespace basecode {
-    enum class arg_type_t : u8 {
-        none,
-        flag,
-        file,
-        string,
-        integer,
-        decimal,
-    };
-
     struct option_t final {
         str::slice_t            long_name;
         str::slice_t            value_name;
@@ -57,9 +48,6 @@ namespace basecode {
         b8                      extra;
     };
 
-    using arg_array_t           = array_t<arg_t>;
-    using option_array_t        = array_t<option_t>;
-
     struct getopt_t final {
         alloc_t*                alloc;
         const s8**              argv;
@@ -72,19 +60,6 @@ namespace basecode {
     };
 
     namespace getopt {
-        enum class status_t : u32 {
-            ok                              = 0,
-            unconfigured,
-            invalid_option,
-            expected_value,
-            duplicate_option,
-            invalid_argument,
-            count_exceeds_allowed,
-            missing_required_option,
-            decimal_conversion_error,
-            integer_conversion_error,
-        };
-
         class option_builder_t final {
             getopt_t*               _opt;
             str::slice_t            _long_name      {};

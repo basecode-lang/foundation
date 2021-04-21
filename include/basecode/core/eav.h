@@ -22,31 +22,9 @@
 #include <basecode/core/path.h>
 #include <basecode/core/array.h>
 #include <basecode/core/string.h>
-#include <basecode/core/hashtab.h>
 #include <basecode/core/stable_array.h>
 
 namespace basecode {
-    [[maybe_unused]] constexpr s32 app_id       = 0x000dead1;
-
-    struct db_t;
-    struct txn_t;
-    struct tuple_t;
-    struct entity_t;
-
-    using txn_list_t            = stable_array_t<txn_t>;
-    using tuple_list_t          = array_t<tuple_t>;
-    using entity_list_t         = array_t<entity_t>;
-
-    enum class value_type_t : u8 {
-        nil,
-        list,
-        entity,
-        string,
-        boolean,
-        integer,
-        floating_point,
-    };
-
     struct entity_t final {
         constexpr entity_t()        : id(0)         {}
         constexpr entity_t(s64 id)  : id(id)        {}
@@ -129,14 +107,16 @@ namespace basecode {
             return *this;
         }
     };
-    static_assert(sizeof(value_t) <= 32, "value_t is now larger than 32 bytes!");
+    static_assert(sizeof(value_t) <= 32,
+                  "value_t is now larger than 32 bytes!");
 
     struct tuple_t final {
         s64                     rowid;
         entity_t                attr;
         value_t                 value;
     };
-    static_assert(sizeof(tuple_t) <= 48, "tuple_t is now larger than 48 bytes!");
+    static_assert(sizeof(tuple_t) <= 48,
+                  "tuple_t is now larger than 48 bytes!");
 
     struct simple_stmt_cache_t final {
         sqlite3_stmt*           select      {};
@@ -177,15 +157,6 @@ namespace basecode {
     };
 
     namespace eav {
-        enum class status_t : u8 {
-            ok                  = 0,
-            error               = 101,
-            not_found           = 102,
-            sql_error           = 103,
-            invalid_rowid       = 104,
-            invalid_entity      = 105,
-        };
-
         namespace txn {
             status_t begin(db_t& db, txn_t& txn);
 
@@ -296,11 +267,6 @@ namespace basecode {
         }
 
         namespace entity {
-            namespace status {
-                [[maybe_unused]] constexpr u8 dead          = 0;
-                [[maybe_unused]] constexpr u8 live          = 1;
-            }
-
             status_t find(txn_t& txn,
                           entity_t id,
                           entity_t& type_id,

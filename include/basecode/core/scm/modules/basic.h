@@ -16,11 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/log.h>
-#include <basecode/core/error.h>
-#include <basecode/core/string.h>
-#include <basecode/core/cxx/cxx.h>
-#include <basecode/core/scm/kernel.h>
+#include <basecode/core/types.h>
+#include <basecode/core/context.h>
 
 namespace basecode::scm::module::basic {
     enum class status_t : u32 {

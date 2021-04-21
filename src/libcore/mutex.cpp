@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/mutex.h>
-#include <basecode/core/string.h>
 
 namespace basecode::mutex {
     static status_t status_from_errno(s32 err) {

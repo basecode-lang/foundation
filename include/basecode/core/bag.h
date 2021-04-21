@@ -18,14 +18,10 @@
 
 #pragma once
 
+#include <basecode/core/bits.h>
 #include <basecode/core/array.h>
 #include <basecode/core/memory.h>
-#ifdef __clang__
-#   include <basecode/core/getopt.h>            // XXX: only clang complains about not finding
-                                                //      the hash64 function unless i include the
-                                                //      header here.
-#endif
-#include <basecode/core/hashable.h>
+#include <basecode/core/context.h>
 #include <basecode/core/iterator.h>
 #include <basecode/core/hash_common.h>
 
@@ -115,7 +111,8 @@ namespace basecode {
         };
         DECL_ITERS(bag_t, Item_Type, iterator_state_t);
     };
-    static_assert(sizeof(bag_t<s32>) <= 56, "bag_t<T> is now larger than 56 bytes!");
+    static_assert(sizeof(bag_t<s32>) <= 56,
+                  "bag_t<T> is now larger than 56 bytes!");
 
     namespace bag {
         template <Hash_Bag T>

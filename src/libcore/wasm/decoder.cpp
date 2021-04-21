@@ -16,7 +16,6 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/buf.h>
 #include <basecode/core/leb128.h>
 #include <basecode/core/wasm/decoder.h>
 

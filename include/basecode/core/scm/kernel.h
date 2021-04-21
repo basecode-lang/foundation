@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <basecode/core/ffi.h>
 #include <basecode/core/scm/scm.h>
 
 #define REQ(name, type)         basecode::scm::kernel::proc_param_t{            \

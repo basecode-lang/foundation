@@ -19,8 +19,9 @@
 #pragma once
 
 #include <basecode/core/slice.h>
-#include <basecode/core/array.h>
 
 namespace basecode::slice {
-    b8 to_fields(const str::slice_t& value, array_t<str::slice_t>& fields, s8 sep = ',');
+    b8 to_fields(const str::slice_t& value,
+                 array_t<str::slice_t>& fields,
+                 s8 sep = ',');
 }

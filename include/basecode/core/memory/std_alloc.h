@@ -18,9 +18,9 @@
 
 #pragma once
 
-namespace basecode {
-    struct alloc_t;
+#include <basecode/core/assert.h>
 
+namespace basecode {
     namespace memory::std_alloc {
         u0  free(alloc_t* alloc, u0* mem, u32 size);
 

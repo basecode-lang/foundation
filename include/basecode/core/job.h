@@ -25,17 +25,6 @@
 #include <basecode/core/stable_array.h>
 
 namespace basecode {
-    struct job_t;
-    using job_id                = u32;
-    using job_id_list_t         = array_t<job_id>;
-
-    enum class job_state_t : u8 {
-        queued                  = 250,
-        created,
-        running,
-        finished,
-    };
-
     struct job_task_base_t {
         virtual ~job_task_base_t() = default;
 
@@ -99,20 +88,10 @@ namespace basecode {
 
         b8 operator==(const job_t& other) const { return id == other.id; };
     };
-    static_assert(sizeof(job_t) <= 72, "sizeof(job_t) is now greater than 72 bytes!");
-
-    using job_list_t            = stable_array_t<job_t>;
+    static_assert(sizeof(job_t) <= 72,
+                  "sizeof(job_t) is now greater than 72 bytes!");
 
     namespace job {
-        enum class status_t : u8 {
-            ok                      = 0,
-            busy                    = 138,
-            error                   = 139,
-            invalid_job_id          = 140,
-            invalid_job_state       = 141,
-            label_intern_failure    = 142,
-        };
-
         namespace system {
             u0 fini();
 

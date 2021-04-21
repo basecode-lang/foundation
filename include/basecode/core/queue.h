@@ -32,7 +32,8 @@ namespace basecode {
         T& operator[](u32 index)                { return items[(index + offset) % items.size]; }
         const T& operator[](u32 index) const    { return items[(index + offset) % items.size]; }
     };
-    static_assert(sizeof(queue_t<s32>) <= 32, "queue_t<T> is now larger than 32 bytes!");
+    static_assert(sizeof(queue_t<s32>) <= 32,
+                  "queue_t<T> is now larger than 32 bytes!");
 
     namespace queue {
         namespace internal {

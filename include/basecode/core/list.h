@@ -31,21 +31,6 @@ namespace basecode {
     };
 
     template <typename T>
-    concept Linked_List = requires(const T& t) {
-        typename                T::Value_Type;
-        typename                T::Node_Array;
-        typename                T::Value_Array;
-
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.nodes}               -> same_as<typename T::Node_Array>;
-        {t.values}              -> same_as<typename T::Value_Array>;
-        {t.head}                -> same_as<u32>;
-        {t.tail}                -> same_as<u32>;
-        {t.free}                -> same_as<u32>;
-        {t.size}                -> same_as<u32>;
-    };
-
-    template <typename T>
     struct list_t final {
         using Value_Type        = T;
         using Node_Array        = array_t<list_node_t>;

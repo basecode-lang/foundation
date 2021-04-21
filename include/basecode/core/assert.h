@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/format_types.h>
+#include <basecode/core/format_fwd.h>
 
 #define BC_ASSERT_MSG(cond, msg, ...)   SAFE_SCOPE(                                                                     \
 	if (!(cond)) {                                                                                                      \
@@ -40,7 +39,7 @@ namespace basecode {
                      const s8* file,
                      s32 line,
                      const s8* msg,
-                     fmt_args_t args);
+                     const fmt_args_t& args);
 
     template <typename... Args>
     u0 assert_handler(const s8* prefix,

@@ -31,29 +31,6 @@ namespace basecode {
                   "glob_result_t is now bigger than 112 bytes!");
 
     namespace filesys {
-        enum class status_t : u8 {
-            ok                              = 0,
-            not_dir                         = 116,
-            not_file                        = 117,
-            not_exists                      = 118,
-            invalid_dir                     = 119,
-            chdir_failure                   = 120,
-            file_writable                   = 121,
-            mkdir_failure                   = 122,
-            getcwd_failure                  = 123,
-            rename_failure                  = 124,
-            remove_failure                  = 125,
-            not_equivalent                  = 126,
-            mkdtemp_failure                 = 127,
-            not_implemented                 = 128,
-            unexpected_path                 = 129,
-            realpath_failure                = 130,
-            cannot_modify_root              = 131,
-            unexpected_empty_path           = 132,
-            cannot_rename_to_existing_file  = 133,
-            no_home_path                    = 134,
-        };
-
         namespace glob {
             u0 free(glob_result_t& r);
 

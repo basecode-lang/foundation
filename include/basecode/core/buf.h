@@ -19,8 +19,9 @@
 #pragma once
 
 #include <basecode/core/path.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/stack.h>
+#include <basecode/core/array.h>
+#include <basecode/core/defer.h>
 
 #define CRSR_POS(c)             ((c).pos)
 #define CRSR_END(c)             ((c).buf->length - 1)
@@ -80,14 +81,6 @@
         return status_t::write_error;)
 
 namespace basecode {
-    template <typename T>
-    concept Buffer_Concept = String_Concept<T> || requires(const T& t) {
-        {t.alloc}       -> same_as<alloc_t*>;
-        {t.data}        -> same_as<u8*>;
-        {t.length}      -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
-    };
-
     struct buf_line_t final {
         u32                     pos;
         u32                     len;
@@ -118,7 +111,8 @@ namespace basecode {
         u8& operator[](u32 idx)      { return data[idx]; }
         u8 operator[](u32 idx) const { return data[idx]; }
     };
-    static_assert(sizeof(buf_t) <= 128, "buf_t is now larger than 128 bytes!");
+    static_assert(sizeof(buf_t) <= 128,
+                  "buf_t is now larger than 128 bytes!");
 
     struct buf_crsr_t final {
         buf_t*                  buf;
@@ -131,7 +125,8 @@ namespace basecode {
         u8& operator[](u32 idx)         { return (*buf)[idx];       }
         u8 operator[](u32 idx) const    { return (*buf)[idx];       }
     };
-    static_assert(sizeof(buf_crsr_t) <= 56, "buf_crsr_t is now larger than 56 bytes!");
+    static_assert(sizeof(buf_crsr_t) <= 56,
+                  "buf_crsr_t is now larger than 56 bytes!");
 
     namespace buf {
         enum class status_t : u8 {

@@ -23,15 +23,6 @@
 #include <basecode/core/str.h>
 
 namespace basecode {
-    struct thread_t;
-
-    enum class thread_state_t : u8 {
-        exited,
-        created,
-        running,
-        canceled,
-    };
-
     struct proc_base_t {
         virtual ~proc_base_t() = default;
 
@@ -53,9 +44,11 @@ namespace basecode {
         args_t                  args;
         return_t                ret_val;
 
-        thread_proc_t(thread_t* thread, proc_t proc, args_t args) : thread(thread),
-                                                                    proc(proc),
-                                                                    args(std::move(args)) {
+        thread_proc_t(thread_t* thread,
+                      proc_t proc,
+                      args_t args) : thread(thread),
+                                     proc(proc),
+                                     args(std::move(args)) {
         }
 
         u0* invoke() override {
@@ -90,22 +83,6 @@ namespace basecode {
     };
 
     namespace thread {
-        enum class status_t : u8 {
-            ok                      = 0,
-            error                   = 167,
-            deadlock                = 168,
-            not_joinable            = 169,
-            invalid_state           = 170,
-            name_too_long           = 171,
-            invalid_thread          = 172,
-            already_joined          = 173,
-            not_cancelable          = 174,
-            already_canceled        = 175,
-            already_detached        = 176,
-            create_thread_failure   = 177,
-            insufficient_privilege  = 178,
-        };
-
         namespace system {
             u0 fini();
 

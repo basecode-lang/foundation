@@ -81,24 +81,6 @@ namespace basecode {
             memory::system::free(storage.alloc);
         }
 
-        b8 format_record(bass_t& ast,
-                         fmt_buf_t& buf,
-                         u32 id,
-                         format_record_callback_t record_cb,
-                         u0* ctx) {
-            u32 value{};
-            cursor_t cursor{};
-            if (!bass::seek_record(ast, id, cursor))
-                return false;
-            if (!record_cb(format_type_t::header, cursor, buf, ctx))
-                return false;
-            while (bass::next_field(cursor, value)) {
-                if (!record_cb(format_type_t::field, cursor, buf, ctx))
-                    return false;
-            }
-            return true;
-        }
-
         b8 next_record(cursor_t& cursor) {
             const auto page_size = memory::bump::end_offset(cursor.storage->bump_alloc);
             if (cursor.offset + sizeof(field_t) >= page_size) {

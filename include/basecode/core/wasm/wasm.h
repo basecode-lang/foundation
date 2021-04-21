@@ -19,7 +19,6 @@
 #pragma once
 
 #include <basecode/core/buf.h>
-#include <basecode/core/path.h>
 #include <basecode/core/array.h>
 #include <basecode/core/hashtab.h>
 

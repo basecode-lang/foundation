@@ -42,15 +42,6 @@ namespace basecode {
     };
 
     namespace leb {
-        constexpr u8 sign_bit         = 0x40;
-        constexpr u8 continuation_bit = 0x80;
-        constexpr u8 lower_seven_bits = 0x7f;
-
-        enum class status_t {
-            ok,
-            decode_error
-        };
-
         u0 init(leb128_t& leb);
 
         template <typename T,

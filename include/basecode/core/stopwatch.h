@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <basecode/core/defer.h>
 #include <basecode/core/format.h>
 
 #define TIME_BLOCK_ALLOC(slug, alloc, ...)                                      \
@@ -47,8 +48,6 @@ namespace basecode {
         u64                     end;
         u64                     start;
     };
-
-    using timed_block_callable_t    = std::function<s32()>;
 
     namespace stopwatch {
         u0 init(stopwatch_t& w);

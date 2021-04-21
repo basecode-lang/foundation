@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/log.h>
+#include <basecode/core/types.h>
 
 namespace basecode {
     struct default_config_t : logger_config_t {

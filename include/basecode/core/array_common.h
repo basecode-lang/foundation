@@ -18,49 +18,9 @@
 
 #pragma once
 
-#include <basecode/core/array.h>
+#include <basecode/core/types.h>
 
 namespace basecode {
-    template <typename T>
-    concept Proxy_Array = requires(const T& t) {
-        typename                T::Value_Type;
-        typename                T::Size_Per_16;
-        typename                T::Backing_Array;
-
-        {t.backing}             -> same_as<typename T::Backing_Array>;
-        {t.start}               -> same_as<u32>;
-        {t.size}                -> same_as<u32>;
-    };
-
-    template <typename T>
-    concept Static_Array_Concept = same_as<typename T::Is_Static, std::true_type>
-                                   && requires(const T& t) {
-        typename                T::Is_Static;
-        typename                T::Value_Type;
-
-        {t.data}                -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
-    };
-
-    template <typename T>
-    concept Dynamic_Array_Concept = same_as<typename T::Is_Static, std::false_type>
-                                    && requires(const T& t) {
-        typename                T::Is_Static;
-        typename                T::Value_Type;
-        typename                T::Size_Per_16;
-
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.data}                -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
-    };
-
-    template <typename T>
-    concept Array_Concept = Static_Array_Concept<T>
-        || Dynamic_Array_Concept<T>
-        || Proxy_Array<T>;
-
     namespace array {
         template <Array_Concept T>
         u0 pop(T& array) {

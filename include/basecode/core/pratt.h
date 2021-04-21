@@ -26,11 +26,6 @@ namespace basecode {
     struct rule_t;
     struct pratt_ctx_t;
 
-    using rule_map_t            = hashtab_t<token_type_t, rule_t>;
-    using std_t                 = ast::node_id_t (*)(pratt_ctx_t*);
-    using nud_t                 = ast::node_id_t (*)(pratt_ctx_t*);
-    using led_t                 = ast::node_id_t (*)(pratt_ctx_t*, ast::node_id_t);
-
     struct rule_t final {
         std_t                   std;
         nud_t                   nud;
@@ -58,12 +53,6 @@ namespace basecode {
     };
 
     namespace pratt {
-        namespace associativity {
-            [[maybe_unused]] constexpr u8 none  = 0b0000;
-            [[maybe_unused]] constexpr u8 left  = 0b0001;
-            [[maybe_unused]] constexpr u8 right = 0b0010;
-        }
-
         namespace parser {
             ast::node_id_t expression(pratt_ctx_t& ctx, u32 rbp = 0);
         }

@@ -17,9 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <catch.hpp>
-#include <basecode/core/defer.h>
-#include <basecode/core/format.h>
-#include <basecode/core/stopwatch.h>
+#include <basecode/core/buf.h>
 #include <basecode/core/graphviz/gv.h>
 
 using namespace basecode;

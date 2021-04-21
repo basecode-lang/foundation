@@ -21,16 +21,6 @@
 #include <basecode/core/plot.h>
 
 namespace basecode {
-    struct alloc_info_t;
-
-    using alloc_info_array_t    = array_t<alloc_info_t*>;
-
-    enum class plot_mode_t : u8 {
-        none,
-        rolled,
-        scrolled,
-    };
-
     struct alloc_info_t final {
         alloc_t*                alloc;
         alloc_info_t*           parent;

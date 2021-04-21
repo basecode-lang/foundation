@@ -33,11 +33,13 @@ namespace basecode {
         }
     };
 
-    namespace locale {
-        enum class status_t : u8 {
-            ok,
-        };
+    namespace hash {
+        inline u64 hash64(const locale_key_t& key) {
+            return murmur::hash64(&key, sizeof(locale_key_t));
+        }
+    }
 
+    namespace locale {
         namespace system {
             u0 fini();
 
@@ -49,12 +51,6 @@ namespace basecode {
         locale_key_t make_key(u32 id);
 
         locale_key_t make_key(u32 id, str::slice_t locale);
-    }
-}
-
-namespace basecode::hash {
-    inline u64 hash64(const locale_key_t& key) {
-        return murmur::hash64(&key, sizeof(locale_key_t));
     }
 }
 

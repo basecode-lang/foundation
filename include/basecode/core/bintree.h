@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <basecode/core/buf.h>
 #include <basecode/core/types.h>
 #include <basecode/core/format.h>
 #include <basecode/core/graphviz/gv.h>
@@ -25,31 +26,17 @@
 #define NODE_BRANCH(n, d)       ((d) == 1 ? (n)->rhs : (n)->lhs)
 
 namespace basecode {
-    template <typename T>
-    concept Binary_Tree = requires(const T& t) {
-        typename                T::Node_Type;
-        typename                T::Value_Type;
-
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.node_slab}           -> same_as<alloc_t*>;
-        {t.value_slab}          -> same_as<alloc_t*>;
-        {t.root}                -> same_as<typename T::Node_Type>;
-        {t.size}                -> same_as<u32>;
-    };
-
-    template <Binary_Tree Tree_Type,
-              typename Node_Type = typename Tree_Type::Node_Type>
+    template <Binary_Tree Tree_Type, typename Node_Type>
     struct bin_tree_cursor_t final {
         Tree_Type*              tree;
         Node_Type               node;
     };
 
     namespace bintree {
-        namespace color {
-            constexpr u8 none  = 0;
-            constexpr u8 red   = 1;
-            constexpr u8 black = 2;
-        }
+        inline graphviz::edge_t* make_edge(graphviz::graph_t& g,
+                                           u32 first,
+                                           u32 second,
+                                           str::slice_t label = {});
 
         inline u32 size(const Binary_Tree auto& tree) {
             return tree.size;
@@ -60,77 +47,12 @@ namespace basecode {
         }
 
         template <Binary_Tree T,
-                  typename Node_Type = typename T::Node_Type,
-                  typename Value_Type = typename T::Value_Type>
-        const Node_Type find(const T& tree, const Value_Type& value) {
-            auto p = tree.root;
-            while (p != nullptr) {
-                auto cmp = value <=> *p->value;
-                if (cmp < 0)        p = p->lhs;
-                else if (cmp > 0)   p = p->rhs;
-                else return         p;
-            }
-            return nullptr;
-        }
-
-        template <Binary_Tree T,
-                  typename Node_Type = typename T::_Node_Type>
-        u0 print_tree_struct(const T& tree, const Node_Type node, u32 level) {
-            if (level > 16) {
-                format::print("[...]");
-                return;
-            }
-
-            if (!node) {
-                format::print("nil");
-                return;
-            }
-
-            format::print("{}", *node->value);
-            if (node->lhs || node->rhs) {
-                format::print("(");
-                print_tree_struct(tree, node->lhs, level + 1);
-                if (node->rhs) {
-                    format::print(",");
-                    print_tree_struct(tree, node->rhs, level + 1);
-                }
-                format::print(")");
-            }
-        }
-
-        inline graphviz::edge_t* make_edge(graphviz::graph_t& g,
-                                           u32 first,
-                                           u32 second,
-                                           str::slice_t label = {}) {
-            auto e = graphviz::graph::make_edge(g);
-            e->first  = graphviz::graph::node_ref(&g, first);
-            e->second = graphviz::graph::node_ref(&g, second);
-            if (!slice::empty(label))
-                graphviz::edge::label(*e, label);
-            graphviz::edge::arrow_size(*e, .5f);
-            graphviz::edge::dir(*e, graphviz::dir_type_t::both);
-            graphviz::edge::arrow_tail(*e, graphviz::arrow_type_t::dot);
-            graphviz::edge::arrow_head(*e, graphviz::arrow_type_t::normal);
-            return e;
-        }
-
-        u0 print_whole_tree(const Binary_Tree auto& tree, str::slice_t title) {
-            format::print("{}: ", title);
-            print_tree_struct(tree, tree.root, 0);
-            format::print("\n");
-        }
-
-        inline u0 make_nil_node(graphviz::graph_t& g, u32 id, str::slice_t label) {
-            auto nil = graphviz::graph::make_node(g);
-            graphviz::node::shape(*nil, graphviz::shape_t::point);
-            make_edge(g, id, nil->id, label);
-        }
-
-        template <Binary_Tree T,
                   typename Has_Color = typename T::Has_Color,
                   typename Node_Type = typename T::Node_Type,
                   typename Value_Type = typename T::Value_Type>
-        u32 dump_node(T& tree, graphviz::graph_t& g, Node_Type node, u32 parent_id = {}) {
+        u32 dump_node(T& tree,
+                      graphviz::graph_t& g,
+                      Node_Type node, u32 parent_id = {}) {
             auto n  = graphviz::graph::make_node(g);
             auto id = n->id;
             graphviz::node::label(*n,
@@ -176,6 +98,13 @@ namespace basecode {
             return id;
         }
 
+        inline u0 make_nil_node(graphviz::graph_t& g,
+                                u32 id, str::slice_t label) {
+            auto nil = graphviz::graph::make_node(g);
+            graphviz::node::shape(*nil, graphviz::shape_t::point);
+            make_edge(g, id, nil->id, label);
+        }
+
         template <Binary_Tree T,
                   typename Node_Type = typename T::Node_Type,
                   typename Value_Type = typename T::Value_Type>
@@ -211,31 +140,74 @@ namespace basecode {
             buf::save(buf, p);
         }
 
+        inline graphviz::edge_t* make_edge(graphviz::graph_t& g,
+                                           u32 first,
+                                           u32 second,
+                                           str::slice_t label) {
+            auto e = graphviz::graph::make_edge(g);
+            e->first  = graphviz::graph::node_ref(&g, first);
+            e->second = graphviz::graph::node_ref(&g, second);
+            if (!slice::empty(label))
+                graphviz::edge::label(*e, label);
+            graphviz::edge::arrow_size(*e, .5f);
+            graphviz::edge::dir(*e, graphviz::dir_type_t::both);
+            graphviz::edge::arrow_tail(*e, graphviz::arrow_type_t::dot);
+            graphviz::edge::arrow_head(*e, graphviz::arrow_type_t::normal);
+            return e;
+        }
+
+        template <Binary_Tree T,
+                  typename Node_Type = typename T::Node_Type,
+                  typename Value_Type = typename T::Value_Type>
+        const Node_Type find(const T& tree, const Value_Type& value) {
+            auto p = tree.root;
+            while (p != nullptr) {
+                auto cmp = value <=> *p->value;
+                if (cmp < 0)        p = p->lhs;
+                else if (cmp > 0)   p = p->rhs;
+                else return         p;
+            }
+            return nullptr;
+        }
+
+        template <Binary_Tree T,
+                  typename Node_Type = typename T::_Node_Type>
+        u0 print_tree_struct(const T& tree, const Node_Type node, u32 level) {
+            if (level > 16) {
+                format::print("[...]");
+                return;
+            }
+
+            if (!node) {
+                format::print("nil");
+                return;
+            }
+
+            format::print("{}", *node->value);
+            if (node->lhs || node->rhs) {
+                format::print("(");
+                print_tree_struct(tree, node->lhs, level + 1);
+                if (node->rhs) {
+                    format::print(",");
+                    print_tree_struct(tree, node->rhs, level + 1);
+                }
+                format::print(")");
+            }
+        }
+
+        u0 print_whole_tree(const Binary_Tree auto& tree, str::slice_t title) {
+            format::print("{}: ", title);
+            print_tree_struct(tree, tree.root, 0);
+            format::print("\n");
+        }
+
         namespace cursor {
             // insert
 
-            template <Binary_Tree Tree_Type>
-            u0 init(bin_tree_cursor_t<Tree_Type>& cursor, Tree_Type* tree) {
-                cursor.tree = tree;
-                cursor.node = nullptr;
-            }
-
             template <Binary_Tree Tree_Type,
                       typename Value_Type = typename Tree_Type::Value_Type>
-            Value_Type* first(bin_tree_cursor_t<Tree_Type>& cursor, Tree_Type* tree) {
-                cursor.tree = tree;
-                cursor.node = tree->root;
-                if (cursor.node) {
-                    while (cursor.node->lhs)
-                        cursor.node = cursor.node->lhs;
-                    return cursor.node->value;
-                }
-                return nullptr;
-            }
-
-            template <Binary_Tree Tree_Type,
-                      typename Value_Type = typename Tree_Type::Value_Type>
-            Value_Type* last(bin_tree_cursor_t<Tree_Type>& cursor, Tree_Type* tree) {
+            Value_Type* last(bin_tree_cursor_t<Tree_Type>& cursor,
+                             Tree_Type* tree) {
                 cursor.tree = tree;
                 cursor.node = tree->root;
                 if (cursor.node) {
@@ -248,7 +220,30 @@ namespace basecode {
 
             template <Binary_Tree Tree_Type,
                       typename Value_Type = typename Tree_Type::Value_Type>
-            Value_Type* find(bin_tree_cursor_t<Tree_Type>& cursor, Tree_Type* tree, const Value_Type& value) {
+            Value_Type* first(bin_tree_cursor_t<Tree_Type>& cursor,
+                              Tree_Type* tree) {
+                cursor.tree = tree;
+                cursor.node = tree->root;
+                if (cursor.node) {
+                    while (cursor.node->lhs)
+                        cursor.node = cursor.node->lhs;
+                    return cursor.node->value;
+                }
+                return nullptr;
+            }
+
+            template <Binary_Tree Tree_Type,
+                      typename Value_Type = typename Tree_Type::Value_Type>
+            u0 replace(bin_tree_cursor_t<Tree_Type>& cursor,
+                       const Value_Type& value) {
+                *cursor.node->value = value;
+            }
+
+            template <Binary_Tree Tree_Type,
+                      typename Value_Type = typename Tree_Type::Value_Type>
+            Value_Type* find(bin_tree_cursor_t<Tree_Type>& cursor,
+                             Tree_Type* tree,
+                             const Value_Type& value) {
                 s32 dir;
                 cursor.tree = tree;
                 for (auto p = tree->root; p; p = NODE_BRANCH(p, dir)) {
@@ -311,10 +306,10 @@ namespace basecode {
                 return cursor.node ? cursor.node->value : nullptr;
             }
 
-            template <Binary_Tree Tree_Type,
-                      typename Value_Type = typename Tree_Type::Value_Type>
-            u0 replace(bin_tree_cursor_t<Tree_Type>& cursor, const Value_Type& value) {
-                *cursor.node->value = value;
+            template <Binary_Tree Tree_Type>
+            u0 init(bin_tree_cursor_t<Tree_Type>& cursor, Tree_Type* tree) {
+                cursor.tree = tree;
+                cursor.node = nullptr;
             }
         }
     }

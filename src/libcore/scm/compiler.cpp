@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/path.h>
 #include <basecode/core/scm/scm.h>
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/scm/compiler.h>

@@ -22,13 +22,6 @@
 #include <basecode/core/slice.h>
 
 namespace basecode::numbers {
-    enum class status_t : u8 {
-        ok,
-        overflow,
-        underflow,
-        not_convertible
-    };
-
     namespace fp {
         status_t parse(str::slice_t value, f32& out);
 

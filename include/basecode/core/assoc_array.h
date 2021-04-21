@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <basecode/core/slice.h>
 #include <basecode/core/memory.h>
 
 namespace basecode {

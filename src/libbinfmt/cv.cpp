@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/binfmt/cv.h>
+#include <basecode/core/format.h>
 
 namespace basecode::binfmt::cv {
 // skip pad bytes

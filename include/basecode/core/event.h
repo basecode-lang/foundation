@@ -19,19 +19,10 @@
 #pragma once
 
 #include <pthread.h>
-#include <basecode/core/array.h>
+#include <basecode/core/memory.h>
 
 namespace basecode {
-    struct  event_t_;
-    using   event_t = event_t_*;
-
     namespace event {
-        enum class status_t : u8 {
-            ok                  = 0,
-            error               = 106,
-            timeout             = 107,
-        };
-
         namespace system {
             u0 fini();
 

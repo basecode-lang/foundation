@@ -42,13 +42,6 @@ namespace basecode {
         using value_type        = u32;
     };
 
-    template <typename T> concept Utf_String_Concept = (same_as<typename T::value_type, u32> || same_as<typename T::value_type, u16>) && requires(const T& t) {
-        typename                T::value_type;
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.data}                -> same_as<typename T::value_type*>;
-        {t.length}              -> same_as<u32>;
-    };
-
     namespace utf {
         b8 isalnum(s32 cp);
 

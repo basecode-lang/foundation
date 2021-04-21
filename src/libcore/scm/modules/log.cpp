@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/obj_pool.h>
 #include <basecode/core/scm/types.h>

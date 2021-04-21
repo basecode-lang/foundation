@@ -19,11 +19,10 @@
 #pragma once
 
 #include <chrono>
-#include <x86intrin.h>
+#include <basecode/core/types.h>
 #if __APPLE__
 #   include <mach/mach_time.h>
 #endif
-#include <basecode/core/types.h>
 
 #if defined _WIN32                                                              \
     || defined __CYGWIN__                                                       \
@@ -37,12 +36,6 @@
 #endif
 
 namespace basecode::profiler {
-    enum class status_t : u8 {
-        ok                              = 0,
-        no_cpu_rtdscp_support           = 164,
-        no_cpu_invariant_tsc_support    = 165
-    };
-
     u0 fini();
 
     status_t init();

@@ -40,6 +40,9 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/buf.h>
+#include <basecode/core/ffi.h>
+#include <basecode/core/string.h>
 #include <basecode/core/scm/scm.h>
 #include <basecode/core/scm/types.h>
 #include <basecode/core/scm/compiler.h>

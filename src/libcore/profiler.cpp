@@ -17,8 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <thread>
-#include <cpuid.h>
 #include <basecode/core/profiler.h>
+#include <cpuid.h>
 #ifdef _WIN32
 #   ifndef WIN32_LEAN_AND_MEAN
 #       define WIN32_LEAN_AND_MEAN
@@ -56,21 +56,18 @@ namespace basecode::profiler {
 #endif
     }
 
-    static u0 cpuid(u32* regs, u32 leaf) {
-        __get_cpuid(leaf, regs, regs + 1, regs + 2, regs + 3);
-    }
-
     u0 fini() {
     }
 
     status_t init() {
         u32 regs[4];
+        u32* rp = regs;
 
-        cpuid(regs, 0x80000001);
+        __get_cpuid(0x80000001, rp, rp + 1, rp + 2, rp + 3);
         if (!(regs[3] & (1 << 27)))
             return status_t::no_cpu_rtdscp_support;
 
-        cpuid(regs, 0x80000007);
+        __get_cpuid(0x80000007, rp, rp + 1, rp + 2, rp + 3);
         if (!(regs[3] & (1 << 8)))
             return status_t::no_cpu_invariant_tsc_support;
 

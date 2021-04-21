@@ -24,28 +24,6 @@
                                      && (a)->system->type == alloc_type_t::proxy)
 
 namespace basecode {
-    struct slab_t;
-    struct alloc_t;
-    struct buddy_block_t;
-    struct page_header_t;
-
-    using mspace                    = u0*;
-
-    enum class alloc_type_t : u8 {
-        none,
-        base,
-        bump,
-        page,
-        slab,
-        temp,
-        proxy,
-        trace,
-        stack,
-        buddy,
-        scratch,
-        dlmalloc,
-    };
-
     struct alloc_config_t {
         alloc_config_t(alloc_type_t _type) : backing(),
                                              type(_type) {}
@@ -73,18 +51,6 @@ namespace basecode {
         u0*                     mem;
         s32                     size;
     } __attribute__((aligned(16)));
-
-    using mem_fini_callback_t       = u32 (*)(alloc_t*);
-    using mem_size_callback_t       = u32 (*)(alloc_t*, u0* mem);
-    using mem_free_callback_t       = u32 (*)(alloc_t*, u0* mem);
-    using mem_init_callback_t       = u0  (*)(alloc_t*, alloc_config_t*);
-    using mem_alloc_callback_t      = mem_result_t (*)(alloc_t*,
-                                                       u32 size,
-                                                       u32 align);
-    using mem_realloc_callback_t    = mem_result_t (*)(alloc_t*,
-                                                       u0* mem,
-                                                       u32 size,
-                                                       u32 align);
 
     struct alloc_system_t final {
         mem_size_callback_t         size;
@@ -165,13 +131,6 @@ namespace basecode {
                   "alloc_t is now larger than 72 bytes!");
 
     namespace memory {
-        enum class status_t : u8 {
-            ok,
-            invalid_allocator,
-            invalid_default_allocator,
-            invalid_allocation_system,
-        };
-
         namespace system {
             u0 fini();
 

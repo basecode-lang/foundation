@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/str.h>
-#include <basecode/core/context.h>
+#include <basecode/core/types.h>
 
 namespace basecode::base64 {
     b8 encode(str::slice_t src, str_t& buf);

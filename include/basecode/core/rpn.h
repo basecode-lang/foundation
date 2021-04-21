@@ -27,8 +27,6 @@ namespace basecode {
         u32                     stmt_count: 24;
     };
 
-    using postfix_expr_list_t   = array_t<postfix_expr_t>;
-
     struct postfix_t final {
         alloc_t*                alloc;
         token_cache_t*          tokens;
@@ -36,28 +34,7 @@ namespace basecode {
         postfix_expr_list_t     exprs;
     };
 
-    namespace token::cls {
-        [[maybe_unused]] constexpr u16 none                 = 0;
-        [[maybe_unused]] constexpr u16 operator_            = 1;
-        [[maybe_unused]] constexpr u16 param_end            = 2;
-        [[maybe_unused]] constexpr u16 scope_end            = 3;
-        [[maybe_unused]] constexpr u16 param_begin          = 4;
-        [[maybe_unused]] constexpr u16 scope_begin          = 5;
-        [[maybe_unused]] constexpr u16 call_operator        = 7;
-        [[maybe_unused]] constexpr u16 call_terminator      = 8;
-        [[maybe_unused]] constexpr u16 stmt_terminator      = 9;
-        [[maybe_unused]] constexpr u16 operator_consumer    = 10;
-
-        str::slice_t name(token_type_t type);
-    }
-
     namespace rpn {
-        enum class status_t : u8 {
-            ok                                  = 0,
-            error                               = 200,
-            invalid_operator_precedence_array   = 201
-        };
-
         namespace expr {
             u0 free(postfix_expr_t& expr);
 

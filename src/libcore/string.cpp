@@ -16,7 +16,6 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/defer.h>
 #include <basecode/core/mutex.h>
 #include <basecode/core/locale.h>
 #include <basecode/core/string.h>
@@ -24,17 +23,16 @@
 #   include <win32_locale.h>
 #endif
 #include <basecode/core/hashtab.h>
-#include <basecode/core/hashable.h>
 
 namespace basecode::string {
-    using interned_list_t       = array_t<intern::result_t>;
-    using localized_str_map_t   = hashtab_t<locale_key_t, str::slice_t>;
+    using interned_array_t      = array_t<intern::result_t>;
+    using localized_strtab_t    = hashtab_t<locale_key_t, str::slice_t>;
 
     struct system_t final {
         alloc_t*                alloc;
         intern_t                pool;
-        interned_list_t         interned;
-        localized_str_map_t     localized;
+        interned_array_t        interned;
+        localized_strtab_t      localized;
         mutex_t                 lock;
     };
 

@@ -17,6 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/bag.h>
+#include <basecode/core/path.h>
+#include <basecode/core/defer.h>
 #include <basecode/core/queue.h>
 #include <basecode/core/getopt.h>
 #include <basecode/core/string.h>

@@ -18,9 +18,8 @@
 
 #pragma once
 
-#include <basecode/core/buf.h>
-#include <basecode/core/path.h>
-#include <basecode/core/string.h>
+#include <basecode/core/str.h>
+#include <basecode/core/array.h>
 
 namespace basecode::graphviz {
     struct node_t;

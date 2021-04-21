@@ -19,7 +19,6 @@
 #pragma once
 
 #include <basecode/core/str.h>
-#include <basecode/core/hashable.h>
 
 namespace basecode {
     struct integer_t final {

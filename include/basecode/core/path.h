@@ -30,8 +30,6 @@ namespace basecode {
         u16                     value:      12;
     };
 
-    using path_mark_list_t      = array_t<path_mark_t>;
-
     struct path_t final {
         str_t                   str;
         path_mark_list_t        marks;
@@ -40,30 +38,10 @@ namespace basecode {
             return str == other.str;
         }
     };
-    static_assert(sizeof(path_t) <= 48, "path_t is now larger than 48 bytes!");
+    static_assert(sizeof(path_t) <= 48,
+                  "path_t is now larger than 48 bytes!");
 
     namespace path {
-        enum class status_t : u8 {
-            ok                          = 0,
-            path_too_long               = 159,
-            no_parent_path              = 160,
-            unexpected_empty_path       = 161,
-            expected_relative_path      = 162,
-            unexpected_empty_extension  = 163,
-        };
-
-        namespace marks {
-            [[maybe_unused]] constexpr u16 none         = 0;
-#ifdef _WIN32
-            [[maybe_unused]] constexpr u16 drive_name   = 1;
-#endif
-            [[maybe_unused]] constexpr u16 root_part    = 2;
-            [[maybe_unused]] constexpr u16 path_part    = 3;
-            [[maybe_unused]] constexpr u16 extension    = 4;
-            [[maybe_unused]] constexpr u16 parent_dir   = 5;
-            [[maybe_unused]] constexpr u16 current_dir  = 6;
-        }
-
         u0 free(path_t& path);
 
         u0 reset(path_t& path);

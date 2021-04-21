@@ -22,11 +22,6 @@
 #include <basecode/core/array.h>
 
 namespace basecode {
-    struct interned_str_t;
-
-    using intern_id             = u32;
-    using interned_str_list_t   = array_t<interned_str_t>;
-
     struct interned_str_t final {
         str::slice_t            value;
         u32                     bucket_index;
@@ -42,15 +37,10 @@ namespace basecode {
         u32                     capacity;
         f32                     load_factor;
     };
-    static_assert(sizeof(intern_t) <= 88, "intern_t is now larger than 88 bytes!");
+    static_assert(sizeof(intern_t) <= 88,
+                  "intern_t is now larger than 88 bytes!");
 
     namespace intern {
-        enum class status_t : u8 {
-            ok                  = 0,
-            no_bucket           = 135,
-            not_found           = 136,
-        };
-
         struct result_t final {
             u64                 hash        {};
             str::slice_t        slice       {};

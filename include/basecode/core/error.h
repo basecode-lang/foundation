@@ -18,29 +18,16 @@
 
 #pragma once
 
-#include <basecode/core/buf.h>
-#include <basecode/core/format.h>
+#include <basecode/core/slice.h>
+#include <basecode/core/context.h>
 #include <basecode/core/src_loc.h>
 
 namespace basecode {
-    template <typename T>
-    concept Error_Id = std::is_enum_v<T> || same_as<T, u32> || same_as<T, s32>;
-
     struct error_def_t final {
         str::slice_t            code;
         str::slice_t            locale;
         u32                     id;
         u32                     lc_str_id;
-    };
-
-    enum class error_report_level_t : u8 {
-        warning,
-        error,
-    };
-
-    enum class error_report_type_t : u8 {
-        default_,
-        source,
     };
 
     struct error_report_t final {
@@ -55,12 +42,6 @@ namespace basecode {
     };
 
     namespace error {
-        enum class status_t : u8 {
-            ok                  = 0,
-            localized_dup_key,
-            localized_not_found,
-        };
-
         namespace system {
             u0 fini();
 

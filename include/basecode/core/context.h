@@ -46,9 +46,6 @@
         } while (false)
 
 namespace basecode {
-    struct alloc_t;
-    struct logger_t;
-
     struct context_t {
         struct {
             alloc_t*        main;

@@ -21,10 +21,6 @@
 #include <basecode/core/array.h>
 
 namespace basecode {
-    struct data_point_t;
-
-    using data_point_array_t    = array_t<data_point_t>;
-
     struct data_point_t final {
         f32                     x, y;
     };

@@ -42,9 +42,6 @@ namespace basecode {
 
     struct socket_t;
 
-    using socket_read_callback_t    = b8 (*)(socket_t&, u0*);
-    using socket_close_callback_t   = u0 (*)(socket_t&);
-
     struct socket_t final {
         alloc_t*                alloc;
         u8*                     buf;
@@ -57,19 +54,6 @@ namespace basecode {
     };
 
     namespace network {
-        enum class status_t : u8 {
-            ok                              = 0,
-            bind_failure                    = 150,
-            listen_failure                  = 151,
-            connect_failure                 = 152,
-            socket_dgram_error              = 153,
-            socket_already_open             = 154,
-            winsock_init_failure            = 155,
-            socket_already_closed           = 156,
-            invalid_address_and_port        = 157,
-            socket_option_broadcast_error   = 158,
-        };
-
         namespace udp {
             status_t listen(socket_t& sock, u16 port);
 

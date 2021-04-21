@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <sys/time.h>
+#include <basecode/core/array.h>
 #include <basecode/core/mutex.h>
 #include <basecode/core/event.h>
 #include <basecode/core/memory/system/slab.h>
@@ -50,8 +51,6 @@ namespace basecode {
         u8                              pad:            6;
     };
     static_assert(sizeof(event_t_) <= 152, "sizeof(event_t_) is now greater than 152 bytes!");
-
-    using event_array_t                 = array_t<event_t>;
 
     namespace event {
         struct system_t final {

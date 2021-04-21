@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/string.h>
 #include <basecode/core/cxx/cxx.h>
 
 namespace basecode::cxx::scope {

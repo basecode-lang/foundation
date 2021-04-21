@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/defer.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/gfx/alloc_window.h>
 #include <basecode/gfx/implot/implot.h>

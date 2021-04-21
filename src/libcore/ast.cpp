@@ -17,8 +17,50 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/ast.h>
+#include <basecode/core/bass.h>
 
 namespace basecode::ast {
+    node_id_t make_num_lit(bass_t& ast,
+                           token_id_t token,
+                           num_lit_flags_t flags,
+                           u32 radix) {
+        cursor_t c{};
+        bass::seek_current(ast, c);
+        bass::new_record(c, node::header::num_lit, 3);
+        bass::write_field(c, node::field::token, token);
+        bass::write_field(c, node::field::radix, radix);
+        bass::write_field(c, node::field::flags, *((const u8*) &flags));
+        return c.id;
+    }
+
+    node_id_t make_unary_op(bass_t& ast,
+                            u32 type,
+                            node_id_t expr,
+                            token_id_t token) {
+        cursor_t c{};
+        bass::seek_current(ast, c);
+        bass::new_record(c, node::header::unary, 3);
+        bass::write_field(c, node::field::token, token);
+        bass::write_field(c, node::field::expr, expr);
+        bass::write_field(c, node::field::flags, type);
+        return c.id;
+    }
+
+    node_id_t make_binary_op(bass_t& ast,
+                             u32 type,
+                             node_id_t lhs,
+                             node_id_t rhs,
+                             token_id_t token) {
+        cursor_t c{};
+        bass::seek_current(ast, c);
+        bass::new_record(c, node::header::binary, 4);
+        bass::write_field(c, node::field::token, token);
+        bass::write_field(c, node::field::rhs, lhs);
+        bass::write_field(c, node::field::lhs, rhs);
+        bass::write_field(c, node::field::flags, type);
+        return c.id;
+    }
+
     node_id_t make_ident(bass_t& ast, token_id_t token) {
         cursor_t c{};
         bass::seek_current(ast, c);
@@ -40,27 +82,6 @@ namespace basecode::ast {
         bass::seek_current(ast, c);
         bass::new_record(c, node::header::comment, 1);
         bass::write_field(c, node::field::token, token);
-        return c.id;
-    }
-
-    node_id_t make_unary_op(bass_t& ast, u32 type, node_id_t expr, token_id_t token) {
-        cursor_t c{};
-        bass::seek_current(ast, c);
-        bass::new_record(c, node::header::unary, 3);
-        bass::write_field(c, node::field::token, token);
-        bass::write_field(c, node::field::expr, expr);
-        bass::write_field(c, node::field::flags, type);
-        return c.id;
-    }
-
-    node_id_t make_binary_op(bass_t& ast, u32 type, node_id_t lhs, node_id_t rhs, token_id_t token) {
-        cursor_t c{};
-        bass::seek_current(ast, c);
-        bass::new_record(c, node::header::binary, 4);
-        bass::write_field(c, node::field::token, token);
-        bass::write_field(c, node::field::rhs, lhs);
-        bass::write_field(c, node::field::lhs, rhs);
-        bass::write_field(c, node::field::flags, type);
         return c.id;
     }
 }

@@ -39,7 +39,8 @@ namespace basecode {
             Value_Type*         value;
             s8                  balance;
         };
-        static_assert(sizeof(node_t) <= 40, "avl<T>::node_t is now larger than 40 bytes!");
+        static_assert(sizeof(node_t) <= 40,
+                      "avl<T>::node_t is now larger than 40 bytes!");
 
         static constexpr u32    Node_Type_Size     = sizeof(node_t);
         static constexpr u32    Node_Type_Align    = alignof(node_t);
@@ -50,7 +51,8 @@ namespace basecode {
         Node_Type               root;
         u32                     size;
     };
-    static_assert(sizeof(avl_t<u32>) <= 40, "avl_t<u32> is now larger than 40 bytes!");
+    static_assert(sizeof(avl_t<u32>) <= 40,
+                  "avl_t<u32> is now larger than 40 bytes!");
 
     namespace avl {
         u0 free(Binary_Tree auto& tree) {

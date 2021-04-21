@@ -24,38 +24,6 @@
 #include <basecode/core/symtab.h>
 
 namespace basecode {
-    struct lib_t;
-    struct param_t;
-    struct proto_t;
-    struct overload_t;
-    struct param_value_t;
-
-    using param_array_t         = array_t<param_t*>;
-    using symbol_array_t        = assoc_array_t<u0*>;
-    using overload_array_t      = array_t<overload_t*>;
-    using param_value_array_t   = array_t<param_value_t>;
-
-    enum class call_mode_t : u8 {
-        system                  = 1,
-        variadic,
-    };
-
-    enum class param_cls_t : u8 {
-        ptr                     = 'P',
-        int_                    = 'I',
-        void_                   = 'V',
-        float_                  = 'F',
-        struct_                 = 'S',
-    };
-
-    enum class param_size_t : u8 {
-        none                    = '-',
-        byte                    = 'b',
-        word                    = 'w',
-        dword                   = 'd',
-        qword                   = 'q',
-    };
-
     struct lib_t final {
         alloc_t*                alloc;
         DLLib*                  handle;
@@ -122,21 +90,6 @@ namespace basecode {
     } __attribute__((aligned(32)));
 
     namespace ffi {
-        enum class status_t : u8 {
-            ok                                  = 0,
-            address_null                        = 108,
-            prototype_null                      = 109,
-            lib_not_loaded                      = 110,
-            symbol_not_found                    = 111,
-            invalid_int_size                    = 112,
-            invalid_float_size                  = 113,
-            parameter_overflow                  = 117,
-            duplicate_overload                  = 116,
-            load_library_failure                = 114,
-            struct_by_value_not_implemented     = 115,
-            only_one_rest_param_allowed         = 118,  // FIXME
-        };
-
         namespace lib {
             status_t unload(lib_t* lib);
 

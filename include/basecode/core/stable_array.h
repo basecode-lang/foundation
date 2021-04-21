@@ -24,17 +24,6 @@
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode {
-    template <typename T>
-    concept Stable_Array = requires(const T& t) {
-        typename                T::Value_Type;
-
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.slab}                -> same_as<alloc_t*>;
-        {t.data}                -> same_as<typename T::Value_Type**>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
-    };
-
     template<typename T>
     struct stable_array_t final {
         using Value_Type        = T;

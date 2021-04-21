@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/format.h>
 #include <basecode/core/cxx/cxx.h>
 #include <basecode/core/memory/system/proxy.h>
 
@@ -218,7 +219,7 @@ namespace basecode::cxx::serializer {
     template <typename... Args>
     static u0 at_indent(serializer_t& s,
                         str_buf_t& buf,
-                        fmt::string_view format_str,
+                        fmt_str_t format_str,
                         const Args&... args) {
         if (LIKELY(s.column == 0 && s.indent > 0))
             format::format_to(buf, "{:<{}}", " ", s.indent);

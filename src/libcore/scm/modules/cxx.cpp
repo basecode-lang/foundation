@@ -18,6 +18,7 @@
 
 #include <basecode/core/obj_pool.h>
 #include <basecode/core/scm/types.h>
+#include <basecode/core/scm/kernel.h>
 #include <basecode/core/scm/modules/cxx.h>
 
 namespace basecode::scm::module::cxx {

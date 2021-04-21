@@ -23,93 +23,25 @@
 #include <basecode/core/format.h>
 
 namespace basecode {
-    struct term_t;
-    struct term_command_t;
+    struct rgb_t final {
+        u32                     r:      8;
+        u32                     g:      8;
+        u32                     b:      8;
+        u32                     pad:    8;
 
-    using style_t               = u32;
-    using term_command_array_t  = array_t<term_command_t>;
+        u32 palette_value() const {
+            return (16 + 36 * r) + (6 * g) + b;
+        }
 
-    namespace term {
-        enum class color_t : u8 {
-            black           = 30,
-            red,
-            green,
-            yellow,
-            blue,
-            magenta,
-            cyan,
-            white,
-            fg_default      = 39,
+        inline b8 operator==(const rgb_t& other) const {
+            return r == other.r
+                   && g == other.g
+                   && b == other.b;
+        }
 
-            bg_black,
-            bg_red,
-            bg_green,
-            bg_yellow,
-            bg_blue,
-            bg_magenta,
-            bg_cyan,
-            bg_white,
-            bg_default      = 49,
-
-            bright_black    = 90,
-            bright_red,
-            bright_green,
-            bright_yellow,
-            bright_blue,
-            bright_magenta,
-            bright_cyan,
-            bright_white
-        };
-
-        struct rgb_t final {
-            u32                     r:      8;
-            u32                     g:      8;
-            u32                     b:      8;
-            u32                     pad:    8;
-
-            u32 palette_value() const {
-                return (16 + 36 * r) + (6 * g) + b;
-            }
-
-            inline b8 operator==(const rgb_t& other) const {
-                return r == other.r
-                    && g == other.g
-                    && b == other.b;
-            }
-
-            inline b8 operator!=(const rgb_t& other) const {
-                return !(*this == other);
-            }
-        };
-    }
-
-    enum class clear_mode_t : u8 {
-        cursor_to_bottom,
-        cursor_to_top,
-        entire
-    };
-
-    enum class color_mode_t : u8 {
-        indexed,
-        palette,
-        true_color
-    };
-
-    enum class term_command_type_t : u8 {
-        cursor_up                   = 'A',
-        cursor_to                   = 'H',
-        scroll_up                   = 'S',
-        erase_line                  = 'K',
-        cursor_down                 = 'B',
-        scroll_down                 = 'T',
-        cursor_back                 = 'D',
-        erase_display               = 'J',
-        cursor_forward              = 'C',
-        cursor_next_line            = 'E',
-        cursor_prev_line            = 'F',
-        cursor_horiz_abs            = 'G',
-        cursor_horiz_vert_pos       = 'f',
-        select_graphic_rendition    = 'm',
+        inline b8 operator!=(const rgb_t& other) const {
+            return !(*this == other);
+        }
     };
 
     struct cursor_pos_t final {
@@ -120,7 +52,7 @@ namespace basecode {
     struct color_value_t final {
         union {
             term::color_t       index;
-            term::rgb_t         triplet;
+            rgb_t               triplet;
         }                       value;
         color_mode_t            mode;
     };
@@ -132,8 +64,8 @@ namespace basecode {
             struct {
                 u32             mode;
                 u32             mask;
-                term::rgb_t     fg;
-                term::rgb_t     bg;
+                rgb_t           fg;
+                rgb_t           bg;
             }                   sgr;
             struct {
                 u32             n;
@@ -155,24 +87,6 @@ namespace basecode {
     };
 
     namespace term {
-        namespace style {
-            constexpr u32 none              = 0b00000000000000000000000000000000;
-            constexpr u32 bold              = 0b00000000000000000000000000000001;
-            constexpr u32 dim               = 0b00000000000000000000000000000010;
-            constexpr u32 italic            = 0b00000000000000000000000000000100;
-            constexpr u32 underline         = 0b00000000000000000000000000001000;
-            constexpr u32 slow_blink        = 0b00000000000000000000000000010000;
-            constexpr u32 fast_blink        = 0b00000000000000000000000000100000;
-            constexpr u32 reverse           = 0b00000000000000000000000001000000;
-            constexpr u32 hidden            = 0b00000000000000000000000010000000;
-            constexpr u32 strike            = 0b00000000000000000000000100000000;
-            constexpr u32 double_underline  = 0b00000000000100000000000000000000;
-        }
-
-        enum class status_t : u8 {
-            ok
-        };
-
         namespace system {
             u0 fini();
 

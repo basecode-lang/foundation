@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/str.h>
 #include <basecode/core/base64.h>
 
 namespace basecode::base64 {

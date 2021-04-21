@@ -18,7 +18,6 @@
 
 #include <basecode/core/ffi.h>
 #include <basecode/core/hashtab.h>
-#include <basecode/core/stable_array.h>
 
 namespace basecode::ffi {
     struct lib_pair_t;

@@ -38,7 +38,8 @@ namespace basecode {
             node_t*             parent;
             Value_Type*         value;
         };
-        static_assert(sizeof(node_t) <= 32, "bst<T>::node_t is now larger than 32 bytes!");
+        static_assert(sizeof(node_t) <= 32,
+                      "bst<T>::node_t is now larger than 32 bytes!");
 
         static constexpr u32    Node_Type_Size     = sizeof(node_t);
         static constexpr u32    Node_Type_Align    = alignof(node_t);
@@ -49,7 +50,8 @@ namespace basecode {
         Node_Type               root;
         u32                     size;
     };
-    static_assert(sizeof(bst_t<u32>) <= 40, "bst_t<u32> is now larger than 40 bytes!");
+    static_assert(sizeof(bst_t<u32>) <= 40,
+                  "bst_t<u32> is now larger than 40 bytes!");
 
     namespace bst {
         template <Binary_Tree T,

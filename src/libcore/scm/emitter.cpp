@@ -16,6 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/buf.h>
+#include <basecode/core/graphviz/gv.h>
 #include <basecode/core/scm/emitter.h>
 #include <basecode/core/scm/register_pool.h>
 

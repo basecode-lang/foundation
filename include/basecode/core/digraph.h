@@ -20,34 +20,9 @@
 
 #include <basecode/core/array.h>
 #include <basecode/core/stack.h>
-#include <basecode/core/memory.h>
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode {
-    template <typename T>
-    concept Directed_Graph = requires(const T& t) {
-        typename                T::Node;
-        typename                T::Edge;
-        typename                T::Edge_Set;
-        typename                T::Edge_Pair;
-        typename                T::Value_Type;
-        typename                T::Node_Array;
-        typename                T::Edge_Array;
-        typename                T::Node_Stack;
-        typename                T::Edge_Pair_Array;
-        typename                T::Component_Array;
-
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.node_slab}           -> same_as<alloc_t*>;
-        {t.edge_slab}           -> same_as<alloc_t*>;
-        {t.nodes}               -> same_as<typename T::Node_Array>;
-        {t.edges}               -> same_as<typename T::Edge_Array>;
-        {t.outgoing}            -> same_as<typename T::Edge_Set>;
-        {t.incoming}            -> same_as<typename T::Edge_Set>;
-        {t.size}                -> same_as<u32>;
-        {t.id}                  -> same_as<u32>;
-    };
-
     template <typename V>
     struct digraph_t final {
         struct node_t;
@@ -119,7 +94,8 @@ namespace basecode {
         u32                     size;
         u32                     id;
     };
-    static_assert(sizeof(digraph_t<s32>) <= 128, "digraph_t<T> is now larger than 128 bytes!");
+    static_assert(sizeof(digraph_t<s32>) <= 128,
+                  "digraph_t<T> is now larger than 128 bytes!");
 
     namespace digraph {
         enum class status_t {

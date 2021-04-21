@@ -18,22 +18,17 @@
 
 #pragma once
 
-#include <basecode/core/buf.h>
+#include <basecode/core/types.h>
+#include <basecode/core/slice.h>
 #include <basecode/core/array.h>
+#include <basecode/core/context.h>
 #include <basecode/core/src_loc.h>
-#include <basecode/core/hashable.h>
+#include <basecode/core/hash/murmur.h>
 
 #define TOKEN_CLS(t)            (u32((t)) >> 16U & 0xffffU)
 #define TOKEN_TYPE(cls, type)   (u32((cls)) << 16U | u32((type)))
 
 namespace basecode {
-    struct token_t;
-    struct token_id_t;
-    struct token_type_t;
-
-    using token_list_t          = array_t<token_t>;
-    using token_id_list_t       = array_t<token_id_t>;
-
     struct token_id_t final {
         constexpr token_id_t()       : id(0)        {}
         constexpr token_id_t(u32 id) : id(id)       {}

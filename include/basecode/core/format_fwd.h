@@ -18,21 +18,15 @@
 
 #pragma once
 
+#include <fmt/format.h>
+#include <fmt/chrono.h>
 #include <basecode/core/types.h>
 
 namespace basecode {
-    template <typename...>
-    struct family_t final {
-    private:
-        inline static u32       id;
-
-        template <typename...>
-        inline static const u32 inner_id = id++;
-
-    public:
-        using Family_Type       = u32;
-
-        template <typename... Type>
-        inline static const Family_Type type = inner_id<std::decay_t<Type>...>;
-    };
+    using fmt_ctx_t         = fmt::format_context;
+    using fmt_arg_t         = fmt::basic_format_arg<fmt_ctx_t>;
+    using fmt_buf_t         = fmt::basic_memory_buffer<char,
+                                                      fmt::inline_buffer_size,
+                                                      fmt_alloc_t>;
+    using fmt_dyn_args_t    = fmt::dynamic_format_arg_store<fmt_ctx_t>;
 }

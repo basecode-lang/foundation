@@ -20,9 +20,6 @@
 
 #include <basecode/core/types.h>
 
-struct sqlite3;
-struct sqlite3_stmt;
-
 #define SQL_BEGIN(h) SAFE_SCOPE({                                           \
         s32 r;                                                              \
         r = sqlite3_exec((h), "BEGIN;", nullptr, nullptr, nullptr);         \

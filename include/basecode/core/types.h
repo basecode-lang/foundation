@@ -21,10 +21,13 @@
 #include <bit>
 #include <cmath>
 #include <cstdio>
+#include <memory>
+#include <chrono>
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
 #include <unistd.h>
+#include <functional>
 #include <sys/types.h>
 #include <x86intrin.h>
 #include <type_traits>
@@ -80,8 +83,57 @@
 #define OK(x)                   (0 == (u32) x)
 #define SAFE_SCOPE(x)           do { x } while (false)
 #define ZERO_MEM(x, s)          std::memset((x), 0, sizeof(s))
-#define HAS_ZERO(v)             (((v)-UINT64_C(0x0101010101010101)) & ~(v)&UINT64_C(0x8080808080808080))
+#define HAS_ZERO(v)             (((v)-UINT64_C(0x0101010101010101))             \
+                                 & ~(v)&UINT64_C(0x8080808080808080))
 #define VA_COUNT(...)           basecode::va_count(__VA_ARGS__)
+
+#define FORMAT_TYPE(Type, Code)                                                 \
+    template <>                                                                 \
+    struct fmt::formatter<Type> {                                               \
+        template <typename ParseContext> auto parse(ParseContext& ctx) {        \
+            return ctx.begin();                                                 \
+        }                                                                       \
+        template <typename FormatContext>                                       \
+        auto format(const Type& data,                                           \
+                    FormatContext& ctx) -> decltype(ctx.out()) {                \
+            Code;                                                               \
+            return ctx.out();                                                   \
+        }                                                                       \
+    }
+
+#define FORMAT_TYPE_AS(Type, Base)                                              \
+    template <typename Char>                                                    \
+    struct fmt::formatter<Type, Char> : fmt::formatter<Base, Char> {            \
+        template <typename FormatContext>                                       \
+        auto format(Type const& val,                                            \
+                    FormatContext& ctx) -> decltype(ctx.out()) {                \
+            return fmt::formatter<Base, Char>::format(val, ctx);                \
+        }                                                                       \
+    }
+
+#if defined(__GNUC__) && defined(__clang__)
+namespace std {
+    template <typename To, typename From> requires (sizeof(From) == sizeof(To)
+                                                    && std::is_trivially_constructible_v<From>
+                                                    && std::is_trivially_constructible_v<To>)
+    constexpr To bit_cast(const From& src) noexcept {
+        return __builtin_bit_cast(To, src);
+    }
+}
+#endif
+
+struct sqlite3;
+struct sqlite3_stmt;
+
+namespace fmt {
+    inline namespace v7 {
+        struct format_args;
+    }
+}
+
+namespace spdlog {
+    class logger;
+}
 
 namespace basecode {
     using u0                    = void;
@@ -100,8 +152,6 @@ namespace basecode {
     using u128                  = __uint128_t;
     using usize                 = std::size_t;
     using ssize                 = ssize_t;
-
-    struct alloc_t;
 
     union numeric_alias_t final {
         u8                      b;
@@ -172,15 +222,1625 @@ namespace basecode {
 
     template <typename... Args>
     constexpr usize va_count(Args&&...) { return sizeof...(Args); }
-}
 
-#if defined(__GNUC__) && defined(__clang__)
-namespace std {
-    template <typename To, typename From> requires (sizeof(From) == sizeof(To)
-                                                    && std::is_trivially_constructible_v<From>
-                                                    && std::is_trivially_constructible_v<To>)
-    constexpr To bit_cast(const From& src) noexcept {
-        return __builtin_bit_cast(To, src);
+    // ------------------------------------------------------------------------
+    //
+    // alloc_t, std_alloc_t
+    //
+    // ------------------------------------------------------------------------
+    struct alloc_t;
+
+    template <typename T>
+    class std_alloc_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // format
+    //
+    // ------------------------------------------------------------------------
+    class mem_buf_t;
+    class str_buf_t;
+
+    using fmt_str_t             = std::string_view;
+    using fmt_args_t            = fmt::format_args;
+    using fmt_alloc_t           = std_alloc_t<char>;
+
+    // ------------------------------------------------------------------------
+    //
+    // hashable
+    //
+    // ------------------------------------------------------------------------
+    namespace hash {
+        template <typename K> u32 hash32(const K& value);
+
+        template <typename K> u64 hash64(const K& value);
+
+        template <typename T> concept Hashable = requires(T hashable) {
+            { hash::hash32(hashable) } -> convertible_to<u32>;
+            { hash::hash64(hashable) } -> convertible_to<u64>;
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // str_t, slice_t
+    //
+    // ------------------------------------------------------------------------
+    struct str_t;
+
+    template <typename T>
+    struct slice_t;
+
+    template <typename T>
+    concept Slice_Concept = same_as<typename T::Is_Static,
+                                    std::true_type>
+                            && requires(const T& t) {
+        {t.data}        -> same_as<const u8*>;
+        {t.length}      -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept Static_String_Concept = same_as<typename T::Is_Static,
+                                            std::true_type>
+                                    && requires(const T& t) {
+        {t.data}        -> same_as<u8*>;
+        {t.length}      -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept Dynamic_String_Concept  = same_as<typename T::Is_Static,
+                                              std::false_type>
+                                      && requires(const T& t) {
+        {t.alloc}       -> same_as<alloc_t*>;
+        {t.data}        -> same_as<u8*>;
+        {t.length}      -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept String_Concept = Slice_Concept<T>
+                             || Static_String_Concept<T>
+                             || Dynamic_String_Concept<T>;
+
+    namespace str {
+        using slice_t = slice_t<u8>;
+    }
+
+    using line_callback_t = std::function<b8 (str::slice_t)>;
+
+    // ------------------------------------------------------------------------
+    //
+    // array
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Proxy_Array = requires(const T& t) {
+        typename                T::Value_Type;
+        typename                T::Size_Per_16;
+        typename                T::Backing_Array;
+
+        {t.backing}             -> same_as<typename T::Backing_Array>;
+        {t.start}               -> same_as<u32>;
+        {t.size}                -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept Static_Array_Concept = same_as<typename T::Is_Static, std::true_type>
+                                   && requires(const T& t) {
+        typename                T::Is_Static;
+        typename                T::Value_Type;
+
+        {t.data}                -> same_as<typename T::Value_Type*>;
+        {t.size}                -> same_as<u32>;
+        {t.capacity}            -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept Dynamic_Array_Concept = same_as<typename T::Is_Static, std::false_type>
+                                    && requires(const T& t) {
+         typename                T::Is_Static;
+         typename                T::Value_Type;
+         typename                T::Size_Per_16;
+
+         {t.alloc}               -> same_as<alloc_t*>;
+         {t.data}                -> same_as<typename T::Value_Type*>;
+         {t.size}                -> same_as<u32>;
+         {t.capacity}            -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept Array_Concept = Static_Array_Concept<T>
+                            || Dynamic_Array_Concept<T>
+                            || Proxy_Array<T>;
+
+    template <typename T, u32 Capacity = 8>
+    struct static_array_t;
+
+    template <typename T>
+    struct array_t;
+
+    namespace slice {
+        template <typename T>
+        inline slice_t<T> make(const Array_Concept auto& array,
+                               u32 start,
+                               u32 end) {
+            return slice_t{.data = array.data + start, .length = end - start};
+        }
+
+        template <typename T>
+        inline slice_t<T> make(const Array_Concept auto& array) {
+            return slice_t{.data = array.data, .length = array.size};
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // stable_array
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Stable_Array = requires(const T& t) {
+        typename                T::Value_Type;
+
+        {t.alloc}               -> same_as<alloc_t*>;
+        {t.slab}                -> same_as<alloc_t*>;
+        {t.data}                -> same_as<typename T::Value_Type**>;
+        {t.size}                -> same_as<u32>;
+        {t.capacity}            -> same_as<u32>;
+    };
+
+    template <typename T>
+    struct stable_array_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // assoc_array
+    //
+    // ------------------------------------------------------------------------
+    template <typename V>
+    struct assoc_pair_t;
+
+    template <typename V>
+    struct assoc_array_t;
+
+    struct assoc_key_idx_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // ast
+    //
+    // ------------------------------------------------------------------------
+    namespace ast {
+        namespace node {
+            namespace field {
+                static constexpr u8 none        = 0b00000;
+                static constexpr u8 id          = 0b00001;
+                static constexpr u8 lhs         = 0b00010;
+                static constexpr u8 rhs         = 0b00011;
+                static constexpr u8 expr        = 0b00100;
+                static constexpr u8 flags       = 0b00101;
+                static constexpr u8 token       = 0b00110;
+                static constexpr u8 radix       = 0b00111;
+                static constexpr u8 child       = 0b01000;
+                static constexpr u8 parent      = 0b01001;
+                static constexpr u8 custom      = parent + 1;
+            }
+
+            namespace header {
+                static constexpr u8 none        = 0b00000;
+                static constexpr u8 ident       = 0b00001;
+                static constexpr u8 unary       = 0b00010;
+                static constexpr u8 binary      = 0b00011;
+                static constexpr u8 comment     = 0b00100;
+                static constexpr u8 str_lit     = 0b00101;
+                static constexpr u8 num_lit     = 0b00110;
+                static constexpr u8 custom      = num_lit + 1;
+            }
+        }
+
+        struct node_id_t;
+        struct node_type_t;
+        struct num_lit_flags_t;
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // avl
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    struct avl_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // bag
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    struct bag_t;
+
+    struct bag_buf_size_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // bass
+    // (basecode awesome serialization system)
+    //
+    // ------------------------------------------------------------------------
+    struct bass_t;
+    struct field_t;
+    struct cursor_t;
+    struct field_dict_t;
+    struct field_index_t;
+
+    enum class format_type_t : u8 {
+        header,
+        field
+    };
+
+    using record_index_t = array_t<field_index_t>;
+
+    namespace kind {
+        constexpr u8 none       = 0b000;
+        constexpr u8 blob       = 0b001;
+        constexpr u8 field      = 0b010;
+        constexpr u8 header     = 0b100;
+
+        str::slice_t name(u8);
+    }
+
+    namespace field {
+        constexpr u8 none       = 0b00000;
+        constexpr u8 id         = 0b00001;
+    }
+
+    template <typename Buffer>
+    using format_record_callback_t = b8 (*)(format_type_t,
+                                            cursor_t&,
+                                            Buffer&,
+                                            u0*);
+
+    // ------------------------------------------------------------------------
+    //
+    // bintree
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Binary_Tree = requires(const T& t) {
+        typename                T::Node_Type;
+        typename                T::Value_Type;
+
+        {t.alloc}               -> same_as<alloc_t*>;
+        {t.node_slab}           -> same_as<alloc_t*>;
+        {t.value_slab}          -> same_as<alloc_t*>;
+        {t.root}                -> same_as<typename T::Node_Type>;
+        {t.size}                -> same_as<u32>;
+    };
+
+    template <Binary_Tree Tree_Type,
+              typename Node_Type = typename Tree_Type::Node_Type>
+    struct bin_tree_cursor_t;
+
+    namespace bintree {
+        namespace color {
+            constexpr u8 none   = 0;
+            constexpr u8 red    = 1;
+            constexpr u8 black  = 2;
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // bitset
+    //
+    // ------------------------------------------------------------------------
+    struct bitset_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // bst
+    //
+    // ------------------------------------------------------------------------
+    template <typename t>
+    struct bst_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // buf
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Buffer_Concept = String_Concept<T> || requires(const T& t) {
+        {t.alloc}       -> same_as<alloc_t*>;
+        {t.data}        -> same_as<u8*>;
+        {t.length}      -> same_as<u32>;
+        {t.capacity}    -> same_as<u32>;
+    };
+
+    struct buf_t;
+    struct buf_crsr_t;
+    struct buf_line_t;
+    struct buf_node_t;
+    struct buf_token_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // buf_pool
+    //
+    // ------------------------------------------------------------------------
+    struct lease_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // context
+    //
+    // ------------------------------------------------------------------------
+    struct context_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // decimal
+    //
+    // ------------------------------------------------------------------------
+    struct decimal_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // digraph
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Directed_Graph = requires(const T& t) {
+        typename                T::Node;
+        typename                T::Edge;
+        typename                T::Edge_Set;
+        typename                T::Edge_Pair;
+        typename                T::Value_Type;
+        typename                T::Node_Array;
+        typename                T::Edge_Array;
+        typename                T::Node_Stack;
+        typename                T::Edge_Pair_Array;
+        typename                T::Component_Array;
+
+        {t.alloc}               -> same_as<alloc_t*>;
+        {t.node_slab}           -> same_as<alloc_t*>;
+        {t.edge_slab}           -> same_as<alloc_t*>;
+        {t.nodes}               -> same_as<typename T::Node_Array>;
+        {t.edges}               -> same_as<typename T::Edge_Array>;
+        {t.outgoing}            -> same_as<typename T::Edge_Set>;
+        {t.incoming}            -> same_as<typename T::Edge_Set>;
+        {t.size}                -> same_as<u32>;
+        {t.id}                  -> same_as<u32>;
+    };
+
+    template <typename V>
+    struct digraph_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // eav
+    //
+    // ------------------------------------------------------------------------
+    constexpr s32 app_id        = 0x000dead1;
+
+    struct db_t;
+    struct txn_t;
+    struct tuple_t;
+    struct value_t;
+    struct entity_t;
+    union value_data_t;
+    struct tuple_stmt_cache_t;
+    struct simple_stmt_cache_t;
+    struct entity_stmt_cache_t;
+
+    enum class value_type_t : u8 {
+        nil,
+        list,
+        entity,
+        string,
+        boolean,
+        integer,
+        floating_point,
+    };
+
+    using txn_list_t            = stable_array_t<txn_t>;
+    using tuple_list_t          = array_t<tuple_t>;
+    using entity_list_t         = array_t<entity_t>;
+
+    namespace eav {
+        enum class status_t : u8 {
+            ok                  = 0,
+            error               = 101,
+            not_found           = 102,
+            sql_error           = 103,
+            invalid_rowid       = 104,
+            invalid_entity      = 105,
+        };
+
+        namespace entity {
+            namespace status {
+                constexpr u8 dead  = 0;
+                constexpr u8 live  = 1;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // error
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Error_Id = std::is_enum_v<T> || same_as<T, u32> || same_as<T, s32>;
+
+    enum class error_report_level_t : u8 {
+        warning,
+        error,
+    };
+
+    enum class error_report_type_t : u8 {
+        default_,
+        source,
+    };
+
+    struct error_def_t;
+    struct error_report_t;
+
+    namespace error {
+        enum class status_t : u8 {
+            ok                  = 0,
+            localized_dup_key,
+            localized_not_found,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // event
+    //
+    // ------------------------------------------------------------------------
+    struct event_t_;
+
+    using event_t               = event_t_*;
+    using event_array_t         = array_t<event_t>;
+
+    namespace event {
+        enum class status_t : u8 {
+            ok                  = 0,
+            error               = 106,
+            timeout             = 107,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // family
+    //
+    // ------------------------------------------------------------------------
+    template <typename...>
+    struct family_t final {
+    private:
+        inline static u32       id;
+
+        template <typename...>
+        inline static const u32 inner_id = id++;
+
+    public:
+        using Family_Type       = u32;
+
+        template <typename... Type>
+        inline static const Family_Type type = inner_id<std::decay_t<Type>...>;
+    };
+
+    // ------------------------------------------------------------------------
+    //
+    // ffi
+    //
+    // ------------------------------------------------------------------------
+    struct ffi_t;
+    struct lib_t;
+    struct param_t;
+    struct proto_t;
+    struct overload_t;
+    struct param_type_t;
+    struct param_value_t;
+    union  param_alias_t;
+
+    using param_array_t         = array_t<param_t*>;
+    using symbol_array_t        = assoc_array_t<u0*>;
+    using overload_array_t      = array_t<overload_t*>;
+    using param_value_array_t   = array_t<param_value_t>;
+
+    enum class call_mode_t : u8 {
+        system                  = 1,
+        variadic,
+    };
+
+    enum class param_cls_t : u8 {
+        ptr                     = 'P',
+        int_                    = 'I',
+        void_                   = 'V',
+        float_                  = 'F',
+        struct_                 = 'S',
+    };
+
+    enum class param_size_t : u8 {
+        none                    = '-',
+        byte                    = 'b',
+        word                    = 'w',
+        dword                   = 'd',
+        qword                   = 'q',
+    };
+
+    namespace ffi {
+        enum class status_t : u8 {
+            ok                                  = 0,
+            address_null                        = 108,
+            prototype_null                      = 109,
+            lib_not_loaded                      = 110,
+            symbol_not_found                    = 111,
+            invalid_int_size                    = 112,
+            invalid_float_size                  = 113,
+            parameter_overflow                  = 117,
+            duplicate_overload                  = 116,
+            load_library_failure                = 114,
+            struct_by_value_not_implemented     = 115,
+            only_one_rest_param_allowed         = 118,  // FIXME
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // filesys
+    //
+    // ------------------------------------------------------------------------
+    struct glob_result_t;
+
+    namespace filesys {
+        enum class status_t : u8 {
+            ok                              = 0,
+            not_dir                         = 116,
+            not_file                        = 117,
+            not_exists                      = 118,
+            invalid_dir                     = 119,
+            chdir_failure                   = 120,
+            file_writable                   = 121,
+            mkdir_failure                   = 122,
+            getcwd_failure                  = 123,
+            rename_failure                  = 124,
+            remove_failure                  = 125,
+            not_equivalent                  = 126,
+            mkdtemp_failure                 = 127,
+            not_implemented                 = 128,
+            unexpected_path                 = 129,
+            realpath_failure                = 130,
+            cannot_modify_root              = 131,
+            unexpected_empty_path           = 132,
+            cannot_rename_to_existing_file  = 133,
+            no_home_path                    = 134,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // gap_buf
+    //
+    // ------------------------------------------------------------------------
+    struct gap_t;
+    struct gap_buf_t;
+
+    namespace gap_buf {
+        enum class status_t : u8 {
+            ok                  = 0,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // getopt
+    //
+    // ------------------------------------------------------------------------
+    enum class arg_type_t : u8 {
+        none,
+        flag,
+        file,
+        string,
+        integer,
+        decimal,
+    };
+
+    struct arg_t;
+    struct getopt_t;
+    struct option_t;
+    union arg_subclass_t;
+    using arg_array_t           = array_t<arg_t>;
+    using option_array_t        = array_t<option_t>;
+
+    namespace getopt {
+        enum class status_t : u32 {
+            ok                              = 0,
+            unconfigured,
+            invalid_option,
+            expected_value,
+            duplicate_option,
+            invalid_argument,
+            count_exceeds_allowed,
+            missing_required_option,
+            decimal_conversion_error,
+            integer_conversion_error,
+        };
+
+        class option_builder_t;
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // hashtab
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Hash_Table = hash::Hashable<typename T::Key_Type>
+                         && requires(const T& t) {
+        typename                T::Key_Type;
+        typename                T::Pair_Type;
+        typename                T::Value_Type;
+
+        {t.flags}               -> same_as<u64*>;
+        {t.hashes}              -> same_as<u64*>;
+        {t.keys}                -> same_as<typename T::Key_Type*>;
+        {t.values}              -> same_as<typename T::Value_Type*>;
+        {t.alloc}               -> same_as<alloc_t*>;
+        {t.size}                -> same_as<u32>;
+        {t.capacity}            -> same_as<u32>;
+        {t.load_factor}         -> same_as<f32>;
+    };
+
+    template <typename K, typename V>
+    struct hashtab_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // integer
+    //
+    // ------------------------------------------------------------------------
+    struct integer_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // intern
+    //
+    // ------------------------------------------------------------------------
+    struct intern_t;
+    struct interned_str_t;
+
+    using intern_id             = u32;
+    using interned_str_list_t   = array_t<interned_str_t>;
+
+    namespace intern {
+        enum class status_t : u8 {
+            ok                  = 0,
+            no_bucket           = 135,
+            not_found           = 136,
+        };
+
+        struct result_t;
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // ipc
+    //
+    // ------------------------------------------------------------------------
+    namespace ipc {
+        enum class status_t : u8 {
+            ok                  = 0,
+            error,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // job
+    //
+    // ------------------------------------------------------------------------
+    struct job_t;
+    struct job_task_base;
+
+    template <typename Proc, typename... Args>
+    struct job_task_t;
+
+    using job_id                = u32;
+    using job_list_t            = stable_array_t<job_t>;
+    using job_id_list_t         = array_t<job_id>;
+
+    enum class job_state_t : u8 {
+        queued                  = 250,
+        created,
+        running,
+        finished,
+    };
+
+    namespace job {
+        enum class status_t : u8 {
+            ok                      = 0,
+            busy                    = 138,
+            error                   = 139,
+            invalid_job_id          = 140,
+            invalid_job_state       = 141,
+            label_intern_failure    = 142,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // leb128
+    //
+    // ------------------------------------------------------------------------
+    struct leb128_t;
+
+    namespace leb {
+        constexpr u8 sign_bit         = 0x40;
+        constexpr u8 continuation_bit = 0x80;
+        constexpr u8 lower_seven_bits = 0x7f;
+
+        enum class status_t {
+            ok,
+            decode_error
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // list
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Linked_List = requires(const T& t) {
+        typename                T::Value_Type;
+        typename                T::Node_Array;
+        typename                T::Value_Array;
+
+        {t.alloc}               -> same_as<alloc_t*>;
+        {t.nodes}               -> same_as<typename T::Node_Array>;
+        {t.values}              -> same_as<typename T::Value_Array>;
+        {t.head}                -> same_as<u32>;
+        {t.tail}                -> same_as<u32>;
+        {t.free}                -> same_as<u32>;
+        {t.size}                -> same_as<u32>;
+    };
+
+    struct list_node_t;
+
+    template <typename T>
+    struct list_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // locale
+    //
+    // ------------------------------------------------------------------------
+    struct locale_key_t;
+
+    namespace locale{
+        enum class status_t : u8 {
+            ok,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // log
+    //
+    // ------------------------------------------------------------------------
+    struct logger_t;
+    struct logger_config_t;
+    struct logger_system_t;
+    union logger_subclass_t;
+
+    enum class logger_type_t : u8 {
+        default_                = 240,
+        spdlog,
+        syslog,
+    };
+
+    enum class log_level_t : u8 {
+        emergency,
+        alert,
+        critical,
+        error,
+        warn,
+        notice,
+        info,
+        debug,
+    };
+
+    using logger_array_t        = array_t<logger_t*>;
+    using shared_logger_t       = std::shared_ptr<::spdlog::logger>;
+
+    using logger_fini_callback_t = u0 (*)(logger_t*);
+    using logger_init_callback_t = u0 (*)(logger_t*, logger_config_t*);
+    using logger_emit_callback_t = u0 (*)(logger_t*, log_level_t,
+                                          fmt_str_t, const fmt_args_t&);
+
+    namespace log {
+        enum class status_t : u8 {
+            ok,
+            invalid_logger,
+            invalid_logger_system,
+            invalid_default_logger,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // macro
+    //
+    // ------------------------------------------------------------------------
+    struct macro_t;
+
+    enum class macro_op_t : u8 {
+        nop,
+        get,
+        set,
+        cmp,
+        je,
+        jne,
+        jl,
+        jle,
+        jg,
+        jge,
+        copy,
+    };
+
+    enum class macro_directive_t : u8 {
+        none,
+        if_,
+        odd,
+        each,
+        loop,
+        last,
+        even,
+        first,
+        local,
+        after,
+        macro,
+        upper,
+        lower,
+        label,
+        global,
+        substr,
+        escape,
+        break_,
+        binary,
+        before,
+        between,
+        nothing,
+        include,
+        for_each,
+        continue_,
+        after_all,
+        before_all,
+    };
+
+    using macro_array_t         = array_t<macro_t*>;
+
+    namespace macro {
+        enum class status_t : u32 {
+            ok,
+            error
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // memory
+    //
+    // ------------------------------------------------------------------------
+    struct slab_t;
+    struct alloc_t;
+    struct mem_result_t;
+    struct buddy_block_t;
+    struct page_header_t;
+    struct alloc_system_t;
+    struct alloc_config_t;
+    struct system_config_t;
+    union alloc_subclass_t;
+
+    using mspace                = u0*;
+
+    enum class alloc_type_t : u8 {
+        none,
+        base,
+        bump,
+        page,
+        slab,
+        temp,
+        proxy,
+        trace,
+        stack,
+        buddy,
+        scratch,
+        dlmalloc,
+    };
+
+    using mem_fini_callback_t       = u32 (*)(alloc_t*);
+    using mem_size_callback_t       = u32 (*)(alloc_t*, u0* mem);
+    using mem_free_callback_t       = u32 (*)(alloc_t*, u0* mem);
+    using mem_init_callback_t       = u0  (*)(alloc_t*, alloc_config_t*);
+    using mem_alloc_callback_t      = mem_result_t (*)(alloc_t*,
+                                                       u32 size,
+                                                       u32 align);
+    using mem_realloc_callback_t    = mem_result_t (*)(alloc_t*,
+                                                       u0* mem,
+                                                       u32 size,
+                                                       u32 align);
+
+    namespace memory {
+        enum class status_t : u8 {
+            ok,
+            invalid_allocator,
+            invalid_default_allocator,
+            invalid_allocation_system,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // memory/meta
+    //
+    // ------------------------------------------------------------------------
+    struct alloc_info_t;
+
+    using alloc_info_array_t    = array_t<alloc_info_t*>;
+
+    enum class plot_mode_t : u8 {
+        none,
+        rolled,
+        scrolled,
+    };
+
+    // ------------------------------------------------------------------------
+    //
+    // mutex
+    //
+    // ------------------------------------------------------------------------
+    struct mutex_t;
+    struct scoped_lock_t;
+
+    namespace mutex {
+        enum class status_t : u8 {
+            ok                          = 0,
+            busy                        = 143,
+            error                       = 144,
+            invalid_mutex               = 145,
+            out_of_memory               = 146,
+            create_mutex_failure        = 147,
+            insufficient_privilege      = 148,
+            thread_already_owns_lock    = 149,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // network
+    //
+    // ------------------------------------------------------------------------
+    struct socket_t;
+    struct ip_address_t;
+
+    using socket_read_callback_t    = b8 (*)(socket_t&, u0*);
+    using socket_close_callback_t   = u0 (*)(socket_t&);
+
+    namespace network {
+        enum class status_t : u8 {
+            ok                              = 0,
+            bind_failure                    = 150,
+            listen_failure                  = 151,
+            connect_failure                 = 152,
+            socket_dgram_error              = 153,
+            socket_already_open             = 154,
+            winsock_init_failure            = 155,
+            socket_already_closed           = 156,
+            invalid_address_and_port        = 157,
+            socket_option_broadcast_error   = 158,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // numbers
+    //
+    // ------------------------------------------------------------------------
+    namespace numbers {
+        enum class status_t : u8 {
+            ok,
+            overflow,
+            underflow,
+            not_convertible
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // obj_pool
+    //
+    // ------------------------------------------------------------------------
+    struct obj_pool_t;
+    struct obj_type_t;
+
+    using obj_array_t           = array_t<u0*>;
+    using slab_table_t          = hashtab_t<u32, obj_type_t>;
+    using destroy_callback_t    = u0 (*)(const u0*);
+
+    namespace obj_pool {
+        enum class status_t : u32 {
+            ok                  = 0,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // path
+    //
+    // ------------------------------------------------------------------------
+    struct path_t;
+    struct path_mark_t;
+
+    using path_mark_list_t      = array_t<path_mark_t>;
+
+    namespace path {
+        namespace marks {
+            [[maybe_unused]] constexpr u16 none         = 0;
+#ifdef _WIN32
+            [[maybe_unused]] constexpr u16 drive_name   = 1;
+#endif
+            [[maybe_unused]] constexpr u16 root_part    = 2;
+            [[maybe_unused]] constexpr u16 path_part    = 3;
+            [[maybe_unused]] constexpr u16 extension    = 4;
+            [[maybe_unused]] constexpr u16 parent_dir   = 5;
+            [[maybe_unused]] constexpr u16 current_dir  = 6;
+        }
+
+        enum class status_t : u8 {
+            ok                          = 0,
+            path_too_long               = 159,
+            no_parent_path              = 160,
+            unexpected_empty_path       = 161,
+            expected_relative_path      = 162,
+            unexpected_empty_extension  = 163,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // plot
+    //
+    // ------------------------------------------------------------------------
+    struct data_point_t;
+    struct rolled_view_t;
+    struct scrolled_view_t;
+
+    using data_point_array_t    = array_t<data_point_t>;
+
+    // ------------------------------------------------------------------------
+    //
+    // token
+    //
+    // ------------------------------------------------------------------------
+    struct token_t;
+    struct token_id_t;
+    struct token_type_t;
+    struct token_cache_t;
+    struct prefix_rule_t;
+    struct operator_precedent_t;
+
+    using token_list_t          = array_t<token_t>;
+    using token_id_list_t       = array_t<token_id_t>;
+
+    // ------------------------------------------------------------------------
+    //
+    // pratt
+    //
+    // ------------------------------------------------------------------------
+    struct rule_t;
+    struct grammar_t;
+    struct pratt_ctx_t;
+
+    using rule_map_t            = hashtab_t<token_type_t, rule_t>;
+    using std_t                 = ast::node_id_t (*)(pratt_ctx_t*);
+    using nud_t                 = ast::node_id_t (*)(pratt_ctx_t*);
+    using led_t                 = ast::node_id_t (*)(pratt_ctx_t*,
+                                                     ast::node_id_t);
+
+    namespace pratt {
+        namespace associativity {
+            constexpr u8 none   = 0b0000;
+            constexpr u8 left   = 0b0001;
+            constexpr u8 right  = 0b0010;
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // profiler
+    //
+    // ------------------------------------------------------------------------
+    namespace profiler {
+        enum class status_t : u8 {
+            ok                              = 0,
+            no_cpu_rtdscp_support           = 164,
+            no_cpu_invariant_tsc_support    = 165
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // proxy_array
+    //
+    // ------------------------------------------------------------------------
+    template <typename T, typename Backing_Type = T>
+    struct proxy_array_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // queue
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    struct queue_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // rbt
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    struct rbt_t;
+
+    enum class rbt_color_t : u8 {
+        none  = bintree::color::none,
+        red   = bintree::color::red,
+        black = bintree::color::black
+    };
+
+    // ------------------------------------------------------------------------
+    //
+    // rpn
+    //
+    // ------------------------------------------------------------------------
+    struct postfix_t;
+    struct postfix_expr_t;
+
+    using postfix_expr_list_t   = array_t<postfix_expr_t>;
+
+    namespace token::cls {
+        constexpr u16 none                 = 0;
+        constexpr u16 operator_            = 1;
+        constexpr u16 param_end            = 2;
+        constexpr u16 scope_end            = 3;
+        constexpr u16 param_begin          = 4;
+        constexpr u16 scope_begin          = 5;
+        constexpr u16 call_operator        = 7;
+        constexpr u16 call_terminator      = 8;
+        constexpr u16 stmt_terminator      = 9;
+        constexpr u16 operator_consumer    = 10;
+
+        str::slice_t name(token_type_t type);
+    }
+
+    namespace rpn {
+        enum class status_t : u8 {
+            ok                                  = 0,
+            error                               = 200,
+            invalid_operator_precedence_array   = 201
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // set
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Hash_Set = hash::Hashable<T> && requires(const T& t) {
+        typename                T::Value_Type;
+        typename                T::Is_Pointer;
+        typename                T::Value_Type_Base;
+
+        {t.alloc}               -> same_as<alloc_t*>;
+        {t.flags}               -> same_as<u64*>;
+        {t.hashes}              -> same_as<u64*>;
+        {t.values}              -> same_as<typename T::Value_Type*>;
+        {t.size}                -> same_as<u32>;
+        {t.capacity}            -> same_as<u32>;
+        {t.load_factor}         -> same_as<f32>;
+    };
+
+    struct set_buf_size_t;
+
+    template <typename t>
+    struct set_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // src_loc
+    //
+    // ------------------------------------------------------------------------
+    struct source_loc_t;
+    struct source_pos_t;
+    struct source_info_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // stack
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Fixed_Stack = requires(const T& t) {
+        typename                T::Value_Type;
+        typename                T::Base_Value_Type;
+
+        {t.data}                -> same_as<typename T::Value_Type*>;
+        {t.size}                -> same_as<u32>;
+        {t.capacity}            -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept Dynamic_Stack = requires(const T& t) {
+        typename                T::Value_Type;
+        typename                T::Base_Value_Type;
+
+        {t.alloc}               -> same_as<alloc_t*>;
+        {t.data}                -> same_as<typename T::Value_Type*>;
+        {t.size}                -> same_as<u32>;
+        {t.capacity}            -> same_as<u32>;
+    };
+
+    template <typename T>
+    concept Stack = Fixed_Stack<T> || Dynamic_Stack<T>;
+
+    template <typename T>
+    struct stack_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // stopwatch
+    //
+    // ------------------------------------------------------------------------
+    struct stopwatch_t;
+
+    using timed_block_callable_t    = std::function<s32()>;
+
+    // ------------------------------------------------------------------------
+    //
+    // str_array
+    //
+    // ------------------------------------------------------------------------
+    struct str_idx_t;
+    struct str_array_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // string
+    //
+    // ------------------------------------------------------------------------
+    namespace string {
+        enum class status_t : u8 {
+            ok,
+            localized_not_found,
+            localized_duplicate_key
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // symtab
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Symbol_Table = requires(const T& t) {
+        typename                T::Value_Type;
+        typename                T::Value_Array;
+        typename                T::Pair_Array;
+        typename                T::Node_Type;
+        typename                T::Node_Array;
+
+        {t.alloc}               -> same_as<alloc_t*>;
+        {t.nodes}               -> same_as<typename T::Node_Array>;
+        {t.values}              -> same_as<typename T::Value_Array>;
+        {t.size}                -> same_as<u32>;
+    };
+
+    enum class symtab_node_type_t : u8 {
+        empty,
+        used,
+        leaf,
+    };
+
+    template <typename V>
+    struct symtab_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // term
+    //
+    // ------------------------------------------------------------------------
+    struct rgb_t;
+    struct term_t;
+    struct term_command_t;
+    struct cursor_pos_t;
+    struct color_value_t;
+
+    using style_t               = u32;
+    using term_command_array_t  = array_t<term_command_t>;
+
+    enum class clear_mode_t : u8 {
+        cursor_to_bottom,
+        cursor_to_top,
+        entire
+    };
+
+    enum class color_mode_t : u8 {
+        indexed,
+        palette,
+        true_color
+    };
+
+    enum class term_command_type_t : u8 {
+        cursor_up                   = 'A',
+        cursor_to                   = 'H',
+        scroll_up                   = 'S',
+        erase_line                  = 'K',
+        cursor_down                 = 'B',
+        scroll_down                 = 'T',
+        cursor_back                 = 'D',
+        erase_display               = 'J',
+        cursor_forward              = 'C',
+        cursor_next_line            = 'E',
+        cursor_prev_line            = 'F',
+        cursor_horiz_abs            = 'G',
+        cursor_horiz_vert_pos       = 'f',
+        select_graphic_rendition    = 'm',
+    };
+
+    namespace term {
+        enum class color_t : u8 {
+            black           = 30,
+            red,
+            green,
+            yellow,
+            blue,
+            magenta,
+            cyan,
+            white,
+            fg_default      = 39,
+
+            bg_black,
+            bg_red,
+            bg_green,
+            bg_yellow,
+            bg_blue,
+            bg_magenta,
+            bg_cyan,
+            bg_white,
+            bg_default      = 49,
+
+            bright_black    = 90,
+            bright_red,
+            bright_green,
+            bright_yellow,
+            bright_blue,
+            bright_magenta,
+            bright_cyan,
+            bright_white
+        };
+
+        namespace style {
+            constexpr u32 none              = 0b00000000000000000000000000000000;
+            constexpr u32 bold              = 0b00000000000000000000000000000001;
+            constexpr u32 dim               = 0b00000000000000000000000000000010;
+            constexpr u32 italic            = 0b00000000000000000000000000000100;
+            constexpr u32 underline         = 0b00000000000000000000000000001000;
+            constexpr u32 slow_blink        = 0b00000000000000000000000000010000;
+            constexpr u32 fast_blink        = 0b00000000000000000000000000100000;
+            constexpr u32 reverse           = 0b00000000000000000000000001000000;
+            constexpr u32 hidden            = 0b00000000000000000000000010000000;
+            constexpr u32 strike            = 0b00000000000000000000000100000000;
+            constexpr u32 double_underline  = 0b00000000000100000000000000000000;
+        }
+
+        enum class status_t : u8 {
+            ok
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // test_suite
+    //
+    // ------------------------------------------------------------------------
+    struct test_suite_t;
+
+    using suite_runner_t        = s32 (*)(test_suite_t&);
+
+    // ------------------------------------------------------------------------
+    //
+    // thread
+    //
+    // ------------------------------------------------------------------------
+    struct thread_t;
+    struct proc_base_t;
+
+    template <typename Proc, typename... Args>
+    struct thread_proc_t;
+
+    enum class thread_state_t : u8 {
+        exited,
+        created,
+        running,
+        canceled,
+    };
+
+    namespace thread {
+        enum class status_t : u8 {
+            ok                      = 0,
+            error                   = 167,
+            deadlock                = 168,
+            not_joinable            = 169,
+            invalid_state           = 170,
+            name_too_long           = 171,
+            invalid_thread          = 172,
+            already_joined          = 173,
+            not_cancelable          = 174,
+            already_canceled        = 175,
+            already_detached        = 176,
+            create_thread_failure   = 177,
+            insufficient_privilege  = 178,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // timer
+    //
+    // ------------------------------------------------------------------------
+    struct timer_t;
+
+    using timer_callback_t      = b8 (*)(timer_t*, u0*);
+
+    namespace timer {
+        enum class status_t : u8 {
+            ok                  = 0,
+            error               = 179
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // utf
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Utf_String_Concept = (same_as<typename T::value_type, u32>
+                                  || same_as<typename T::value_type, u16>)
+                                 && requires(const T& t) {
+        typename                T::value_type;
+        {t.alloc}               -> same_as<alloc_t*>;
+        {t.data}                -> same_as<typename T::value_type*>;
+        {t.length}              -> same_as<u32>;
+    };
+
+    template <typename T>
+    struct utf_str_t;
+
+    // ------------------------------------------------------------------------
+    //
+    // uuid
+    //
+    // ------------------------------------------------------------------------
+    struct uuid_t;
+
+    namespace uuid {
+        enum class status_t : u32 {
+            ok                  = 0,
+            parse_error
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // hashable implementation/prototypes
+    //
+    // ------------------------------------------------------------------------
+    namespace hash {
+        static const u64 s_fixed_random = std::chrono::steady_clock::now()
+            .time_since_epoch()
+            .count();
+
+        // http://xorshift.di.unimi.it/splitmix64.c
+        inline u64 splitmix64(u64 x) {
+            x += 0x9e3779b97f4a7c15;
+            x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9;
+            x = (x ^ (x >> 27)) * 0x94d049bb133111eb;
+            return x ^ (x >> 31);
+        }
+
+        template <String_Concept T>
+        inline u64 hash64(const T& key);
+
+        inline u32 hash32(const u8& key) {
+            return hash32((u32) key);
+        }
+
+        inline u64 hash64(const u8& key) {
+            return hash64((u64) key);
+        }
+
+        inline u32 hash32(const s8& key) {
+            return hash32((s32) key);
+        }
+
+        inline u64 hash64(const s8& key) {
+            return hash64((s64) key);
+        }
+
+        inline u32 hash32(const u16& key) {
+            return hash32((u32) key);
+        }
+
+        inline u64 hash64(u0* const& key) {
+            static const usize shift = std::log2(1 + sizeof(u0*));
+            return splitmix64(s_fixed_random + (usize(key) >> shift));
+        }
+
+        inline u64 hash64(const u16& key) {
+            return hash64((u64) key);
+        }
+
+        inline u32 hash32(const s16& key) {
+            return hash32((s32) key);
+        }
+
+        inline u64 hash64(const s16& key) {
+            return hash64((s64) key);
+        }
+
+        inline u32 hash32(const u32& key) {
+            return splitmix64(s_fixed_random + key);
+        }
+
+        inline u64 hash64(const u32& key) {
+            return splitmix64(s_fixed_random + key);
+        }
+
+        inline u32 hash32(const s32& key) {
+            return splitmix64(s_fixed_random + key);
+        }
+
+        inline u64 hash64(const s32& key) {
+            return splitmix64(s_fixed_random + key);
+        }
+
+        inline u64 hash64(const s64& key) {
+            return splitmix64(s_fixed_random + key);
+        }
+
+        inline u64 hash64(const u64& key) {
+            return splitmix64(s_fixed_random + key);
+        }
+
+        inline u64 hash64(option_t* const& key);
+
+        inline u64 hash64(const integer_t& key);
+
+        inline u64 hash64(const decimal_t& key);
+
+        template <typename T>
+        inline u64 hash64(const slice_t<T>& key);
+
+        inline u64 hash64(const locale_key_t& key);
+
+        inline u64 hash64(const token_type_t& key);
     }
 }
-#endif

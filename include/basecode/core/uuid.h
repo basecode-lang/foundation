@@ -19,7 +19,6 @@
 #pragma once
 
 #include <basecode/core/str.h>
-#include <basecode/core/format_types.h>
 
 namespace basecode {
     struct uuid_t final {
@@ -37,11 +36,6 @@ namespace basecode {
     };
 
     namespace uuid {
-        enum class status_t : u32 {
-            ok                  = 0,
-            parse_error
-        };
-
         uuid_t make();
 
         status_t parse(const s8* str, uuid_t* u);

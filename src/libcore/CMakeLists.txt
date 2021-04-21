@@ -75,7 +75,6 @@ set(
 
     ${CORE_INC_DIR}/defer.h
     ${CORE_INC_DIR}/types.h
-    ${CORE_INC_DIR}/family.h
 
     base64.cpp ${CORE_INC_DIR}/base64.h
 
@@ -115,15 +114,14 @@ set(
 
     ffi.cpp ${CORE_INC_DIR}/ffi.h
 
-    format.cpp ${CORE_INC_DIR}/format.h ${CORE_INC_DIR}/format_types.h
+    ${CORE_INC_DIR}/format_fwd.h
+    format.cpp ${CORE_INC_DIR}/format.h
 
     gap_buf.cpp ${CORE_INC_DIR}/gap_buf.h
 
     getopt.cpp ${CORE_INC_DIR}/getopt.h
 
     graphviz/gv.cpp ${CORE_INC_DIR}/graphviz/gv.h
-
-    ${CORE_INC_DIR}/hashable.h
 
     hash_common.cpp ${CORE_INC_DIR}/hash_common.h
 

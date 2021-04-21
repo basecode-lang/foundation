@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/graphviz/gv.h>
+#include <basecode/core/string.h>
 #include <basecode/core/scm/bytecode.h>
 #include <basecode/core/scm/compiler.h>
 

@@ -22,13 +22,7 @@
 #include <basecode/core/context.h>
 
 namespace basecode {
-
     namespace ipc {
-        enum class status_t : u8 {
-            ok                  = 0,
-            error,
-        };
-
         namespace system {
             u0 fini();
 

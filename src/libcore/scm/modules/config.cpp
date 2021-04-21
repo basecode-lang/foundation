@@ -16,9 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/log.h>
 #include <basecode/core/error.h>
-#include <basecode/core/string.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/core/scm/types.h>
 #include <basecode/core/scm/system.h>

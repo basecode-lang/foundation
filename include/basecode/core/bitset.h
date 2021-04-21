@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
 #include <basecode/core/memory.h>
 #include <basecode/core/context.h>
 

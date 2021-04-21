@@ -16,6 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <fmt/chrono.h>
+#include <basecode/core/log.h>
 #include <basecode/core/path.h>
 #include <basecode/core/log/system/default.h>
 

@@ -29,7 +29,7 @@
      ((array).size++, obj_pool::make<type>(storage))
 
 namespace basecode {
-    template<typename T, typename Backing_Type = T>
+    template<typename T, typename Backing_Type>
     struct proxy_array_t final {
         using Is_Static         [[maybe_unused]] = std::integral_constant<b8, true>;
         using Value_Type        = T;
@@ -54,7 +54,8 @@ namespace basecode {
         };
         DECL_ITERS(proxy_array_t, Value_Type, iterator_state_t);
     };
-    static_assert(sizeof(proxy_array_t<s32>) <= 16, "proxy_array_t<T> is now larger than 16 bytes!");
+    static_assert(sizeof(proxy_array_t<s32>) <= 16,
+                  "proxy_array_t<T> is now larger than 16 bytes!");
 
     namespace proxy_array {
         template <Proxy_Array T,

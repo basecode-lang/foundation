@@ -26,26 +26,9 @@
 #include <basecode/core/locale.h>
 #include <basecode/core/context.h>
 #include <basecode/core/iterator.h>
-#include <basecode/core/hashable.h>
 #include <basecode/core/hash_common.h>
 
 namespace basecode {
-    template <typename T>
-    concept Hash_Table = hash::Hashable<typename T::Key_Type> && requires(const T& t) {
-        typename                T::Key_Type;
-        typename                T::Pair_Type;
-        typename                T::Value_Type;
-
-        {t.flags}              -> same_as<u64*>;
-        {t.hashes}              -> same_as<u64*>;
-        {t.keys}                -> same_as<typename T::Key_Type*>;
-        {t.values}              -> same_as<typename T::Value_Type*>;
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
-        {t.load_factor}         -> same_as<f32>;
-    };
-
     template <typename K, typename V>
     struct hashtab_t final {
         struct pair_t;
@@ -119,7 +102,8 @@ namespace basecode {
         };
         DECL_ITERS(hashtab_t, Pair_Type, iterator_state_t);
     };
-    static_assert(sizeof(hashtab_t<s32, s32>) <= 56, "hashtab_t<K, V> is now larger than 56 bytes!");
+    static_assert(sizeof(hashtab_t<s32, s32>) <= 56,
+                  "hashtab_t<K, V> is now larger than 56 bytes!");
 
     namespace hashtab {
         template <Hash_Table T>

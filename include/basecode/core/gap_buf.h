@@ -37,10 +37,6 @@ namespace basecode {
     };
 
     namespace gap_buf {
-        enum class status_t : u8 {
-            ok                  = 0,
-        };
-
         u0 free(gap_buf_t& buf);
 
         u8 caret_curr(gap_buf_t& buf);

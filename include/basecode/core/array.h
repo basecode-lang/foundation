@@ -18,15 +18,13 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/slice.h>
 #include <basecode/core/assert.h>
 #include <basecode/core/memory.h>
 #include <basecode/core/context.h>
 #include <basecode/core/array_common.h>
 
 namespace basecode {
-    template <typename T, u32 Capacity = 8>
+    template <typename T, u32 Capacity>
     struct static_array_t final {
         using Is_Static         [[maybe_unused]] = std::integral_constant<b8, true>;
         using Value_Type        = T;
@@ -270,7 +268,8 @@ namespace basecode {
                 new_capacity * sizeof(Value_Type),
                 alignof(Value_Type));
             const auto data          = array.data + array.size;
-            const auto size_to_clear = new_capacity > array.capacity ? new_capacity - array.capacity : 0;
+            const auto size_to_clear = new_capacity > array.capacity ?
+                                       new_capacity - array.capacity : 0;
             std::memset(data, 0, size_to_clear * sizeof(Value_Type));
             array.capacity = new_capacity;
         }
@@ -325,14 +324,3 @@ namespace basecode {
     }
 }
 
-namespace basecode::slice {
-    template <typename T>
-    inline slice_t<T> make(const Array_Concept auto& array) {
-        return slice_t{.data = array.data, .length = array.size};
-    }
-
-    template <typename T>
-    inline slice_t<T> make(const Array_Concept auto& array, u32 start, u32 end) {
-        return slice_t{.data = array.data + start, .length = end - start};
-    }
-}

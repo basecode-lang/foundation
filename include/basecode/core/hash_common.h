@@ -19,8 +19,6 @@
 #pragma once
 
 #include <basecode/core/bits.h>
-#include <basecode/core/types.h>
-#include <basecode/core/format.h>
 
 namespace basecode::hash_common {
     u32 prime_capacity(u32 idx);

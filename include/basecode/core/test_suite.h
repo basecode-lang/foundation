@@ -23,10 +23,6 @@
 #include <basecode/core/stopwatch.h>
 
 namespace basecode {
-    struct test_suite_t;
-
-    using suite_runner_t        = s32 (*)(test_suite_t&);
-
     struct test_suite_t final {
         Catch::Session          session;
         const s8**              argv;

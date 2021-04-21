@@ -27,8 +27,8 @@
 
 #pragma once
 
-#include <basecode/core/ffi.h>
-#include <basecode/core/buf.h>
+#include <basecode/core/types.h>
+#include <basecode/core/context.h>
 
 namespace basecode::scm {
     struct obj_t;

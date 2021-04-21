@@ -24,41 +24,9 @@
 #include <basecode/core/assert.h>
 #include <basecode/core/memory.h>
 #include <basecode/core/context.h>
-#include <basecode/core/hashable.h>
 #include <basecode/core/hash/murmur.h>
 
 namespace basecode {
-    template <typename T>
-    concept Slice_Concept = same_as<typename T::Is_Static, std::true_type>
-                            && requires(const T& t) {
-        {t.data}        -> same_as<const u8*>;
-        {t.length}      -> same_as<u32>;
-    };
-
-    template <typename T>
-    concept Static_String_Concept = same_as<typename T::Is_Static, std::true_type>
-                                    && requires(const T& t) {
-        {t.data}        -> same_as<u8*>;
-        {t.length}      -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
-    };
-
-    template <typename T>
-    concept Dynamic_String_Concept  = same_as<typename T::Is_Static, std::false_type>
-                                      && requires(const T& t) {
-        {t.alloc}       -> same_as<alloc_t*>;
-        {t.data}        -> same_as<u8*>;
-        {t.length}      -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
-    };
-
-    template <typename T>
-    concept String_Concept = Slice_Concept<T>
-            || Static_String_Concept<T>
-            || Dynamic_String_Concept<T>;
-
-    struct str_t;
-
     namespace str {
         u0 free(String_Concept auto& str);
 

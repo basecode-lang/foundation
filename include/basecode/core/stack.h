@@ -25,30 +25,6 @@
 #include <basecode/core/context.h>
 
 namespace basecode {
-    template <typename T>
-    concept Fixed_Stack = requires(const T& t) {
-        typename                T::Value_Type;
-        typename                T::Base_Value_Type;
-
-        {t.data}                -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
-    };
-
-    template <typename T>
-    concept Dynamic_Stack = requires(const T& t) {
-        typename                T::Value_Type;
-        typename                T::Base_Value_Type;
-
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.data}                -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
-    };
-
-    template <typename T>
-    concept Stack = Fixed_Stack<T> || Dynamic_Stack<T>;
-
     template <typename T, u32 Size = 8>
     struct fixed_stack_t final {
         using Value_Type        = T;
@@ -75,7 +51,8 @@ namespace basecode {
         T& operator[](u32 index)                { return data[index]; }
         const T& operator[](u32 index) const    { return data[index]; }
     };
-    static_assert(sizeof(stack_t<s32>) <= 24, "stack_t<T> is now larger than 24 bytes!");
+    static_assert(sizeof(stack_t<s32>) <= 24,
+                  "stack_t<T> is now larger than 24 bytes!");
 
     namespace stack {
         template <Stack T,

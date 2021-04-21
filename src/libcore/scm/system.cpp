@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/buf.h>
 #include <basecode/core/scm/types.h>
 #include <basecode/core/scm/system.h>
 

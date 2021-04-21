@@ -22,54 +22,6 @@
 #include <basecode/core/array.h>
 
 namespace basecode {
-    struct macro_t;
-
-    using macro_array_t         = array_t<macro_t*>;
-
-    enum class macro_op_t : u8 {
-        nop,
-        get,
-        set,
-        cmp,
-        je,
-        jne,
-        jl,
-        jle,
-        jg,
-        jge,
-        copy,
-    };
-
-    enum class macro_directive_t : u8 {
-        none,
-        if_,
-        odd,
-        each,
-        loop,
-        last,
-        even,
-        first,
-        local,
-        after,
-        macro,
-        upper,
-        lower,
-        label,
-        global,
-        substr,
-        escape,
-        break_,
-        binary,
-        before,
-        between,
-        nothing,
-        include,
-        for_each,
-        continue_,
-        after_all,
-        before_all,
-    };
-
     struct macro_t final {
         u32                     id;
     };
@@ -90,11 +42,6 @@ namespace basecode {
     //  ${quux(3, true, left, right)}.
     //
     namespace macro {
-        enum class status_t : u32 {
-            ok,
-            error
-        };
-
         namespace system {
             u0 fini();
 

@@ -23,12 +23,6 @@
 #include <basecode/core/format.h>
 
 namespace basecode::string {
-    enum class status_t : u8 {
-        ok,
-        localized_not_found,
-        localized_duplicate_key
-    };
-
     namespace system {
         u0 fini();
 
@@ -60,25 +54,38 @@ namespace basecode::string {
     }
 
     namespace localized {
-        status_t find(u32 id, str::slice_t** value, const s8* locale = {}, s32 len = -1);
+        status_t add(u32 id,
+                     str::slice_t locale,
+                     const s8* value,
+                     s32 len = -1);
 
-        status_t find(u32 id, str::slice_t** value, const String_Concept auto& locale = {}) {
+        status_t find(u32 id,
+                      str::slice_t** value,
+                      const s8* locale = {},
+                      s32 len = -1);
+
+        status_t find(u32 id,
+                      str::slice_t** value,
+                      const String_Concept auto& locale = {}) {
             if (locale.length == 0)
                 return find(id, value);
             else
                 return find(id, value, (const s8*) locale.data, locale.length);
         }
 
-        str::slice_t status_name(Status_Concept auto status) {
-            str::slice_t* s{};
-            return OK(find(u32(status), &s)) ? *s : interned::fold(format::format("[error] invalid status name id: {}", u32(status)));
-        }
-
-        status_t add(u32 id, str::slice_t locale, const s8* value, s32 len = -1);
-
-        status_t add(u32 id, const String_Concept auto& locale, const String_Concept auto& value) {
+        status_t add(u32 id,
+                     const String_Concept auto& locale,
+                     const String_Concept auto& value) {
             auto lc = slice::make(locale.data, locale.length);
             return add(id, lc, (const s8*) value.data, value.length);
+        }
+
+        str::slice_t status_name(Status_Concept auto status) {
+            str::slice_t* s{};
+            return OK(find(u32(status), &s)) ? *s :
+                   interned::fold(format::format(
+                       "[error] invalid status name id: {}",
+                       u32(status)));
         }
     }
 }

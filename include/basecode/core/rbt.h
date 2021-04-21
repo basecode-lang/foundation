@@ -22,12 +22,6 @@
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode {
-    enum class rbt_color_t : u8 {
-        none  = bintree::color::none,
-        red   = bintree::color::red,
-        black = bintree::color::black
-    };
-
     template <typename T>
     struct rbt_t final {
         struct node_t;
@@ -45,7 +39,8 @@ namespace basecode {
             Value_Type*         value;
             rbt_color_t         color;
         };
-        static_assert(sizeof(node_t) <= 40, "node_t is now larger than 40 bytes!");
+        static_assert(sizeof(node_t) <= 40,
+                      "node_t is now larger than 40 bytes!");
 
         static constexpr u32    Node_Type_Size     = sizeof(node_t);
         static constexpr u32    Node_Type_Align    = alignof(node_t);
@@ -56,7 +51,8 @@ namespace basecode {
         Node_Type               root;
         u32                     size;
     };
-    static_assert(sizeof(rbt_t<u32>) <= 40, "rbt_t<u32> is now larger than 40 bytes!");
+    static_assert(sizeof(rbt_t<u32>) <= 40,
+                  "rbt_t<u32> is now larger than 40 bytes!");
 
     namespace rbt {
         u0 free(Binary_Tree auto& tree) {

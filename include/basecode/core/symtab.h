@@ -19,34 +19,14 @@
 #pragma once
 
 #include <basecode/core/types.h>
-#include <basecode/core/array.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/format.h>
+#include <basecode/core/context.h>
 #include <basecode/core/graphviz/gv.h>
 #include <basecode/core/assoc_array.h>
 #include <basecode/core/stable_array.h>
 
 namespace basecode {
-    enum class symtab_node_type_t : u8 {
-        empty,
-        used,
-        leaf,
-    };
-
-    template <typename T>
-    concept Symbol_Table = requires(const T& t) {
-        typename                T::Value_Type;
-        typename                T::Value_Array;
-        typename                T::Pair_Array;
-        typename                T::Node_Type;
-        typename                T::Node_Array;
-
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.nodes}               -> same_as<typename T::Node_Array>;
-        {t.values}              -> same_as<typename T::Value_Array>;
-        {t.size}                -> same_as<u32>;
-    };
-
     template <typename V>
     struct symtab_t final {
         using Value_Type        = V;
@@ -70,7 +50,8 @@ namespace basecode {
         Value_Array             values;
         u32                     size;
     };
-    static_assert(sizeof(symtab_t<s32>) <= 80, "symtab_t<V> is now larger than 80 bytes!");
+    static_assert(sizeof(symtab_t<s32>) <= 80,
+                  "symtab_t<V> is now larger than 80 bytes!");
 
     namespace symtab {
         template <Symbol_Table T>

@@ -22,16 +22,14 @@
 #include <basecode/core/types.h>
 #include <basecode/core/stack.h>
 #include <basecode/core/array.h>
-#include <basecode/core/string.h>
-#include <basecode/core/format.h>
 #include <basecode/core/symtab.h>
 
-#define MAKE_TYPE(m, d) ((((u32) m) << (u32) 8) | ((u32) d))
-#define POSTFIX(x)      (((u32)x) | (u32) 0b100000000000000000000000)
-#define PREFIX(x)       (((u32)x) | (u32) 0b010000000000000000000000)
-#define BASE_TYPE(x)    ((((u32) x) & (u32) 0b1111111100000000) >> (u32) 8)
-#define SUB_TYPE(x)     (((u32)  x) & (u32) 0b0000000011111111)
-#define POS_TYPE(x)     ((((u32) x) & (u32) 0b110000000000000000000000) >> (u32) 22)
+#define MAKE_TYPE(m, d)         ((((u32) m) << (u32) 8) | ((u32) d))
+#define POSTFIX(x)              (((u32)x) | (u32) 0b100000000000000000000000)
+#define PREFIX(x)               (((u32)x) | (u32) 0b010000000000000000000000)
+#define BASE_TYPE(x)            ((((u32) x) & (u32) 0b1111111100000000) >> (u32) 8)
+#define SUB_TYPE(x)             (((u32)  x) & (u32) 0b0000000011111111)
+#define POS_TYPE(x)             ((((u32) x) & (u32) 0b110000000000000000000000) >> (u32) 22)
 
 namespace basecode::cxx {
     struct scope_t;
@@ -668,6 +666,11 @@ namespace basecode::cxx {
     namespace program {
         u0 free(program_t& pgm);
 
+        b8 format_record(format_type_t type,
+                         cursor_t& c,
+                         fmt_buf_t& buf,
+                         u0* ctx);
+
         u0 init(program_t& pgm,
                 alloc_t* alloc = context::top()->alloc.main,
                 u32 num_modules = 16);
@@ -686,7 +689,20 @@ namespace basecode::cxx {
 
         module_t& get_module(program_t& pgm, u32 module_idx);
 
-        [[maybe_unused]] u0 debug_dump(program_t& pgm, fmt_buf_t& buf);
+        template <typename Buffer>
+        [[maybe_unused]] u0 debug_dump(program_t& pgm, Buffer& buf) {
+            cursor_t cursor{};
+            if (!bass::seek_first(pgm.storage, cursor))
+                return;
+            do {
+                bass::format_record(pgm.storage,
+                                    buf,
+                                    cursor.id,
+                                    format_record,
+                                    &pgm);
+                format::format_to(buf, "}}\n");
+            } while (bass::next_record(cursor));
+        }
     }
 
     namespace serializer {
