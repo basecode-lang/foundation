@@ -54,9 +54,6 @@ namespace ImGui {
 }
 
 namespace basecode::alloc_window {
-    static alloc_info_t* s_selected{};
-
-
     static u0 draw_allocators(alloc_window_t& win,
                               const alloc_info_array_t& roots) {
 
@@ -91,16 +88,17 @@ namespace basecode::alloc_window {
             ImGui::Text("%s", str::c_str(scratch));
             ++row;
             if (node_open) {
-                s_selected = info;
+                win.selected = info;
                 memory::meta::system::start_plot(info,
                                                  plot_mode_t::scrolled);
                 if (info->children.size > 0)
                     draw_allocators(win, info->children);
                 ImGui::TreePop();
             } else {
-                memory::meta::system::stop_plot(info);
-                if (s_selected == info)
-                    s_selected = {};
+                if (win.selected == info) {
+                    memory::meta::system::stop_plot(win.selected);
+                    win.selected = {};
+                }
             }
             ImGui::PopID();
         }
@@ -151,9 +149,9 @@ namespace basecode::alloc_window {
         ImGui::BeginChild("Graph",
                           ImVec2(win.graph_size, win.height),
                           true);
-        if (s_selected) {
+        if (win.selected) {
             const ImPlotAxisFlags rt_axis = ImPlotAxisFlags_NoTickLabels;
-            auto plot = &s_selected->plot.scrolled;
+            auto plot = &win.selected->plot.scrolled;
             ImPlot::SetNextPlotLimitsX(plot->time - 10,
                                        plot->time,
                                        ImGuiCond_Always);

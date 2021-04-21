@@ -62,14 +62,14 @@ namespace basecode::profiler {
         clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
         return s64(ts.tv_sec) * 1000000000ll + s64(ts.tv_nsec);
 #    else
-        return duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+        return duration_cast<nanoseconds>(high_resolution_clock::now()
+                                            .time_since_epoch())
+                                         .count();
 #    endif
 #  elif defined _WIN32 || defined __CYGWIN__
-        unsigned int dontcare;
-        _mm_mfence();
-        const auto t = __rdtscp(&dontcare);
-        _mm_lfence();
-        return t;
+        LARGE_INTEGER li{};
+        QueryPerformanceCounter(&li);
+        return li.QuadPart;
 #  elif defined __i386 || defined _M_IX86 || defined __x86_64__ || defined _M_X64
         u32 eax, edx;
         _mm_mfence();
@@ -78,7 +78,9 @@ namespace basecode::profiler {
         return (u64(edx) << (u8) 32) + u64(eax);
 #  endif
 #else
-        return duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+        return duration_cast<nanoseconds>(high_resolution_clock::now()
+                                            .time_since_epoch())
+                                         .count();
 #endif
     }
 }

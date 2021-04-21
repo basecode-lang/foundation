@@ -82,16 +82,14 @@ namespace basecode::app {
 
 #if defined(IMGUI_IMPL_OPENGL_ES2)
         const s8* glsl_version = "#version 100";
-#elif __APPLE__
+#else
         const s8* glsl_version = "#version 150";
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+#if __APPLE__
         glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#else
-        const s8* glsl_version = "#version 130";
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+#endif
 #endif
 
         glfwWindowHint(GLFW_MAXIMIZED, app.window.maximized != 0);
@@ -173,12 +171,12 @@ namespace basecode::app {
 
         s32 dw{};
         s32 dh{};
+        f64 timer_mult = profiler::calibration_mult();
 
         while (!glfwWindowShouldClose(app.window.backing)) {
             glfwPollEvents();
 
-            const auto ticks = profiler::get_time()
-                               * profiler::calibration_mult();
+            const auto ticks = profiler::get_time() * timer_mult;
             timer::update(ticks);
             memory::meta::system::update(io.DeltaTime);
 

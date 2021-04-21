@@ -24,9 +24,12 @@
 struct ImPlotContext;
 
 namespace basecode {
+    struct alloc_info_t;
+
     struct alloc_window_t final {
         alloc_t*                alloc;
         ImPlotContext*          ctx;
+        alloc_info_t*           selected;
         f32                     table_size;
         f32                     graph_size;
         f32                     height;
