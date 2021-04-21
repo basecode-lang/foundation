@@ -75,10 +75,8 @@ namespace basecode::alloc_window {
                                              (u64) info->tracked);
             ImGui::TableSetColumnIndex(1);
             if (IS_PROXY(info->tracked)) {
-                str::reset(scratch);
-                str::append(scratch,
-                            memory::proxy::name(info->tracked));
-                ImGui::Text("%s", str::c_str(scratch));
+                const auto name = memory::proxy::name(info->tracked);
+                ImGui::Text("%s", name.data);
             } else {
                 ImGui::Text("%s", "(none)");
             }
@@ -163,7 +161,7 @@ namespace basecode::alloc_window {
                                        std::max<u32>(4096, plot->max_y * 2),
                                        ImGuiCond_Always);
             if (plot->values.size > 0
-                &&  ImPlot::BeginPlot("##scrolled", {}, {}, ImVec2(-1, -1),
+            &&  ImPlot::BeginPlot("##scrolled", {}, {}, ImVec2(-1, -1),
                                       rt_axis, rt_axis | ImPlotAxisFlags_LockMin)) {
                 ImPlot::PlotShaded("memory",
                                    &plot->values[0].x,

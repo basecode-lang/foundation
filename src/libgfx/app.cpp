@@ -16,7 +16,6 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <thread>
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
 #include <imgui_freetype.h>
@@ -66,6 +65,8 @@ namespace basecode::app {
     }
 
     status_t run(app_t& app) {
+        BC_ASSERT_NOT_NULL(app.on_render);
+
         if (!OK(load_config(app))) {
             log::error("load_config failed");
             return status_t::load_config_error;
@@ -176,11 +177,6 @@ namespace basecode::app {
         while (!glfwWindowShouldClose(app.window.backing)) {
             glfwPollEvents();
 
-            if (glfwGetWindowAttrib(app.window.backing, GLFW_ICONIFIED)) {
-                std::this_thread::yield();
-                continue;
-            }
-
             const auto ticks = profiler::get_time()
                                * profiler::calibration_mult();
             timer::update(ticks);
@@ -189,10 +185,8 @@ namespace basecode::app {
             ImGui_ImplOpenGL3_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
-            if (app.on_render) {
-                if (!app.on_render(app))
-                    break;
-            }
+            if (!app.on_render(app))
+                break;
             ImGui::Render();
 
             glfwGetFramebufferSize(app.window.backing, &dw, &dh);

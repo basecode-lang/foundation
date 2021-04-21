@@ -72,15 +72,6 @@ else ()
     endif ()
 endif ()
 
-# harfbuzz
-#add_subdirectory(harfbuzz EXCLUDE_FROM_ALL)
-#set(HARFBUZZ_INCLUDE_DIRS ${PROJECT_SOURCE_DIR}/harfbuzz/src)
-#if (MSVC)
-#    set(HARFBUZZ_LIBRARIES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libharfbuzz.lib")
-#else ()
-#    set(HARFBUZZ_LIBRARIES "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libharfbuzz.a")
-#endif ()
-
 # freetype
 option(FT_WITH_ZLIB         "" ON)
 option(FT_WITH_BZIP2        "" ON)
@@ -124,6 +115,41 @@ elseif (WIN32)
 else()
     set(FRAMEWORKS "")
 endif()
+
+set(HARFBUZZ_SOURCES
+
+    harfbuzz/src/harfbuzz.cc
+    harfbuzz/src/hb-aat-layout.h
+    harfbuzz/src/hb-aat.h
+    harfbuzz/src/hb-blob.h
+    harfbuzz/src/hb-buffer.h
+    harfbuzz/src/hb-common.h
+    harfbuzz/src/hb-deprecated.h
+    harfbuzz/src/hb-face.h
+    harfbuzz/src/hb-font.h
+    harfbuzz/src/hb-map.h
+    harfbuzz/src/hb-ot-color.h
+    harfbuzz/src/hb-ot-deprecated.h
+    harfbuzz/src/hb-ot-font.h
+    harfbuzz/src/hb-ot-layout.h
+    harfbuzz/src/hb-ot-math.h
+    harfbuzz/src/hb-ot-meta.h
+    harfbuzz/src/hb-ot-metrics.h
+    harfbuzz/src/hb-ot-name.h
+    harfbuzz/src/hb-ot-shape.h
+    harfbuzz/src/hb-ot-var.h
+    harfbuzz/src/hb-ot.h
+    harfbuzz/src/hb-set.h
+    harfbuzz/src/hb-shape-plan.h
+    harfbuzz/src/hb-shape.h
+    harfbuzz/src/hb-unicode.h
+    harfbuzz/src/hb-version.h
+    harfbuzz/src/hb.h
+    harfbuzz/src/
+)
+add_library(harfbuzz ${HARFBUZZ_SOURCES})
+target_include_directories(harfbuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/freetype/include)
+target_compile_definitions(harfbuzz PRIVATE -DHAVE_FREETYPE)
 
 set(CLIP_SOURCES
 
@@ -236,6 +262,9 @@ target_link_libraries(
     PRIVATE basecode-core
             glfw
             freetype
+            zlibstatic
+            png_static
+            harfbuzz
             ${FRAMEWORKS}
 )
 
@@ -265,5 +294,8 @@ target_link_libraries(
                 basecode-core
                 glfw
                 freetype
+                zlibstatic
+                png_static
+                harfbuzz
                 ${FRAMEWORKS}
 )

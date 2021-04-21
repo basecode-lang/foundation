@@ -21,12 +21,14 @@
 #include <basecode/core/string.h>
 #include <basecode/gfx/imgui/imgui.h>
 #include <basecode/gfx/alloc_window.h>
+#include <basecode/gfx/imgui/imgui_internal.h>
 #include <basecode/gfx/imgui/imgui_memory_editor.h>
 #include "app.h"
 
 namespace basecode {
-    static MemoryEditor s_mem_edit;
-    static alloc_window_t s_alloc_win{};
+    static s8                   s_buf[128];
+    static MemoryEditor         s_mem_edit;
+    static alloc_window_t       s_alloc_win{};
 
     b8 on_render(app_t& app) {
         auto& io = ImGui::GetIO();
@@ -37,17 +39,14 @@ namespace basecode {
                 ImGui::EndMenu();
             }
             const auto size = ImGui::GetContentRegionAvail();
-            str::reset(app.scratch); {
-                str_buf_t buf(&app.scratch);
-                format::format_to(buf,
-                                  ICON_FA_CHART_BAR "  app average {:> 2.2f} ms/frame ({:> 3.2f} FPS)",
-                                  1000.0f / io.Framerate,
-                                  io.Framerate);
-            }
-            auto text_size = ImGui::CalcTextSize((const s8*) app.scratch.begin(),
-                                                 (const s8*) app.scratch.end());
+            ImFormatString(s_buf,
+                           128,
+                           ICON_FA_CHART_BAR "  app average %.2f ms/frame (%.2f FPS)",
+                           1000.0f / io.Framerate,
+                           io.Framerate);
+            auto text_size = ImGui::CalcTextSize(s_buf);
             ImGui::SameLine(size.x - (text_size.x - 40));
-            ImGui::TextUnformatted(str::c_str(app.scratch));
+            ImGui::TextUnformatted(s_buf);
             ImGui::EndMainMenuBar();
         }
 

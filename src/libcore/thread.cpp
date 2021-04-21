@@ -24,6 +24,7 @@
 #include <pthread.h>
 #include <basecode/core/thread.h>
 #include <basecode/core/memory/system/slab.h>
+#include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::thread {
     thread_local thread_t*      t_self{};
@@ -70,7 +71,9 @@ namespace basecode::thread {
             slab_config.buf_align     = 8;
             slab_config.num_pages     = DEFAULT_NUM_PAGES;
             slab_config.backing.alloc = g_system.alloc;
-            g_system.proc_pool = memory::system::make(&slab_config);
+            g_system.proc_pool = memory::proxy::make(
+                memory::system::make(&slab_config),
+                "thread pool"_ss);
             g_system.num_cores = sysconf(_SC_NPROCESSORS_ONLN);
             return status_t::ok;
         }
@@ -81,7 +84,10 @@ namespace basecode::thread {
         }
 
         status_t start(thread_t& thread) {
-            auto rc = pthread_create(&thread.handle, nullptr, &bootstrap, thread.proc);
+            auto rc = pthread_create(&thread.handle,
+                                     nullptr,
+                                     &bootstrap,
+                                     thread.proc);
             if (rc == 0)
                 thread.state = thread_state_t::running;
             return status_from_errno(rc);
