@@ -1,6 +1,5 @@
 HIGH
 ---------
-- memory: base allocator doesn't handle alignment properly
 - macro: text macro system
 
 - binfmt: pe/coff backend is missing section name mapping; not sure
@@ -45,10 +44,6 @@ HIGH
 - scm: add .dq meta-op to emitter
 - libgfx: pull in nfd or rewrite based on nfd_extended
 
-MEDIUM
----------
-- memory: make scratch allocator & temp allocator default in the system
-- binfmt: one-pass cleanup & make task notes here
 - filesys: implement glob function, which will also touch the init and fini functions for the
             filesys module.
 - filesys: need to open and read the xdg config file (if found) and put into a symtab_t or hashtab_t.
@@ -56,6 +51,9 @@ MEDIUM
             same symtab_t/hashtab_t.
 - filesys: once meta data is done (previous task), implement the remaining places::* functions
 
+
+MEDIUM
+---------
 LOW
 ---------
 - review and improve symtab_t if possible
@@ -72,6 +70,9 @@ LOW
 
 DONE
 ----
+- memory: base allocator doesn't handle alignment properly
+- binfmt: one-pass cleanup & make task notes here
+- memory: make scratch allocator & temp allocator default in the system
 - binfmt: rework test runner main.cpp to match core
 - legal: clean up all file headers
 - libgfx: create test bed application within foundation project

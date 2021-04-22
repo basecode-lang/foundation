@@ -33,7 +33,8 @@ namespace basecode::memory::base {
     }
 
     inline static u32 size_with_padding(u32 size, u32 align) {
-        return size + align + sizeof(header_t);
+        const auto padded_size = size + align + sizeof(header_t);
+        return ((padded_size + (align - 1)) / align) * align;
     }
 
     inline static u0 fill(header_t* header, u0* data, u32 size) {
