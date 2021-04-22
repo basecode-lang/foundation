@@ -35,15 +35,19 @@ static u0 assemble_and_execute_block(scm::ctx_t* ctx,
     auto& emit = ctx->compiler.emit;
     auto& vm   = ctx->vm;
 
-    auto code_size = scm::emitter::assembled_size_bytes(emit, bb);
-    auto code_buf  = (u64*) memory::alloc(ctx->alloc, code_size, alignof(u64));
-    defer(memory::free(ctx->alloc, code_buf));
+    auto code_size = scm::emitter::assembled_size_bytes(emit, bb) / 8;
+    auto code_area = scm::vm::add_mem_area(vm,
+                                           scm::mem_area_type_t::code,
+                                           scm::vm::register_file::none,
+                                           emit.alloc,
+                                           code_size);
+    defer(scm::vm::remove_mem_area(vm, code_area));
 
-    auto status = scm::emitter::assemble(emit, bb, code_buf);
+    auto status = scm::emitter::assemble(emit, bb, code_area, code_size);
     if (!OK(status))
         REQUIRE(false);
 
-    const auto start_addr = u64(code_buf);
+    const auto start_addr = u64(code_area->data);
     PC = start_addr;
     status = scm::vm::step(vm, ctx, cycles);
     if (!OK(status))

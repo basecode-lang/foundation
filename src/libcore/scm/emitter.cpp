@@ -104,6 +104,77 @@ namespace basecode::scm::emitter {
         stable_array::reset(e.versions);
     }
 
+    status_t assemble(emitter_t& e,
+                      bb_t& start_block,
+                      mem_area_t* heap,
+                      u64 size) {
+        auto curr = &start_block;
+
+        u64 addr = vm::mem_area::base_addr(*heap);
+        while (curr) {
+            curr->addr = addr;
+            addr += curr->insts.size() * sizeof(encoded_inst_t);
+            curr = curr->next;
+        }
+
+        mem_area_t* area = heap;
+        curr = &start_block;
+        while (curr) {
+            for (u32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
+                const auto& inst = e.insts[i];
+                if (inst.block_id != curr->id)
+                    continue;
+                for (u32 j = curr->directives.sidx;
+                     j < curr->directives.eidx;
+                     ++j) {
+                    const auto& directive = e.directives[j];
+                    u32 stride{};
+                    switch (directive.type) {
+                        case directive_type_t::db:
+                            stride = 1;
+                        case directive_type_t::dw:
+                            if (!stride)
+                                stride = 2;
+                        case directive_type_t::dd:
+                            if (!stride)
+                                stride = 4;
+                        case directive_type_t::dq:
+                            if (!stride)
+                                stride = 8;
+                            for (auto data : directive.kind.data) {
+                                u64 value{};
+                                for (u32 k = 0;
+                                     k < 8;
+                                     k += stride) {
+                                    if (k > 0)
+                                        value <<= stride * 8;
+                                    value |= data;
+                                }
+                                vm::mem_area::push(*area, value);
+                            }
+                            break;
+                        case directive_type_t::area:
+                            area = vm::get_mem_area_by_type(*e.vm,
+                                                            directive.kind.area);
+                            if (!area)
+                                return status_t::invalid_mem_area;
+                            break;
+                        case directive_type_t::code:
+                            area = heap;
+                            break;
+                        default:
+                            break;
+                    }
+                }
+                auto status = encode_inst(e, inst, heap);
+                if (!OK(status))
+                    return status;
+            }
+            curr = curr->next;
+        }
+        return status_t::ok;
+    }
+
     static u0 format_directives(str_buf_t& buf,
                                 const directive_array_t& directives,
                                 u32 block_id,
@@ -111,6 +182,62 @@ namespace basecode::scm::emitter {
                                 u32 eidx,
                                 s32 line,
                                 u64 addr) {
+        for (u32 i = sidx; i < eidx; ++i) {
+            const auto& directive = directives[i];
+            if (directive.block_id != block_id)
+                continue;
+            if (directive.line != line)
+                continue;
+            format::format_to(buf,
+                              "${:08X}:    .{:<4}       ",
+                              addr,
+                              directive_name(directive.type));
+            u32 width{};
+            u32 max_per_line{};
+            switch (directive.type) {
+                case directive_type_t::db:
+                    width = 2;
+                    max_per_line = 8;
+                case directive_type_t::dw:
+                    if (!width) {
+                        width = 4;
+                        max_per_line = 4;
+                    }
+                case directive_type_t::dd:
+                    if (!width) {
+                        width = 8;
+                        max_per_line = 3;
+                    }
+                case directive_type_t::dq:
+                    if (!width) {
+                        width = 16;
+                        max_per_line = 2;
+                    }
+                    for (u32 j = 0; j < directive.kind.data.size; ++j) {
+                        if (j > 0) {
+                            format::format_to(buf, ", ");
+                            if ((j % max_per_line) == 0)
+                                format::format_to(buf,
+                                                  "\n${:08X}:                ",
+                                                  addr);
+                        }
+                        format::format_to(buf,
+                                          "0x{:0{}x}",
+                                          directive.kind.data[j],
+                                          width);
+                    }
+                    break;
+                case directive_type_t::area:
+                    format::format_to(
+                        buf,
+                        "{}",
+                        vm::mem_area::type_name(directive.kind.area));
+                    break;
+                default:
+                    break;
+            }
+            format::format_to(buf, "\n");
+        }
     }
 
     static u0 format_comments(str_buf_t& buf,
@@ -292,6 +419,18 @@ namespace basecode::scm::emitter {
         for (u32 i = 0; i < pairs.size; ++i)
             create_ranges(e, pairs[i].value->first);
         return status_t::ok;
+    }
+
+    str::slice_t directive_name(directive_type_t type) {
+        switch (type) {
+            case directive_type_t::db:      return "db"_ss;
+            case directive_type_t::dw:      return "dw"_ss;
+            case directive_type_t::dd:      return "dd"_ss;
+            case directive_type_t::dq:      return "dq"_ss;
+            case directive_type_t::none:    return "none"_ss;
+            case directive_type_t::code:    return "code"_ss;
+            case directive_type_t::area:    return "area"_ss;
+        }
     }
 
     static u0 set_interval(emitter_t& e,
@@ -561,34 +700,6 @@ namespace basecode::scm::emitter {
         return inst;
     }
 
-    status_t assemble(emitter_t& e, bb_t& start_block, u64* heap) {
-        auto curr = &start_block;
-
-        // assign block addresses
-        u64 addr = u64(heap);
-        while (curr) {
-            curr->addr = addr;
-            addr += curr->insts.size() * sizeof(encoded_inst_t);
-            curr = curr->next;
-        }
-
-        // emit blocks to vm heap
-        curr = &start_block;
-        while (curr) {
-            for (u32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
-                const auto& inst = e.insts[i];
-                if (inst.block_id != curr->id)
-                    continue;
-                auto status = encode_inst(e, inst, heap);
-                if (!OK(status))
-                    return status;
-                ++heap;
-            }
-            curr = curr->next;
-        }
-        return status_t::ok;
-    }
-
     static u0 format_edges(str_buf_t& buf, bb_t* block, u64 addr) {
         const auto& ic_nodes = digraph::incoming_nodes(block->emit->bb_graph,
                                                        block->node);
@@ -657,6 +768,15 @@ namespace basecode::scm::emitter {
                               *curr);
             format_params(buf, curr, addr);
             format_edges(buf, curr, addr);
+            if (curr->insts.size() == 0) {
+                format_directives(buf,
+                                  e.directives,
+                                  curr->id,
+                                  curr->directives.sidx,
+                                  curr->directives.eidx,
+                                  line,
+                                  addr);
+            }
             for (s32 i = curr->insts.sidx; i < curr->insts.eidx; ++i) {
                 const auto& inst = e.insts[i];
                 if (inst.block_id != curr->id)
@@ -793,11 +913,11 @@ namespace basecode::scm::emitter {
         }
     }
 
-    status_t encode_inst(emitter_t& e, const inst_t& inst, u64* heap) {
+    status_t encode_inst(emitter_t& e, const inst_t& inst, mem_area_t* heap) {
         u64 buf{};
         u64 data{};
         auto& vm = *e.vm;
-        const u64 addr    = u64(heap);
+        const u64 addr    = vm::mem_area::base_addr(*heap);
         auto      encoded = (encoded_inst_t*) &buf;
         auto      opers   = (encoded_operand_t*) &data;
         encoded->type      = inst.type;
@@ -897,7 +1017,7 @@ namespace basecode::scm::emitter {
                 return status_t::fail;
         }
         encoded->data = data;
-        *heap         = buf;
+        vm::mem_area::push(*heap, buf);
         return status_t::ok;
     }
 }

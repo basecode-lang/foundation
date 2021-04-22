@@ -66,6 +66,13 @@ namespace basecode::scm::compiler {
 
         TIME_BLOCK(
             "compile expr"_ss,
+            basic_block::encode(bb)
+                .area(mem_area_type_t::heap)
+                .db({2, 3, 7, 15, 31, 63, 127, 255})
+                .dw({1024, 2048, 4096, 8192, 16386})
+                .dd({(u32) INT_MIN, INT_MAX, UINT_MAX})
+                .dq({(u64) LONG_MIN, LONG_MAX, ULONG_MAX})
+                .code();
             auto tc = compiler::make_context(bb,
                                              ctx,
                                              obj,
@@ -79,11 +86,9 @@ namespace basecode::scm::compiler {
                     .build();
             auto status = emitter::find_liveliness_intervals(comp.emit);
             if (!OK(status)) {
-//                format::print(stderr, "find_liveliness_intervals failed\n");
             }
             status = emitter::allocate_registers(comp.emit);
             if (!OK(status)) {
-//                format::print(stderr, "allocate_registers failed\n");
             }
         );
 
@@ -91,7 +96,7 @@ namespace basecode::scm::compiler {
 
         {
             str_t str{};
-            str::init(str, context::top()->alloc.scratch);
+            str::init(str, context::top()->alloc.main);
             str::reserve(str, 32 * 1024);
             {
                 str_buf_t buf{&str};

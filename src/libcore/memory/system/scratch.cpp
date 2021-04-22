@@ -39,6 +39,7 @@ namespace basecode::memory::scratch {
     }
 
     inline static u0 fill(header_t* header, u0* data, u32 size) {
+        header->free = false;
         header->size = size;
         auto p = (header_t*) header + 1;
         while (p < data) {
@@ -85,6 +86,7 @@ namespace basecode::memory::scratch {
             if (!h->free)
                 break;
             sc->free += h->size;
+            h->size = 0;
             if (sc->free == sc->end)
                 sc->free = sc->begin;
         }
@@ -129,7 +131,6 @@ namespace basecode::memory::scratch {
         BC_ASSERT_MSG(!in_use(alloc, p), "scratch allocator exhausted");
 
         fill(h, data, p - (u8*) h);
-        h->free   = false;
         sc->alloc = p;
         r.mem     = data;
         r.size    = h->size;
@@ -137,12 +138,17 @@ namespace basecode::memory::scratch {
     }
 
     static mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
+        auto sc = &alloc->subclass.scratch;
         mem_result_t r          {};
         u32          old_size   {};
         if (mem) {
-            old_size = scratch::free(alloc, mem);
-            r = scratch::alloc(alloc, size, align);
-            r.size = s32(r.size - old_size);
+            auto h = header(mem);
+            old_size = h->size;
+            BC_ASSERT_MSG((u8*) h + old_size == sc->alloc,
+                          "realloc only supported for top allocation");
+            h->size = size;
+            r.mem  = mem;
+            r.size = s32(h->size - old_size);
         } else {
             r = scratch::alloc(alloc, size, align);
         }

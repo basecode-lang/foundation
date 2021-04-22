@@ -663,6 +663,19 @@ namespace basecode::scm::vm {
             reserve(area, new_capacity * 2 + 8);
         }
 
+        str::slice_t type_name(mem_area_type_t type) {
+            switch (type) {
+                case mem_area_type_t::none:         return "none"_ss;
+                case mem_area_type_t::heap:         return "heap"_ss;
+                case mem_area_type_t::code:         return "code"_ss;
+                case mem_area_type_t::gc_stack:     return "gc_stack"_ss;
+                case mem_area_type_t::env_stack:    return "env_stack"_ss;
+                case mem_area_type_t::code_stack:   return "code_stack"_ss;
+                case mem_area_type_t::data_stack:   return "data_stack"_ss;
+                case mem_area_type_t::register_file:return "register_file"_ss;
+            }
+        }
+
         u0 reserve(mem_area_t& area, u32 new_capacity) {
             if (new_capacity == 0) {
                 memory::free(area.alloc, area.data);
@@ -691,37 +704,38 @@ namespace basecode::scm::vm {
         u0 shrink_to_size(mem_area_t& area, u32 new_size) {
             auto& vm = *area.vm;
             area.size = new_size;
-            G(area.reg) = base_addr(area);
+            if (area.reg != register_file::none)
+                G(area.reg) = base_addr(area);
         }
     }
 
     u0 free(vm_t& vm) {
-        for (auto& area : vm.mem_map)
-            mem_area::free(area);
-        array::free(vm.mem_map);
+        for (auto area : vm.mem_map)
+            mem_area::free(*area);
         hashtab::free(vm.traptab);
+        stable_array::free(vm.mem_map);
     }
 
     u0 reset(vm_t& vm) {
-        for (auto& area : vm.mem_map) {
-            if (area.type != mem_area_type_t::register_file)
-                mem_area::reset(area, true);
-            if (area.reg != register_file::none)
-                G(area.reg) = mem_area::base_addr(area);
+        for (auto area : vm.mem_map) {
+            if (area->type != mem_area_type_t::register_file)
+                mem_area::reset(*area, true);
+            if (area->reg != register_file::none)
+                G(area->reg) = mem_area::base_addr(*area);
         }
         F  = 0;
         M  = 0;
         PC = 0;
     }
 
-    mem_area_t& add_mem_area(vm_t& vm,
+    mem_area_t* add_mem_area(vm_t& vm,
                              mem_area_type_t type,
                              reg_t reg,
                              alloc_t* alloc,
                              u32 min_capacity,
                              b8 top) {
-        auto& area = array::append(vm.mem_map);
-        mem_area::init(area,
+        auto area = &stable_array::append(vm.mem_map);
+        mem_area::init(*area,
                        &vm,
                        vm.mem_map.size,
                        type,
@@ -729,10 +743,24 @@ namespace basecode::scm::vm {
                        alloc,
                        min_capacity,
                        top);
-        if (area.reg != register_file::none) {
-            vm.area_by_reg[area.reg] = area.id;
-        }
+        if (area->reg != register_file::none)
+            vm.area_by_reg[area->reg] = area;
+
+        // N.B. "code" areas are a bit special because there
+        //      can be an arbitrary number of them.  since the
+        //      mem_area_t* will likely live on the proc_t, it's better
+        //      to access these directly instead of an indirect lookup.
+        if (type != mem_area_type_t::code)
+            vm.area_by_type[u32(type)] = area;
+
         return area;
+    }
+
+    b8 remove_mem_area(vm_t& vm, mem_area_t* area) {
+        if (!area)
+            return false;
+        mem_area::free(*area);
+        return stable_array::erase(vm.mem_map, area);
     }
 
     status_t step(vm_t& vm, ctx_t* ctx, s32 cycles) {
@@ -2111,23 +2139,22 @@ namespace basecode::scm::vm {
 
     status_t init(vm_t& vm, alloc_t* alloc) {
         vm.alloc = alloc;
-        array::init(vm.mem_map, vm.alloc);
         hashtab::init(vm.traptab, vm.alloc);
-        vm.reg_file = &add_mem_area(vm,
-                                    mem_area_type_t::register_file,
-                                    register_file::none,
-                                    vm.alloc,
-                                    register_file::max);
+        stable_array::init(vm.mem_map, vm.alloc);
+        vm.reg_file = add_mem_area(vm,
+                                   mem_area_type_t::register_file,
+                                   register_file::none,
+                                   vm.alloc,
+                                   register_file::max);
         vm.reg_file->size = register_file::max;
         return status_t::ok;
     }
 
-    mem_area_t* get_mem_area(vm_t& vm, u32 id) {
-        return id == 0 || id > vm.mem_map.size ? nullptr : &vm.mem_map[id - 1];
+    mem_area_t* get_mem_area_by_reg(vm_t& vm, reg_t reg) {
+        return vm.area_by_reg[reg];
     }
 
-    mem_area_t* get_mem_area_by_reg(vm_t& vm, reg_t reg) {
-        const auto id = vm.area_by_reg[reg];
-        return get_mem_area(vm, id);
+    mem_area_t* get_mem_area_by_type(vm_t& vm, mem_area_type_t type) {
+        return vm.area_by_type[u32(type)];
     }
 }

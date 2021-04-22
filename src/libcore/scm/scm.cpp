@@ -180,8 +180,11 @@ namespace basecode::scm {
         proc->sym          = sym;
         proc->body         = body;
         proc->params       = params;
-        proc->is_tco       = false;
         proc->is_macro     = macro;
+        proc->bytecode     = vm::add_mem_area(ctx->vm,
+                                              mem_area_type_t::code,
+                                              vm::register_file::none,
+                                              ctx->alloc);
         proc->is_compiled  = false;
         proc->is_assembled = false;
         array::append(ctx->native_ptrs, proc);
@@ -624,24 +627,24 @@ namespace basecode::scm {
                          ctx->alloc,
                          1024,
                          true);
-        ctx->data_stack = &vm::add_mem_area(vm,
+        ctx->data_stack = vm::add_mem_area(vm,
                                            mem_area_type_t::data_stack,
                                            rf::dp,
                                            ctx->alloc,
                                            1024,
                                            true);
-        ctx->gc_stack = &vm::add_mem_area(vm,
-                                           mem_area_type_t::gc_stack,
-                                           rf::gp,
-                                           ctx->alloc,
-                                           1024,
-                                           true);
-        ctx->env_stack = &vm::add_mem_area(vm,
-                                           mem_area_type_t::env_stack,
-                                           rf::ep,
-                                           ctx->alloc,
-                                           1024,
-                                           true);
+        ctx->gc_stack = vm::add_mem_area(vm,
+                                         mem_area_type_t::gc_stack,
+                                         rf::gp,
+                                         ctx->alloc,
+                                         1024,
+                                         true);
+        ctx->env_stack = vm::add_mem_area(vm,
+                                          mem_area_type_t::env_stack,
+                                          rf::ep,
+                                          ctx->alloc,
+                                          1024,
+                                          true);
         vm::reset(vm);
 
         compiler::init(ctx->compiler, &vm, ctx->alloc);

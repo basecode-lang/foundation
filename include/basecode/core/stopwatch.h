@@ -83,7 +83,7 @@ namespace basecode {
         u0 print_elapsed(const String_Concept auto& label,
                          s32 width,
                          stopwatch_t& w) {
-            print_elapsed(context::top()->alloc.scratch, stdout, label, width, w);
+            print_elapsed(context::top()->alloc.main, stdout, label, width, w);
         }
 
         s32 time_block(const String_Concept auto& slug,
@@ -92,7 +92,7 @@ namespace basecode {
             start(timer);
             auto rc = cb();
             stop(timer);
-            print_elapsed(alloc ? alloc : memory::system::scratch_alloc(),
+            print_elapsed(alloc ? alloc : memory::system::main_alloc(),
                           stdout,
                           slug,
                           60,

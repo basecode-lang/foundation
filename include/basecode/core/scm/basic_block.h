@@ -279,8 +279,9 @@ namespace basecode::scm::basic_block {
 
         directive_t& make_directive(directive_type_t type) {
             auto& directive = array::append(_em->directives);
-            directive.type = type;
-            directive.line = _em->insts.size;
+            directive.type     = type;
+            directive.line     = _em->insts.size;
+            directive.block_id = _bb->id;
             if (_bb->directives.eidx == 0) {
                 _bb->directives.sidx = _em->directives.size - 1;
                 _bb->directives.eidx = _bb->directives.sidx + 1;
@@ -311,6 +312,11 @@ namespace basecode::scm::basic_block {
         bb_builder_t(bb_t* bb);
 
         bb_builder_t(bb_t& bb);
+
+        bb_builder_t& code() {
+            make_directive(directive_type_t::code);
+            return *this;
+        }
 
         bb_builder_t& next(bb_t& next) {
             next.prev = _bb;

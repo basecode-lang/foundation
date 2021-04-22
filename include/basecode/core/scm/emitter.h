@@ -51,11 +51,18 @@ namespace basecode::scm::emitter {
         return status_t::ok;
     }
 
+    status_t assemble(emitter_t& e,
+                      bb_t& start_block,
+                      mem_area_t* heap,
+                      u64 size = 0);
+
     status_t allocate_registers(emitter_t& e);
 
     u0 format_liveliness_intervals(emitter_t& e);
 
     status_t find_liveliness_intervals(emitter_t& e);
+
+    str::slice_t directive_name(directive_type_t type);
 
     status_t create_dot(emitter_t& e, const path_t& path);
 
@@ -66,17 +73,18 @@ namespace basecode::scm::emitter {
                            bb_type_t type = bb_type_t::code) {
         str_array::append(e.strtab, name);
         auto& bb = stable_array::append(e.blocks);
-        bb.id     = e.blocks.size;
-        bb.node   = digraph::make_node(e.bb_graph, bb);
-        bb.prev   = {};
-        bb.next   = {};
-        bb.addr   = 0;
-        bb.emit   = &e;
-        bb.type   = type;
-        bb.notes  = {};
-        bb.insts  = {};
-        bb.params = {};
-        bb.str_id = e.strtab.size;
+        bb.id         = e.blocks.size;
+        bb.node       = digraph::make_node(e.bb_graph, bb);
+        bb.prev       = {};
+        bb.next       = {};
+        bb.addr       = 0;
+        bb.emit       = &e;
+        bb.type       = type;
+        bb.notes      = {};
+        bb.insts      = {};
+        bb.params     = {};
+        bb.str_id     = e.strtab.size;
+        bb.directives = {};
         if (prev) {
             prev->next = &bb;
             bb.prev    = prev;
@@ -88,8 +96,6 @@ namespace basecode::scm::emitter {
     u32 assembled_size_bytes(emitter_t& e, bb_t& start_block);
 
     inst_t* make_instruction(emitter_t& e, bb_t& bb, u8 encoding);
-
-    status_t assemble(emitter_t& e, bb_t& start_block, u64* heap);
 
     inline status_t encode_reg(const operand_t& oper, u8& field) {
         switch (oper.type) {
@@ -108,7 +114,7 @@ namespace basecode::scm::emitter {
 
     u0 disassemble(emitter_t& e, bb_t& start_block, str_buf_t& buf);
 
-    status_t encode_inst(emitter_t& e, const inst_t& inst, u64* heap);
+    status_t encode_inst(emitter_t& e, const inst_t& inst, mem_area_t* heap);
 
     namespace virtual_var {
         namespace access_type {

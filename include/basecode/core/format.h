@@ -94,7 +94,7 @@ namespace basecode {
 
         template <typename... Args>
         inline u0 print(fmt_str_t format_str, const Args&... args) {
-            vprint(context::top()->alloc.scratch,
+            vprint(context::top()->alloc.main,
                    stdout,
                    format_str,
                    fmt::make_format_args(args...));
@@ -109,7 +109,7 @@ namespace basecode {
         template <typename... Args>
         inline str_t format(fmt_str_t format_str,
                             const Args&... args) {
-            return vformat(context::top()->alloc.scratch,
+            return vformat(context::top()->alloc.main,
                            format_str,
                            fmt::make_format_args(args...));
         }
@@ -118,7 +118,7 @@ namespace basecode {
         inline u0 print(FILE* file,
                         fmt_str_t format_str,
                         const Args&... args) {
-            vprint(context::top()->alloc.scratch,
+            vprint(context::top()->alloc.main,
                    file,
                    format_str,
                    fmt::make_format_args(args...));
@@ -185,13 +185,13 @@ namespace basecode {
                                  u32 width,
                                  fmt_str_t format_str,
                                  const Args&... args) {
-            vprint(context::top()->alloc.scratch,
+            vprint(context::top()->alloc.main,
                    stdout,
                    "{} {:.<{}} ",
                    fmt::make_format_args(label_str,
                                          ".",
                                          width - label_str.size()));
-            vprint(context::top()->alloc.scratch,
+            vprint(context::top()->alloc.main,
                    stdout,
                    format_str,
                    fmt::make_format_args(args...));
@@ -220,7 +220,7 @@ namespace basecode {
 
         FORCE_INLINE str_t to_radix(Integer_Concept auto value,
                                     Radix_Concept auto radix = 10,
-                                    alloc_t* alloc = context::top()->alloc.scratch) {
+                                    alloc_t* alloc = context::top()->alloc.main) {
             fmt_alloc_t fmt_alloc(alloc);
             fmt_buf_t buf(fmt_alloc);
             switch (radix) {

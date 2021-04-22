@@ -183,14 +183,75 @@ namespace basecode::scm::vm {
                       u32 min_capacity,
                       b8 top);
 
+        template <typename T>
+        T top(mem_area_t& area) {
+            auto& vm = *area.vm;
+            if (area.size == 0)
+                return T{};
+            if (area.reg != register_file::none) {
+                return T(HU(G(area.reg)));
+            } else {
+                return (T) (area.top ? area[area.capacity - area.size - 1] :
+                            area[area.size - 1]);
+            }
+        }
+
+        template <typename T>
+        T pop(mem_area_t& area) {
+            auto& vm = *area.vm;
+            if (area.size > 0) {
+                u64 tos{};
+                if (area.reg != register_file::none) {
+                    tos = HU(G(area.reg));
+                    if (area.top) {
+                        G(area.reg) += sizeof(u64);
+                    } else {
+                        G(area.reg) -= sizeof(u64);
+                    }
+                } else {
+                    tos = area.top ? area[area.capacity - area.size - 1] :
+                          area[area.size - 1];
+                }
+                --area.size;
+                return T(tos);
+            }
+            return {};
+        }
+
         u0 free(mem_area_t& area);
 
+        template <typename T>
+        u0 push(mem_area_t& area, T value) {
+            auto& vm = *area.vm;
+            if (area.size + 1 > area.capacity)
+                grow(area);
+            if (area.top) {
+                if (area.reg != register_file::none) {
+                    G(area.reg) -= sizeof(u64);
+                    HU(G(area.reg)) = u64(value);
+                } else {
+                    area[area.capacity - area.size - 1] = u64(value);
+                }
+            } else {
+                if (area.reg != register_file::none) {
+                    HU(G(area.reg)) = u64(value);
+                    G(area.reg) += sizeof(u64);
+                } else {
+                    area[area.size] = u64(value);
+                }
+            }
+            ++area.size;
+        }
+
         inline u64 base_addr(mem_area_t& area) {
-            return area.top ? u64(area.data) + ((area.capacity - area.size) * sizeof(u64)) :
+            return area.top ? u64(area.data)
+                              + ((area.capacity - area.size) * sizeof(u64)) :
                    u64(area.data) + (area.size * sizeof(u64));
         }
 
         u0 resize(mem_area_t& area, u32 new_size);
+
+        str::slice_t type_name(mem_area_type_t type);
 
         u0 reserve(mem_area_t& area, u32 new_capacity);
 
@@ -199,61 +260,26 @@ namespace basecode::scm::vm {
         u0 grow(mem_area_t& area, u32 new_capacity = 16);
 
         u0 shrink_to_size(mem_area_t& area, u32 new_size);
-
-        template <typename T>
-        T top(mem_area_t& area) {
-            auto& vm = *area.vm;
-            return area.size == 0 ? T{} : T(HU(G(area.reg)));
-        }
-
-        template <typename T>
-        T pop(mem_area_t& area) {
-            auto& vm = *area.vm;
-            if (area.size > 0) {
-                auto tos = HU(G(area.reg));
-                if (area.top) {
-                    G(area.reg) += sizeof(u64);
-                } else {
-                    G(area.reg) -= sizeof(u64);
-                }
-                --area.size;
-                return T(tos);
-            }
-            return {};
-        }
-
-        template <typename T>
-        u0 push(mem_area_t& area, T value) {
-            auto& vm = *area.vm;
-            if (area.size + 1 > area.capacity)
-                grow(area);
-            if (area.top) {
-                G(area.reg) -= sizeof(u64);
-                HU(G(area.reg)) = u64(value);
-            } else {
-                HU(G(area.reg)) = u64(value);
-                G(area.reg) += sizeof(u64);
-            }
-            ++area.size;
-        }
     }
 
     u0 free(vm_t& vm);
 
     u0 reset(vm_t& vm);
 
-    mem_area_t& add_mem_area(vm_t& vm,
+    mem_area_t* add_mem_area(vm_t& vm,
                              mem_area_type_t type,
                              reg_t reg,
                              alloc_t* alloc,
-                             u32 min_capacity,
+                             u32 min_capacity = 0,
                              b8 top = false);
 
-    mem_area_t* get_mem_area(vm_t& vm, u32 id);
+    b8 remove_mem_area(vm_t& vm, mem_area_t* area);
 
     mem_area_t* get_mem_area_by_reg(vm_t& vm, reg_t reg);
 
     status_t step(vm_t& vm, ctx_t* ctx, s32 cycles = -1);
+
+    mem_area_t* get_mem_area_by_type(vm_t& vm, mem_area_type_t type);
 
     status_t init(vm_t& vm, alloc_t* alloc = context::top()->alloc.main);
 }

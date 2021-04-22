@@ -28,7 +28,7 @@ HIGH
 - binfmt(pe): needs attention, several FIXME
 - binfmt(pe_backend): needs attention; read not implemented
 
-- scm: map out bytecode, closure, continuation, literal frame model
+- scm: map out closure, continuation, literal frame model
 - scm: compiler should wrap top-level expression in an anonymous lambda
        that's surfaced as a real proc to scheme.  probably can just recycle
        the same proc and just replace the bytecode buffer each time.
@@ -52,8 +52,6 @@ MEDIUM
 
 LOW
 ---------
-- scm: add .area directive to emitter
-- scm: add .db, .dw, .dd, .dq directives to emitter
 - review and improve symtab_t if possible
 - rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
     * add ca_hashtab_t and ca_set_t using chaining via linked list?
@@ -68,6 +66,9 @@ LOW
 
 DONE
 ----
+- scm: map out how to store bytecode & relate it to proc_t
+- scm: add .area directive to emitter
+- scm: add .db, .dw, .dd, .dq directives to emitter
 - scm: add a B instruction and change BR to be only reg1 encoded
 - scm: introduce a new CP (continuation pointer) and LP (literal-frame pointer)
        register and mem area

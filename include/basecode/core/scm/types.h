@@ -113,7 +113,7 @@ namespace basecode::scm {
     using access_array_t        = array_t<var_access_t>;
     using keyword_table_t       = hashtab_t<str::slice_t, obj_t*>;
     using comment_array_t       = array_t<comment_t>;
-    using mem_area_array_t      = array_t<mem_area_t>;
+    using mem_area_array_t      = stable_array_t<mem_area_t>;
     using directive_array_t     = array_t<directive_t>;
     using interval_array_t      = array_t<liveliness_range_t*>;
     using liveliness_array_t    = stable_array_t<liveliness_range_t>;
@@ -125,6 +125,7 @@ namespace basecode::scm {
         error,
         unquote_invalid,
         unresolved_label,
+        invalid_mem_area,
         unknown_primitive,
         var_intern_failure,
         unquote_splicing_invalid,
@@ -181,7 +182,9 @@ namespace basecode::scm {
     };
 
     enum class mem_area_type_t : u8 {
+        none,
         heap,
+        code,
         gc_stack,
         env_stack,
         code_stack,
@@ -210,7 +213,8 @@ namespace basecode::scm {
         dw,
         dd,
         dq,
-        area
+        area,
+        code,
     };
 
     enum class var_access_type_t : u8 {
@@ -218,6 +222,24 @@ namespace basecode::scm {
         def,
         read,
         write
+    };
+
+    struct mem_area_t final {
+        alloc_t*                alloc;
+        vm_t*                   vm;
+        u64*                    data;
+        u64                     null;
+        u32                     id;
+        u32                     size;
+        u32                     capacity;
+        u32                     min_capacity;
+        mem_area_type_t         type;
+        reg_t                   reg;
+        u8                      top:    1;
+        u8                      pad:    7;
+
+        u64& operator[](u32 idx)        { return data[idx]; }
+        u64 operator[](u32 idx) const   { return data[idx]; }
     };
 
     struct reg_pool_t final {
@@ -251,11 +273,11 @@ namespace basecode::scm {
         obj_t*                  sym;
         obj_t*                  body;
         obj_t*                  params;
+        mem_area_t*             bytecode;
         union {
             bb_t*               bb;
             u32                 abs;
         }                       addr;
-        u8                      is_tco:         1;
         u8                      is_macro:       1;
         u8                      is_compiled:    1;
         u8                      is_assembled:   1;
@@ -350,7 +372,8 @@ namespace basecode::scm {
         u64                     encoding:   4;
         u64                     data:       51;
     };
-    static_assert(sizeof(encoded_inst_t) <= 8, "encoded_inst_t is now greater than 8 bytes!");
+    static_assert(sizeof(encoded_inst_t) <= 8,
+                  "encoded_inst_t is now greater than 8 bytes!");
 
     struct var_access_t final {
         u32                     inst_id;
@@ -435,6 +458,7 @@ namespace basecode::scm {
             mem_area_type_t     area;
         }                       kind;
         u32                     line;
+        u32                     block_id;
         directive_type_t        type;
     };
 
@@ -487,31 +511,6 @@ namespace basecode::scm {
         directive_array_t       directives;
     };
 
-    struct mem_area_t final {
-        alloc_t*                alloc;
-        vm_t*                   vm;
-        u64*                    data;
-        u64                     null;
-        u32                     id;
-        u32                     size;
-        u32                     capacity;
-        u32                     min_capacity;
-        mem_area_type_t         type;
-        reg_t                   reg;
-        u8                      top:    1;
-        u8                      pad:    7;
-
-        u64& operator[](u32 idx) {
-            return top ? (idx < capacity ? data[idx] : null) :
-                   (idx < size ? data[idx] : null);
-        }
-
-        u64 operator[](u32 idx) const {
-            return top ? (idx < capacity ? data[idx] : null) :
-                   (idx < size ? data[idx] : null);
-        }
-   };
-
     struct flag_register_t final {
         u64                     n:      1;
         u64                     z:      1;
@@ -527,7 +526,8 @@ namespace basecode::scm {
         mem_area_t*             reg_file;
         trap_table_t            traptab;
         mem_area_array_t        mem_map;
-        u32                     area_by_reg[27];
+        mem_area_t*             area_by_reg[29];
+        mem_area_t*             area_by_type[16];
         u8                      exited: 1;
         u8                      pad:    7;
     };
