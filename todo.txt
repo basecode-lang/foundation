@@ -28,7 +28,6 @@ HIGH
 - binfmt(pe): needs attention, several FIXME
 - binfmt(pe_backend): needs attention; read not implemented
 
-- scm: add a B instruction and change BR to be only reg1 encoded
 - scm: map out bytecode, closure, continuation, literal frame model
 - scm: compiler should wrap top-level expression in an anonymous lambda
        that's surfaced as a real proc to scheme.  probably can just recycle
@@ -37,11 +36,10 @@ HIGH
        different FIXNUM/FLONUM/etc.
 - scm: arithmetic ops should compile down to pairwise ADD/ADDF, et al. instead
        of the high-level LADD/LSUB/LMUL/LDIV/LMOD, etc.
-- scm: introduce a new CP (continuation pointer) and LP (literal-frame pointer)
-       register and mem area
 - scm: extend emitter to support append (default) or insert modes
 - scm: add .segment meta-op to emitter
 - scm: add .dq meta-op to emitter
+
 - libgfx: pull in nfd or rewrite based on nfd_extended
 
 - filesys: implement glob function, which will also touch the init and fini functions for the
@@ -51,9 +49,9 @@ HIGH
             same symtab_t/hashtab_t.
 - filesys: once meta data is done (previous task), implement the remaining places::* functions
 
-
 MEDIUM
 ---------
+
 LOW
 ---------
 - review and improve symtab_t if possible
@@ -70,6 +68,9 @@ LOW
 
 DONE
 ----
+- scm: add a B instruction and change BR to be only reg1 encoded
+- scm: introduce a new CP (continuation pointer) and LP (literal-frame pointer)
+       register and mem area
 - memory: base allocator doesn't handle alignment properly
 - binfmt: one-pass cleanup & make task notes here
 - memory: make scratch allocator & temp allocator default in the system

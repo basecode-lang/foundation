@@ -327,7 +327,8 @@ namespace basecode::scm::basic_block {
         template <String_Concept T>
         bb_builder_t& comment(const T& value, s32 line = -1) {
             auto& strtab = _em->strtab;
-            line = (line == -1 ? std::max<u32>(_bb->insts.eidx - _bb->insts.sidx, 0) : line);
+            line = (line == -1 ?
+                    std::max<u32>(_bb->insts.eidx - _bb->insts.sidx, 0) : line);
             str_array::append(strtab, value);
             auto& c = array::append(_em->comments);
             c.id       = strtab.size;

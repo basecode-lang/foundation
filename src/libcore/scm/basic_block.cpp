@@ -136,6 +136,7 @@ namespace basecode::scm::basic_block {
 
     bb_builder_t& imm1_builder_t::build() {
         switch (_builder->_inst->type) {
+            case op::type::b:
             case op::type::br:
             case op::type::bl:
             case op::type::bg:
@@ -143,8 +144,7 @@ namespace basecode::scm::basic_block {
             case op::type::bge:
             case op::type::beq:
             case op::type::bne:
-            case op::type::blr:
-            case op::type::bra: {
+            case op::type::blr: {
                 auto& imm = _builder->_inst->operands[0];
                 digraph::make_edge(_builder->_em->bb_graph,
                                    _builder->_bb->node,

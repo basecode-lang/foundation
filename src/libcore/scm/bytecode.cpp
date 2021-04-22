@@ -33,7 +33,7 @@ namespace basecode::scm::bytecode {
                                                      &entry_block);
         basic_block::encode(bb)
             .imm1()
-                .op(op::br)
+                .op(op::b)
                 .value(&entry_block)
                 .build();
         basic_block::encode(entry_block)
@@ -177,7 +177,7 @@ namespace basecode::scm::bytecode {
         }
         basic_block::encode(oc.bb)
             .imm1()
-                .op(op::br)
+                .op(op::b)
                 .value(&exit_bb)
                 .build();
         return {&exit_bb, res};
@@ -254,7 +254,7 @@ namespace basecode::scm::bytecode {
         basic_block::encode(true_res.bb)
             .next(false_bb)
             .imm1()
-                .op(op::br)
+                .op(op::b)
                 .value(&exit_bb)
                 .build();
 
@@ -267,7 +267,7 @@ namespace basecode::scm::bytecode {
             basic_block::encode(false_res.bb)
                 .next(exit_bb)
                 .imm1()
-                    .op(op::br)
+                    .op(op::b)
                     .value(&exit_bb)
                     .build();
         }
@@ -294,7 +294,7 @@ namespace basecode::scm::bytecode {
                                                       &entry_block);
         basic_block::encode(bb)
             .imm1()
-                .op(op::br)
+                .op(op::b)
                 .value(&entry_block)
                 .build();
         basic_block::encode(entry_block)
@@ -312,7 +312,7 @@ namespace basecode::scm::bytecode {
                 .dst(rf::fp)
                 .build()
             .imm1()
-                .op(op::br)
+                .op(op::b)
                 .value(&exit_block)
                 .build();
         if (locals > 0) {

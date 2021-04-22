@@ -83,7 +83,7 @@ namespace basecode::scm::vm {
                 [exit]      = "EXIT"_ss,
                 [trap]      = "TRAP"_ss,
                 [lea]       = "LEA"_ss,
-                [bra]       = "BRA"_ss,
+                [b]         = "B"_ss,
                 [car]       = "CAR"_ss,
                 [cdr]       = "CDR"_ss,
                 [setcar]    = "SETCAR"_ss,
@@ -130,12 +130,14 @@ namespace basecode::scm::vm {
         static str::slice_t s_names[] = {
             [none]  = "NONE"_ss,
             [pc]    = "PC"_ss,
-            [gp]    = "GP"_ss,
             [ep]    = "EP"_ss,
+            [cp]    = "CP"_ss,
+            [lp]    = "LP"_ss,
+            [gp]    = "GP"_ss,
             [dp]    = "DP"_ss,
             [hp]    = "HP"_ss,
-            [sp]    = "SP"_ss,
             [fp]    = "FP"_ss,
+            [sp]    = "SP"_ss,
             [m]     = "M"_ss,
             [f]     = "F"_ss,
             [lr]    = "LR"_ss,
@@ -193,7 +195,7 @@ namespace basecode::scm::vm {
     constexpr u8 op_and_reg2        = 28;
     constexpr u8 op_xor_imm         = 29;
     constexpr u8 op_xor_reg2        = 30;
-    constexpr u8 op_br_imm          = 31;
+    constexpr u8 op__UNUSED0__      = 31;
     constexpr u8 op_br_reg1         = 32;
     constexpr u8 op_blr_imm         = 33;
     constexpr u8 op_blr_reg1        = 34;
@@ -246,8 +248,8 @@ namespace basecode::scm::vm {
     constexpr u8 op_trap_reg2       = 81;
     constexpr u8 op_lea_imm         = 82;
     constexpr u8 op_lea_offs        = 109;
-    constexpr u8 op_bra_imm         = 83;
-    constexpr u8 op_bra_reg1        = 84;
+    constexpr u8 op_b_imm           = 83;
+    constexpr u8 op__UNUSED1_       = 84;
     constexpr u8 op_car_reg2        = 85;
     constexpr u8 op_cdr_reg2        = 86;
     constexpr u8 op_setcar_reg2     = 87;
@@ -352,7 +354,7 @@ namespace basecode::scm::vm {
             {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
         },
         [instruction::type::br] = {
-            {op_error,      op_br_imm,      op_br_reg1,     op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+            {op_error,      op_error,       op_br_reg1,     op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
         },
         [instruction::type::blr] = {
@@ -459,8 +461,8 @@ namespace basecode::scm::vm {
             {op_error,      op_lea_imm,     op_error,       op_error,       op_error,       op_error,       op_lea_offs,    op_error,           op_error},
             {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
         },
-        [instruction::type::bra] = {
-            {op_error,      op_bra_imm,     op_bra_reg1,    op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
+        [instruction::type::b] = {
+            {op_error,      op_b_imm,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
             {op_error,      op_error,       op_error,       op_error,       op_error,       op_error,       op_error,       op_error,           op_error},
         },
         [instruction::type::car] = {
@@ -766,7 +768,6 @@ namespace basecode::scm::vm {
             [op_and_reg2]           = &&and_reg2,
             [op_xor_imm]            = &&xor_imm,
             [op_xor_reg2]           = &&xor_reg2,
-            [op_br_imm]             = &&br_imm,
             [op_br_reg1]            = &&br_reg1,
             [op_blr_imm]            = &&blr_imm,
             [op_blr_reg1]           = &&blr_reg1,
@@ -819,8 +820,7 @@ namespace basecode::scm::vm {
             [op_trap_reg2]          = &&trap_reg2,
             [op_lea_imm]            = &&lea_imm,
             [op_lea_offs]           = &&lea_offs,
-            [op_bra_imm]            = &&bra_imm,
-            [op_bra_reg1]           = &&bra_reg1,
+            [op_b_imm]              = &&b_imm,
             [op_car_reg2]           = &&car_reg2,
             [op_cdr_reg2]           = &&cdr_reg2,
             [op_setcar_reg2]        = &&setcar_reg2,
@@ -1271,24 +1271,14 @@ namespace basecode::scm::vm {
             PC += sizeof(encoded_inst_t);
             EXEC_NEXT();
         }
-        br_imm:
-        {
-            PC += s64(opers->imm.src);
-            EXEC_NEXT();
-        }
         br_reg1:
         {
             PC += s64(G(opers->reg1.dst));
             EXEC_NEXT();
         }
-        bra_imm:
+        b_imm:
         {
-            PC = u64(opers->imm.src);
-            EXEC_NEXT();
-        }
-        bra_reg1:
-        {
-            PC = G(opers->reg1.dst);
+            PC += s64(opers->imm.src);
             EXEC_NEXT();
         }
         blr_imm:
