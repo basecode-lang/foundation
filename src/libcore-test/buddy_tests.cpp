@@ -25,6 +25,7 @@ using namespace basecode;
 
 TEST_CASE("basecode::memory::buddy basics") {
     buddy_config_t config{};
+    config.name          = "core-test::buddy";
     config.heap_size     = 256 * 1024;
     config.backing.alloc = context::top()->alloc.main;
 

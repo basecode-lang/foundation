@@ -16,6 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/str.h>
+#include <basecode/core/array.h>
 #include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::memory::proxy {
@@ -40,6 +42,7 @@ namespace basecode::memory::proxy {
         auto proxy_config = (proxy_config_t*) config;
         alloc->backing = proxy_config->backing.alloc;
         sc->owner      = proxy_config->owner;
+        sc->pad        = {};
         BC_ASSERT_NOT_NULL(alloc->backing);
     }
 
@@ -107,18 +110,12 @@ namespace basecode::memory::proxy {
     }
 
     alloc_t* make(alloc_t* backing, str::slice_t name, b8 owner) {
-        auto rc = string::interned::fold_for_result(name);
-        if (!OK(rc.status))
-            return nullptr;
-
         proxy_config_t config{};
         config.owner         = owner;
         config.backing.alloc = backing;
         auto proxy = system::make(&config);
-        auto psc = &proxy->subclass.proxy;
-        psc->name_id = rc.id;
         array::append(t_proxy_system.proxies, proxy);
-
+        memory::set_name(proxy, name);
         return proxy;
     }
 }

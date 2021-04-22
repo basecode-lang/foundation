@@ -46,6 +46,8 @@ namespace basecode {
 
             u0 stop_plot(alloc_info_t* info);
 
+            const alloc_info_array_t& infos();
+
             const alloc_info_array_t& roots();
 
             u0 start_plot(alloc_info_t* info, plot_mode_t mode);

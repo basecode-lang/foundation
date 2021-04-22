@@ -74,6 +74,7 @@ namespace basecode {
                 array::init(g_system.events, g_system.alloc);
 
                 slab_config_t slab_config{};
+                slab_config.name          = "event::slab";
                 slab_config.buf_size      = sizeof(event_t_);
                 slab_config.buf_align     = alignof(event_t_);
                 slab_config.num_pages     = DEFAULT_NUM_PAGES;

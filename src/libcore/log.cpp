@@ -84,6 +84,7 @@ namespace basecode::log {
             array::init(g_log_system.loggers, g_log_system.alloc);
 
             slab_config_t slab_config{};
+            slab_config.name          = "log::logger_slab";
             slab_config.buf_size      = sizeof(logger_t);
             slab_config.buf_align     = alignof(logger_t);
             slab_config.num_pages     = DEFAULT_NUM_PAGES;

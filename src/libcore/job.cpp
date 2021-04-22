@@ -19,7 +19,6 @@
 #include <atomic>
 #include <basecode/core/log.h>
 #include <basecode/core/job.h>
-#include <basecode/core/queue.h>
 #include <basecode/core/thread.h>
 #include <basecode/core/string.h>
 #include <basecode/core/memory/system/dl.h>
@@ -77,9 +76,11 @@ namespace basecode::job {
 
         static u0 run(worker_t& worker) {
             dl_config_t dl_cfg{};
+            dl_cfg.name      = "main heap";
             dl_cfg.heap_size = 4 * 1024 * 1024;
 
             scratch_config_t scratch_cfg{};
+            scratch_cfg.name     = "scratch heap";
             scratch_cfg.buf_size = 256 * 1024;
 
             system_config_t sys_cfg{};
@@ -95,6 +96,7 @@ namespace basecode::job {
             ctx.alloc.scratch = memory::system::scratch_alloc();
             context::push(&ctx);
             memory::proxy::init();
+            memory::system::mark_initialized();
             array::init(worker.active);
             array::reserve(worker.active, 128);
             array::init(worker.pending);
@@ -167,6 +169,7 @@ namespace basecode::job {
             g_job_sys.worker_idx  = {};
 
             slab_config_t slab_config{};
+            slab_config.name          = "job::task_slab";
             slab_config.buf_size      = job_task_buffer_size;
             slab_config.buf_align     = alignof(job_task_base_t*);
             slab_config.num_pages     = DEFAULT_NUM_PAGES;

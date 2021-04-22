@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/string.h>
+#include <basecode/core/memory.h>
 
 namespace basecode {
     struct proxy_config_t : alloc_config_t {
@@ -43,14 +43,6 @@ namespace basecode {
         b8 remove(alloc_t* alloc);
 
         const array_t<alloc_t*>& active();
-
-        inline str::slice_t name(alloc_t* alloc) {
-            BC_ASSERT_MSG(IS_PROXY(alloc),
-                          "expected a non-null proxy allocator");
-            auto id = alloc->subclass.proxy.name_id;
-            auto rc = string::interned::get(id);
-            return OK(rc.status) ? rc.slice : str::slice_t{};
-        }
 
         status_t init(alloc_t* alloc = context::top()->alloc.main);
 

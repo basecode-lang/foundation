@@ -19,6 +19,14 @@
 #include <basecode/gfx/imgui_extensions.h>
 
 namespace ImGui {
+    void TextRightAlign(const char* text_begin,
+                        const char* text_end,
+                        float offset) {
+        const auto text_size = ImGui::CalcTextSize(text_begin, text_end);
+        ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - text_size.x);
+        ImGui::TextUnformatted(text_begin);
+    }
+
     bool Splitter(bool split_vertically,
                   float thickness,
                   float* size1,
@@ -45,11 +53,5 @@ namespace ImGui {
                                        min_size1,
                                        min_size2,
                                        0.0f);
-    }
-
-    void TextRightAlign(const char* text_begin, const char* text_end) {
-        const auto text_size = ImGui::CalcTextSize(text_begin, text_end);
-        ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - text_size.x);
-        ImGui::TextUnformatted(text_begin);
     }
 }

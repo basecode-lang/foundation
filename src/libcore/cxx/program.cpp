@@ -17,8 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/format.h>
+#include <basecode/core/string.h>
 #include <basecode/core/cxx/cxx.h>
-#include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::cxx::program {
     b8 format_record(format_type_t type,

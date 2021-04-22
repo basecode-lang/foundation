@@ -64,6 +64,7 @@ namespace basecode::memory::meta {
             hashtab::init(t_meta_sys.infotab, t_meta_sys.alloc);
 
             slab_config_t slab_config{};
+            slab_config.name          = "memory::meta_slab";
             slab_config.buf_size      = sizeof(alloc_info_t);
             slab_config.buf_align     = alignof(alloc_info_t);
             slab_config.num_pages     = DEFAULT_NUM_PAGES;
@@ -89,8 +90,8 @@ namespace basecode::memory::meta {
                 auto backing_info = hashtab::find(t_meta_sys.infotab,
                                                   (u0*) alloc->backing);
                 if (backing_info) {
-                    array::append(backing_info->children, info);
-                    info->parent = backing_info;
+                    array::append(info->children, backing_info);
+                    backing_info->parent = info;
                 }
             } else {
                 array::append(t_meta_sys.roots, info);
@@ -128,6 +129,10 @@ namespace basecode::memory::meta {
 
         const alloc_info_array_t& roots() {
             return t_meta_sys.roots;
+        }
+
+        const alloc_info_array_t& infos() {
+            return t_meta_sys.infos;
         }
 
         u0 start_plot(alloc_info_t* info, plot_mode_t mode) {

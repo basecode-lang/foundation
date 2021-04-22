@@ -301,6 +301,8 @@ s32 main(s32 argc, const s8** argv) {
         path::free(load_path);
     }
 
+    memory::system::mark_initialized();
+
     rc = repl(scm::system::global_ctx(), argc, argv);
 
     network::system::fini();

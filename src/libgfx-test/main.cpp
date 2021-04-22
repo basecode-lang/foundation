@@ -56,9 +56,11 @@ s32 main(s32 argc, const s8** argv) {
     alloc_t* temp_alloc;
     alloc_t* scratch_alloc; {
         dl_config_t dl_cfg{};
+        dl_cfg.name      = "main heap";
         dl_cfg.heap_size = 32 * 1024 * 1024;
 
         scratch_config_t scratch_cfg{};
+        scratch_cfg.name     = "scratch heap";
         scratch_cfg.buf_size = 256 * 1024;
 
         system_config_t sys_cfg{};
@@ -193,6 +195,9 @@ s32 main(s32 argc, const s8** argv) {
 
                    path::free(config_path);
                    path::free(load_path));
+
+    TIME_BLOCK("memory::system::mark_initialized"_ss,
+               memory::system::mark_initialized());
 
     s32 rc = run(argc, argv);
 

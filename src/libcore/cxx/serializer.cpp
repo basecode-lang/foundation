@@ -17,8 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/format.h>
+#include <basecode/core/string.h>
 #include <basecode/core/cxx/cxx.h>
-#include <basecode/core/memory/system/proxy.h>
 
 #define GET_INTERN(x)           (string::interned::get((x)))
 

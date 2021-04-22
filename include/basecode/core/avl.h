@@ -377,6 +377,7 @@ namespace basecode {
             tree.alloc = alloc;
 
             slab_config_t node_cfg{};
+            node_cfg.name          = "avl::node_slab";
             node_cfg.buf_size      = avl_t<T>::Node_Type_Size;
             node_cfg.buf_align     = avl_t<T>::Node_Type_Align;
             node_cfg.num_pages     = DEFAULT_NUM_PAGES;
@@ -384,6 +385,7 @@ namespace basecode {
             tree.node_slab = memory::system::make(&node_cfg);
 
             slab_config_t value_cfg{};
+            value_cfg.name          = "avl::value_slab";
             value_cfg.buf_size      = avl_t<T>::Value_Type_Size;
             value_cfg.buf_align     = avl_t<T>::Value_Type_Align;
             value_cfg.num_pages     = DEFAULT_NUM_PAGES;

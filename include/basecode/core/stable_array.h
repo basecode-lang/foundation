@@ -239,6 +239,7 @@ namespace basecode {
             array.size  = array.capacity = {};
 
             slab_config_t slab_config{};
+            slab_config.name          = "stable_array::slab";
             slab_config.buf_size      = sizeof(Value_Type);
             slab_config.buf_align     = alignof(Value_Type);
             slab_config.num_pages     = num_pages;

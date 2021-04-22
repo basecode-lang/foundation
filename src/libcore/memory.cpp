@@ -25,7 +25,7 @@
 #include <sys/mman.h>
 #include <basecode/core/array.h>
 #include <basecode/core/format.h>
-#include <basecode/core/memory.h>
+#include <basecode/core/string.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/core/memory/system/dl.h>
 #include <basecode/core/memory/system/page.h>
@@ -39,7 +39,16 @@
 #include <basecode/core/memory/system/scratch.h>
 
 namespace basecode::memory {
+    struct name_command_t;
+
     using alloc_array_t         = array_t<alloc_t*>;
+    using name_command_array_t  = array_t<name_command_t>;
+
+    struct name_command_t final {
+        alloc_t*                alloc;
+        s8*                     name;
+        s32                     len;
+    };
 
     struct system_t final {
         alloc_t                 temp;
@@ -47,8 +56,10 @@ namespace basecode::memory {
         alloc_t                 scratch;
         alloc_t                 slab_alloc;
         alloc_array_t           allocators;
+        name_command_array_t    naming_queue;
         usize                   os_page_size;
         usize                   os_alloc_granularity;
+        std::atomic<b8>         initialized;
     };
 
     static const s8*            s_status_names[] = {
@@ -77,6 +88,11 @@ namespace basecode::memory {
 
     namespace system {
         u0 fini() {
+            for (auto& cmd : t_system.naming_queue) {
+                if (cmd.name)
+                    memory::free(&t_system.main, cmd.name);
+            }
+            array::free(t_system.naming_queue);
             for (auto alloc : t_system.allocators) {
                 memory::internal::fini(alloc);
                 memory::internal::free(&t_system.slab_alloc, alloc);
@@ -87,7 +103,13 @@ namespace basecode::memory {
             memory::internal::fini(&t_system.temp);
             memory::internal::fini(&t_system.scratch);
             memory::internal::fini(&t_system.main);
+            t_system.naming_queue.alloc = {};
+            t_system.initialized = false;
         }
+
+        static u0 enqueue_naming_command(alloc_t* alloc,
+                                         const s8* name,
+                                         s32 len = -1);
 
         usize os_page_size() {
             return t_system.os_page_size;
@@ -99,6 +121,15 @@ namespace basecode::memory {
 
         alloc_t* main_alloc() {
             return &t_system.main;
+        }
+
+        u0 mark_initialized() {
+            t_system.initialized = true;
+            for (auto& cmd : t_system.naming_queue) {
+                memory::set_name(cmd.alloc, cmd.name, cmd.len);
+                memory::free(&t_system.main, cmd.name);
+            }
+            array::reset(t_system.naming_queue);
         }
 
         u0 print_allocators() {
@@ -138,6 +169,20 @@ namespace basecode::memory {
             return alloc;
         }
 
+        static u0 enqueue_naming_command(alloc_t* alloc,
+                                         const s8* name,
+                                         s32 len) {
+            if (!alloc || !name)
+                return;
+            len = len == -1 ? strlen(name) : len;
+            auto& cmd = array::append(t_system.naming_queue);
+            cmd.alloc = alloc;
+            cmd.name  = (s8*) memory::alloc(&t_system.main, len + 1);
+            cmd.len   = len;
+            std::strcpy(cmd.name, name);
+            cmd.name[len] = '\0';
+        }
+
         b8 set_page_executable(u0* ptr, usize size) {
             const auto page_size = t_system.os_page_size;
             u64 start, end;
@@ -163,6 +208,8 @@ namespace basecode::memory {
             auto sys_cfg = (system_config_t*) cfg;
             BC_ASSERT_NOT_NULL(sys_cfg->main);
             memory::init(&t_system.main, sys_cfg->main);
+            array::init(t_system.naming_queue, &t_system.main);
+            enqueue_naming_command(&t_system.main, sys_cfg->main->name);
             meta::system::init(&t_system.main);
             meta::system::track(&t_system.main);
 
@@ -181,6 +228,7 @@ namespace basecode::memory {
             array::init(t_system.allocators, &t_system.main);
 
             slab_config_t slab_config{};
+            slab_config.name          = "memory::alloc_slab";
             slab_config.buf_size      = sizeof(alloc_t);
             slab_config.buf_align     = alignof(alloc_t);
             slab_config.num_pages     = DEFAULT_NUM_PAGES;
@@ -255,6 +303,13 @@ namespace basecode::memory {
         }
     }
 
+    const s8* name(alloc_t* alloc) {
+        if (alloc->name == 0)
+            return "(none)";
+        auto rc = string::interned::get(alloc->name);
+        return OK(rc.status) ? (const s8*) rc.slice.data : "(none)";
+    }
+
     alloc_t* unwrap(alloc_t* alloc) {
         while (alloc && IS_PROXY(alloc))
             alloc = alloc->backing;
@@ -267,6 +322,18 @@ namespace basecode::memory {
 
     const s8* status_name(status_t status) {
         return s_status_names[(u32) status];
+    }
+
+    u0 set_name(alloc_t* alloc, const s8* name, s32 len) {
+        if (!t_system.initialized) {
+            if (t_system.naming_queue.alloc)
+                system::enqueue_naming_command(alloc, name, len);
+            return;
+        }
+        auto rc = string::interned::fold_for_result(name, len);
+        if (!OK(rc.status))
+            return;
+        alloc->name = rc.id;
     }
 
     status_t init(alloc_t* alloc, alloc_config_t* config) {
@@ -286,10 +353,13 @@ namespace basecode::memory {
             case alloc_type_t::scratch:     alloc->system = scratch::system();  break;
             case alloc_type_t::dlmalloc:    alloc->system = dl::system();       break;
         }
+        BC_ASSERT_NOT_NULL(alloc->system);
         alloc->backing         = {};
         alloc->total_allocated = {};
         if (alloc->system->init)
             alloc->system->init(alloc, config);
+        if (config->name)
+            memory::set_name(alloc, config->name);
         meta::system::track(alloc);
         return status_t::ok;
     }

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <basecode/core/format.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/core/memory/system/slab.h>
 
@@ -64,14 +65,19 @@ namespace basecode {
             const auto type_id = family_t<>::template type<T>;
             auto [type, is_new] = hashtab::emplace2(pool.slabs, type_id);
             if (is_new) {
+                type->type_id   = type_id;
+                type->type_name = typeid(T).name();
+                auto slab_name = format::format("obj_pool<{}>::slab\0",
+                                                type->type_name);
+
                 slab_config_t cfg{};
-                cfg.backing.alloc = pool.alloc;
+                cfg.name          = (const s8*) slab_name.data;
                 cfg.buf_size      = sizeof(T);
                 cfg.buf_align     = alignof(T);
                 cfg.num_pages     = DEFAULT_NUM_PAGES;
+                cfg.backing.alloc = pool.alloc;
                 type->alloc       = memory::system::make(&cfg);
-                type->type_id   = type_id;
-                type->type_name = typeid(T).name();
+
                 if constexpr (std::is_destructible_v<T>) {
                     type->destroyer = [](const u0* x) -> u0 {
                         static_cast<const T*>(x)->~T();

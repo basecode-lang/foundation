@@ -26,12 +26,14 @@
 namespace basecode {
     struct alloc_config_t {
         alloc_config_t(alloc_type_t _type) : backing(),
+                                             name(nullptr),
                                              type(_type) {}
 
         union {
             u0*                 buf;
             alloc_t*            alloc;
         }                       backing;
+        const s8*               name;
         alloc_type_t            type;
     };
 
@@ -105,7 +107,7 @@ namespace basecode {
         }                           page;
         struct {
             u32                     owner:      1;
-            u32                     name_id:    31;
+            u32                     pad:        31;
         }                           proxy;
         struct buddy_t {
             u0*                     heap;
@@ -124,8 +126,8 @@ namespace basecode {
         alloc_system_t*             system;
         alloc_t*                    backing;
         alloc_subclass_t            subclass;
+        intern_id                   name;
         u32                         total_allocated;
-        u32                         pad;
     };
     static_assert(sizeof(alloc_t) <= 72,
                   "alloc_t is now larger than 72 bytes!");
@@ -141,6 +143,8 @@ namespace basecode {
             alloc_t* temp_alloc();
 
             alloc_t* main_alloc();
+
+            u0 mark_initialized();
 
             alloc_t* scratch_alloc();
 
@@ -174,6 +178,12 @@ namespace basecode {
             mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align);
         }
 
+        u0 set_name(alloc_t* alloc,
+                    const s8* name,
+                    s32 len = -1);
+
+        const s8* name(alloc_t* alloc);
+
         alloc_t* unwrap(alloc_t* alloc);
 
         inline u32 fini(alloc_t* alloc) {
@@ -182,6 +192,11 @@ namespace basecode {
 
         inline u0* alloc(alloc_t* alloc) {
             return internal::alloc(alloc, 0, 0).mem;
+        }
+
+        template <String_Concept T>
+        u0 set_name(alloc_t* alloc, const T& name) {
+            set_name(alloc, (const s8*) name.data, name.length);
         }
 
         const s8* type_name(alloc_type_t type);

@@ -17,15 +17,12 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/defer.h>
+#include <basecode/core/format.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/gfx/alloc_window.h>
 #include <basecode/gfx/implot/implot.h>
 #include <basecode/gfx/imgui_extensions.h>
-#include <basecode/core/memory/system/proxy.h>
 #include <basecode/gfx/fonts/IconsFontAwesome5.h>
-
-namespace ImGui {
-}
 
 namespace basecode::alloc_window {
     static alloc_info_t* selected{};
@@ -49,6 +46,8 @@ namespace basecode::alloc_window {
             auto node_flags = base_flags;
             if (info->selected)
                 node_flags |= ImGuiTreeNodeFlags_Selected;
+            if (info->children.size == 0)
+                node_flags |= ImGuiTreeNodeFlags_Leaf;
             auto node_open = ImGui::TreeNodeEx(info,
                                                node_flags,
                                                "0x%016llX",
@@ -63,14 +62,10 @@ namespace basecode::alloc_window {
                 }
             }
             ImGui::TableSetColumnIndex(1);
-            if (IS_PROXY(info->tracked)) {
-                const auto name = memory::proxy::name(info->tracked);
-                ImGui::Text("%s", name.data);
-            } else {
-                ImGui::Text("%s", "(none)");
-            }
+            ImGui::TextUnformatted(memory::name(info->tracked));
             ImGui::TableSetColumnIndex(2);
-            ImGui::Text("%s", memory::type_name(info->tracked->system->type));
+            ImGui::TextUnformatted(memory::type_name(info->tracked->system->type));
+            ImGui::SetNextItemWidth(-FLT_MIN);
             ImGui::TableSetColumnIndex(3);
             str::reset(scratch); {
                 str_buf_t buf(&scratch);
@@ -78,7 +73,8 @@ namespace basecode::alloc_window {
                                            info->tracked->total_allocated);
             }
             ImGui::TextRightAlign(str::c_str(scratch),
-                                  (const s8*) scratch.end());
+                                  (const s8*) scratch.end(),
+                                  node_open ? ImGui::GetTreeNodeToLabelSpacing() : 0.f);
             ++row;
             if (node_open) {
                 if (info->children.size > 0)
@@ -126,7 +122,7 @@ namespace basecode::alloc_window {
             ImGui::TableSetupColumn("Type");
             ImGui::TableSetupColumn("Total Allocated");
             ImGui::TableHeadersRow();
-            draw_allocators(win, memory::meta::system::roots());
+            draw_allocators(win, memory::meta::system::infos());
             ImGui::EndTable();
         }
         ImGui::EndChild();
@@ -156,7 +152,7 @@ namespace basecode::alloc_window {
                                        ImGuiCond_Always);
             ImPlot::SetNextPlotLimitsY(0,
                                        std::max<u32>(plot->min_y, plot->max_y * 2),
-                                       ImGuiCond_Once);
+                                       ImGuiCond_Always);
             if (plot->values.size > 0
             &&  ImPlot::BeginPlot("##scrolled", {}, {}, ImVec2(-1, -1),
                                       rt_axis, rt_axis | ImPlotAxisFlags_LockMin)) {

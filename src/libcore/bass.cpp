@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/str.h>
 #include <basecode/core/bass.h>
 #include <basecode/core/memory/system/bump.h>
 #include <basecode/core/memory/system/page.h>
@@ -145,6 +146,7 @@ namespace basecode {
                         memory::proxy::make(storage.alloc, "bass::index"_ss));
 
             page_config_t page_config{};
+            page_config.name          = "bass::page_alloc";
             page_config.num_pages     = num_pages;
             page_config.backing.alloc = storage.alloc;
             storage.page_alloc = memory::proxy::make(memory::system::make(&page_config),
@@ -152,6 +154,7 @@ namespace basecode {
                                                      true);
 
             bump_config_t bump_config{};
+            bump_config.name          = "bass::bump_alloc";
             bump_config.type          = bump_type_t::allocator;
             bump_config.backing.alloc = storage.page_alloc;
             storage.bump_alloc        = memory::system::make(&bump_config);

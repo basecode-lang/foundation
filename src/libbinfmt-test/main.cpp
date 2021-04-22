@@ -199,6 +199,9 @@ s32 run(test_suite_t& suite) {
                    return (s32) status;
                });
 
+    TIME_BLOCK("memory::system::mark_initialized"_ss,
+               memory::system::mark_initialized());
+
     TIME_BLOCK("catch2 session::run"_ss, rc = suite.session.run(suite.argc,
                                                                 suite.argv));
 

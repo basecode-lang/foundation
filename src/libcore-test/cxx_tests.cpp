@@ -18,6 +18,7 @@
 
 #include <catch.hpp>
 #include <basecode/core/log.h>
+#include <basecode/core/string.h>
 #include <basecode/core/cxx/cxx.h>
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/memory/system/dl.h>
@@ -278,7 +279,7 @@ TEST_CASE("basecode::cxx example program") {
     {
         str_buf_t fmt_buf(&buf);
         for (auto proxy : proxies) {
-            format::format_to(fmt_buf, "{:<40} ", memory::proxy::name(proxy));
+            format::format_to(fmt_buf, "{:<40} ", memory::name(proxy));
             format::unitized_byte_size(fmt_buf, proxy->total_allocated);
             format::format_to(fmt_buf, "\n");
         }

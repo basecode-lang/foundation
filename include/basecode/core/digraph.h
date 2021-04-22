@@ -298,6 +298,7 @@ namespace basecode {
             array::init(graph.incoming, graph.alloc);
 
             slab_config_t node_cfg{};
+            node_cfg.name          = "digraph::node_slab";
             node_cfg.buf_size      = digraph_t<T>::Node_Size;
             node_cfg.buf_align     = digraph_t<T>::Node_Align;
             node_cfg.num_pages     = DEFAULT_NUM_PAGES;
@@ -305,6 +306,7 @@ namespace basecode {
             graph.node_slab = memory::system::make(&node_cfg);
 
             slab_config_t edge_cfg{};
+            edge_cfg.name          = "digraph::edge_slab";
             edge_cfg.buf_size      = digraph_t<T>::Edge_Size;
             edge_cfg.buf_align     = digraph_t<T>::Edge_Align;
             edge_cfg.num_pages     = DEFAULT_NUM_PAGES;

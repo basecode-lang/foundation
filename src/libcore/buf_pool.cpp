@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/bits.h>
+#include <basecode/core/format.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/memory/system/slab.h>
@@ -61,6 +62,9 @@ namespace basecode::buf_pool {
             slab_config.backing.alloc = g_system.alloc;
 
             for (u32 i = 0; i < max_pool_count; ++i) {
+                auto slab_name = format::format("buf_pool<{}>::slab\0",
+                                                s_pool_sizes[i]);
+                slab_config.name     = (const s8*) slab_name.data;
                 slab_config.buf_size = s_pool_sizes[i];
                 g_system.pools[i] = memory::system::make(&slab_config);
             }

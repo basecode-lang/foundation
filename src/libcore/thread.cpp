@@ -67,13 +67,12 @@ namespace basecode::thread {
         status_t init(alloc_t* alloc) {
             g_system.alloc = alloc;
             slab_config_t slab_config{};
-            slab_config.buf_size      = 128;
+            slab_config.name          = "thread::worker_slab";
+            slab_config.buf_size      = 128;        // FIXME!
             slab_config.buf_align     = 8;
             slab_config.num_pages     = DEFAULT_NUM_PAGES;
             slab_config.backing.alloc = g_system.alloc;
-            g_system.proc_pool = memory::proxy::make(
-                memory::system::make(&slab_config),
-                "thread pool"_ss);
+            g_system.proc_pool = memory::system::make(&slab_config);
             g_system.num_cores = sysconf(_SC_NPROCESSORS_ONLN);
             return status_t::ok;
         }
@@ -131,7 +130,8 @@ namespace basecode::thread {
     }
 
     status_t free(thread_t& thread) {
-        if (thread.state == thread_state_t::running && (thread.joinable && !thread.joined)) {
+        if (thread.state == thread_state_t::running
+        && (thread.joinable && !thread.joined)) {
             u0* ret{};
             auto err = pthread_join(thread.handle, &ret);
             if (err != 0)

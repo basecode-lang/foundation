@@ -22,6 +22,10 @@
 #include <basecode/gfx/imgui/imgui_internal.h>
 
 namespace ImGui {
+    void TextRightAlign(const char* text_begin,
+                        const char* text_end = {},
+                        float offset = 0);
+
     bool Splitter(bool split_vertically,
                   float thickness,
                   float* size1,
@@ -29,6 +33,4 @@ namespace ImGui {
                   float min_size1,
                   float min_size2,
                   float splitter_long_axis_size = -1.0f);
-
-    void TextRightAlign(const char* text_begin, const char* text_end = {});
 }

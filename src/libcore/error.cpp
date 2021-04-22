@@ -126,6 +126,7 @@ namespace basecode::error {
             hashtab::init(g_err_sys.errors, g_err_sys.alloc);
             mutex::init(g_err_sys.lock);
             slab_config_t slab_config{};
+            slab_config.name          = "error::def_slab";
             slab_config.buf_size      = sizeof(error_def_t);
             slab_config.buf_align     = alignof(error_def_t);
             slab_config.num_pages     = DEFAULT_NUM_PAGES;
