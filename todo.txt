@@ -37,8 +37,6 @@ HIGH
 - scm: arithmetic ops should compile down to pairwise ADD/ADDF, et al. instead
        of the high-level LADD/LSUB/LMUL/LDIV/LMOD, etc.
 - scm: extend emitter to support append (default) or insert modes
-- scm: add .segment meta-op to emitter
-- scm: add .dq meta-op to emitter
 
 - libgfx: pull in nfd or rewrite based on nfd_extended
 
@@ -54,6 +52,8 @@ MEDIUM
 
 LOW
 ---------
+- scm: add .area directive to emitter
+- scm: add .db, .dw, .dd, .dq directives to emitter
 - review and improve symtab_t if possible
 - rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
     * add ca_hashtab_t and ca_set_t using chaining via linked list?

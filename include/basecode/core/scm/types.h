@@ -86,6 +86,7 @@ namespace basecode::scm {
     struct operand_t;
     struct emitter_t;
     struct mem_area_t;
+    struct directive_t;
     struct var_access_t;
     struct var_version_t;
     struct encoded_inst_t;
@@ -113,6 +114,7 @@ namespace basecode::scm {
     using keyword_table_t       = hashtab_t<str::slice_t, obj_t*>;
     using comment_array_t       = array_t<comment_t>;
     using mem_area_array_t      = array_t<mem_area_t>;
+    using directive_array_t     = array_t<directive_t>;
     using interval_array_t      = array_t<liveliness_range_t*>;
     using liveliness_array_t    = stable_array_t<liveliness_range_t>;
     using var_version_array_t   = stable_array_t<var_version_t>;
@@ -200,6 +202,15 @@ namespace basecode::scm {
         trap,
         value,
         block,
+    };
+
+    enum class directive_type_t : u8 {
+        none,
+        db,
+        dw,
+        dd,
+        dq,
+        area
     };
 
     enum class var_access_type_t : u8 {
@@ -418,6 +429,15 @@ namespace basecode::scm {
         comment_type_t          type;
     };
 
+    struct directive_t final {
+        union {
+            array_t<u64>        data;
+            mem_area_type_t     area;
+        }                       kind;
+        u32                     line;
+        directive_type_t        type;
+    };
+
     struct bb_t final {
         using Node_Type         = typename bb_digraph_t::Node;
 
@@ -442,6 +462,11 @@ namespace basecode::scm {
             var_version_t*      vars[4];
             u32                 size;
         }                       params;
+        struct {
+            u32                 sidx;
+            u32                 eidx;
+            inline u32 size() const     { return (eidx - sidx); }
+        }                       directives;
         bb_type_t               type;
     };
 
@@ -459,6 +484,7 @@ namespace basecode::scm {
         var_version_array_t     versions;
         var_digraph_t           var_graph;
         interval_array_t        intervals;
+        directive_array_t       directives;
     };
 
     struct mem_area_t final {

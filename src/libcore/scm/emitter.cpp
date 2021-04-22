@@ -48,6 +48,18 @@ namespace basecode::scm::emitter {
                                                    var_version_t* version);
 
     u0 free(emitter_t& e) {
+        for (auto& directive : e.directives) {
+            switch (directive.type) {
+                case directive_type_t::db:
+                case directive_type_t::dw:
+                case directive_type_t::dd:
+                case directive_type_t::dq:
+                    array::free(directive.kind.data);
+                    break;
+                default:
+                    break;
+            }
+        }
         for (auto version : e.versions)
             array::free(version->accesses);
         array::free(e.insts);
@@ -56,6 +68,7 @@ namespace basecode::scm::emitter {
         array::free(e.intervals);
         digraph::free(e.bb_graph);
         str_array::free(e.strtab);
+        array::free(e.directives);
         digraph::free(e.var_graph);
         stable_array::free(e.vars);
         stable_array::free(e.blocks);
@@ -64,6 +77,18 @@ namespace basecode::scm::emitter {
     }
 
     u0 reset(emitter_t& e) {
+        for (auto& directive : e.directives) {
+            switch (directive.type) {
+                case directive_type_t::db:
+                case directive_type_t::dw:
+                case directive_type_t::dd:
+                case directive_type_t::dq:
+                    array::free(directive.kind.data);
+                    break;
+                default:
+                    break;
+            }
+        }
         for (auto version : e.versions)
             array::free(version->accesses);
         array::reset(e.insts);
@@ -77,6 +102,15 @@ namespace basecode::scm::emitter {
         stable_array::reset(e.blocks);
         stable_array::reset(e.ranges);
         stable_array::reset(e.versions);
+    }
+
+    static u0 format_directives(str_buf_t& buf,
+                                const directive_array_t& directives,
+                                u32 block_id,
+                                u32 sidx,
+                                u32 eidx,
+                                s32 line,
+                                u64 addr) {
     }
 
     static u0 format_comments(str_buf_t& buf,
@@ -93,7 +127,7 @@ namespace basecode::scm::emitter {
         for (u32 i = sidx; i < eidx; ++i) {
             const auto& c = comments[i];
             if (c.type != type
-                ||  c.block_id != block_id) {
+            ||  c.block_id != block_id) {
                 continue;
             }
             const auto& str = strings[c.id - 1];
@@ -199,6 +233,7 @@ namespace basecode::scm::emitter {
         array::init(e.intervals, e.alloc);
         digraph::init(e.bb_graph, e.alloc);
         str_array::init(e.strtab, e.alloc);
+        array::init(e.directives, e.alloc);
         digraph::init(e.var_graph, e.alloc);
         stable_array::init(e.vars, e.alloc);
         stable_array::init(e.blocks, e.alloc);
@@ -627,6 +662,13 @@ namespace basecode::scm::emitter {
                 if (inst.block_id != curr->id)
                     continue;
                 auto start_pos = buf.size();
+                format_directives(buf,
+                                  e.directives,
+                                  curr->id,
+                                  curr->directives.sidx,
+                                  curr->directives.eidx,
+                                  line,
+                                  addr);
                 format::format_to(
                     buf,
                     "${:08X}:    {:<12}",

@@ -277,6 +277,19 @@ namespace basecode::scm::basic_block {
             };
         }
 
+        directive_t& make_directive(directive_type_t type) {
+            auto& directive = array::append(_em->directives);
+            directive.type = type;
+            directive.line = _em->insts.size;
+            if (_bb->directives.eidx == 0) {
+                _bb->directives.sidx = _em->directives.size - 1;
+                _bb->directives.eidx = _bb->directives.sidx + 1;
+            } else {
+                _bb->directives.eidx = _em->directives.size;
+            }
+            return directive;
+        }
+
         operand_t operand(u32 value,
                           operand_type_t type = operand_type_t::value) {
             operand_t oper{};
@@ -321,6 +334,44 @@ namespace basecode::scm::basic_block {
             } else {
                 _bb->notes.eidx = _em->comments.size;
             }
+            return *this;
+        }
+
+        bb_builder_t& area(mem_area_type_t area) {
+            auto& directive = make_directive(directive_type_t::area);
+            directive.kind.area = area;
+            return *this;
+        }
+
+        bb_builder_t& db(std::initializer_list<u8> bytes) {
+            auto& directive = make_directive(directive_type_t::db);
+            array::init(directive.kind.data, _em->alloc);
+            for (auto byte : bytes)
+                array::append(directive.kind.data, byte);
+            return *this;
+        }
+
+        bb_builder_t& dw(std::initializer_list<u16> words) {
+            auto& directive = make_directive(directive_type_t::db);
+            array::init(directive.kind.data, _em->alloc);
+            for (auto word : words)
+                array::append(directive.kind.data, word);
+            return *this;
+        }
+
+        bb_builder_t& dd(std::initializer_list<u32> dwords) {
+            auto& directive = make_directive(directive_type_t::dd);
+            array::init(directive.kind.data, _em->alloc);
+            for (auto dword : dwords)
+                array::append(directive.kind.data, dword);
+            return *this;
+        }
+
+        bb_builder_t& dq(std::initializer_list<u64> qwords) {
+            auto& directive = make_directive(directive_type_t::dq);
+            array::init(directive.kind.data, _em->alloc);
+            for (auto qword : qwords)
+                array::append(directive.kind.data, qword);
             return *this;
         }
 
