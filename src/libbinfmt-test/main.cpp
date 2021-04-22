@@ -49,10 +49,10 @@ s32 run(test_suite_t& suite) {
     alloc_t* temp_alloc;
     alloc_t* scratch_alloc; {
         dl_config_t dl_cfg{};
-        dl_cfg.heap_size = 32 * 1024 * 1024;
+        dl_cfg.heap_size = MB(32);
 
         scratch_config_t scratch_cfg{};
-        scratch_cfg.buf_size = 256 * 1024;
+        scratch_cfg.buf_size = KB(256);
 
         system_config_t sys_cfg{};
         sys_cfg.main    = &dl_cfg;

@@ -86,6 +86,9 @@
 #define HAS_ZERO(v)             (((v)-UINT64_C(0x0101010101010101))             \
                                  & ~(v)&UINT64_C(0x8080808080808080))
 #define VA_COUNT(...)           basecode::va_count(__VA_ARGS__)
+#define KB(x)                   (1024 * (x))
+#define MB(x)                   (1024 * KB(x))
+#define GB(x)                   (1024 * MB(x))
 
 #define FORMAT_TYPE(Type, Code)                                                 \
     template <>                                                                 \
@@ -222,6 +225,18 @@ namespace basecode {
 
     template <typename... Args>
     constexpr usize va_count(Args&&...) { return sizeof...(Args); }
+
+    constexpr u32 operator "" _kb(u64 value) {
+        return value * 1024;
+    }
+
+    constexpr u32 operator "" _mb(u64 value) {
+        return 1024 * (value * 1024);
+    }
+
+    constexpr u32 operator "" _gb(u64 value) {
+        return 1204 * (1024 * (value * 1024));
+    }
 
     // ------------------------------------------------------------------------
     //

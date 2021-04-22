@@ -150,8 +150,8 @@ namespace basecode {
         inline u0 unitized_byte_size(Buffer& buf,
                                      u64 size) {
             u64 i{};
-            while (size > 1024) {
-                size /= 1024;
+            while (size > KB(1)) {
+                size /= KB(1);
                 i++;
             }
             if (i > 1) {

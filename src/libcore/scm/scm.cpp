@@ -625,25 +625,25 @@ namespace basecode::scm {
                          mem_area_type_t::code_stack,
                          rf::sp,
                          ctx->alloc,
-                         1024,
+                         KB(1),
                          true);
         ctx->data_stack = vm::add_mem_area(vm,
                                            mem_area_type_t::data_stack,
                                            rf::dp,
                                            ctx->alloc,
-                                           1024,
+                                           KB(1),
                                            true);
         ctx->gc_stack = vm::add_mem_area(vm,
                                          mem_area_type_t::gc_stack,
                                          rf::gp,
                                          ctx->alloc,
-                                         1024,
+                                         KB(1),
                                          true);
         ctx->env_stack = vm::add_mem_area(vm,
                                           mem_area_type_t::env_stack,
                                           rf::ep,
                                           ctx->alloc,
-                                          1024,
+                                          KB(1),
                                           true);
         vm::reset(vm);
 
@@ -1375,7 +1375,7 @@ namespace basecode::scm {
         str::reserve(signature, 32);
 
         ffi_t ffi{};
-        ffi::init(ffi, 1024, ctx->alloc);
+        ffi::init(ffi, KB(1), ctx->alloc);
 
         keyword_table_t keywords{};
         hashtab::init(keywords, ctx->alloc);

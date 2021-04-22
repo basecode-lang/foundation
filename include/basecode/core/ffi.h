@@ -223,7 +223,7 @@ namespace basecode {
         }
 
         status_t init(ffi_t& ffi,
-                      u32 heap_size = 2 * 1024,
+                      u32 heap_size = KB(2),
                       alloc_t* alloc = context::top()->alloc.main);
 
         status_t call(ffi_t& ffi, const overload_t* ol, param_alias_t& ret);
