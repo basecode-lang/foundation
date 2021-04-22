@@ -31,6 +31,7 @@ namespace basecode {
             scrolled_view_t     scrolled;
         }                       plot;
         plot_mode_t             mode;
+        b8                      selected;
     };
 
     namespace memory::meta {
@@ -55,13 +56,13 @@ namespace basecode {
         namespace alloc_info {
             u0 free(alloc_info_t& info);
 
-            u0 stop_plot(alloc_info_t& info);
+            b8 stop_plot(alloc_info_t& info);
 
             u0 init(alloc_info_t& info, alloc_t* alloc);
 
             u0 append_point(alloc_info_t& info, f32 x, f32 y);
 
-            u0 start_plot(alloc_info_t& info, plot_mode_t mode);
+            b8 start_plot(alloc_info_t& info, plot_mode_t mode);
         }
     }
 }

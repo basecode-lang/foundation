@@ -223,6 +223,9 @@ set(GFX_SOURCES
     alloc_window.cpp ${GFX_INC_DIR}/alloc_window.h
 
     font.cpp ${GFX_INC_DIR}/font.h
+
+    imgui_extensions.cpp ${GFX_INC_DIR}/imgui_extensions.h
+
     ${GFX_INC_DIR}/fonts/IconsKenney.h
     ${GFX_INC_DIR}/fonts/IconsFontaudio.h
     ${GFX_INC_DIR}/fonts/IconsForkAwesome.h

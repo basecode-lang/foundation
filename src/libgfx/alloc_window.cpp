@@ -20,41 +20,16 @@
 #include <basecode/core/memory/meta.h>
 #include <basecode/gfx/alloc_window.h>
 #include <basecode/gfx/implot/implot.h>
-#include <basecode/gfx/imgui/imgui_internal.h>
+#include <basecode/gfx/imgui_extensions.h>
 #include <basecode/core/memory/system/proxy.h>
 #include <basecode/gfx/fonts/IconsFontAwesome5.h>
 
 namespace ImGui {
-    bool Splitter(bool split_vertically,
-                  float thickness,
-                  float* size1,
-                  float* size2,
-                  float min_size1,
-                  float min_size2,
-                  float splitter_long_axis_size = -1.0f) {
-        ImGuiContext& g = *GImGui;
-        ImGuiWindow* window = g.CurrentWindow;
-        ImGuiID id = window->GetID("##Splitter");
-        ImRect bb;
-        bb.Min = window->DC.CursorPos
-                 + (split_vertically ? ImVec2(*size1, 0.0f) : ImVec2(0.0f, *size1));
-        bb.Max = bb.Min + ImGui::CalcItemSize(split_vertically ?
-                                              ImVec2(thickness, splitter_long_axis_size) :
-                                              ImVec2(splitter_long_axis_size, thickness),
-                                              0.0f,
-                                              0.0f);
-        return ImGui::SplitterBehavior(bb,
-                                       id,
-                                       split_vertically ? ImGuiAxis_X : ImGuiAxis_Y,
-                                       size1,
-                                       size2,
-                                       min_size1,
-                                       min_size2,
-                                       0.0f);
-    }
 }
 
 namespace basecode::alloc_window {
+    static alloc_info_t* selected{};
+
     static u0 draw_allocators(alloc_window_t& win,
                               const alloc_info_array_t& roots) {
 
@@ -63,14 +38,30 @@ namespace basecode::alloc_window {
         str::reserve(scratch, 64);
         defer(str::free(scratch));
 
+        const auto base_flags = ImGuiTreeNodeFlags_OpenOnArrow
+                                | ImGuiTreeNodeFlags_OpenOnDoubleClick
+                                | ImGuiTreeNodeFlags_SpanAvailWidth;
         u32 row{};
         for (auto info : roots) {
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0);
             ImGui::PushID(info);
-            auto node_open = ImGui::TreeNode("Alloc",
-                                             "0x%016llX",
-                                             (u64) info->tracked);
+            auto node_flags = base_flags;
+            if (info->selected)
+                node_flags |= ImGuiTreeNodeFlags_Selected;
+            auto node_open = ImGui::TreeNodeEx(info,
+                                               node_flags,
+                                               "0x%016llX",
+                                               (u64) info->tracked);
+            if (ImGui::IsItemClicked()) {
+                if (!info->selected) {
+                    selected = info;
+                    info->selected = true;
+                } else {
+                    selected = {};
+                    info->selected = false;
+                }
+            }
             ImGui::TableSetColumnIndex(1);
             if (IS_PROXY(info->tracked)) {
                 const auto name = memory::proxy::name(info->tracked);
@@ -86,20 +77,13 @@ namespace basecode::alloc_window {
                 format::unitized_byte_size(buf,
                                            info->tracked->total_allocated);
             }
-            ImGui::Text("%s", str::c_str(scratch));
+            ImGui::TextRightAlign(str::c_str(scratch),
+                                  (const s8*) scratch.end());
             ++row;
             if (node_open) {
-                win.selected = info;
-                memory::meta::system::start_plot(info,
-                                                 plot_mode_t::scrolled);
                 if (info->children.size > 0)
                     draw_allocators(win, info->children);
                 ImGui::TreePop();
-            } else {
-                if (win.selected == info) {
-                    memory::meta::system::stop_plot(win.selected);
-                    win.selected = {};
-                }
             }
             ImGui::PopID();
         }
@@ -146,6 +130,20 @@ namespace basecode::alloc_window {
             ImGui::EndTable();
         }
         ImGui::EndChild();
+
+        if (selected) {
+            if (win.selected != selected) {
+                win.selected = selected;
+                memory::meta::system::start_plot(selected,
+                                                 plot_mode_t::scrolled);
+            }
+        } else {
+            if (win.selected) {
+                memory::meta::system::stop_plot(win.selected);
+                win.selected = {};
+            }
+        }
+
         ImGui::SameLine();
         ImGui::BeginChild("Graph",
                           ImVec2(win.graph_size, win.height),
@@ -157,8 +155,8 @@ namespace basecode::alloc_window {
                                        plot->time,
                                        ImGuiCond_Always);
             ImPlot::SetNextPlotLimitsY(0,
-                                       std::max<u32>(4096, plot->max_y * 2),
-                                       ImGuiCond_Always);
+                                       std::max<u32>(plot->min_y, plot->max_y * 2),
+                                       ImGuiCond_Once);
             if (plot->values.size > 0
             &&  ImPlot::BeginPlot("##scrolled", {}, {}, ImVec2(-1, -1),
                                       rt_axis, rt_axis | ImPlotAxisFlags_LockMin)) {

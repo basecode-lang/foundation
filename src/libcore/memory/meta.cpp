@@ -28,6 +28,7 @@ namespace basecode::memory::meta {
         alloc_t                 info_slab;
         alloc_info_array_t      infos;
         alloc_info_array_t      roots;
+        alloc_info_array_t      plotting;
         alloc_info_table_t      infotab;
         b8                      init;
     };
@@ -41,14 +42,13 @@ namespace basecode::memory::meta {
                 alloc_info::free(*info);
             array::free(t_meta_sys.infos);
             array::free(t_meta_sys.roots);
+            array::free(t_meta_sys.plotting);
             hashtab::free(t_meta_sys.infotab);
             memory::fini(&t_meta_sys.info_slab);
         }
 
         u0 update(f32 dt) {
-            for (auto info : t_meta_sys.infos) {
-                if (info->mode == plot_mode_t::none)
-                    continue;
+            for (auto info : t_meta_sys.plotting) {
                 alloc_info::append_point(*info,
                                          dt,
                                          info->tracked->total_allocated);
@@ -60,6 +60,7 @@ namespace basecode::memory::meta {
             t_meta_sys.init  = true;
             array::init(t_meta_sys.roots, t_meta_sys.alloc);
             array::init(t_meta_sys.infos, t_meta_sys.alloc);
+            array::init(t_meta_sys.plotting, t_meta_sys.alloc);
             hashtab::init(t_meta_sys.infotab, t_meta_sys.alloc);
 
             slab_config_t slab_config{};
@@ -121,7 +122,8 @@ namespace basecode::memory::meta {
         u0 stop_plot(alloc_info_t* info) {
             if (!info)
                 return;
-            alloc_info::stop_plot(*info);
+            if (alloc_info::stop_plot(*info))
+                array::erase(t_meta_sys.plotting, info);
         }
 
         const alloc_info_array_t& roots() {
@@ -131,7 +133,8 @@ namespace basecode::memory::meta {
         u0 start_plot(alloc_info_t* info, plot_mode_t mode) {
             if (!info)
                 return;
-            alloc_info::start_plot(*info, mode);
+            if (alloc_info::start_plot(*info, mode))
+                array::append(t_meta_sys.plotting, info);
         }
     }
 
@@ -142,9 +145,9 @@ namespace basecode::memory::meta {
             array::free(info.children);
         }
 
-        u0 stop_plot(alloc_info_t& info) {
+        b8 stop_plot(alloc_info_t& info) {
             if (info.mode == plot_mode_t::none)
-                return;
+                return false;
             switch (info.mode) {
                 case plot_mode_t::rolled:
                     plot::rolled::free(info.plot.rolled);
@@ -156,6 +159,7 @@ namespace basecode::memory::meta {
                     break;
             }
             info.mode = plot_mode_t::none;
+            return true;
        }
 
         u0 init(alloc_info_t& info, alloc_t* alloc) {
@@ -186,9 +190,9 @@ namespace basecode::memory::meta {
             }
         }
 
-        u0 start_plot(alloc_info_t& info, plot_mode_t mode) {
+        b8 start_plot(alloc_info_t& info, plot_mode_t mode) {
             if (info.mode != plot_mode_t::none)
-                return;
+                return false;
             info.mode = mode;
             switch (info.mode) {
                 case plot_mode_t::rolled:
@@ -206,6 +210,7 @@ namespace basecode::memory::meta {
                 default:
                     break;
             }
+            return true;
         }
     }
 }
