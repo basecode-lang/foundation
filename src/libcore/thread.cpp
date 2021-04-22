@@ -24,10 +24,11 @@
 #include <pthread.h>
 #include <basecode/core/thread.h>
 #include <basecode/core/memory/system/slab.h>
-#include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::thread {
     thread_local thread_t*      t_self{};
+    pthread_t                   g_main_thread{};
+    s32                         g_main_thread_id{};
 
     static u0* bootstrap(u0* arg) {
         auto* proc = (proc_base_t*) arg;
@@ -54,6 +55,8 @@ namespace basecode::thread {
             memory::system::free(g_system.proc_pool);
             g_system.proc_pool = {};
             g_system.alloc     = {};
+            g_main_thread      = {};
+            g_main_thread_id   = {};
         }
 
         u32 num_cores() {
@@ -66,6 +69,8 @@ namespace basecode::thread {
 
         status_t init(alloc_t* alloc) {
             g_system.alloc = alloc;
+            g_main_thread    = pthread_self();
+            g_main_thread_id = pthread_getthreadid_np();
             slab_config_t slab_config{};
             slab_config.name          = "thread::worker_slab";
             slab_config.buf_size      = 128;        // FIXME!
@@ -115,6 +120,10 @@ namespace basecode::thread {
         }
     }
 
+    s32 thread_id() {
+        return pthread_getthreadid_np();
+    }
+
     thread_t& self() {
         return *t_self;
     }
@@ -125,8 +134,12 @@ namespace basecode::thread {
 #elif __APPLE__
         return pthread_main_np() == 1;
 #else
-        return false;
+        return pthread_equal(pthread_self(), g_main_thread);
 #endif
+    }
+
+    s32 main_thread_id() {
+        return g_main_thread_id;
     }
 
     status_t free(thread_t& thread) {

@@ -37,6 +37,8 @@ typedef struct {
 
 pthread_t pthread_self();
 
+int pthread_getthreadid_np();
+
 int pthread_setname_np(pthread_t thread, const char* name);
 
 int pthread_create(pthread_t *thread,

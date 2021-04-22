@@ -33,11 +33,14 @@ namespace basecode {
 
     template <typename Proc, typename... Args>
     struct thread_proc_t final : public proc_base_t {
-        static constexpr b8     Is_Void = std::is_void_v<std::invoke_result_t<Proc, Args...>>;
+        static constexpr b8     Is_Void = std::is_void_v<std::invoke_result_t<Proc,
+                                                                              Args...>>;
 
         using proc_t            = Proc;
         using args_t            = std::tuple<Args...>;
-        using return_t          = typename std::conditional<Is_Void, int, std::invoke_result_t<Proc, Args...>>::type;
+        using return_t          = typename std::conditional<Is_Void,
+                                                            int,
+                                                            std::invoke_result_t<Proc, Args...>>::type;
 
         thread_t*               thread;
         proc_t                  proc;
@@ -101,9 +104,13 @@ namespace basecode {
             status_t init(alloc_t* alloc = context::top()->alloc.main);
         }
 
+        s32 thread_id();
+
         thread_t& self();
 
         b8 is_main_thread();
+
+        s32 main_thread_id();
 
         status_t free(thread_t& thread);
 
@@ -128,7 +135,9 @@ namespace basecode {
             if (thread.state != thread_state_t::created)
                 return status_t::invalid_state;
             auto mem = system::alloc_proc();
-            thread.proc = new (mem) thread_proc_t(&thread, proc, std::forward_as_tuple(args...));
+            thread.proc = new (mem) thread_proc_t(&thread,
+                                                  proc,
+                                                  std::forward_as_tuple(args...));
             return system::start(thread);
         }
 

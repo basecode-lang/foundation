@@ -103,3 +103,7 @@ enum {
 #define O_NONBLOCK 0
 #define O_SYNC 0
 #define O_NOCTTY 0
+
+inline pid_t gettid() {
+    return GetCurrentThreadId();
+}
