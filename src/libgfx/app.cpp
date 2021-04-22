@@ -18,7 +18,6 @@
 
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
-#include <imgui_freetype.h>
 #include <basecode/gfx/app.h>
 #include <basecode/core/log.h>
 #include <basecode/core/timer.h>
@@ -28,7 +27,9 @@
 #include <basecode/core/scm/system.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/core/scm/modules/config.h>
+#include <basecode/gfx/imgui/imgui_freetype.h>
 #include <basecode/gfx/imgui/imgui_impl_glfw.h>
+#include <basecode/gfx/fonts/IconsFontAwesome5.h>
 #include <basecode/gfx/imgui/imgui_impl_opengl3.h>
 
 #ifdef _WIN32
@@ -133,7 +134,8 @@ namespace basecode::app {
                 path_t ini_file{};
                 path::init(ini_file, "imgui.ini"_ss);
                 path::append(config_path, ini_file);
-                io.IniFilename = path::c_str(config_path);
+                auto ini_filename = string::interned::fold(path::c_str(config_path));
+                io.IniFilename = (const s8*) ini_filename.data;
                 path::free(ini_file);
             }
             path::free(config_path);

@@ -16,12 +16,12 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/gfx/gfx.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/format.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/gfx/alloc_window.h>
 #include <basecode/gfx/implot/implot.h>
-#include <basecode/gfx/imgui_extensions.h>
 #include <basecode/gfx/fonts/IconsFontAwesome5.h>
 
 namespace basecode::alloc_window {
@@ -72,9 +72,8 @@ namespace basecode::alloc_window {
                 format::unitized_byte_size(buf,
                                            info->tracked->total_allocated);
             }
-            ImGui::TextRightAlign(str::c_str(scratch),
-                                  (const s8*) scratch.end(),
-                                  node_open ? ImGui::GetTreeNodeToLabelSpacing() : 0.f);
+            gfx::text_right_align(str::c_str(scratch),
+                                  (const s8*) scratch.end());
             ++row;
             if (node_open) {
                 if (info->children.size > 0)
@@ -89,7 +88,9 @@ namespace basecode::alloc_window {
         ImPlot::DestroyContext(win.ctx);
     }
 
-    u0 draw(alloc_window_t& win) {
+    b8 draw(alloc_window_t& win) {
+        if (!win.visible)
+            return false;
         ImGui::Begin(ICON_FA_MEMORY "  Allocators", &win.visible);
         const auto region_size = ImGui::GetContentRegionAvail();
         win.height = region_size.y;
@@ -99,13 +100,13 @@ namespace basecode::alloc_window {
             win.table_size = region_size.x * .5;
             win.graph_size = region_size.x * .5;
         }
-        ImGui::Splitter(true,
-                        8.0f,
-                        &win.table_size,
-                        &win.graph_size,
-                        8,
-                        8,
-                        win.height);
+        gfx::splitter(true,
+                      8.0f,
+                      &win.table_size,
+                      &win.graph_size,
+                      8,
+                      8,
+                      win.height);
         ImGui::BeginChild("Allocators",
                           ImVec2(win.table_size, win.height),
                           true);
@@ -174,6 +175,7 @@ namespace basecode::alloc_window {
         }
         ImGui::EndChild();
         ImGui::End();
+        return true;
     }
 
     u0 init(alloc_window_t& win, alloc_t* alloc) {

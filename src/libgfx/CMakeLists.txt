@@ -224,7 +224,7 @@ set(GFX_SOURCES
 
     font.cpp ${GFX_INC_DIR}/font.h
 
-    imgui_extensions.cpp ${GFX_INC_DIR}/imgui_extensions.h
+    gfx.cpp ${GFX_INC_DIR}/gfx.h
 
     ${GFX_INC_DIR}/fonts/IconsKenney.h
     ${GFX_INC_DIR}/fonts/IconsFontaudio.h

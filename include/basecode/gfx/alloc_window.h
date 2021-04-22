@@ -40,7 +40,7 @@ namespace basecode {
     namespace alloc_window {
         u0 free(alloc_window_t& win);
 
-        u0 draw(alloc_window_t& win);
+        b8 draw(alloc_window_t& win);
 
         u0 init(alloc_window_t& win,
                 alloc_t* alloc = context::top()->alloc.main);
