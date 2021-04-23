@@ -17,16 +17,18 @@
 // ----------------------------------------------------------------------------
 
 #include <catch.hpp>
-#include <basecode/core/path.h>
-#include <basecode/core/defer.h>
-#include <basecode/core/filesys.h>
+#include <basecode/core/utf.h>
 #include <basecode/core/stopwatch.h>
-#include "test.h"
 
 using namespace basecode;
 
-TEST_CASE("basecode::filesys basics") {
-    auto xdg_env = env::system::get("xdg"_ss);
-    REQUIRE(xdg_env);
-    format_env(xdg_env);
+TEST_CASE("basecode::utf basics") {
+    utf8_str_t str8{};
+    utf::init(str8);
+    defer(utf::free(str8));
+
+    utf::append(str8, u"this is a utf-16 string; \u263a");
+    utf::append(str8, U"this is a utf-32 string. \u263a");
+
+    REQUIRE(utf::length(str8) == 52);
 }

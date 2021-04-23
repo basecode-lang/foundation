@@ -67,11 +67,11 @@ namespace basecode {
             if (is_new) {
                 type->type_id   = type_id;
                 type->type_name = typeid(T).name();
-                auto slab_name = format::format("obj_pool<{}>::slab\0",
-                                                type->type_name);
+                auto slab_name  = format::format("obj_pool<{}>::slab",
+                                                 type->type_name);
 
                 slab_config_t cfg{};
-                cfg.name          = (const s8*) slab_name.data;
+                cfg.name          = str::c_str(slab_name);
                 cfg.buf_size      = sizeof(T);
                 cfg.buf_align     = alignof(T);
                 cfg.num_pages     = DEFAULT_NUM_PAGES;

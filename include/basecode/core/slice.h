@@ -73,6 +73,14 @@ namespace basecode {
     }
 
     namespace slice {
+        inline b8 contains(const str::slice_t& slice, s8 ch) {
+            for (u32 i = 0; i < slice.length; ++i) {
+                if (slice[i] == ch)
+                    return true;
+            }
+            return false;
+        }
+
         template<typename T>
         inline b8 empty(const slice_t<T>& slice) {
             return slice.length == 0 || slice.data == nullptr;

@@ -104,6 +104,8 @@ set(
 
     ${CORE_INC_DIR}/digraph.h
 
+    env.cpp ${CORE_INC_DIR}/env.h
+
     eav.cpp ${CORE_INC_DIR}/eav.h
 
     error.cpp ${CORE_INC_DIR}/error.h

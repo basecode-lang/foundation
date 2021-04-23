@@ -26,11 +26,11 @@ using namespace basecode;
 
 TEST_CASE("basecode::ffi basics", "[ffi]") {
 #ifdef _MSC_VER
-    auto lib_filename = "ffi-test-kernel.dll"_path;
+    auto lib_filename = "ffi-test-kernel.dll"_ss;
 #elif _WIN32
-    auto lib_filename = "libffi-test-kernel.dll"_path;
+    auto lib_filename = "libffi-test-kernel.dll"_ss;
 #else
-    auto lib_filename = "lib/libffi-test-kernel.so"_path;
+    auto lib_filename = "lib/libffi-test-kernel.so"_ss;
 #endif
 
     path_t proc_path{};
@@ -53,7 +53,6 @@ TEST_CASE("basecode::ffi basics", "[ffi]") {
     defer({
         ffi::lib::unload(proc_lib);
         path::free(proc_path);
-        path::free(lib_filename);
     });
     REQUIRE(OK(status));
 

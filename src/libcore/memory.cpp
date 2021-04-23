@@ -179,7 +179,7 @@ namespace basecode::memory {
             cmd.alloc = alloc;
             cmd.name  = (s8*) memory::alloc(&t_system.main, len + 1);
             cmd.len   = len;
-            std::strcpy(cmd.name, name);
+            std::strncpy(cmd.name, name, len);
             cmd.name[len] = '\0';
         }
 

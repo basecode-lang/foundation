@@ -25,6 +25,12 @@
 #include <basecode/core/array.h>
 
 namespace basecode {
+#ifdef _WIN32
+    constexpr s8 path_sep = '\\';
+#else
+    constexpr s8 path_sep = '/';
+#endif
+
     struct path_mark_t final {
         u16                     type:       4;
         u16                     value:      12;
@@ -79,6 +85,24 @@ namespace basecode {
             str::reset(path.str);
             str::append(path.str, value);
             tokenize(path);
+            return status_t::ok;
+        }
+
+        template <String_Concept S>
+        status_t append(path_t& lhs, const S& rhs) {
+            if (rhs.length == 0)
+                return status_t::ok;
+            if (rhs.length >= 2
+            && (rhs[0] == '/' ||  rhs[1] == ':')) {
+                return status_t::expected_relative_path;
+            }
+            if ((lhs.str.length + rhs.length + 2) > PATH_MAX)
+                return status_t::path_too_long;
+            const auto ch = lhs.str[lhs.str.length - 1];
+            if (ch != '/' && ch != '\\')
+                str::append(lhs.str, path_sep);
+            str::append(lhs.str, rhs);
+            tokenize(lhs);
             return status_t::ok;
         }
 

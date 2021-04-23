@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/env.h>
 #include <basecode/core/log.h>
 #include <basecode/core/ffi.h>
 #include <basecode/core/job.h>
@@ -123,6 +124,10 @@ s32 main(s32 argc, const s8** argv) {
                if (!OK(string::system::init()))
                    return 1);
 
+    TIME_BLOCK("env::system::init"_ss,
+               if (!OK(env::system::init()))
+                   return 1);
+
     TIME_BLOCK("error::system::init"_ss,
                if (!OK(error::system::init()))
                    return 1);
@@ -217,6 +222,7 @@ s32 main(s32 argc, const s8** argv) {
     TIME_BLOCK("job::system::fini"_ss,                  job::system::fini());
     TIME_BLOCK("thread::system::fini"_ss,               thread::system::fini());
     TIME_BLOCK("config::system::fini"_ss,               config::system::fini());
+    TIME_BLOCK("env::system::fini"_ss,                  env::system::fini());
     TIME_BLOCK("string::system::fini"_ss,               string::system::fini());
     TIME_BLOCK("error::system::fini"_ss,                error::system::fini());
     TIME_BLOCK("buf_pool::system::fini"_ss,             buf_pool::system::fini());

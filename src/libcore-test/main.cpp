@@ -21,6 +21,7 @@
 #include <basecode/core/log.h>
 #include <basecode/core/ffi.h>
 #include <basecode/core/job.h>
+#include <basecode/core/env.h>
 #include <basecode/core/term.h>
 #include <basecode/core/error.h>
 #include <basecode/core/locale.h>
@@ -112,6 +113,10 @@ s32 run(test_suite_t& suite) {
 
     TIME_BLOCK("string::system::init"_ss,
                if (!OK(string::system::init()))
+                   return 1);
+
+    TIME_BLOCK("env::system::init"_ss,
+               if (!OK(env::system::init()))
                    return 1);
 
     TIME_BLOCK("error::system::init"_ss,
@@ -233,6 +238,7 @@ s32 run(test_suite_t& suite) {
     TIME_BLOCK("job::system::fini"_ss,                  job::system::fini());
     TIME_BLOCK("thread::system::fini"_ss,               thread::system::fini());
     TIME_BLOCK("config::system::fini"_ss,               config::system::fini());
+    TIME_BLOCK("env::system::fini"_ss,                  env::system::fini());
     TIME_BLOCK("string::system::fini"_ss,               string::system::fini());
     TIME_BLOCK("error::system::fini"_ss,                error::system::fini());
     TIME_BLOCK("buf_pool::system::fini"_ss,             buf_pool::system::fini());

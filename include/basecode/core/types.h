@@ -389,6 +389,8 @@ namespace basecode {
         }
     }
 
+    using slice_array_t         = array_t<str::slice_t>;
+
     // ------------------------------------------------------------------------
     //
     // stable_array
@@ -833,7 +835,9 @@ namespace basecode {
             cannot_modify_root              = 131,
             unexpected_empty_path           = 132,
             cannot_rename_to_existing_file  = 133,
-            no_home_path                    = 134,
+            xdg_user_dirs_invalid           = 134,
+            no_home_path                    = 135,  // FIXME
+            invalid_user_place              = 136,  // FIXME
         };
     }
 
@@ -1302,6 +1306,7 @@ namespace basecode {
     struct path_t;
     struct path_mark_t;
 
+    using path_array_t          = array_t<path_t>;
     using path_mark_list_t      = array_t<path_mark_t>;
 
     namespace path {
@@ -1737,17 +1742,50 @@ namespace basecode {
     //
     // ------------------------------------------------------------------------
     template <typename T>
-    concept Utf_String_Concept = (same_as<typename T::value_type, u32>
-                                  || same_as<typename T::value_type, u16>)
+    concept Utf_String_Concept = (same_as<typename T::Value_Type, u8>
+                                  || same_as<typename T::Value_Type, u32>
+                                  || same_as<typename T::Value_Type, u16>)
                                  && requires(const T& t) {
-        typename                T::value_type;
+        typename                T::Value_Type;
+
         {t.alloc}               -> same_as<alloc_t*>;
-        {t.data}                -> same_as<typename T::value_type*>;
+        {t.data}                -> same_as<typename T::Value_Type*>;
+        {t.size}                -> same_as<u32>;
         {t.length}              -> same_as<u32>;
+        {t.capacity}            -> same_as<u32>;
+    };
+
+    using utf32_codepoint_t     = u32;
+
+    struct utf8_codepoint_t final {
+        u8                      data[4];
+        u8                      len;
+    };
+
+    struct utf16_codepoint_t final {
+        u16                     low;
+        u16                     high;
     };
 
     template <typename T>
-    struct utf_str_t;
+    struct utf_str_t final {
+        using Value_Type        = T;
+        static constexpr b8 Is_Utf8    = sizeof(Value_Type) == 1;
+        static constexpr b8 Is_Utf16   = sizeof(Value_Type) == 2;
+        static constexpr b8 Is_Utf32   = sizeof(Value_Type) == 4;
+
+        alloc_t*                alloc;
+        T*                      data;
+        u32                     size;
+        u32                     length;
+        u32                     capacity;
+        T& operator[](u32 index)                { return data[index]; }
+        const T& operator[](u32 index) const    { return data[index]; }
+    };
+
+    using utf8_str_t  = utf_str_t<u8>;
+    using utf16_str_t = utf_str_t<u16>;
+    using utf32_str_t = utf_str_t<u32>;
 
     // ------------------------------------------------------------------------
     //
@@ -1760,6 +1798,31 @@ namespace basecode {
         enum class status_t : u32 {
             ok                  = 0,
             parse_error
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // env
+    //
+    // ------------------------------------------------------------------------
+    enum class env_value_type_t : u8 {
+        string,
+        array,
+    };
+
+    struct env_t;
+    struct env_value_t;
+
+    using envvar_table_t        = hashtab_t<str::slice_t, env_value_t>;
+
+    namespace env {
+        enum class status_t : u32 {
+            ok,
+            error,
+            key_not_found,
+            load_config_error,
+            expected_non_null_pairs
         };
     }
 

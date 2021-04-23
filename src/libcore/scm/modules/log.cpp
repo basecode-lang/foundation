@@ -320,14 +320,12 @@ namespace basecode::scm::module::log {
         path::init(tmp_path, file_name, g_log_mod.alloc);
         defer(path::free(tmp_path));
         if (!path::absolute(tmp_path)) {
-            path::set(tmp_path, format::format("../logs"));
+            path::set(tmp_path, "../logs"_ss);
             filesys::bin_rel_path(log_path, tmp_path);
             auto status = filesys::exists(log_path);
-            if (!OK(status)) {
+            if (!OK(status))
                 filesys::mkdir(log_path);
-            }
-            path::set(tmp_path, file_name);
-            path::append(log_path, tmp_path);
+            path::append(log_path, file_name);
         } else {
             path::init(log_path, file_name, g_log_mod.alloc);
         }

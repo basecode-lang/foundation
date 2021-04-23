@@ -17,15 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/path.h>
-#include <basecode/core/string.h>
 
 namespace basecode::path {
-#ifdef _WIN32
-    constexpr s8 path_sep = '\\';
-#else
-    constexpr s8 path_sep = '/';
-#endif
-
     u0 tokenize(path_t& path) {
         array::reset(path.marks);
         if (path.str.length == 0) return;

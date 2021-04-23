@@ -42,10 +42,6 @@ HIGH
 
 - filesys: implement glob function, which will also touch the init and fini functions for the
             filesys module.
-- filesys: need to open and read the xdg config file (if found) and put into a symtab_t or hashtab_t.
-            also, need to read applicable env vars once at module init and put them into the
-            same symtab_t/hashtab_t.
-- filesys: once meta data is done (previous task), implement the remaining places::* functions
 
 MEDIUM
 ---------
@@ -66,6 +62,10 @@ LOW
 
 DONE
 ----
+- filesys: need to open and read the xdg config file (if found) and put into a symtab_t or hashtab_t.
+            also, need to read applicable env vars once at module init and put them into the
+            same symtab_t/hashtab_t.
+- filesys: once meta data is done (previous task), implement the remaining places::* functions
 - scm: map out how to store bytecode & relate it to proc_t
 - scm: add .area directive to emitter
 - scm: add .db, .dw, .dd, .dq directives to emitter

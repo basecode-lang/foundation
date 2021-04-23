@@ -12,6 +12,8 @@ add_executable(
 
     test.h
     main.cpp
+    env_tests.cpp
+    utf_tests.cpp
     avl_tests.cpp
     job_tests.cpp
     ffi_tests.cpp

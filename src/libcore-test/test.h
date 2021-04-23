@@ -18,10 +18,11 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/core/env.h>
 #include <basecode/core/array.h>
 #include <basecode/core/slice.h>
 #include <basecode/core/format.h>
+#include <basecode/core/hashtab.h>
 
 namespace basecode {
     struct baby_name_t final {
@@ -39,7 +40,36 @@ namespace basecode {
         u32                     idx;
         u32                     len;
     };
+
+    [[maybe_unused]]
+    static inline u0 format_env(env_t* env) {
+        for (const auto& pair : env->vartab) {
+            format::print("key = {}, value = ", pair.key);
+            switch (pair.value.type) {
+                case env_value_type_t::string:
+                    format::print("{}", pair.value.kind.str);
+                    break;
+                case env_value_type_t::array:
+                    for (u32 i = 0; i < pair.value.kind.list.size; ++i) {
+                        const auto& str = pair.value.kind.list[i];
+                        if (i > 0) format::print(":");
+                        format::print("{}", str);
+                    }
+                    break;
+            }
+            format::print("\n");
+        }
+    }
 }
 
-FORMAT_TYPE(basecode::payload_t, format_to(ctx.out(), "[ptr: {}, offset: {}]", data.ptr, data.offset));
-FORMAT_TYPE(basecode::baby_name_t, format_to(ctx.out(), "[state: {}, year: {}, sex: {}]", data.state, data.year, data.sex));
+FORMAT_TYPE(basecode::payload_t,
+            format_to(ctx.out(),
+                      "[ptr: {}, offset: {}]",
+                      data.ptr,
+                      data.offset));
+FORMAT_TYPE(basecode::baby_name_t,
+            format_to(ctx.out(),
+                      "[state: {}, year: {}, sex: {}]",
+                      data.state,
+                      data.year,
+                      data.sex));

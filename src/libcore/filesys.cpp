@@ -16,16 +16,30 @@
 //
 // ----------------------------------------------------------------------------
 
+#ifdef _WIN32
+#   ifndef WIN32_LEAN_AND_MEAN
+#       define WIN32_LEAN_AND_MEAN
+#   endif
+#   include <windows.h>
+#   include <shlobj.h>
+#   include <KnownFolders.h>
+#endif
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <basecode/core/env.h>
+#include <basecode/core/buf.h>
+#include <basecode/core/utf.h>
+#include <basecode/core/array.h>
 #include <basecode/core/symtab.h>
-#include <basecode/core/string.h>
+#include <basecode/core/hashtab.h>
 #include <basecode/core/filesys.h>
+#include <basecode/core/slice_utils.h>
 
 namespace basecode::filesys {
     struct system_t final {
         alloc_t*                    alloc;
-        symtab_t<str_t>             env;
+        env_t*                      xdg_env;
+        env_t*                      root_env;
     };
 
     thread_local system_t           t_file_sys = {};
@@ -60,7 +74,6 @@ namespace basecode::filesys {
     }
 
     u0 fini() {
-        symtab::free(t_file_sys.env);
     }
 
     status_t pwd(path_t& path) {
@@ -73,15 +86,23 @@ namespace basecode::filesys {
     }
 
     status_t init(alloc_t* alloc) {
-        // XXX: we should read the XDG user-dirs.dirs file and put it into
-        //      an efficient memory structure here so we don't have to
-        //      continually open/read/parse/close this file.
-        //
-        //      additionally, we should grab all of the env vars we need up
-        //      front and put the results into a symtab_t
-        //
         t_file_sys.alloc = alloc;
-        symtab::init(t_file_sys.env, t_file_sys.alloc);
+        t_file_sys.xdg_env  = {};
+        t_file_sys.root_env = env::system::get_root();
+
+        path_t config_path{};
+        path::init(config_path, t_file_sys.alloc);
+        defer(path::free(config_path));
+        if (!OK(places::user::config(config_path)))
+            return status_t::invalid_user_place;
+        path::append(config_path, "user-dirs.dirs"_ss);
+        if (OK(exists(config_path))) {
+            t_file_sys.xdg_env = env::system::make("xdg"_ss,
+                                                   t_file_sys.root_env);
+            auto status = env::load(t_file_sys.xdg_env, config_path);
+            if (!OK(status))
+                return status_t::xdg_user_dirs_invalid;
+        }
         return status_t::ok;
     }
 
@@ -119,21 +140,45 @@ namespace basecode::filesys {
 
     status_t places::user::home(path_t& path) {
 #ifdef _WIN32
-        auto home_drive = getenv("HOMEDRIVE");
-        auto home_path  = getenv("HOMEPATH");
-        if (!home_drive || !home_path)
-            return status_t::no_home_path;
-        path::set(path, format::format("{}{}", home_drive, home_path));
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Profile,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+                  CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
 #else
-        auto home = getenv("HOME");
-        path::set(path, home);
+        auto home = env::get(t_file_sys.root_env, "HOME"_ss);
+        if (!home)
+            return status_t::invalid_user_place;
+        path::set(path, home->kind.str);
 #endif
         return status_t::ok;
     }
 
     status_t places::user::data(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_RoamingAppData,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto status = get_xdg_path("XDG_DATA_HOME", path, ".local/share"_ss);
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
+        return status_t::ok;
     }
 
     status_t is_read_only(const path_t& path) {
@@ -142,53 +187,172 @@ namespace basecode::filesys {
     }
 
     status_t places::user::temp(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        wchar_t buf[MAX_PATH + 1];
+        DWORD count = GetTempPathW(MAX_PATH + 1, buf);
+        if (count == 0)
+            return status_t::mkdtemp_failure;
+        auto utf8_str = utf::utf16_to_utf8(buf);
+        defer(utf::free(utf8_str));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto tmp_dir = env::get(t_file_sys.root_env, "TMPDIR"_ss);
+        if (!tmp_dir) {
+            path::set(path, "/tmp"_ss);
+        } else {
+            path::set(path, temp_dir->kind.str);
+        }
+#endif
+        return status_t::ok;
     }
 
     status_t places::user::cache(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_LocalAppData,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto status = get_xdg_path("XDG_CACHE_HOME"_ss, path, ".cache"_ss);
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
+        return status_t::ok;
     }
 
     status_t places::user::music(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Music,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto status = get_xdg_path("XDG_MUSIC_DIR"_ss, path);
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
+        return status_t::ok;
     }
 
     status_t places::user::config(path_t& path) {
+#ifdef _WIN32
         auto status = places::user::home(path);
         if (!OK(status))
             return status;
-        auto config_path = ".config"_path;
-        path::append(path, config_path);
-        path::free(config_path);
+        path::append(path, ".config"_ss);
+#else
+        auto status = get_xdg_path("XDG_CONFIG_HOME"_ss, path, ".config");
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
         return status_t::ok;
     }
 
     status_t places::user::videos(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Videos,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto status = get_xdg_path("XDG_CACHE_HOME"_ss, path, ".cache");
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
+        return status_t::ok;
     }
 
     status_t places::user::desktop(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Desktop,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto status = get_xdg_path("XDG_DESKTOP_DIR"_ss, path);
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
+        return status_t::ok;
     }
 
     status_t places::user::runtime(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        return places::user::temp(path);
+#else
+        auto status = get_xdg_path("XDG_RUNTIME_DIR"_ss, path);
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
+        return status_t::ok;
     }
 
     status_t places::user::pictures(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Pictures,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto status = get_xdg_path("XDG_PICTURES_DIR"_ss, path);
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
+        return status_t::ok;
     }
 
     status_t places::user::programs(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_ProgramFiles,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        // /usr/local, /opt/local?
+#endif
+        return status_t::ok;
     }
 
     status_t rm(const path_t& path, b8 recursive) {
@@ -205,28 +369,109 @@ namespace basecode::filesys {
     }
 
     status_t places::user::documents(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Documents,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto status = get_xdg_path("XDG_DOCUMENTS_DIR"_ss, path);
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
+        return status_t::ok;
     }
 
     status_t places::user::downloads(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Downloads,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto status = get_xdg_path("XDG_DOWNLOADS_DIR"_ss, path);
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
+        return status_t::ok;
     }
 
     status_t places::user::templates(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_Templates,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto status = get_xdg_path("XDG_TEMPLATES_DIR"_ss, path);
+        if (!OK(status))
+            return status_t::invalid_user_place;
+#endif
+        return status_t::ok;
     }
 
     status_t places::system::programs(path_t& path) {
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_ProgramFiles,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
         auto status = path::set(path, "/opt"_ss);
-        return OK(status) ? status_t::ok : status_t::invalid_dir;
+        if (!OK(status))
+            return status_t::invalid_dir;
+#endif
+        return status_t::ok;
     }
 
     status_t places::user::app_entries(path_t& path) {
-        UNUSED(path);
-        return status_t::not_implemented;
+#ifdef _WIN32
+        PWSTR known_path{};
+        HRESULT hr = SHGetKnownFolderPath(FOLDERID_StartMenu,
+                                          0,
+                                          NULL,
+                                          &known_path);
+        if (!SUCCEEDED(hr))
+            return status_t::invalid_user_place;
+        auto utf8_str = utf::utf16_to_utf8(known_path);
+        defer(utf::free(utf8_str);
+              CoTaskMemFree(known_path));
+        path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
+#else
+        auto status = places::user::data_dir(path);
+        if (!OK(status))
+            return status_t::invalid_user_place;
+        path::append(path, "applications"_ss);
+#endif
+        return status_t::ok;
     }
 
     status_t mkdir(const path_t& path, b8 recursive) {
@@ -282,6 +527,37 @@ namespace basecode::filesys {
     status_t places::user::public_share(path_t& path) {
         UNUSED(path);
         return status_t::not_implemented;
+    }
+
+    status_t places::user::get_xdg_path(str::slice_t name,
+                                        path_t& path,
+                                        str::slice_t default_path) {
+        auto value = env::get(t_file_sys.xdg_env, name);
+        if (value) {
+            str_t expanded{};
+            str::init(expanded, t_file_sys.alloc);
+            auto status = env::expand(t_file_sys.xdg_env, value, expanded);
+            if (!OK(status))
+                return status_t::invalid_user_place;
+            path::set(path, expanded);
+        } else {
+            if (!OK(places::user::home(path)))
+                return status_t::invalid_user_place;
+            if (!slice::empty(default_path))
+                path::append(path, default_path);
+        }
+        return status_t::ok;
+    }
+
+    status_t places::user::get_xdg_path_list(str::slice_t name,
+                                             path_array_t& paths,
+                                             const slice_array_t& default_list) {
+        auto value = env::get(t_file_sys.xdg_env, name);
+        for (const auto& field : value ? value->kind.list : default_list) {
+            auto& path = array::append(paths);
+            path::init(path, field, paths.alloc);
+        }
+        return status_t::ok;
     }
 
     status_t mktmpdir(str::slice_t name, path_t& path) {

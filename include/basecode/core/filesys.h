@@ -81,6 +81,14 @@ namespace basecode {
                 status_t app_entries(path_t& path);
 
                 status_t public_share(path_t& path);
+
+                status_t get_xdg_path(str::slice_t name,
+                                      path_t& path,
+                                      str::slice_t default_path = {});
+
+                status_t get_xdg_path_list(str::slice_t name,
+                                           path_array_t& paths,
+                                           const slice_array_t& default_list = {});
             }
 
             namespace system {

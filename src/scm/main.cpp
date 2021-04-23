@@ -19,6 +19,7 @@
 #include <basecode/core/log.h>
 #include <basecode/core/ffi.h>
 #include <basecode/core/job.h>
+#include <basecode/core/env.h>
 #include <basecode/core/term.h>
 #include <basecode/core/error.h>
 #include <basecode/core/getopt.h>
@@ -246,6 +247,8 @@ s32 main(s32 argc, const s8** argv) {
         return 1;
     if (!OK(string::system::init()))
         return 1;
+    if (!OK(env::system::init()))
+        return 1;
     if (!OK(error::system::init()))
         return 1;
     if (!OK(memory::proxy::init()))
@@ -315,6 +318,7 @@ s32 main(s32 argc, const s8** argv) {
     scm::module::log::system::fini();
     scm::module::basic::system::fini();
     scm::system::fini();
+    env::system::fini();
     string::system::fini();
     error::system::fini();
     buf_pool::system::fini();

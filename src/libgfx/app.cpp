@@ -131,12 +131,9 @@ namespace basecode::gfx::app {
             path_t config_path{};
             path::init(config_path);
             if (OK(get_config_path(app, config_path))) {
-                path_t ini_file{};
-                path::init(ini_file, "imgui.ini"_ss);
-                path::append(config_path, ini_file);
+                path::append(config_path, "imgui_ini"_ss);
                 auto ini_filename = string::interned::fold(path::c_str(config_path));
                 io.IniFilename = (const s8*) ini_filename.data;
-                path::free(ini_file);
             }
             path::free(config_path);
         }
@@ -335,10 +332,7 @@ namespace basecode::gfx::app {
         auto status = filesys::places::user::config(path);
         if (!OK(status))
             return status_t::save_config_error;
-        path_t product_path{};
-        path::init(product_path, app.short_name);
-        path::append(path, product_path);
-        path::free(product_path);
+        path::append(path, app.short_name);
         if (!OK(filesys::exists(path))) {
             if (!OK(filesys::_mkdir(path, true)))
                 return status_t::save_config_error;
@@ -362,10 +356,7 @@ namespace basecode::gfx::app {
         auto status = get_config_path(app, path);
         if (!OK(status))
             return status;
-        path_t config_file{};
-        path::init(config_file, "gfx.scm"_ss);
-        path::append(path, config_file);
-        path::free(config_file);
+        path::append(path, "gfx.scm"_ss);
         return status_t::ok;
     }
 
