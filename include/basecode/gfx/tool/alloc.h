@@ -21,13 +21,10 @@
 #include <basecode/gfx/gfx.h>
 #include <basecode/core/str.h>
 
-struct ImPlotContext;
-
-namespace basecode {
-    struct alloc_info_t;
-
-    struct alloc_window_t final {
+namespace basecode::gfx::tool {
+    struct alloc_win_t final {
         alloc_t*                alloc;
+        app_t*                  app;
         ImPlotContext*          ctx;
         alloc_info_t*           selected;
         f32                     table_size;
@@ -37,12 +34,13 @@ namespace basecode {
         b8                      mem_editor;
     };
 
-    namespace alloc_window {
-        u0 free(alloc_window_t& win);
+    namespace alloc {
+        u0 free(alloc_win_t& win);
 
-        b8 draw(alloc_window_t& win);
+        b8 draw(alloc_win_t& win);
 
-        u0 init(alloc_window_t& win,
+        u0 init(alloc_win_t& win,
+                app_t* app,
                 alloc_t* alloc = context::top()->alloc.main);
     }
 }

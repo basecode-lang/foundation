@@ -18,13 +18,16 @@
 
 #include <basecode/gfx/app.h>
 #include <basecode/core/string.h>
+#include <basecode/core/memory/meta.h>
 #include <basecode/gfx/fonts/IconsFontAwesome5.h>
-#include "app.h"
+#include "test_app.h"
 
 namespace basecode {
-    static test_app_t           s_test_app{};
+    static test_app_t           s_test_app          {};
+    static usize                s_scratch_free      {};
+    static usize                s_scratch_alloc     {};
 
-    b8 on_render(app_t& app) {
+    b8 on_render(gfx::app_t& app) {
         auto& io = ImGui::GetIO();
 
         if (ImGui::BeginMainMenuBar()) {
@@ -88,7 +91,7 @@ namespace basecode {
                     gfx::menu_item_with_icon(nullptr,
                                              "Memory Editor",
                                              nullptr,
-                                             &s_test_app.memory_editor.visible,
+                                             &s_test_app.memory_editor.Open,
                                              true);
                     ImGui::EndMenu();
                 }
@@ -132,31 +135,89 @@ namespace basecode {
                          ImGuiDockNodeFlags_PassthruCentralNode);
         ImGui::End();
 
-        s_test_app
-            .memory_editor
-            .window
-            .DrawWindow("Memory Editor",
-                        &s_test_app.memory_editor.data,
-                        s_test_app.memory_editor.size);
-        alloc_window::draw(s_test_app.alloc_window);
+        gfx::tool::alloc::draw(s_test_app.alloc_window);
+        if (s_test_app.memory_editor.Open) {
+            u0* mem     {};
+            u32 size    {};
+            s_scratch_free  = {};
+            s_scratch_alloc = {};
+            s_test_app.memory_editor.HighlightFn = {};
+            if (s_test_app.alloc_window.selected) {
+                auto tracked = s_test_app.alloc_window.selected->tracked;
+                switch (tracked->system->type) {
+                    case alloc_type_t::base:
+                        break;
+                    case alloc_type_t::bump:
+                        break;
+                    case alloc_type_t::page: {
+                        auto sc = &tracked->subclass.page;
+                        mem  = sc->head;
+                        size = 16;
+                        break;
+                    }
+                    case alloc_type_t::slab: {
+                        auto sc = &tracked->subclass.slab;
+                        mem  = sc->head;
+                        size = 64;
+                        break;
+                    }
+                    case alloc_type_t::temp:
+                        break;
+                    case alloc_type_t::proxy:
+                        break;
+                    case alloc_type_t::trace:
+                        break;
+                    case alloc_type_t::stack:
+                        break;
+                    case alloc_type_t::buddy:
+                        break;
+                    case alloc_type_t::scratch: {
+                        auto sc = &tracked->subclass.scratch;
+                        mem             = sc->begin;
+                        size            = sc->size;
+                        s_scratch_free  = usize(sc->free);
+                        s_scratch_alloc = usize(sc->alloc);
+                        s_test_app.memory_editor.HighlightFn = [](const u8* mem,
+                                                                  usize addr) -> b8 {
+                            usize mem_addr = usize(mem + addr);
+                            return (mem_addr >= s_scratch_free && mem_addr <= s_scratch_free + 1)
+                                   || (mem_addr >= s_scratch_alloc && mem_addr <= s_scratch_alloc + 1);
+                        };
+                        break;
+                    }
+                    case alloc_type_t::dlmalloc: {
+                        auto sc = &tracked->subclass.dl;
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            }
+            s_test_app.memory_editor.DrawWindow("Memory Editor",
+                                                mem,
+                                                mem ? size : 0 );
+        }
+
         return true;
     }
 
     s32 run(s32 argc, const s8** argv) {
-        s_test_app.alloc = memory::system::main_alloc();
-        alloc_window::init(s_test_app.alloc_window, s_test_app.alloc);
-
-        app_t app{};
-        app::init(app);
+        gfx::app_t app{};
+        gfx::app::init(app);
         app.title      = string::interned::fold("Gfx Library Test Harness");
         app.on_render  = on_render;
         app.short_name = string::interned::fold("libgfx-test");
 
-        auto status = app::run(app);
+        s_test_app.alloc = memory::system::main_alloc();
+        gfx::tool::alloc::init(s_test_app.alloc_window,
+                               &app,
+                               s_test_app.alloc);
+
+        auto status = gfx::app::run(app);
         s32 rc = !OK(status);
 
-        app::free(app);
-        alloc_window::free(s_test_app.alloc_window);
+        gfx::app::free(app);
+        gfx::tool::alloc::free(s_test_app.alloc_window);
 
         return rc;
     }

@@ -37,7 +37,7 @@
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
 #include <basecode/core/memory/system/scratch.h>
-#include "app.h"
+#include "test_app.h"
 
 using namespace basecode;
 

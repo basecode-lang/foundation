@@ -31,7 +31,6 @@ namespace basecode {
             scrolled_view_t     scrolled;
         }                       plot;
         plot_mode_t             mode;
-        b8                      selected;
     };
 
     namespace memory::meta {

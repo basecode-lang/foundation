@@ -31,9 +31,13 @@
                                 | ((u32)(R)<<COL32_R_SHIFT))
 #define PT_TO_PX(pt)            ((pt) * 1.3281472327365263157894736842105)
 
+struct ImFont;
 struct GLFWwindow;
+struct ImPlotContext;
 
 namespace basecode {
+    struct alloc_info_t;
+
     struct rect_t final {
         f32                     x;
         f32                     y;
@@ -82,6 +86,25 @@ namespace basecode {
     };
 
     namespace gfx {
+        struct app_t;
+
+        namespace app {
+            enum class status_t : u32 {
+                ok,
+                error,
+                load_config_error,
+                save_config_error,
+                gl3w_init_failure,
+                glfw_init_failure,
+            };
+        }
+
+        namespace tool {
+            struct alloc_win_t;
+            struct errors_win_t;
+            struct strings_win_t;
+        }
+
         b8 menu_item_with_icon(const s8* icon,
                                const s8* label,
                                const s8* shortcut,

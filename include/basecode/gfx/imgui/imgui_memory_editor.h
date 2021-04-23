@@ -98,6 +98,7 @@ struct MemoryEditor
     char            DataInputBuf[32];
     char            AddrInputBuf[32];
     size_t          GotoAddr;
+    size_t          HighlightAddr;
     size_t          HighlightMin, HighlightMax;
     int             PreviewEndianess;
     ImGuiDataType   PreviewDataType;
@@ -130,6 +131,7 @@ struct MemoryEditor
         memset(AddrInputBuf, 0, sizeof(AddrInputBuf));
         GotoAddr = (size_t)-1;
         HighlightMin = HighlightMax = (size_t)-1;
+        HighlightAddr = (size_t)-1;
         PreviewEndianess = 0;
         PreviewDataType = ImGuiDataType_S32;
     }
@@ -494,6 +496,77 @@ struct MemoryEditor
             {
                 GotoAddr = goto_addr - base_display_addr;
                 HighlightMin = HighlightMax = (size_t)-1;
+            }
+        }
+
+        if (HighlightFn)
+        {
+            ImGui::SameLine();
+
+            if (ImGui::Button("<"))
+            {
+                size_t start;
+                bool set = false;
+                size_t addr;
+
+                if (HighlightAddr == 0 || HighlightAddr == (size_t)-1) start = mem_size - 1;
+                else start = HighlightAddr - 1;
+
+                for (addr = start; addr != (size_t)-1; addr--)
+                {
+                    if (HighlightFn((const ImU8*) mem_data, addr))
+                    {
+                        HighlightAddr = GotoAddr = addr;
+                        set = true;
+                        break;
+                    }
+                }
+
+                if (!set)
+                {
+                    for (addr = mem_size - 1; addr > start; addr--)
+                    {
+                        if (HighlightFn((const ImU8*) mem_data, addr))
+                        {
+                            HighlightAddr = GotoAddr = addr;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            ImGui::SameLine();
+
+            if (ImGui::Button(">"))
+            {
+                size_t start;
+                bool set = false;
+                size_t addr;
+
+                if (HighlightAddr == mem_size - 1 || HighlightAddr == (size_t)-1) start = 0;
+                else start = HighlightAddr + 1;
+
+                for (addr = start; addr < mem_size; addr++)
+                {
+                    if (HighlightFn((const ImU8*) mem_data, addr))
+                    {
+                        HighlightAddr = GotoAddr = addr;
+                        set = true;
+                        break;
+                    }
+                }
+
+                if (!set)
+                {
+                    for (addr = 0; addr < start; addr++)
+                    {
+                        if (HighlightFn((const ImU8*) mem_data, addr))
+                        {
+                            HighlightAddr = GotoAddr = addr;
+                            break;
+                        }
+                    }
+                }
             }
         }
 

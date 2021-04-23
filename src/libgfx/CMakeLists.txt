@@ -220,7 +220,9 @@ set(GFX_SOURCES
 
     app.cpp ${GFX_INC_DIR}/app.h
 
-    alloc_window.cpp ${GFX_INC_DIR}/alloc_window.h
+    tool/alloc.cpp ${GFX_INC_DIR}/tool/alloc.h
+    tool/errors.cpp ${GFX_INC_DIR}/tool/errors.h
+    tool/strings.cpp ${GFX_INC_DIR}/tool/strings.h
 
     font.cpp ${GFX_INC_DIR}/font.h
 

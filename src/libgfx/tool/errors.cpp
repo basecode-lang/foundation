@@ -16,16 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#pragma once
+#include <basecode/gfx/tool/errors.h>
 
-#define FOOTERS             1
-#define MSPACES             1
-#define HAVE_MMAP           1
-#define USE_LOCKS           0
-#define HAVE_MORECORE       0
-#define USE_DL_PREFIX       1
-#define MALLOC_INSPECT_ALL  1
-
-#ifndef DLMALLOC_IMPL_UNIT
-#include <basecode/core/memory/system/dlmalloc.h>
-#endif
+namespace basecode::gfx::tool::errors {
+}

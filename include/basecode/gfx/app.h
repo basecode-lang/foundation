@@ -22,13 +22,12 @@
 #include <basecode/core/str.h>
 #include <basecode/core/path.h>
 
-namespace basecode {
-    struct app_t;
-
+namespace basecode::gfx {
     using render_callback_t = std::function<b8 (app_t&)>;
 
     struct app_t final {
         alloc_t*                alloc;
+        ImFont*                 large_font;
         render_callback_t       on_render;
         str::slice_t            short_name;
         str::slice_t            title;
@@ -39,15 +38,6 @@ namespace basecode {
     };
 
     namespace app {
-        enum class status_t : u32 {
-            ok,
-            error,
-            load_config_error,
-            save_config_error,
-            gl3w_init_failure,
-            glfw_init_failure,
-        };
-
         u0 free(app_t& app);
 
         status_t run(app_t& app);

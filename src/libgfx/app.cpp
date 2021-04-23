@@ -36,7 +36,7 @@
 #   include <shellscalingapi.h>
 #endif
 
-namespace basecode::app {
+namespace basecode::gfx::app {
     static u0 glfw_key(GLFWwindow* window,
                        s32 key,
                        s32 scan_code,
@@ -157,17 +157,20 @@ namespace basecode::app {
 
         io.FontDefault = io.Fonts->AddFontFromFileTTF(
             "../share/fonts/SEGOEUI.TTF",
-            PT_TO_PX(18));
-
+            PT_TO_PX(20));
         ImWchar icons_range[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
         ImFontConfig icons_config;
         icons_config.MergeMode  = true;
         icons_config.PixelSnapH = true;
         io.Fonts->AddFontFromFileTTF(
             "../share/fonts/" FONT_ICON_FILE_NAME_FAS,
-            PT_TO_PX(18),
+            PT_TO_PX(20),
             &icons_config,
             icons_range);
+
+        app.large_font = io.Fonts->AddFontFromFileTTF(
+            "../share/fonts/SEGOEUI.TTF",
+            PT_TO_PX(24));
 
         ImGuiFreeType::BuildFontAtlas(io.Fonts);
 
