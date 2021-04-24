@@ -61,7 +61,6 @@ namespace basecode::scm::bytecode {
                         const context_t& c,
                         obj_t* args) {
         auto ctx = c.ctx;
-        auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
         auto res = c.target ? c.target :
                    emitter::virtual_var::get(comp.emit, "res"_ss);
         basic_block::encode(c.bb)
@@ -69,13 +68,13 @@ namespace basecode::scm::bytecode {
                 "literal: {}",
                 scm::to_string(c.ctx, c.obj)))
             .imm2()
-                .op(op::const_)
+                .op(op::move)
                 .src(u32(OBJ_IDX(CAR(args))))
-                .dst(&tmp)
+                .dst(&res)
                 .build()
-            .reg2()
-                .op(op::qt)
-                .src(&tmp)
+            .imm2()
+                .op(op::trap)
+                .src(trap_id_t(vm::trap::quote))
                 .dst(&res)
                 .build();
         return {c.bb, res};
@@ -85,7 +84,6 @@ namespace basecode::scm::bytecode {
                         const context_t& c,
                         obj_t* args) {
         auto ctx = c.ctx;
-        auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
         auto res = c.target ? c.target :
                    emitter::virtual_var::get(comp.emit, "res"_ss);
         basic_block::encode(c.bb)
@@ -93,13 +91,13 @@ namespace basecode::scm::bytecode {
                 "literal: {}",
                 scm::to_string(c.ctx, c.obj)))
             .imm2()
-                .op(op::const_)
+                .op(op::move)
                 .src(u32(OBJ_IDX(CAR(args))))
-                .dst(&tmp)
+                .dst(&res)
                 .build()
-            .reg2()
-                .op(op::qq)
-                .src(&tmp)
+            .imm2()
+                .op(op::trap)
+                .src(trap_id_t(vm::trap::quasiquote))
                 .dst(&res)
                 .build();
         return {c.bb, res};
@@ -125,8 +123,13 @@ namespace basecode::scm::bytecode {
         auto comp_res = compiler::compile_expr(comp, cc);
         basic_block::encode(comp_res.bb)
             .reg2()
-                .op(op::car)
+                .op(op::move)
                 .src(&comp_res.var)
+                .dst(&res)
+                .build()
+            .imm2()
+                .op(op::trap)
+                .src(trap_id_t(vm::trap::car))
                 .dst(&res)
                 .build();
         return {comp_res.bb, res};
@@ -143,8 +146,13 @@ namespace basecode::scm::bytecode {
         auto comp_res = compiler::compile_expr(comp, cc);
         basic_block::encode(comp_res.bb)
             .reg2()
-                .op(op::cdr)
+                .op(op::move)
                 .src(&comp_res.var)
+                .dst(&res)
+                .build()
+            .reg2()
+                .op(op::trap)
+                .src(trap_id_t(vm::trap::cdr))
                 .dst(&res)
                 .build();
         return {comp_res.bb, res};
@@ -157,18 +165,17 @@ namespace basecode::scm::bytecode {
         auto& exit_bb = emitter::make_basic_block(comp.emit, "or_exit"_ss, c.bb);
         auto res = c.target ? c.target :
                    emitter::virtual_var::get(comp.emit, "res"_ss);
-        auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
         auto oc  = c;
         while (!IS_NIL(args)) {
             oc.obj = CAR(args);
             auto comp_res = compiler::compile_expr(comp, oc);
             oc.bb = comp_res.bb;
             basic_block::encode(oc.bb)
-                .reg2()
-                    .op(op::truep)
-                    .src(&comp_res.var)
-                    .dst(&tmp)
-                    .build()
+//                .reg2()
+//                    .op(op::truep)
+//                    .src(&comp_res.var)
+//                    .dst(&tmp)
+//                    .build()
                 .imm1()
                     .op(op::beq)
                     .value(&exit_bb)
@@ -208,10 +215,11 @@ namespace basecode::scm::bytecode {
             .comment(format::format(
                 "symbol: {}",
                 printable_t{c.ctx, key, true}))
-            .imm2()
-                .op(op::set)
-                .src(u32(idx))
-                .dst(&comp_res.var)
+            .offs()
+                .op(op::store)
+                .offset(8)
+                .src(&comp_res.var)
+                .dst(rf::ep)
                 .mode(true)
                 .build();
         return {comp_res.bb, res};
@@ -226,7 +234,6 @@ namespace basecode::scm::bytecode {
         auto& false_bb = emitter::make_basic_block(comp.emit, "if_false"_ss, &true_bb);
         auto& exit_bb  = emitter::make_basic_block(comp.emit, "if_exit"_ss, &false_bb);
 
-        auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
         auto res = c.target ? c.target :
                    emitter::virtual_var::get(comp.emit, "res"_ss);
 
@@ -234,15 +241,11 @@ namespace basecode::scm::bytecode {
         auto ic = c;
         ic.obj = predicate;
         auto pred_res = compiler::compile_expr(comp, ic);
+        UNUSED(pred_res);
         basic_block::encode(c.bb)
             .next(true_bb)
-            .reg2()
-                .op(op::truep)
-                .src(&pred_res.var)
-                .dst(&tmp)
-                .build()
             .imm1()
-            .op(op::bne)
+                .op(op::bne)
                 .value(&false_bb)
                 .build();
 
@@ -358,7 +361,7 @@ namespace basecode::scm::bytecode {
         auto rhs_res = compiler::compile_expr(comp, cc);
         basic_block::encode(rhs_res.bb)
             .reg3()
-                .op(op::cons)
+                .op(op::trap)
                 .a(&lhs_res.var)
                 .b(&rhs_res.var)
                 .c(&res)
@@ -377,8 +380,13 @@ namespace basecode::scm::bytecode {
         auto comp_res = compiler::compile_expr(comp, ac);
         basic_block::encode(comp_res.bb)
             .reg2()
-                .op(op::atomp)
+                .op(op::move)
                 .src(&comp_res.var)
+                .dst(&res)
+                .build()
+            .imm2()
+                .op(op::trap)
+                .src(trap_id_t(vm::trap::is_atom))
                 .dst(&res)
                 .build();
         return {comp_res.bb, res};
@@ -393,12 +401,12 @@ namespace basecode::scm::bytecode {
         auto ec  = c;
         ec.obj = CAR(args);
         auto comp_res = compiler::compile_expr(comp, ec);
-        basic_block::encode(comp_res.bb)
-            .reg2()
-                .op(op::eval)
-                .src(&comp_res.var)
-                .dst(&res)
-                .build();
+//        basic_block::encode(comp_res.bb)
+//            .reg2()
+//                .op(op::eval)
+//                .src(&comp_res.var)
+//                .dst(&res)
+//                .build();
         return {comp_res.bb, res};
     }
 
@@ -430,11 +438,10 @@ namespace basecode::scm::bytecode {
                    emitter::virtual_var::get(comp.emit, "res"_ss);
         auto& list_bb = emitter::make_basic_block(comp.emit, "make_list"_ss, lc.bb);
         basic_block::encode(list_bb)
-            .reg2_imm()
-                .op(op::list)
-                .src(&base_addr)
-                .dst(&res)
-                .value(size * 8)
+            .imm2()
+                .op(op::trap)
+                .src(trap_id_t(vm::trap::list))
+                .dst(&base_addr)
                 .build();
         free_stack(list_bb, size);
         return {&list_bb, res};
@@ -450,10 +457,10 @@ namespace basecode::scm::bytecode {
                    emitter::virtual_var::get(comp.emit, "res"_ss);
         auto comp_res = compiler::compile_expr(comp, nc);
         basic_block::encode(comp_res.bb)
-            .reg2()
-                .op(op::lnot)
-                .src(&comp_res.var)
-                .dst(&res)
+            .imm2()
+                .op(op::trap)
+                .src(trap_id_t(vm::trap::not_true))
+                .dst(&comp_res.var)
                 .build();
         return {comp_res.bb, res};
     }
@@ -463,7 +470,6 @@ namespace basecode::scm::bytecode {
                           obj_t* args) {
         auto ctx = c.ctx;
         auto& exit_bb = emitter::make_basic_block(comp.emit, "and_exit"_ss, c.bb);
-        auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
         auto res = c.target ? c.target :
                    emitter::virtual_var::get(comp.emit, "res"_ss);
         auto oc  = c;
@@ -472,10 +478,10 @@ namespace basecode::scm::bytecode {
             auto comp_res = compiler::compile_expr(comp, oc);
             oc.bb = comp_res.bb;
             basic_block::encode(oc.bb)
-                .reg2()
-                    .op(op::truep)
-                    .src(&res)
-                    .dst(&tmp)
+                .imm2()
+                    .op(op::trap)
+                    .src(trap_id_t(vm::trap::is_true))
+                    .dst(&res)
                     .build()
                 .imm1()
                     .op(op::bne)
@@ -513,21 +519,20 @@ namespace basecode::scm::bytecode {
     compile_result_t error(compiler_t& comp,
                            const context_t& c,
                            obj_t* args) {
-        auto ctx = c.ctx;
         auto res = emitter::virtual_var::get(comp.emit, "res"_ss);
-        auto tmp = emitter::virtual_var::get(comp.emit, "_"_ss);
         basic_block::encode(c.bb)
             .comment(format::format(
                 "literal: {}",
                 scm::to_string(c.ctx, c.obj)))
-            .imm2()
-                .op(op::const_)
-                .src(u32(OBJ_IDX(args)))
-                .dst(&tmp)
+            .offs()
+                .op(op::load)
+                .offset(8)
+                .src(rf::lp)
+                .dst(&res)
                 .build()
-            .reg2()
-                .op(op::error)
-                .src(&tmp)
+            .imm2()
+                .op(op::trap)
+                .src(trap_id_t(vm::trap::error))
                 .dst(&res)
                 .build();
         return {c.bb, res};
@@ -540,20 +545,9 @@ namespace basecode::scm::bytecode {
                            obj_t* args) {
         auto ctx  = c.ctx;
         auto proc = PROC(form);
-        auto tmp       = emitter::virtual_var::get(comp.emit, "_"_ss);
         auto base_addr = emitter::virtual_var::get(comp.emit, "base"_ss);
         auto& apply_bb = emitter::make_basic_block(comp.emit, "apply"_ss, c.bb);
-        basic_block::encode(apply_bb)
-            .reg2()
-                .op(op::env)
-                .src(rf::ep)
-                .dst(&tmp)
-                .build()
-            .reg2()
-                .op(op::push)
-                .src(&tmp)
-                .dst(rf::ep)
-                .build();
+
         alloc_stack(apply_bb, 1, &base_addr);
         auto keys = proc->params;
         auto vals = args;
@@ -568,10 +562,11 @@ namespace basecode::scm::bytecode {
                 vc.bb = comp_res.bb;
                 basic_block::encode(vc.bb)
                     .comment(format::format("symbol: {}", name))
-                    .imm2()
-                        .src(u32(OBJ_IDX(keys)))
-                        .op(op::set)
-                        .dst(&comp_res.var)
+                    .offs()
+                        .op(op::store)
+                        .offset(8)
+                        .src(&comp_res.var)
+                        .dst(rf::ep)
                         .mode(true)
                         .build();
                 break;
@@ -581,10 +576,11 @@ namespace basecode::scm::bytecode {
                 vc.bb = comp_res.bb;
                 basic_block::encode(vc.bb)
                     .comment(format::format("symbol: {}", name))
-                    .imm2()
-                        .src(u32(OBJ_IDX(key)))
-                        .op(op::set)
-                        .dst(&comp_res.var)
+                    .offs()
+                        .op(op::store)
+                        .offset(8)
+                        .src(&comp_res.var)
+                        .dst(rf::ep)
                         .mode(true)
                         .build();
                 keys = CDR(keys);
@@ -615,13 +611,7 @@ namespace basecode::scm::bytecode {
                 .offset(0)
                 .build();
         free_stack(cleanup_bb, 1);
-        basic_block::encode(cleanup_bb)
-            .comment("drop apply env"_ss)
-            .reg2()
-                .op(op::pop)
-                .src(rf::ep)
-                .dst(&tmp)
-                .build();
+
         return {&cleanup_bb, res};
     }
 
@@ -642,7 +632,7 @@ namespace basecode::scm::bytecode {
                 .comment(format::format("literal: {}",
                                         scm::to_string(c.ctx, c.obj)))
                 .imm2()
-                    .op(op::const_)
+                    .op(op::move)
                     .src(u32(idx))
                     .dst(&res)
                     .build();
@@ -688,14 +678,11 @@ namespace basecode::scm::bytecode {
         }
         basic_block::encode(comp_res.bb)
             .comment(format::format(
-                "symbol: {}",
+                "define symbol: {}",
                 printable_t{c.ctx, key, true}))
-            .imm2()
-                .op(op::define)
-                .src(u32(idx))
-                .dst(&comp_res.var)
-                .mode(true)
-                .build();
+            .none()
+                .op(op::nop)
+               .build();
         return {comp_res.bb, res};
     }
 
@@ -716,10 +703,11 @@ namespace basecode::scm::bytecode {
             case prim_type_t::is:
                 basic_block::encode(rhs_res.bb)
                     .comment("prim: is"_ss)
-                    .reg2()
-                        .op(op::lcmp)
+                    .reg2_imm()
+                        .op(op::trap)
                         .src(&lhs_res.var)
                         .dst(&rhs_res.var)
+                        .value(trap_id_t(vm::trap::compare))
                         .build()
                     .reg1()
                         .op(op::seq)
@@ -730,10 +718,11 @@ namespace basecode::scm::bytecode {
             case prim_type_t::lt:
                 basic_block::encode(rhs_res.bb)
                     .comment("prim: lt"_ss)
-                    .reg2()
-                        .op(op::lcmp)
+                    .reg2_imm()
+                        .op(op::trap)
                         .src(&lhs_res.var)
                         .dst(&rhs_res.var)
+                        .value(trap_id_t(vm::trap::compare))
                         .build()
                     .reg1()
                         .op(op::sl)
@@ -744,10 +733,11 @@ namespace basecode::scm::bytecode {
             case prim_type_t::gt:
                 basic_block::encode(rhs_res.bb)
                     .comment("prim: gt"_ss)
-                    .reg2()
-                        .op(op::lcmp)
+                    .reg2_imm()
+                        .op(op::trap)
                         .src(&lhs_res.var)
                         .dst(&rhs_res.var)
+                        .value(trap_id_t(vm::trap::compare))
                         .build()
                     .reg1()
                         .op(op::sg)
@@ -758,10 +748,11 @@ namespace basecode::scm::bytecode {
             case prim_type_t::lte:
                 basic_block::encode(rhs_res.bb)
                     .comment("prim: lte"_ss)
-                    .reg2()
-                        .op(op::lcmp)
+                    .reg2_imm()
+                        .op(op::trap)
                         .src(&lhs_res.var)
                         .dst(&rhs_res.var)
+                        .value(trap_id_t(vm::trap::compare))
                         .build()
                     .reg1()
                         .op(op::sle)
@@ -772,10 +763,11 @@ namespace basecode::scm::bytecode {
             case prim_type_t::gte:
                 basic_block::encode(rhs_res.bb)
                     .comment("prim: gte"_ss)
-                    .reg2()
-                        .op(op::lcmp)
+                    .reg2_imm()
+                        .op(op::trap)
                         .src(&lhs_res.var)
                         .dst(&rhs_res.var)
+                        .value(trap_id_t(vm::trap::compare))
                         .build()
                     .reg1()
                         .op(op::sge)
@@ -814,10 +806,11 @@ namespace basecode::scm::bytecode {
         sc.obj = CAR(args);
         auto lhs_res = compiler::compile_expr(comp, sc);
         basic_block::encode(lhs_res.bb)
-            .reg2()
-                .op(op::setcar)
+            .reg2_imm()
+                .op(op::trap)
                 .src(&lhs_res.var)
                 .dst(&rhs_res.var)
+                .value(trap_id_t(vm::trap::set_car))
                 .build();
         return {lhs_res.bb, {}};
     }
@@ -833,10 +826,11 @@ namespace basecode::scm::bytecode {
         sc.obj = CAR(args);
         auto lhs_res = compiler::compile_expr(comp, sc);
         basic_block::encode(lhs_res.bb)
-            .reg2()
-                .op(op::setcdr)
+            .reg2_imm()
+                .op(op::trap)
                 .src(&lhs_res.var)
                 .dst(&rhs_res.var)
+                .value(trap_id_t(vm::trap::set_cdr))
                 .build();
         return {lhs_res.bb, {}};
     }
@@ -891,11 +885,11 @@ namespace basecode::scm::bytecode {
             case prim_type_t::lt:
             case prim_type_t::lte:
             case prim_type_t::gte:              return cmp_op(comp, c, type, args);
-            case prim_type_t::add:              return arith_op(comp, c, op::ladd, args);
-            case prim_type_t::sub:              return arith_op(comp, c, op::lsub, args);
-            case prim_type_t::mul:              return arith_op(comp, c, op::lmul, args);
-            case prim_type_t::div:              return arith_op(comp, c, op::ldiv, args);
-            case prim_type_t::mod:              return arith_op(comp, c, op::lmod, args);
+            case prim_type_t::add:              return arith_op(comp, c, op::add, args);
+            case prim_type_t::sub:              return arith_op(comp, c, op::sub, args);
+            case prim_type_t::mul:              return arith_op(comp, c, op::mul, args);
+            case prim_type_t::div:              return arith_op(comp, c, op::div, args);
+            case prim_type_t::mod:              return arith_op(comp, c, op::mod, args);
             case prim_type_t::set:              return set(comp, c, args);
             case prim_type_t::if_:              return if_(comp, c, args);
             case prim_type_t::or_:              return or_(comp, c, args);
@@ -1020,10 +1014,11 @@ namespace basecode::scm::bytecode {
             .comment(format::format(
                 "symbol: {}",
                 printable_t{c.ctx, key, true}))
-            .imm2()
-                .op(op::define)
-                .src(u32(idx))
-                .dst(&comp_res.var)
+            .offs()
+                .op(op::store)
+                .offset(8)
+                .src(&comp_res.var)
+                .dst(rf::ep)
                 .mode(true)
                 .build()
             .reg2()
@@ -1050,31 +1045,31 @@ namespace basecode::scm::bytecode {
     }
 
     compile_result_t lookup(compiler_t& comp, const context_t& c) {
-        auto ctx = c.ctx;
         auto sym = scm::to_string(c.ctx, c.obj);
         auto res = emitter::virtual_var::get(comp.emit, sym);
-        BC_ASSERT_MSG(res, "virtual variable not found; delcare it");
+        BC_ASSERT_MSG(res, "virtual variable not found; declare it");
         basic_block::encode(c.bb)
             .comment(format::format("symbol: {}", sym))
-            .imm2()
-                .src((u32) OBJ_IDX(c.obj))
-                .op(op::get)
+            .offs()
+                .op(op::load)
+                .offset(8)
+                .src(rf::ep)
                 .dst(&res)
                 .build();
         return {c.bb, res};
     }
 
     compile_result_t self_eval(compiler_t& comp, const context_t& c) {
-        auto ctx = c.ctx;
         auto lit = c.target ? c.target :
                    emitter::virtual_var::get(comp.emit, "lit"_ss);
         basic_block::encode(c.bb)
             .comment(format::format(
                 "literal: {}",
                 scm::to_string(c.ctx, c.obj)))
-            .imm2()
-                .op(op::const_)
-                .src(u32(OBJ_IDX(c.obj)))
+            .offs()
+                .op(op::load)
+                .offset(8)
+                .src(rf::lp)
                 .dst(&lit)
                 .build();
         return {c.bb, lit};

@@ -155,6 +155,8 @@ namespace basecode::scm::basic_block {
 
         reg2_imm_builder_t& op(op_code_t op_code);
 
+        reg2_imm_builder_t& value(trap_id_t value);
+
         reg2_imm_builder_t& dst(var_version_t** var);
 
         reg2_imm_builder_t& src(var_version_t** var);
@@ -215,6 +217,8 @@ namespace basecode::scm::basic_block {
 
         imm2_builder_t& is_signed(b8 flag);
 
+        imm2_builder_t& src(trap_id_t value);
+
         imm2_builder_t& op(op_code_t op_code);
 
         imm2_builder_t& dst(var_version_t** var);
@@ -267,6 +271,13 @@ namespace basecode::scm::basic_block {
             return operand_t{
                 .kind.reg = reg,
                 .type = operand_type_t::reg
+            };
+        }
+
+        operand_t operand(trap_id_t trap) {
+            return operand_t{
+                .kind.s = trap,
+                .type = operand_type_t::trap
             };
         }
 

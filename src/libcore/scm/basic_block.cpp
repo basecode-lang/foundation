@@ -235,6 +235,11 @@ namespace basecode::scm::basic_block {
         return *this;
     }
 
+    imm2_builder_t& imm2_builder_t::src(trap_id_t value) {
+        _builder->_inst->operands[0] = _builder->operand(value);
+        return *this;
+    }
+
     imm2_builder_t& imm2_builder_t::op(op_code_t op_code) {
         _builder->_inst->type = op_code;
         return *this;
@@ -285,9 +290,6 @@ namespace basecode::scm::basic_block {
         if (_dst) {
             switch (_builder->_inst->type) {
                 case op::type::cmp:
-                case op::type::lcmp:
-                case op::type::setcar:
-                case op::type::setcdr:
                     emitter::virtual_var::read(*_builder->_em,
                                                *_dst,
                                                _builder->_inst->id);
@@ -390,6 +392,11 @@ namespace basecode::scm::basic_block {
 
     reg2_imm_builder_t& reg2_imm_builder_t::op(op_code_t op_code) {
         _builder->_inst->type = op_code;
+        return *this;
+    }
+
+    reg2_imm_builder_t& reg2_imm_builder_t::value(trap_id_t value) {
+        _builder->_inst->operands[2] = _builder->operand(value);
         return *this;
     }
 

@@ -917,7 +917,7 @@ namespace basecode::scm::emitter {
         u64 buf{};
         u64 data{};
         auto& vm = *e.vm;
-        const u64 addr    = vm::mem_area::base_addr(*heap);
+        const u64 addr    = vm::mem_area::curr_addr(*heap);
         auto      encoded = (encoded_inst_t*) &buf;
         auto      opers   = (encoded_operand_t*) &data;
         encoded->type      = inst.type;

@@ -36,8 +36,27 @@
 
 namespace basecode::scm::vm {
     namespace trap {
-        constexpr u8 hash       = 1;
-        constexpr u8 functor    = 2;
+        constexpr u8 eq         = 1;
+        constexpr u8 box        = 2;
+        constexpr u8 car        = 3;
+        constexpr u8 cdr        = 4;
+        constexpr u8 ffi        = 5;
+        constexpr u8 call       = 6;
+        constexpr u8 cons       = 7;
+        constexpr u8 read       = 8;
+        constexpr u8 list       = 9;
+        constexpr u8 unbox      = 10;
+        constexpr u8 write      = 11;
+        constexpr u8 quote      = 12;
+        constexpr u8 error      = 13;
+        constexpr u8 debug      = 14;
+        constexpr u8 is_true    = 15;
+        constexpr u8 not_true   = 16;
+        constexpr u8 is_atom    = 17;
+        constexpr u8 compare    = 18;
+        constexpr u8 set_car    = 19;
+        constexpr u8 set_cdr    = 20;
+        constexpr u8 quasiquote = 21;
 
         str::slice_t name(u8 type);
     }
@@ -80,82 +99,56 @@ namespace basecode::scm::vm {
     namespace instruction {
         namespace type {
             constexpr op_code_t nop     = 0;
-            constexpr op_code_t add     = 1;
-            constexpr op_code_t mul     = 2;
-            constexpr op_code_t sub     = 3;
-            constexpr op_code_t div     = 4;
-            constexpr op_code_t pow     = 5;
-            constexpr op_code_t mod     = 6;
-            constexpr op_code_t neg     = 7;
-            constexpr op_code_t not_    = 8;
-            constexpr op_code_t shl     = 9;
-            constexpr op_code_t shr     = 10;
-            constexpr op_code_t or_     = 11;
-            constexpr op_code_t and_    = 12;
-            constexpr op_code_t xor_    = 13;
-            constexpr op_code_t br      = 14;
-            constexpr op_code_t blr     = 15;
-            constexpr op_code_t cmp     = 16;
-            constexpr op_code_t beq     = 17;
-            constexpr op_code_t bne     = 18;
-            constexpr op_code_t bl      = 19;
-            constexpr op_code_t ble     = 20;
-            constexpr op_code_t bg      = 21;
-            constexpr op_code_t bge     = 22;
-            constexpr op_code_t seq     = 23;
-            constexpr op_code_t sne     = 24;
-            constexpr op_code_t sl      = 25;
-            constexpr op_code_t sle     = 26;
-            constexpr op_code_t sg      = 27;
-            constexpr op_code_t sge     = 28;
-            constexpr op_code_t ret     = 29;
-            constexpr op_code_t mma     = 30;
-            constexpr op_code_t pop     = 31;
-            constexpr op_code_t get     = 32;
-            constexpr op_code_t set     = 33;
-            constexpr op_code_t push    = 34;
-            constexpr op_code_t move    = 35;
-            constexpr op_code_t load    = 36;
-            constexpr op_code_t store   = 37;
-            constexpr op_code_t exit    = 38;
-            constexpr op_code_t trap    = 39;
-            constexpr op_code_t lea     = 40;
-            constexpr op_code_t b       = 41;
-            constexpr op_code_t car     = 42;
-            constexpr op_code_t cdr     = 43;
-            constexpr op_code_t setcar  = 44;
-            constexpr op_code_t setcdr  = 45;
-            constexpr op_code_t fix     = 46;
-            constexpr op_code_t flo     = 47;
-            constexpr op_code_t cons    = 48;
-            constexpr op_code_t env     = 49;
-            constexpr op_code_t type    = 50;
-            constexpr op_code_t list    = 51;
-            constexpr op_code_t eval    = 52;
-            constexpr op_code_t error   = 53;
-            constexpr op_code_t write   = 54;
-            constexpr op_code_t qt      = 55;
-            constexpr op_code_t qq      = 56;
-            constexpr op_code_t collect = 57;
-            constexpr op_code_t apply   = 58;
-            constexpr op_code_t const_  = 59;
-            constexpr op_code_t ladd    = 60;
-            constexpr op_code_t lsub    = 61;
-            constexpr op_code_t lmul    = 62;
-            constexpr op_code_t ldiv    = 63;
-            constexpr op_code_t lmod    = 64;
-            constexpr op_code_t lnot    = 65;
-            constexpr op_code_t pairp   = 66;
-            constexpr op_code_t listp   = 67;
-            constexpr op_code_t symp    = 68;
-            constexpr op_code_t atomp   = 69;
-            constexpr op_code_t truep   = 70;
-            constexpr op_code_t falsep  = 71;
-            constexpr op_code_t lcmp    = 72;
-            constexpr op_code_t clc     = 73;
-            constexpr op_code_t sec     = 74;
-            constexpr op_code_t read    = 75;
-            constexpr op_code_t define  = 76;
+            constexpr op_code_t clc     = 1;
+            constexpr op_code_t sec     = 2;
+            constexpr op_code_t add     = 3;
+            constexpr op_code_t mul     = 4;
+            constexpr op_code_t sub     = 5;
+            constexpr op_code_t div     = 6;
+            constexpr op_code_t pow     = 7;
+            constexpr op_code_t mod     = 8;
+            constexpr op_code_t neg     = 9;
+            constexpr op_code_t addf    = 10;
+            constexpr op_code_t mulf    = 11;
+            constexpr op_code_t subf    = 12;
+            constexpr op_code_t divf    = 13;
+            constexpr op_code_t powf    = 14;
+            constexpr op_code_t modf    = 15;
+            constexpr op_code_t negf    = 16;
+            constexpr op_code_t not_    = 17;
+            constexpr op_code_t shl     = 18;
+            constexpr op_code_t shr     = 19;
+            constexpr op_code_t rol     = 20;
+            constexpr op_code_t ror     = 21;
+            constexpr op_code_t or_     = 22;
+            constexpr op_code_t and_    = 23;
+            constexpr op_code_t xor_    = 24;
+            constexpr op_code_t b       = 25;
+            constexpr op_code_t br      = 26;
+            constexpr op_code_t blr     = 27;
+            constexpr op_code_t trap    = 28;
+            constexpr op_code_t cmp     = 29;
+            constexpr op_code_t beq     = 30;
+            constexpr op_code_t bne     = 31;
+            constexpr op_code_t bl      = 32;
+            constexpr op_code_t ble     = 33;
+            constexpr op_code_t bg      = 34;
+            constexpr op_code_t bge     = 35;
+            constexpr op_code_t seq     = 36;
+            constexpr op_code_t sne     = 37;
+            constexpr op_code_t sl      = 38;
+            constexpr op_code_t sle     = 40;
+            constexpr op_code_t sg      = 41;
+            constexpr op_code_t sge     = 42;
+            constexpr op_code_t ret     = 43;
+            constexpr op_code_t mma     = 44;
+            constexpr op_code_t push    = 45;
+            constexpr op_code_t pop     = 46;
+            constexpr op_code_t lea     = 47;
+            constexpr op_code_t move    = 48;
+            constexpr op_code_t load    = 49;
+            constexpr op_code_t store   = 50;
+            constexpr op_code_t exit    = 51;
 
             str::slice_t name(op_code_t op);
         }
@@ -243,10 +236,15 @@ namespace basecode::scm::vm {
             ++area.size;
         }
 
-        inline u64 base_addr(mem_area_t& area) {
+        inline u64 curr_addr(mem_area_t& area) {
             return area.top ? u64(area.data)
                               + ((area.capacity - area.size) * sizeof(u64)) :
                    u64(area.data) + (area.size * sizeof(u64));
+        }
+
+        inline u64 base_addr(mem_area_t& area) {
+            return area.top ? u64(area.data) + (area.capacity * sizeof(u64)) :
+                   u64(area.data);
         }
 
         u0 resize(mem_area_t& area, u32 new_size);

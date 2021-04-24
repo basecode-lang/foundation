@@ -96,6 +96,7 @@ namespace basecode::scm {
     using reg_t                 = u8;
     using trap_t                = b8 (*)(vm_t& vm, u64 arg);
     using op_code_t             = u8;
+    using trap_id_t             = u16;
     using bb_array_t            = stable_array_t<bb_t>;
     using obj_stack_t           = stack_t<obj_t*>;
     using ptr_array_t           = array_t<u0*>;
