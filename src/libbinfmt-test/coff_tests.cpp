@@ -17,24 +17,22 @@
 // ----------------------------------------------------------------------------
 
 #include <catch.hpp>
-#include <basecode/binfmt/io.h>
+#include <basecode/binfmt/binfmt.h>
 
 using namespace basecode;
 
 TEST_CASE("basecode::binfmt COFF read obj file") {
-    using namespace binfmt;
-
-    io::session_t s{};
-    io::session::init(s);
-    defer(io::session::free(s));
+    binfmt::session_t s{};
+    binfmt::session::init(s);
+    defer(binfmt::session::free(s));
 
     auto backend_obj_path = R"(C:\temp\test\msvc\backend.cpp.obj)"_path;
     defer(path::free(backend_obj_path));
 
-    auto backend_obj = io::session::add_file(s,
-                                             backend_obj_path,
-                                             io::type_t::coff,
-                                             io::file_type_t::obj);
+    auto backend_obj = binfmt::session::add_file(s,
+                                                 backend_obj_path,
+                                                 binfmt::type_t::coff,
+                                                 binfmt::file_type_t::obj);
     REQUIRE(backend_obj);
-    REQUIRE(OK(io::read(s)));
+    REQUIRE(OK(binfmt::session::read(s)));
 }

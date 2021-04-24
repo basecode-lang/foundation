@@ -19,7 +19,7 @@
 #pragma once
 
 #include <basecode/core/uuid.h>
-#include <basecode/binfmt/io.h>
+#include <basecode/binfmt/types.h>
 
 #define LF_PAD(n)               (0xf0 + (n))
 
@@ -1395,12 +1395,12 @@ namespace basecode::binfmt::cv {
     str::slice_t sig_name(u32 sig);
 
     status_t read_type_data(cv_t& cv,
-                            io::file_t& file,
+                            file_t& file,
                             u32 offset,
                             u32 size);
 
     status_t read_symbol_data(cv_t& cv,
-                              io::file_t& file,
+                              file_t& file,
                               u32 offset,
                               u32 size);
 

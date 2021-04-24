@@ -18,9 +18,8 @@
 
 #include <basecode/core/bits.h>
 #include <basecode/binfmt/ar.h>
-#include <basecode/binfmt/io.h>
 
-namespace basecode::binfmt::io::archive {
+namespace basecode::binfmt::archive {
     namespace internal {
         static u0 fini();
 
@@ -30,7 +29,7 @@ namespace basecode::binfmt::io::archive {
 
         static status_t init(alloc_t* alloc);
 
-        system_t                    g_archive_backend {
+        io_system_t             g_archive_backend {
             .init                   = init,
             .fini                   = fini,
             .read                   = read,
@@ -61,7 +60,7 @@ namespace basecode::binfmt::io::archive {
         }
     }
 
-    system_t* system() {
+    io_system_t* system() {
         return &internal::g_archive_backend;
     }
 }

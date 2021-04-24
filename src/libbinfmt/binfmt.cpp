@@ -16,8 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/binfmt/io.h>
 #include <basecode/core/error.h>
+#include <basecode/core/string.h>
 #include <basecode/core/filesys.h>
 #include <basecode/binfmt/binfmt.h>
 #include <basecode/core/stable_array.h>
@@ -34,13 +34,218 @@ namespace basecode::binfmt {
         module_array_t          modules;
         symbol_array_t          symbols;
         section_array_t         sections;
+        io_system_t*            systems[max_type_count];
         module_id               id;
     };
 
     system_t                    g_binfmt_sys{};
 
+    // N.B. forward declare back-end accessor functions
+    namespace pe {
+        io_system_t* system();
+    }
+
+    namespace elf {
+        io_system_t* system();
+    }
+
+    namespace coff {
+        io_system_t* system();
+    }
+
+    namespace macho {
+        io_system_t* system();
+    }
+
+    namespace archive {
+        io_system_t* system();
+    }
+
+    namespace io {
+    }
+
+    namespace name_map {
+        u0 free(name_array_t& names) {
+            array::free(names);
+        }
+
+        u0 add(name_array_t& names,
+               section::type_t type,
+               name_flags_t flags,
+               str::slice_t name) {
+            auto entry = &array::append(names);
+            entry->type      = type;
+            entry->flags     = flags;
+            entry->flags.pad = {};
+            entry->name      = string::interned::fold(name);
+        }
+
+        u0 init(name_array_t& names, alloc_t* alloc) {
+            array::init(names, alloc);
+        }
+
+        const name_map_t* find(const name_array_t& names,
+                               section::type_t type,
+                               name_flags_t flags) {
+            for (const auto& entry : names) {
+                if (entry.type == type
+                    &&  std::memcmp(&entry.flags,
+                                    &flags,
+                                    sizeof(name_flags_t)) == 0) {
+                    return &entry;
+                }
+            }
+            return nullptr;
+        }
+    }
+
+    // XXX: if files are smaller than some currently unknown size,
+    //      we should use the buf_t in alloc mode and call save.  if greater
+    //      than this size, we should map_new/unmap
+    //
+    namespace file {
+        u0 free(file_t& file) {
+            buf::cursor::free(file.crsr);
+            buf::free(file.buf);
+            path::free(file.path);
+        }
+
+        status_t save(file_t& file) {
+            auto status = buf::save(file.buf, file.path);
+            if (!OK(status))
+                return status_t::write_error;
+            return status_t::ok;
+        }
+
+        status_t map_existing(file_t& file) {
+            if (!OK(buf::map_existing(file.buf, file.path)))
+                return status_t::read_error;
+            return status_t::ok;
+        }
+
+        status_t init(file_t& file, alloc_t* alloc) {
+            path::init(file.path, alloc);
+            buf::init(file.buf, alloc);
+            buf::cursor::init(file.crsr, file.buf);
+            return status_t::ok;
+        }
+
+        status_t unmap(file_t& file, b8 sync_flush) {
+            auto status = buf::unmap(file.buf, sync_flush);
+            if (!OK(status))
+                return status_t::write_error;
+            return status_t::ok;
+        }
+
+        status_t map_new(file_t& file, usize file_size) {
+            if (!OK(buf::map_new(file.buf, file.path, file_size)))
+                return status_t::read_error;
+            return status_t::ok;
+        }
+    }
+
+    namespace session {
+        u0 free(session_t& s) {
+            for (auto& file : s.files)
+                file::free(file);
+            array::free(s.files);
+        }
+
+        status_t read(session_t& s) {
+            for (auto& file : s.files) {
+                const auto idx = u32(file.bin_type);
+                if (idx > max_type_count - 1)
+                    return status_t::invalid_container_type;
+                auto status = g_binfmt_sys.systems[idx]->read(file);
+                if (!OK(status))
+                    return status;
+            }
+            return status_t::ok;
+        }
+
+        status_t write(session_t& s) {
+            for (auto& file : s.files) {
+                const auto idx = u32(file.bin_type);
+                if (idx > max_type_count - 1)
+                    return status_t::invalid_container_type;
+                auto status = g_binfmt_sys.systems[idx]->write(file);
+                if (!OK(status))
+                    return status;
+            }
+            return status_t::ok;
+        }
+
+        file_t* add_file(session_t& s,
+                         module_t* module,
+                         const path_t& path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         file_type_t output_type) {
+            return add_file(s,
+                            module,
+                            path::c_str(path),
+                            machine,
+                            bin_type,
+                            output_type,
+                            path.str.length);
+        }
+
+        file_t* add_file(session_t& s,
+                         const path_t& path,
+                         type_t bin_type,
+                         file_type_t file_type) {
+            return add_file(s,
+                            path::c_str(path),
+                            bin_type,
+                            file_type,
+                            path.str.length);
+        }
+
+        file_t* add_file(session_t& s,
+                         const s8* path,
+                         type_t bin_type,
+                         file_type_t file_type,
+                         s32 path_len) {
+            auto file = &array::append(s.files);
+            file::init(*file, s.alloc);
+            path::set(file->path, path, path_len);
+            file->session    = &s;
+            file->module     = {};
+            file->machine    = {};
+            file->bin_type   = bin_type;
+            file->file_type  = file_type;
+            return file;
+        }
+
+        file_t* add_file(session_t& s,
+                         module_t* module,
+                         const s8* path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         file_type_t output_type,
+                         s32 path_len) {
+            auto file = &array::append(s.files);
+            file::init(*file, s.alloc);
+            path::set(file->path, path, path_len);
+            file->session    = &s;
+            file->module     = module;
+            file->machine    = machine;
+            file->bin_type   = bin_type;
+            file->file_type  = output_type;
+            return file;
+        }
+
+        status_t init(session_t& s, alloc_t* alloc) {
+            s.alloc = alloc;
+            array::init(s.files, s.alloc);
+            return status_t::ok;
+        }
+    }
+
     namespace system {
         u0 fini() {
+            for (auto sys : g_binfmt_sys.systems)
+                sys->fini();
             for (auto section : g_binfmt_sys.sections)
                 section::free(*section);
             for (auto mod : g_binfmt_sys.modules)
@@ -49,7 +254,6 @@ namespace basecode::binfmt {
             stable_array::free(g_binfmt_sys.symbols);
             stable_array::free(g_binfmt_sys.sections);
             hashtab::free(g_binfmt_sys.modtab);
-            io::fini();
         }
 
         status_t init(alloc_t* alloc) {
@@ -58,7 +262,17 @@ namespace basecode::binfmt {
             stable_array::init(g_binfmt_sys.modules, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.symbols, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.sections, g_binfmt_sys.alloc);
-            return io::init(g_binfmt_sys.alloc);
+            g_binfmt_sys.systems[u32(type_t::ar)]    = archive::system();
+            g_binfmt_sys.systems[u32(type_t::pe)]    = pe::system();
+            g_binfmt_sys.systems[u32(type_t::elf)]   = elf::system();
+            g_binfmt_sys.systems[u32(type_t::coff)]  = coff::system();
+            g_binfmt_sys.systems[u32(type_t::macho)] = macho::system();
+            for (auto sys : g_binfmt_sys.systems) {
+                auto status = sys->init(alloc);
+                if (!OK(status))
+                    return status;
+            }
+            return status_t::ok;
         }
 
         u0 free_module(module_t* mod) {

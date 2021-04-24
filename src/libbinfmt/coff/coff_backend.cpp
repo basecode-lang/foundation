@@ -22,7 +22,7 @@
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/slice_utils.h>
 
-namespace basecode::binfmt::io::coff {
+namespace basecode::binfmt::coff {
     namespace internal {
         struct coff_system_t final {
             alloc_t*                alloc;
@@ -97,7 +97,7 @@ namespace basecode::binfmt::io::coff {
                     format::print("\n");
                 } else if (hdr.name == ".pdata"_ss) {
                     u32 idx{};
-                    unwind_t u{};
+                    coff_unwind_t u{};
                     format::print("    UNWINDS:\n");
                     while (OK(coff::unwind::get(coff, hdr, idx++, u))) {
                         format::print("      BEGIN: {:08x} END: {:08x} INFO: {:08x}\n",
@@ -159,7 +159,7 @@ namespace basecode::binfmt::io::coff {
             u32 idx{};
             for (const auto& sym : coff.symtab.list) {
                 switch (sym.type) {
-                    case sym_type_t::sym: {
+                    case coff_sym_type_t::sym: {
                         auto sc = &sym.subclass.sym;
                         format::print("{:>03} ", idx);
                         switch (sc->section) {
@@ -210,19 +210,19 @@ namespace basecode::binfmt::io::coff {
                         format::print("{} \n", sc->name);
                         break;
                     }
-                    case sym_type_t::aux_xf: {
+                    case coff_sym_type_t::aux_xf: {
                         auto sc = &sym.subclass.aux_xf;
                         format::print("                           AUX    XF   {}\n",
                                       sc->line_num);
                         break;
                     }
-                    case sym_type_t::aux_file: {
+                    case coff_sym_type_t::aux_file: {
                         auto sc = &sym.subclass.aux_file;
                         format::print("                           AUX    FILE {}\n",
                                       slice::make(sc->bytes, sizeof(sc->bytes)));
                         break;
                     }
-                    case sym_type_t::aux_section: {
+                    case coff_sym_type_t::aux_section: {
                         auto sc = &sym.subclass.aux_section;
                         format::print("                           AUX    SECT LEN: {:08x} CHKSUM: {:08x} {}: {:03} SEL: {}\n",
                                       sc->len,
@@ -232,19 +232,19 @@ namespace basecode::binfmt::io::coff {
                                       coff::comdat::name(sc->comdat_sel));
                         break;
                     }
-                    case sym_type_t::aux_func_def: {
+                    case coff_sym_type_t::aux_func_def: {
                         auto sc = &sym.subclass.aux_func_def;
                         format::print("                           AUX    FUNC {}\n",
                                       sc->tag_idx);
                         break;
                     }
-                    case sym_type_t::aux_token_def: {
+                    case coff_sym_type_t::aux_token_def: {
                         auto sc = &sym.subclass.aux_token_def;
                         format::print("                           AUX    TOKE {}\n",
                                       sc->symtab_idx);
                         break;
                     }
-                    case sym_type_t::aux_weak_extern: {
+                    case coff_sym_type_t::aux_weak_extern: {
                         auto sc = &sym.subclass.aux_weak_extern;
                         format::print("                           AUX    WEAK {}\n",
                                       sc->tag_idx);
@@ -269,7 +269,7 @@ namespace basecode::binfmt::io::coff {
 
                 status_t status;
 
-                status = io::file::map_existing(file);
+                status = file::map_existing(file);
                 if (!OK(status))
                     return status_t::read_error;
 
@@ -398,7 +398,7 @@ namespace basecode::binfmt::io::coff {
             return status_t::ok;
         }
 
-        system_t                    g_coff_backend {
+        io_system_t                 g_coff_backend {
             .init   = init,
             .fini   = fini,
             .read   = read,
@@ -407,7 +407,7 @@ namespace basecode::binfmt::io::coff {
         };
     }
 
-    system_t* system() {
+    io_system_t* system() {
         return &internal::g_coff_backend;
     }
 

@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <catch.hpp>
-#include <basecode/binfmt/io.h>
 #include <basecode/core/error.h>
 #include <basecode/binfmt/binfmt.h>
 #include "test.h"
@@ -71,84 +70,77 @@ static const u8 s_rot13_code[] = {
 };
 
 TEST_CASE("basecode::binfmt ELF read obj file") {
-    using namespace binfmt;
-
-    io::session_t s{};
-    io::session::init(s);
+    binfmt::session_t s{};
+    binfmt::session::init(s);
 
     auto backend_obj_path = R"(C:\temp\test\elf\backend.cpp.o)"_path;
     defer(
         path::free(backend_obj_path);
-        io::session::free(s);
+        binfmt::session::free(s);
         error::report::print_range(0, error::report::count());
         );
 
-    auto backend_obj = io::session::add_file(s,
-                                             backend_obj_path,
-                                             io::type_t::elf,
-                                             io::file_type_t::obj);
+    auto backend_obj = binfmt::session::add_file(s,
+                                                 backend_obj_path,
+                                                 binfmt::type_t::elf,
+                                                 binfmt::file_type_t::obj);
     REQUIRE(backend_obj);
     REQUIRE(!backend_obj->module);
 
-    REQUIRE(OK(io::read(s)));
+    REQUIRE(OK(binfmt::session::read(s)));
 
     REQUIRE(backend_obj->module);
 }
 
 TEST_CASE("basecode::binfmt ELF round trip obj file") {
-    using namespace binfmt;
+    binfmt::session_t read_session{};
+    binfmt::session::init(read_session);
 
-    io::session_t read_session{};
-    io::session::init(read_session);
-
-    io::session_t write_session{};
-    io::session::init(write_session);
+    binfmt::session_t write_session{};
+    binfmt::session::init(write_session);
 
     auto source_obj_path = R"(C:\temp\test\elf\backend.cpp.o)"_path;
     auto dest_obj_path   = R"(backend.cpp.o)"_path;
     defer(path::free(source_obj_path);
           path::free(dest_obj_path);
-          io::session::free(read_session);
-          io::session::free(write_session);
+          binfmt::session::free(read_session);
+          binfmt::session::free(write_session);
           error::report::print_range(0, error::report::count()));
 
-    auto source_obj = io::session::add_file(read_session,
-                                            source_obj_path,
-                                            io::type_t::elf,
-                                            io::file_type_t::obj);
+    auto source_obj = binfmt::session::add_file(read_session,
+                                                source_obj_path,
+                                                binfmt::type_t::elf,
+                                                binfmt::file_type_t::obj);
     REQUIRE(source_obj);
     REQUIRE(!source_obj->module);
-    REQUIRE(OK(io::read(read_session)));
+    REQUIRE(OK(binfmt::session::read(read_session)));
     REQUIRE(source_obj->module);
 
-    auto dest_obj = io::session::add_file(write_session,
-                                          source_obj->module,
-                                          dest_obj_path,
-                                          source_obj->machine,
-                                          source_obj->bin_type,
-                                          source_obj->file_type);
+    auto dest_obj = binfmt::session::add_file(write_session,
+                                              source_obj->module,
+                                              dest_obj_path,
+                                              source_obj->machine,
+                                              source_obj->bin_type,
+                                              source_obj->file_type);
 
     REQUIRE(dest_obj);
-    REQUIRE(OK(io::write(write_session)));
+    REQUIRE(OK(binfmt::session::write(write_session)));
 }
 
 TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
-    using namespace binfmt;
-
-    module_t mod{};
-    REQUIRE(OK(module::init(mod, module_type_t::object, 20)));
-    defer(module::free(mod);
-              error::report::print_range(0, error::report::count());
-    );
+    binfmt::module_t mod{};
+    REQUIRE(OK(binfmt::module::init(mod, binfmt::module_type_t::object, 20)));
+    defer(binfmt::module::free(mod);
+          error::report::print_range(0, error::report::count()));
 
     // 1. create the default string table
-    auto strtab_sect = module::make_default_string_table(mod);
+    auto strtab_sect = binfmt::module::make_default_string_table(mod);
     REQUIRE(strtab_sect);
     REQUIRE(error::report::ok());
 
-    auto read_file_str      = section::add_string(strtab_sect, "ReadFile"_ss);
-    auto write_file_str     = section::add_string(strtab_sect, "WriteFile"_ss);
-    auto get_std_handle_str = section::add_string(strtab_sect, "GetStdHandle"_ss);
+    auto read_file_str      = binfmt::section::add_string(strtab_sect, "ReadFile"_ss);
+    auto write_file_str     = binfmt::section::add_string(strtab_sect, "WriteFile"_ss);
+    auto get_std_handle_str = binfmt::section::add_string(strtab_sect, "GetStdHandle"_ss);
 
     REQUIRE(read_file_str > 0);
     REQUIRE(write_file_str > read_file_str);
@@ -156,30 +148,35 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
     REQUIRE(error::report::ok());
 
     // 2. create the default symbol table
-    auto symtab_sect = module::make_default_symbol_table(mod);
+    auto symtab_sect = binfmt::module::make_default_symbol_table(mod);
     REQUIRE(symtab_sect);
     REQUIRE(error::report::ok());
 
-    auto read_file_sym = section::add_symbol(symtab_sect, read_file_str);
+    auto read_file_sym = binfmt::section::add_symbol(symtab_sect,
+                                                     read_file_str);
     REQUIRE(read_file_sym);
-    read_file_sym->type  = symbol::type_t::function;
+    read_file_sym->type  = binfmt::symbol::type_t::function;
     read_file_sym->value = 2;
-    read_file_sym->scope = symbol::scope_t::global;
+    read_file_sym->scope = binfmt::symbol::scope_t::global;
 
-    auto write_file_sym = section::add_symbol(symtab_sect, write_file_str);
+    auto write_file_sym = binfmt::section::add_symbol(symtab_sect,
+                                                      write_file_str);
     REQUIRE(write_file_sym);
-    write_file_sym->type  = symbol::type_t::function;
+    write_file_sym->type  = binfmt::symbol::type_t::function;
     write_file_sym->value = 3;
-    write_file_sym->scope = symbol::scope_t::global;
+    write_file_sym->scope = binfmt::symbol::scope_t::global;
 
-    auto get_std_handle_sym = section::add_symbol(symtab_sect, get_std_handle_str);
+    auto get_std_handle_sym = binfmt::section::add_symbol(symtab_sect,
+                                                          get_std_handle_str);
     REQUIRE(get_std_handle_sym);
-    get_std_handle_sym->type  = symbol::type_t::function;
+    get_std_handle_sym->type  = binfmt::symbol::type_t::function;
     get_std_handle_sym->value = 4;
-    get_std_handle_sym->scope = symbol::scope_t::global;
+    get_std_handle_sym->scope = binfmt::symbol::scope_t::global;
 
     /* .text section */ {
-        auto text_sect = module::make_text(mod, (u8*) s_rot13_code, sizeof(s_rot13_code));
+        auto text_sect = binfmt::module::make_text(mod,
+                                                   (u8*) s_rot13_code,
+                                                   sizeof(s_rot13_code));
         REQUIRE(text_sect);
         REQUIRE(error::report::ok());
 
@@ -191,36 +188,38 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
     }
 
     /* .rdata section */ {
-        auto rodata_sect = module::make_rodata(mod, (u8*) s_rot13_table, sizeof(s_rot13_table));
+        auto rodata_sect = binfmt::module::make_rodata(mod,
+                                                       (u8*) s_rot13_table,
+                                                       sizeof(s_rot13_table));
         REQUIRE(rodata_sect);
         REQUIRE(error::report::ok());
     }
 
     /* .bss section */ {
-        auto bss_sect = module::make_bss(mod, 4096);
+        auto bss_sect = binfmt::module::make_bss(mod, 4096);
         REQUIRE(bss_sect);
         REQUIRE(bss_sect->size == 4096);
     }
 
-    io::session_t s{};
-    io::session::init(s);
+    binfmt::session_t s{};
+    binfmt::session::init(s);
 
     auto rot13_exe_path = "rot13_elf.exe"_path;
     defer(
-        io::session::free(s);
+        binfmt::session::free(s);
         path::free(rot13_exe_path);
         );
-    auto rot13_exe_file = io::session::add_file(s,
-                                                &mod,
-                                                rot13_exe_path,
-                                                machine::type_t::x86_64,
-                                                io::type_t::elf,
-                                                io::file_type_t::exe);
+    auto rot13_exe_file = binfmt::session::add_file(s,
+                                                    &mod,
+                                                    rot13_exe_path,
+                                                    binfmt::machine::type_t::x86_64,
+                                                    binfmt::type_t::elf,
+                                                    binfmt::file_type_t::exe);
     rot13_exe_file->versions.linker.major = 6;
     rot13_exe_file->versions.linker.minor = 0;
     rot13_exe_file->versions.min_os.major = 4;
     rot13_exe_file->versions.min_os.minor = 0;
     rot13_exe_file->flags.console = true;
 
-    REQUIRE(OK(io::write(s)));
+    REQUIRE(OK(binfmt::session::write(s)));
 }

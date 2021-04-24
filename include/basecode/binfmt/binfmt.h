@@ -21,6 +21,98 @@
 #include <basecode/binfmt/types.h>
 
 namespace basecode::binfmt {
+    namespace file {
+        u0 free(file_t& file);
+
+        status_t save(file_t& file);
+
+        status_t map_existing(file_t& file);
+
+        status_t init(file_t& file, alloc_t* alloc);
+
+        status_t map_new(file_t& file, usize file_size);
+
+        status_t unmap(file_t& file, b8 sync_flush = false);
+    }
+
+    namespace name_map {
+        u0 add(name_array_t& names,
+               section::type_t type,
+               name_flags_t flags,
+               str::slice_t name);
+
+        u0 free(name_array_t& names);
+
+        u0 init(name_array_t& names, alloc_t* alloc);
+
+        const name_map_t* find(const name_array_t& names,
+                               section::type_t type,
+                               name_flags_t flags);
+    }
+
+    namespace session {
+        u0 free(session_t& s);
+
+        status_t read(session_t& s);
+
+        status_t write(session_t& s);
+
+        file_t* add_file(session_t& s,
+                         const s8* path,
+                         type_t bin_type,
+                         file_type_t file_type,
+                         s32 path_len = -1);
+
+        file_t* add_file(session_t& s,
+                         const path_t& path,
+                         type_t bin_type,
+                         file_type_t file_type);
+
+        file_t* add_file(session_t& s,
+                         module_t* module,
+                         const s8* path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         file_type_t output_type,
+                         s32 path_len = -1);
+
+        file_t* add_file(session_t& s,
+                         module_t* module,
+                         const path_t& path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         file_type_t output_type);
+
+        file_t* add_file(session_t& s,
+                         const String_Concept auto& path,
+                         type_t bin_type,
+                         file_type_t file_type) {
+            return add_file(s,
+                            (const s8*) path.data,
+                            bin_type,
+                            file_type,
+                            path.length);
+        }
+
+        file_t* add_file(session_t& s,
+                         module_t* module,
+                         const String_Concept auto& path,
+                         machine::type_t machine,
+                         type_t bin_type,
+                         file_type_t output_type) {
+            return add_file(s,
+                            module,
+                            (const s8*) path.data,
+                            machine,
+                            bin_type,
+                            output_type,
+                            path.length);
+        }
+
+        status_t init(session_t& s,
+                      alloc_t* alloc = context::top()->alloc.main);
+    }
+
     namespace system {
         u0 fini();
 

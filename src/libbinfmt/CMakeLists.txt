@@ -59,8 +59,6 @@ set(
     elf/elf_backend.cpp
     elf/elf.cpp ${INC_DIR}/elf.h
 
-    io.cpp ${INC_DIR}/io.h
-
     macho/macho_backend.cpp
     macho/macho.cpp ${INC_DIR}/macho.h
 

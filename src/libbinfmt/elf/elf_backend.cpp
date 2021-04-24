@@ -22,7 +22,7 @@
 #include <basecode/binfmt/binfmt.h>
 #include <basecode/core/stopwatch.h>
 
-namespace basecode::binfmt::io::elf {
+namespace basecode::binfmt::elf {
     namespace internal {
         struct elf_system_t final {
             alloc_t*            alloc;
@@ -47,11 +47,11 @@ namespace basecode::binfmt::io::elf {
 
                 status_t status;
 
-                status = io::file::map_existing(file);
+                status = binfmt::file::map_existing(file);
                 if (!OK(status))
                     return status;
 
-                opts_t opts{};
+                elf_opts_t opts{};
                 opts.file        = &file;
                 opts.alloc       = g_elf_sys.alloc;
                 opts.entry_point = {};
@@ -61,7 +61,7 @@ namespace basecode::binfmt::io::elf {
                     return status;
                 defer(elf::free(elf));
 
-                status = read(elf, file);
+                status = elf::read(elf, file);
                 if (!OK(status))
                     return status);
 
@@ -75,7 +75,7 @@ namespace basecode::binfmt::io::elf {
             status_t status{};
             auto msc = &file.module->subclass.object;
 
-            opts_t opts{};
+            elf_opts_t opts{};
             opts.file         = &file;
             opts.alloc        = g_elf_sys.alloc;
             opts.entry_point  = file.opts.base_addr;
@@ -102,13 +102,13 @@ namespace basecode::binfmt::io::elf {
                 + (num_segments * segment::header_size)
                 + (num_sections * section::header_size);
 
-            status = io::file::map_new(file, file_size);
+            status = binfmt::file::map_new(file, file_size);
             if (!OK(status))
                 return status;
 
             elf_t elf{};
             defer(elf::free(elf);
-                  io::file::unmap(file);
+                  binfmt::file::unmap(file);
                   stopwatch::stop(timer);
                   stopwatch::print_elapsed("binfmt ELF write time"_ss, 40, timer));
 
@@ -189,7 +189,7 @@ namespace basecode::binfmt::io::elf {
             return status_t::ok;
         }
 
-        system_t                    g_elf_backend {
+        io_system_t                 g_elf_backend {
             .init   = init,
             .fini   = fini,
             .read   = read,
@@ -198,7 +198,7 @@ namespace basecode::binfmt::io::elf {
         };
     }
 
-    system_t* system() {
+    io_system_t* system() {
         return &internal::g_elf_backend;
     }
 

@@ -22,7 +22,7 @@
 #include <basecode/core/string.h>
 #include <basecode/binfmt/binfmt.h>
 
-namespace basecode::binfmt::io::pe {
+namespace basecode::binfmt::pe {
     static u8 s_dos_stub[64] = {
         0x0e, 0x1f, 0xba, 0x0e, 0x00, 0xb4, 0x09, 0xcd, 0x21, 0xb8, 0x01, 0x4c,
         0xcd, 0x21, 0x54, 0x68, 0x69, 0x73, 0x20, 0x70, 0x72, 0x6f, 0x67, 0x72,
@@ -73,7 +73,7 @@ namespace basecode::binfmt::io::pe {
     }
 
     namespace dir_entry {
-        u0 free(pe_t& pe, dir_type_t type) {
+        u0 free(pe_t& pe, pe_dir_type_t type) {
             auto& entry = pe.dirs[u32(type)];
             if (!entry.init)
                 return;
@@ -109,7 +109,7 @@ namespace basecode::binfmt::io::pe {
             }
         }
 
-        status_t init(pe_t& pe, dir_type_t type) {
+        status_t init(pe_t& pe, pe_dir_type_t type) {
             auto& entry = pe.dirs[u32(type)];
             if (entry.init)
                 return status_t::ok;
@@ -152,12 +152,12 @@ namespace basecode::binfmt::io::pe {
         for (u32 dir_type = 0;
              dir_type < max_dir_entry_count;
              ++dir_type) {
-            dir_entry::free(pe, dir_type_t(dir_type));
+            dir_entry::free(pe, pe_dir_type_t(dir_type));
         }
         coff::free(pe.coff);
     }
 
-    status_t init(pe_t& pe, const opts_t& opts) {
+    status_t init(pe_t& pe, const pe_opts_t& opts) {
         auto status = coff::init(pe.coff, *opts.file, opts.alloc);
         if (!OK(status))
             return status;
@@ -182,7 +182,7 @@ namespace basecode::binfmt::io::pe {
             auto& dir_entry = pe.dirs[dir_type];
             dir_entry.rva  = {};
             dir_entry.init = false;
-            dir_entry.type = dir_type_t(dir_type);
+            dir_entry.type = pe_dir_type_t(dir_type);
         }
 
         return status_t::ok;
@@ -308,7 +308,7 @@ namespace basecode::binfmt::io::pe {
     // 0x.....3055: import address table
     //      1...n 8-byte rva
     //      0     8-byte null marker
-    status_t build_section(file_t& file, pe_t& pe, coff::header_t& hdr) {
+    status_t build_section(file_t& file, pe_t& pe, coff_header_t& hdr) {
         auto& coff = pe.coff;
 
         hdr.file.offset = coff.offset;
@@ -322,18 +322,18 @@ namespace basecode::binfmt::io::pe {
             case section::type_t::import: {
                 status_t status;
 
-                status = dir_entry::init(pe, dir_type_t::import_table);
+                status = dir_entry::init(pe, pe_dir_type_t::import_table);
                 if (!OK(status))
                     return status;
 
-                status = dir_entry::init(pe, dir_type_t::import_address_table);
+                status = dir_entry::init(pe, pe_dir_type_t::import_address_table);
                 if (!OK(status))
                     return status;
 
                 const auto& imports = hdr.section->subclass.imports;
 
-                auto& iat_entry          = pe.dirs[dir_type_t::import_address_table];
-                auto& import_table_entry = pe.dirs[dir_type_t::import_table];
+                auto& iat_entry          = pe.dirs[pe_dir_type_t::import_address_table];
+                auto& import_table_entry = pe.dirs[pe_dir_type_t::import_table];
                 auto& import_table       = import_table_entry.subclass.import;
                 import_table_entry.rva.base = coff.rva;
                 import_table_entry.rva.size = (imports.size + 1)
@@ -429,7 +429,7 @@ namespace basecode::binfmt::io::pe {
         return status_t::ok;
     }
 
-    status_t write_section_data(file_t& file, pe_t& pe, coff::header_t& hdr) {
+    status_t write_section_data(file_t& file, pe_t& pe, coff_header_t& hdr) {
         const auto type = hdr.section->type;
         if (type == section::type_t::bss)
             return status_t::ok;
@@ -441,8 +441,8 @@ namespace basecode::binfmt::io::pe {
                 return status_t::not_implemented;
             }
             case section::type_t::import: {
-                const auto& iat_entry          = pe.dirs[dir_type_t::import_address_table];
-                const auto& import_table_entry = pe.dirs[dir_type_t::import_table];
+                const auto& iat_entry          = pe.dirs[pe_dir_type_t::import_address_table];
+                const auto& import_table_entry = pe.dirs[pe_dir_type_t::import_table];
                 const auto& import_table       = import_table_entry.subclass.import;
                 for (const auto& module : import_table.modules) {
                     FILE_WRITE(u32, module.lookup_rva);
@@ -454,7 +454,7 @@ namespace basecode::binfmt::io::pe {
                 for (const auto& module : import_table.modules) {
                     FILE_WRITE_CSTR(module.name.slice);
                     for (const auto& name_hint : import_table.name_hints.list) {
-                        thunk_t data{};
+                        pe_thunk_t data{};
                         data.thunk.by_ordinal = false;
                         data.thunk.value      = name_hint.rva.base;
                         FILE_WRITE(u64, data.bits);
@@ -462,7 +462,7 @@ namespace basecode::binfmt::io::pe {
                     FILE_WRITE0(u64);
                 }
                 for (const auto& name_hint : import_table.name_hints.list) {
-                    thunk_t data{};
+                    pe_thunk_t data{};
                     data.thunk.by_ordinal = false;
                     data.thunk.value      = name_hint.rva.base;
                     FILE_WRITE(u64, data.bits);

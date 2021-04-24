@@ -18,7 +18,7 @@
 
 #include <basecode/binfmt/macho.h>
 
-namespace basecode::binfmt::io::macho {
+namespace basecode::binfmt::macho {
     u0 free(macho_t& macho) {
         UNUSED(macho);
     }
@@ -41,7 +41,7 @@ namespace basecode::binfmt::io::macho {
         return status_t::ok;
     }
 
-    status_t init(macho_t& macho, const opts_t& opts) {
+    status_t init(macho_t& macho, const macho_opts_t& opts) {
         macho.alloc = opts.alloc;
         macho.opts  = &opts;
         return status_t::ok;

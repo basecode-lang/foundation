@@ -18,311 +18,37 @@
 
 #pragma once
 
-#include <basecode/binfmt/io.h>
+#include <basecode/binfmt/types.h>
 
-#define FLAG_CHK(v, f) (((v) & u32((f))) == f)
-
-namespace basecode::binfmt::io::coff {
-    struct sym_t;
-    struct reloc_t;
-    struct unwind_t;
-    struct header_t;
-    struct line_num_t;
-
-    using sym_array_t           = array_t<sym_t>;
-    using str_array_t           = array_t<str::slice_t>;
-    using header_array_t        = array_t<header_t>;
-
-    constexpr u32 header_size   = 0x14;
-
-    struct rva_t final {
-        u32                     base;
-        u32                     size;
-    };
-
-    struct raw_t final {
-        u32                     offset;
-        u32                     size;
-    };
-
-    // .debug$S (symbolic info)
-    // .debug$T (type info)
-    struct debug_t final {
-    };
-
-    struct reloc_t final {
-        u32                     rva;
-        u32                     symtab_idx;
-        u16                     type;
-    };
-
-    struct unwind_t final {
-        u32                     begin_rva;
-        u32                     end_rva;
-        u32                     info;
-    };
-
-    struct line_num_t final {
-        union {
-            u32                 rva;
-            u32                 symtab_idx;
-        };
-        u16                     number;
-    };
-
-    enum class sym_type_t : u8 {
-        sym,
-        aux_xf,
-        aux_file,
-        aux_section,
-        aux_func_def,
-        aux_token_def,
-        aux_weak_extern,
-    };
-
-    struct sym_t final {
-        union {
-            struct {
-                s8              bytes[18];
-            }                   aux_file;
-            struct {
-                u32             ptr_next_func;
-                u16             line_num;
-            }                   aux_xf;
-            struct {
-                u32             tag_idx;
-                u32             flags;
-            }                   aux_weak_extern;
-            struct {
-                u32             tag_idx;
-                u32             total_size;
-                u32             ptr_line_num;
-                u32             ptr_next_func;
-            }                   aux_func_def;
-            struct {
-                u32             len;
-                u32             check_sum;
-                u16             num_relocs;
-                u16             num_lines;
-                u16             sect_num;
-                u8              comdat_sel;
-            }                   aux_section;
-            struct {
-                u32             symtab_idx;
-                u8              aux_type;
-            }                   aux_token_def;
-            struct {
-                u64             strtab_offset;
-                str::slice_t    name;
-                struct {
-                    u32         idx;
-                    u32         len;
-                }               aux;
-                u32             value;
-                u16             type;
-                s16             section;
-                u8              sclass;
-            }                   sym;
-        }                       subclass;
-        u32                     id;
-        sym_type_t              type;
-    };
-
-    struct header_t final {
-        const section_t*        section;
-        u64                     short_name;
-        str::slice_t            name;
-        u32                     symbol;
-        rva_t                   rva;
-        raw_t                   file;
-        struct {
-            raw_t               file;
-        }                       relocs;
-        struct {
-            raw_t               file;
-        }                       line_nums;
-        u32                     number;
-        u32                     flags;
-    };
-
-    struct coff_t final {
-        alloc_t*                alloc;
-        u8*                     buf;
-        header_array_t          headers;
-        u32                     rva;
-        u32                     offset;
-        u32                     timestamp;
-        struct {
-            raw_t               file;
-            str_array_t         list;
-        }                       strtab;
-        struct {
-            raw_t               file;
-            sym_array_t         list;
-            u32                 num_symbols;
-        }                       symtab;
-        struct {
-            u32                 image;
-            u16                 headers;
-            u16                 opt_hdr;
-        }                       size;
-        struct {
-            u16                 image;
-        }                       flags;
-        struct {
-            u32                 file;
-            u32                 section;
-        }                       align;
-        rva_t                   code;
-        rva_t                   relocs;
-        rva_t                   init_data;
-        rva_t                   uninit_data;
-        u16                     machine;
-    };
-
-
-    namespace clr {
-    }
-
-    namespace debug {
-        constexpr u32 unknown   = 0;
-        constexpr u32 code_view = 2;
-    }
-
+namespace basecode::binfmt::coff {
     namespace unwind {
-        constexpr u32 entry_size = 12;
-
         status_t get(const coff_t& coff,
-                     const header_t& hdr,
+                     const coff_header_t& hdr,
                      u32 idx,
-                     unwind_t& u);
+                     coff_unwind_t& u);
     }
 
     namespace reloc {
-        constexpr u32 entry_size                = 10;
-
         namespace type::x86_64 {
-            constexpr u16 absolute              = 0;
-            constexpr u16 addr64                = 1;
-            constexpr u16 addr32                = 2;
-            constexpr u16 addr32nb              = 3;
-            constexpr u16 rel32                 = 4;
-            constexpr u16 rel32_1               = 5;
-            constexpr u16 rel32_2               = 6;
-            constexpr u16 rel32_3               = 7;
-            constexpr u16 rel32_4               = 8;
-            constexpr u16 rel32_5               = 9;
-            constexpr u16 section               = 10;
-            constexpr u16 section_rel           = 11;
-            constexpr u16 section_rel_7         = 12;
-            constexpr u16 token                 = 13;
-            constexpr u16 span_rel32_signed     = 14;
-            constexpr u16 pair                  = 15;
-            constexpr u16 span32_signed         = 16;
-
             str::slice_t name(u16 type);
         }
 
         namespace type::aarch64 {
-            constexpr u16 absolute              = 0;
-            constexpr u16 addr32                = 1;
-            constexpr u16 addr32nb              = 2;
-            constexpr u16 branch26              = 3;
-            constexpr u16 page_base_rel_21      = 4;
-            constexpr u16 rel_21                = 5;
-            constexpr u16 page_offset_12a       = 6;
-            constexpr u16 page_offset_12l       = 7;
-            constexpr u16 section_rel           = 8;
-            constexpr u16 section_rel_low12a    = 9;
-            constexpr u16 section_rel_high12a   = 10;
-            constexpr u16 section_rel_low12l    = 11;
-            constexpr u16 token                 = 12;
-            constexpr u16 section               = 13;
-            constexpr u16 addr64                = 14;
-            constexpr u16 branch19              = 15;
-            constexpr u16 branch14              = 16;
-            constexpr u16 rel_32                = 17;
-
             str::slice_t name(u16 type);
         }
 
-        reloc_t get(const coff_t& coff, const header_t& hdr, u32 idx);
-    }
-
-    namespace machine {
-        constexpr u16 amd64                     = 0x8664;
-        constexpr u16 arm64                     = 0xaa64;
+        coff_reloc_t get(const coff_t& coff, const coff_header_t& hdr, u32 idx);
     }
 
     namespace section {
-        constexpr u32 header_size               = 0x28;
-        constexpr u32 no_pad                    = 0x00000008;
-        constexpr u32 content_code              = 0x00000020;
-        constexpr u32 data_init                 = 0x00000040;
-        constexpr u32 data_uninit               = 0x00000080;
-        constexpr u32 link_info                 = 0x00000200;
-        constexpr u32 link_remove               = 0x00000800;
-        constexpr u32 link_comdat               = 0x00001000;
-        constexpr u32 gp_relative               = 0x00008000;
-        constexpr u32 memory_purgeable          = 0x00020000;
-        constexpr u32 memory_locked             = 0x00040000;
-        constexpr u32 memory_preload            = 0x00080000;
-        constexpr u32 memory_align_1            = 0x00100000;
-        constexpr u32 memory_align_2            = 0x00200000;
-        constexpr u32 memory_align_4            = 0x00300000;
-        constexpr u32 memory_align_8            = 0x00400000;
-        constexpr u32 memory_align_16           = 0x00500000; // default
-        constexpr u32 memory_align_32           = 0x00600000;
-        constexpr u32 memory_align_64           = 0x00700000;
-        constexpr u32 memory_align_128          = 0x00800000;
-        constexpr u32 memory_align_256          = 0x00900000;
-        constexpr u32 memory_align_512          = 0x00a00000;
-        constexpr u32 memory_align_1024         = 0x00b00000;
-        constexpr u32 memory_align_2048         = 0x00c00000;
-        constexpr u32 memory_align_4096         = 0x00d00000;
-        constexpr u32 memory_align_8192         = 0x00e00000;
-        constexpr u32 link_reloc_overflow       = 0x01000000;
-        constexpr u32 memory_discard            = 0x02000000;
-        constexpr u32 memory_not_cached         = 0x04000000;
-        constexpr u32 memory_not_paged          = 0x08000000;
-        constexpr u32 memory_shared             = 0x10000000;
-        constexpr u32 memory_execute            = 0x20000000;
-        constexpr u32 memory_read               = 0x40000000;
-        constexpr u32 memory_write              = 0x80000000;
-
-        sym_t* get_symbol(coff_t& coff, header_t& hdr);
+        coff_sym_t* get_symbol(coff_t& coff, coff_header_t& hdr);
     }
 
     namespace flags {
-        constexpr u32 relocs_stripped           = 0x0001;
-        constexpr u32 executable_type           = 0x0002;
-        constexpr u32 line_nums_stripped        = 0x0004;
-        constexpr u32 local_syms_stripped       = 0x0008;
-        constexpr u32 aggressive_ws_trim        = 0x0010;
-        constexpr u32 large_address_aware       = 0x0020;
-        constexpr u32 reserved                  = 0x0040;
-        constexpr u32 bytes_reversed_lo         = 0x0080;
-        constexpr u32 machine_32bit             = 0x0100;
-        constexpr u32 debug_stripped            = 0x0200;
-        constexpr u32 removable_run_from_swap   = 0x0400;
-        constexpr u32 net_run_from_swap         = 0x0800;
-        constexpr u32 system_type               = 0x1000;
-        constexpr u32 dll_type                  = 0x2000;
-        constexpr u32 up_system_only            = 0x4000;
-        constexpr u32 bytes_reversed_hi         = 0x8000;
-
         str::slice_t name(u32 flag);
     }
 
     namespace comdat {
-        constexpr u32 select_none               = 0;
-        constexpr u32 select_no_duplicates      = 1;
-        constexpr u32 select_any                = 2;
-        constexpr u32 select_same_as            = 3;
-        constexpr u32 select_exact_match        = 4;
-        constexpr u32 select_associative        = 5;
-        constexpr u32 select_largest            = 6;
-
         str::slice_t name(u32 sel);
     }
 
@@ -337,52 +63,7 @@ namespace basecode::binfmt::io::coff {
     }
 
     namespace symtab {
-        constexpr u32 entry_size                = 0x12;
-
-        namespace aux {
-            constexpr u8 clr_token_def          = 1;
-        }
-
-        namespace type {
-            constexpr u8 none                   = 0;
-            constexpr u8 function               = 0x20;
-        }
-
-        namespace section {
-            constexpr s32 undef                 = 0;
-            constexpr s32 absolute              = -1;
-            constexpr s32 debug                 = -2;
-        }
-
         namespace sclass {
-            constexpr u8 null_                  = 0;
-            constexpr u8 auto_                  = 1;
-            constexpr u8 external_              = 2;
-            constexpr u8 static_                = 3;
-            constexpr u8 register_              = 4;
-            constexpr u8 extern_def             = 5;
-            constexpr u8 label                  = 6;
-            constexpr u8 undef_label            = 7;
-            constexpr u8 member_of_struct       = 8;
-            constexpr u8 argument               = 9;
-            constexpr u8 struct_tag             = 10;
-            constexpr u8 member_of_union        = 11;
-            constexpr u8 union_tag              = 12;
-            constexpr u8 type_def               = 13;
-            constexpr u8 undef_static           = 14;
-            constexpr u8 enum_tag               = 15;
-            constexpr u8 member_of_enum         = 16;
-            constexpr u8 register_param         = 17;
-            constexpr u8 bit_field              = 18;
-            constexpr u8 block                  = 100;
-            constexpr u8 function               = 101;
-            constexpr u8 end_of_struct          = 102;
-            constexpr u8 file                   = 103;
-            constexpr u8 section                = 104;
-            constexpr u8 weak_external          = 105;
-            constexpr u8 clr_token              = 107;
-            constexpr u8 end_of_function        = 0xff;
-
             str::slice_t name(u8 sclass);
         }
 
@@ -390,23 +71,21 @@ namespace basecode::binfmt::io::coff {
 
         u0 init(coff_t& sym, alloc_t* alloc);
 
-        sym_t* make_symbol(coff_t& coff);
+        coff_sym_t* make_symbol(coff_t& coff);
 
-        sym_t* find_symbol(coff_t& coff, u64 name);
+        coff_sym_t* find_symbol(coff_t& coff, u64 name);
 
-        sym_t* get_aux(coff_t& coff, sym_t* sym, u32 idx);
+        coff_sym_t* get_aux(coff_t& coff, coff_sym_t* sym, u32 idx);
 
-        sym_t* make_symbol(coff_t& coff, str::slice_t name);
+        coff_sym_t* make_symbol(coff_t& coff, str::slice_t name);
 
-        sym_t* make_symbol(coff_t& coff, u64 name, u32 offset);
+        coff_sym_t* make_symbol(coff_t& coff, u64 name, u32 offset);
 
-        sym_t* make_aux(coff_t& coff, sym_t* sym, sym_type_t type);
+        coff_sym_t* make_aux(coff_t& coff, coff_sym_t* sym, coff_sym_type_t type);
     }
 
     namespace line_num {
-        constexpr u32 entry_size                = 6;
-
-        line_num_t get(const coff_t& coff, const header_t& hdr, u32 idx);
+        coff_line_num_t get(const coff_t& coff, const coff_header_t& hdr, u32 idx);
     }
 
     u0 free(coff_t& coff);
@@ -420,7 +99,7 @@ namespace basecode::binfmt::io::coff {
 
     status_t write_header(file_t& file, coff_t& coff);
 
-    u0 set_section_flags(file_t& file, header_t& hdr);
+    u0 set_section_flags(file_t& file, coff_header_t& hdr);
 
     status_t build_sections(file_t& file, coff_t& coff);
 
@@ -438,9 +117,9 @@ namespace basecode::binfmt::io::coff {
 
     status_t write_section_headers(file_t& file, coff_t& coff);
 
-    status_t build_section(file_t& file, coff_t& coff, header_t& hdr);
+    status_t build_section(file_t& file, coff_t& coff, coff_header_t& hdr);
 
-    status_t write_section_data(file_t& file, coff_t& coff, header_t& hdr);
+    status_t write_section_data(file_t& file, coff_t& coff, coff_header_t& hdr);
 
-    status_t write_section_header(file_t& file, coff_t& coff, header_t& hdr);
+    status_t write_section_header(file_t& file, coff_t& coff, coff_header_t& hdr);
 }

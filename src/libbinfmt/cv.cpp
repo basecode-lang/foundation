@@ -432,12 +432,12 @@ namespace basecode::binfmt::cv {
     }
 
     static status_t read_ansi_symbols(cv_t& cv,
-                                      io::file_t& file,
+                                      file_t& file,
                                       u32 offset,
                                       u32 size);
 
     static status_t read_utf8_symbols(cv_t& cv,
-                                      io::file_t& file,
+                                      file_t& file,
                                       u32 offset,
                                       u32 size);
 
@@ -466,7 +466,7 @@ namespace basecode::binfmt::cv {
     }
 
     static status_t read_ansi_symbols(cv_t& cv,
-                                      io::file_t& file,
+                                      file_t& file,
                                       u32 offset,
                                       u32 size) {
         UNUSED(cv);
@@ -476,7 +476,7 @@ namespace basecode::binfmt::cv {
     }
 
     static status_t read_utf8_symbols(cv_t& cv,
-                                      io::file_t& file,
+                                      file_t& file,
                                       u32 offset,
                                       u32 size) {
         u32 section_size = size;
@@ -716,7 +716,7 @@ namespace basecode::binfmt::cv {
         return "UNKNOWN DEBUG SUBSECTION"_ss;
     }
 
-    status_t read_type_data(cv_t& cv, io::file_t& file, u32 offset, u32 size) {
+    status_t read_type_data(cv_t& cv, file_t& file, u32 offset, u32 size) {
         FILE_PUSH_POS();
         defer(FILE_POP_POS());
 
@@ -882,7 +882,7 @@ namespace basecode::binfmt::cv {
         return status_t::ok;
     }
 
-    status_t read_symbol_data(cv_t& cv, io::file_t& file, u32 offset, u32 size) {
+    status_t read_symbol_data(cv_t& cv, file_t& file, u32 offset, u32 size) {
         FILE_PUSH_POS();
         defer(FILE_POP_POS());
 

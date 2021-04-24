@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <catch.hpp>
-#include <basecode/binfmt/io.h>
 #include <basecode/core/error.h>
 #include <basecode/binfmt/binfmt.h>
 #include <basecode/core/stopwatch.h>
@@ -77,25 +76,27 @@ static const u8 s_rot13_code[] = {
 };
 
 TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
-    using namespace binfmt;
-
     stopwatch_t timer{};
     stopwatch::start(timer);
 
-    auto mod = system::make_module(module_type_t::object, 10);
+    auto mod = binfmt::system::make_module(binfmt::module_type_t::object, 10);
     REQUIRE(mod);
-    REQUIRE(system::get_module(10) != nullptr);
+    REQUIRE(binfmt::system::get_module(10) != nullptr);
     REQUIRE(error::report::ok());
 
     // 1. create the default string table
-    auto strtab_sect = module::make_default_string_table(*mod);
+    auto strtab_sect = binfmt::module::make_default_string_table(*mod);
     REQUIRE(strtab_sect);
     REQUIRE(error::report::ok());
 
-    auto kernel32_str       = section::add_string(strtab_sect, "KERNEL32.DLL"_ss);
-    auto read_file_str      = section::add_string(strtab_sect, "ReadFile"_ss);
-    auto write_file_str     = section::add_string(strtab_sect, "WriteFile"_ss);
-    auto get_std_handle_str = section::add_string(strtab_sect, "GetStdHandle"_ss);
+    auto kernel32_str       = binfmt::section::add_string(strtab_sect,
+                                                          "KERNEL32.DLL"_ss);
+    auto read_file_str      = binfmt::section::add_string(strtab_sect,
+                                                          "ReadFile"_ss);
+    auto write_file_str     = binfmt::section::add_string(strtab_sect,
+                                                          "WriteFile"_ss);
+    auto get_std_handle_str = binfmt::section::add_string(strtab_sect,
+                                                          "GetStdHandle"_ss);
 
     REQUIRE(kernel32_str > 0);
     REQUIRE(read_file_str > kernel32_str);
@@ -104,50 +105,58 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     REQUIRE(error::report::ok());
 
     // 2. create the default symbol table
-    auto symtab_sect = module::make_default_symbol_table(*mod);
+    auto symtab_sect = binfmt::module::make_default_symbol_table(*mod);
     REQUIRE(symtab_sect);
     REQUIRE(error::report::ok());
 
-    auto kernel32_sym = section::add_symbol(symtab_sect, kernel32_str);
+    auto kernel32_sym = binfmt::section::add_symbol(symtab_sect,
+                                                    kernel32_str);
     REQUIRE(kernel32_sym);
-    kernel32_sym->type  = symbol::type_t::file;
+    kernel32_sym->type  = binfmt::symbol::type_t::file;
     kernel32_sym->value = 1;
-    kernel32_sym->scope = symbol::scope_t::local;
+    kernel32_sym->scope = binfmt::symbol::scope_t::local;
 
-    auto read_file_sym = section::add_symbol(symtab_sect, read_file_str);
+    auto read_file_sym = binfmt::section::add_symbol(symtab_sect,
+                                                     read_file_str);
     REQUIRE(read_file_sym);
-    read_file_sym->type  = symbol::type_t::function;
+    read_file_sym->type  = binfmt::symbol::type_t::function;
     read_file_sym->value = 2;
-    read_file_sym->scope = symbol::scope_t::global;
+    read_file_sym->scope = binfmt::symbol::scope_t::global;
 
-    auto write_file_sym = section::add_symbol(symtab_sect, write_file_str);
+    auto write_file_sym = binfmt::section::add_symbol(symtab_sect,
+                                                      write_file_str);
     REQUIRE(write_file_sym);
-    write_file_sym->type  = symbol::type_t::function;
+    write_file_sym->type  = binfmt::symbol::type_t::function;
     write_file_sym->value = 3;
-    write_file_sym->scope = symbol::scope_t::global;
+    write_file_sym->scope = binfmt::symbol::scope_t::global;
 
-    auto get_std_handle_sym = section::add_symbol(symtab_sect, get_std_handle_str);
+    auto get_std_handle_sym = binfmt::section::add_symbol(symtab_sect,
+                                                          get_std_handle_str);
     REQUIRE(get_std_handle_sym);
-    get_std_handle_sym->type  = symbol::type_t::function;
+    get_std_handle_sym->type  = binfmt::symbol::type_t::function;
     get_std_handle_sym->value = 4;
-    get_std_handle_sym->scope = symbol::scope_t::global;
+    get_std_handle_sym->scope = binfmt::symbol::scope_t::global;
 
     REQUIRE(error::report::ok());
 
     /* 3. .text section */ {
-        auto text_sect = module::make_text(*mod, (u8*) s_rot13_code, sizeof(s_rot13_code));
+        auto text_sect = binfmt::module::make_text(*mod,
+                                                   (u8*) s_rot13_code,
+                                                   sizeof(s_rot13_code));
         REQUIRE(text_sect);
         REQUIRE(error::report::ok());
     }
 
     /* 4. .rdata section */ {
-        auto rodata_sect = module::make_rodata(*mod, (u8*) s_rot13_table, sizeof(s_rot13_table));
+        auto rodata_sect = binfmt::module::make_rodata(*mod,
+                                                       (u8*) s_rot13_table,
+                                                       sizeof(s_rot13_table));
         REQUIRE(rodata_sect);
         REQUIRE(error::report::ok());
     }
 
     /* 5. .idata section */ {
-        auto import_sect = module::make_import(*mod);
+        auto import_sect = binfmt::module::make_import(*mod);
         REQUIRE(import_sect);
         REQUIRE(error::report::ok());
 
@@ -156,11 +165,12 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
         write_file_sym->section     = import_sect;
         get_std_handle_sym->section = import_sect;
 
-        auto kernel32_import = section::add_import(import_sect, kernel32_sym);
+        auto kernel32_import = binfmt::section::add_import(import_sect,
+                                                           kernel32_sym);
         REQUIRE(kernel32_import);
-        import::add_symbol(kernel32_import, get_std_handle_sym);
-        import::add_symbol(kernel32_import, read_file_sym);
-        import::add_symbol(kernel32_import, write_file_sym);
+        binfmt::import::add_symbol(kernel32_import, get_std_handle_sym);
+        binfmt::import::add_symbol(kernel32_import, read_file_sym);
+        binfmt::import::add_symbol(kernel32_import, write_file_sym);
         REQUIRE(error::report::ok());
 
         REQUIRE(kernel32_import->symbols.size == 3);
@@ -170,30 +180,30 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
     }
 
     /* 6. .bss section */ {
-        auto bss_sect = module::make_bss(*mod, 4096);
+        auto bss_sect = binfmt::module::make_bss(*mod, 4096);
         REQUIRE(bss_sect);
         REQUIRE(bss_sect->size == 4096);
     }
 
-    io::session_t s{};
-    io::session::init(s);
-    defer(io::session::free(s));
+    binfmt::session_t s{};
+    binfmt::session::init(s);
+    defer(binfmt::session::free(s));
 
     auto rot13_exe_path = "rot13.exe"_path;
     defer(path::free(rot13_exe_path));
-    auto rot13_exe_file = io::session::add_file(s,
-                                                mod,
-                                                rot13_exe_path,
-                                                machine::type_t::x86_64,
-                                                io::type_t::pe,
-                                                io::file_type_t::exe);
+    auto rot13_exe_file = binfmt::session::add_file(s,
+                                                    mod,
+                                                    rot13_exe_path,
+                                                    binfmt::machine::type_t::x86_64,
+                                                    binfmt::type_t::pe,
+                                                    binfmt::file_type_t::exe);
     rot13_exe_file->versions.linker.major = 6;
     rot13_exe_file->versions.linker.minor = 0;
     rot13_exe_file->versions.min_os.major = 4;
     rot13_exe_file->versions.min_os.minor = 0;
     rot13_exe_file->flags.console = true;
 
-    REQUIRE(OK(io::write(s)));
+    REQUIRE(OK(binfmt::session::write(s)));
 
     stopwatch::stop(timer);
     stopwatch::print_elapsed("binfmt write PE executable time"_ss, 40, timer);

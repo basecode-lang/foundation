@@ -17,15 +17,12 @@
 // ----------------------------------------------------------------------------
 
 #include <catch.hpp>
-#include <basecode/binfmt/io.h>
 #include <basecode/binfmt/ar.h>
 #include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
 TEST_CASE("basecode::binfmt ar read test") {
-    using namespace binfmt;
-
     stopwatch_t timer{};
     stopwatch::start(timer);
 
@@ -36,14 +33,14 @@ TEST_CASE("basecode::binfmt ar read test") {
     auto lib_path = R"(/home/jeff/temp/libbasecode-binfmt.a)"_path;
 #endif
 
-    ar::ar_t ar{};
-    ar::init(ar);
+    binfmt::ar_t ar{};
+    binfmt::ar::init(ar);
     defer({
-        ar::free(ar);
+        binfmt::ar::free(ar);
         path::free(lib_path);
     });
 
-    REQUIRE(OK(ar::read(ar, lib_path)));
+    REQUIRE(OK(binfmt::ar::read(ar, lib_path)));
 
     stopwatch::stop(timer);
 
@@ -71,8 +68,6 @@ TEST_CASE("basecode::binfmt ar read test") {
             format::format_to(buf, "\n----\n\n");
         }
 
-        // FIXME
-        // there's some out whack in memory here
         for (const auto& pair : ar.symbol_map) {
             format::format_to(buf, "symbol . . . . . . . {}\n", pair.key);
             format::format_to(buf, "bitmap offset  . . . {}\n", pair.value);
@@ -80,7 +75,7 @@ TEST_CASE("basecode::binfmt ar read test") {
             for (u32 i = 0; i < ar.members.size; ++i) {
                 if (bitset::read(ar.symbol_module_bitmap, pair.value + i)) {
                     const auto& member = ar.members[i];
-//                    format::format_to(buf, "  {:>04}: {}\n", i, member.name);
+                    format::format_to(buf, "  {:>04}: {}\n", i, member.name);
                 }
             }
             format::format_to(buf, "\n");

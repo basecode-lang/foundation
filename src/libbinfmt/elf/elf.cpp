@@ -21,7 +21,7 @@
 #include <basecode/core/string.h>
 #include <basecode/binfmt/binfmt.h>
 
-namespace basecode::binfmt::io::elf {
+namespace basecode::binfmt::elf {
     namespace bf = basecode::binfmt;
 
     enum section_map_status_t : u8 {
@@ -634,14 +634,14 @@ namespace basecode::binfmt::io::elf {
             return h;
         }
 
-        sym_t* get(const elf_t& elf, u32 sect_num, u32 sym_idx) {
+        elf_sym_t* get(const elf_t& elf, u32 sect_num, u32 sym_idx) {
             if (sect_num > elf.file_header->sect_hdr_count)
                 return nullptr;
             const auto& hdr = elf.sections[sect_num];
             if (sym_idx < (hdr.size / hdr.entity_size)) {
-                return (sym_t*) (((u8*) elf.file_header)
+                return (elf_sym_t*) (((u8*) elf.file_header)
                                  + hdr.offset
-                                 + (sizeof(sym_t) * sym_idx));
+                                 + (sizeof(elf_sym_t) * sym_idx));
             }
             return nullptr;
         }
@@ -909,14 +909,14 @@ namespace basecode::binfmt::io::elf {
                 break;
             }
             case bf::section::type_t::note: {
-                auto note_hdr = (note_header_t*) (buf + hdr.offset);
+                auto note_hdr = (elf_note_header_t*) (buf + hdr.offset);
                 UNUSED(note_hdr);
                 // XXX: need to finish
                 break;
             }
             case bf::section::type_t::reloc: {
                 auto& relocs = section->subclass.relocs;
-                auto rels = (rela_t*) (buf + hdr.offset);
+                auto rels = (elf_rela_t*) (buf + hdr.offset);
                 auto num_rels = hdr.size / hdr.entity_size;
                 array::resize(relocs, num_rels);
                 for (u32 j = 0; j < num_rels; ++j) {
@@ -945,7 +945,7 @@ namespace basecode::binfmt::io::elf {
             }
             case bf::section::type_t::group: {
                 auto gsc = &section->subclass.group;
-                auto group = (group_t*) (buf + hdr.offset);
+                auto group = (elf_group_t*) (buf + hdr.offset);
                 auto num_groups = hdr.size / hdr.entity_size;
                 gsc->flags = group->flags;
                 array::resize(gsc->sections, num_groups);
@@ -1055,7 +1055,7 @@ namespace basecode::binfmt::io::elf {
     status_t read(elf_t& elf, file_t& file) {
         auto buf = FILE_PTR();
 
-        elf.file_header = (file_header_t*) (buf);
+        elf.file_header = (elf_file_header_t*) (buf);
         if (std::memcmp(elf.file_header->magic, "\177ELF", 4) != 0)
             return status_t::read_error;
 
@@ -1087,11 +1087,11 @@ namespace basecode::binfmt::io::elf {
         }
 
         if (elf.file_header->pgm_hdr_count > 0) {
-            elf.segments = (pgm_header_t*) (buf + elf.file_header->pgm_hdr_offset);
+            elf.segments = (elf_pgm_header_t*) (buf + elf.file_header->pgm_hdr_offset);
         }
 
         if (elf.file_header->sect_hdr_count > 0) {
-            elf.sections = (sect_header_t*) (buf + elf.file_header->sect_hdr_offset);
+            elf.sections = (elf_sect_header_t*) (buf + elf.file_header->sect_hdr_offset);
         }
 
         file.module = bf::system::make_module(module_type_t::object);
@@ -1153,7 +1153,7 @@ namespace basecode::binfmt::io::elf {
             fh->sect_hdr_count  = msc->sections.size + 1;
             fh->sect_hdr_size   = section::header_size;
             fh->sect_hdr_offset = opts.header_offset;
-            elf.sections = (sect_header_t*) (buf + fh->sect_hdr_offset);
+            elf.sections = (elf_sect_header_t*) (buf + fh->sect_hdr_offset);
         }
 
         if (num_segments > 0) {
@@ -1161,7 +1161,7 @@ namespace basecode::binfmt::io::elf {
             fh->pgm_hdr_size   = segment::header_size;
             fh->pgm_hdr_offset = fh->sect_hdr_offset
                                  + (fh->sect_hdr_count * fh->sect_hdr_size);
-            elf.segments = (pgm_header_t*) (buf + fh->pgm_hdr_offset);
+            elf.segments = (elf_pgm_header_t*) (buf + fh->pgm_hdr_offset);
         }
 
         switch (file.file_type) {
@@ -1268,7 +1268,7 @@ namespace basecode::binfmt::io::elf {
                 case section_type_t::reloc: {
                     hdr.type        = section::type::rela;
                     hdr.entity_size = relocs::entity_size;
-                    auto rela = (rela_t*) data;
+                    auto rela = (elf_rela_t*) data;
                     for (u32 j = 0; j < section->subclass.relocs.size; ++j) {
                         const auto& reloc = section->subclass.relocs[j];
                         u32 type{};
@@ -1292,7 +1292,7 @@ namespace basecode::binfmt::io::elf {
                 case section_type_t::group: {
                     hdr.type        = section::type::group;
                     hdr.entity_size = group::entity_size;
-                    auto group = (group_t*) data;
+                    auto group = (elf_group_t*) data;
                     group->flags = section->subclass.group.flags;
                     for (u32 j = 0; j < section->subclass.group.sections.size; ++j)
                         group->sect_hdr_indexes[j] = section->subclass.group.sections[j];
@@ -1327,7 +1327,7 @@ namespace basecode::binfmt::io::elf {
                                section::type::symtab;
                     hdr.entity_size = symtab::entity_size;
 
-                    auto sym_data = (sym_t*) (buf + hdr.offset);
+                    auto sym_data = (elf_sym_t*) (buf + hdr.offset);
                     u32 i       {};
                     u32 scope   {};
                     u32 type    {};
@@ -1419,11 +1419,11 @@ namespace basecode::binfmt::io::elf {
         return status_t::ok;
     }
 
-    status_t init(elf_t& elf, const opts_t& opts) {
+    status_t init(elf_t& elf, const elf_opts_t& opts) {
         auto& file = *opts.file;
         elf.alloc       = opts.alloc;
         elf.opts        = &opts;
-        elf.file_header = (file_header_t*) (FILE_PTR());
+        elf.file_header = (elf_file_header_t*) (FILE_PTR());
         return status_t::ok;
     }
 

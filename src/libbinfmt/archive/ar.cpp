@@ -39,9 +39,9 @@ namespace basecode::binfmt::ar {
 
     static status_t parse_symbol_table(ar_t& ar, buf_crsr_t& c);
 
-    static status_t parse_long_name_ref(ar_t& ar, member_t& member);
-
     static status_t parse_ecoff_symbol_table(ar_t& ar, buf_crsr_t& c);
+
+    static status_t parse_long_name_ref(ar_t& ar, ar_member_t& member);
 
     u0 free(ar_t& ar) {
         buf::free(ar.buf);
@@ -102,7 +102,7 @@ namespace basecode::binfmt::ar {
         return status_t::ok;
     }
 
-    u0 add_member(ar_t& ar, const member_t& member) {
+    u0 add_member(ar_t& ar, const ar_member_t& member) {
         array::append(ar.members, member);
     }
 
@@ -260,26 +260,6 @@ namespace basecode::binfmt::ar {
         return status_t::ok;
     }
 
-    static status_t parse_long_name_ref(ar_t& ar, member_t& member) {
-        if (member.name[0] != '/' || !isdigit(member.name[1]))
-            return status_t::ok;
-
-        auto& long_names = ar.members[ar.known.long_names - 1];
-
-        u32 offset{};
-        const auto name_slice = slice::make(member.name.data + 1, 15);
-        auto status = numbers::integer::parse(name_slice, 10, offset);
-        if (!OK(status))
-            return status_t::read_error;
-
-        member.name.data    = long_names.content.data + offset;
-        auto p = member.name.data;
-        while (*p != '\n') p++;
-        member.name.length  = p - member.name.data;
-
-        return status_t::ok;
-    }
-
     // XXX: this isn't finished but m$ sucks so...there
     static status_t parse_ecoff_symbol_table(ar_t& ar, buf_crsr_t& c) {
         ar.known.ecoff_symbol_table = 2;
@@ -320,7 +300,27 @@ namespace basecode::binfmt::ar {
         return status_t::ok;
     }
 
-    u0 find_member(ar_t& ar, str::slice_t name, member_ptr_array_t& list) {
+    static status_t parse_long_name_ref(ar_t& ar, ar_member_t& member) {
+        if (member.name[0] != '/' || !isdigit(member.name[1]))
+            return status_t::ok;
+
+        auto& long_names = ar.members[ar.known.long_names - 1];
+
+        u32 offset{};
+        const auto name_slice = slice::make(member.name.data + 1, 15);
+        auto status = numbers::integer::parse(name_slice, 10, offset);
+        if (!OK(status))
+            return status_t::read_error;
+
+        member.name.data    = long_names.content.data + offset;
+        auto p = member.name.data;
+        while (*p != '\n') p++;
+        member.name.length  = p - member.name.data;
+
+        return status_t::ok;
+    }
+
+    u0 find_member(ar_t& ar, str::slice_t name, ar_member_ptr_array_t& list) {
         for (auto& member : ar.members) {
             if (member.name == name)
                 array::append(list, &member);

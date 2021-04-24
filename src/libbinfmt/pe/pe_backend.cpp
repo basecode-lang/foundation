@@ -18,7 +18,7 @@
 
 #include <basecode/binfmt/pe.h>
 
-namespace basecode::binfmt::io::pe {
+namespace basecode::binfmt::pe {
     namespace internal {
         static u0 fini() {
         }
@@ -31,7 +31,7 @@ namespace basecode::binfmt::io::pe {
         static status_t write(file_t& file) {
             const auto module = file.module;
 
-            opts_t opts{};
+            pe_opts_t opts{};
             opts.alloc         = module->alloc;
             opts.file          = &file;
             opts.base_addr     = file.opts.base_addr;
@@ -112,7 +112,7 @@ namespace basecode::binfmt::io::pe {
             return status_t::ok;
         }
 
-        system_t                    g_pe_sys {
+        io_system_t                 g_pe_sys {
             .init   = init,
             .fini   = fini,
             .read   = read,
@@ -121,7 +121,7 @@ namespace basecode::binfmt::io::pe {
         };
     }
 
-    system_t* system() {
+    io_system_t* system() {
         return &internal::g_pe_sys;
     }
 }
