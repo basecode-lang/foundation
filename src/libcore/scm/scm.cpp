@@ -847,6 +847,8 @@ namespace basecode::scm {
                 default:
                     break;
             }
+        } else if (TYPE(kar) == obj_type_t::pair) {
+            fn = EVAL(kar);
         } else {
             fn = kar;
         }
