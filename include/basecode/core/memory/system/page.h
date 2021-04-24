@@ -19,6 +19,7 @@
 #pragma once
 
 #include <basecode/core/memory.h>
+#include <basecode/core/assert.h>
 
 namespace basecode {
     struct page_header_t final {

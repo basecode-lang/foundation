@@ -104,14 +104,6 @@ namespace basecode {
         return (*(s8*) & n) == 1;
     }
 
-    u64 align(u64 size, u64 align) {
-        if (align > 0) {
-            auto result = size + align - 1;
-            return result - result % align;
-        }
-        return size;
-    }
-
     u16 endian_swap_word(u16 value) {
         return (value >> u16(8)) | (value << u16(8));
     }

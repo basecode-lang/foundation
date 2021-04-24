@@ -91,8 +91,7 @@ TEST_CASE("basecode::hashtab payload with random string keys") {
 
     str_array_t strings{};
     str_array::init(strings);
-    str_array::reserve_index(strings, 4096);
-    str_array::reserve_data(strings, 4096 * 33);
+    str_array::reserve(strings, 4096);
 
     str_t temp{};
     str::init(temp);

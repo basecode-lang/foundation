@@ -1537,8 +1537,24 @@ namespace basecode {
     // str_array
     //
     // ------------------------------------------------------------------------
-    struct str_idx_t;
-    struct str_array_t;
+    struct str_idx_t final {
+        u8*                     buf;
+        u32                     len;
+    };
+
+    struct str_array_t final {
+        alloc_t*                alloc;
+        alloc_t*                page_alloc;
+        alloc_t*                bump_alloc;
+        str_idx_t*              index;
+        u32                     size;
+        u32                     capacity;
+
+        inline str::slice_t operator[](u32 i) const;
+    };
+
+    static_assert(sizeof(str_array_t) <= 40,
+                  "str_array_t is now greater than 40 bytes!");
 
     // ------------------------------------------------------------------------
     //

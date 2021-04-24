@@ -55,13 +55,18 @@ LOW
 - ipc: create an ipc module for low-level base
     ipc_addr_t, ipc_transport_t, ipc_
 
-- page allocator: implement free list so pages can recycle
 - page allocator/slab allocator: implement reserve function so n numbers of pages can be allocated at a time.
         this would replace passing num_pages into these up front and makes the interface (perhaps) more consistent
         with other mechanisms in the library.
 
 DONE
 ----
+- str_array: refactor to use page + bump allocators to simplify interface with
+    stable pointers to strings.
+- page allocator: implement free list so pages can recycle
+    * fixed the existing implementation so it actually recycles existing pages, though
+      only on an explicit reset call to the allocator. freed pages are simply removed from the
+      page list.
 - filesys: need to open and read the xdg config file (if found) and put into a symtab_t or hashtab_t.
             also, need to read applicable env vars once at module init and put them into the
             same symtab_t/hashtab_t.

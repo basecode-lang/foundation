@@ -68,8 +68,7 @@ TEST_CASE("basecode::intern") {
 
     str_array_t strings{};
     str_array::init(strings);
-    str_array::reserve_index(strings, expected_intern_count);
-    str_array::reserve_data(strings, expected_intern_count * 65);
+    str_array::reserve(strings, expected_intern_count);
 
     str_t temp{};
     str::init(temp);

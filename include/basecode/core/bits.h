@@ -51,8 +51,6 @@ namespace basecode {
 
     b8 is_platform_little_endian();
 
-    u64 align(u64 size, u64 align);
-
     u16 endian_swap_word(u16 value);
 
     u32 previous_power_of_two(u32 n);
@@ -72,6 +70,10 @@ namespace basecode {
     u8 lnybble(u8 original, u8 value);
 
     u8 unybble(u8 original, u8 value);
+
+    inline u64 align(u64 size, u64 align) {
+        return size + (-size & (align - 1));
+    }
 
     template <typename T>
     inline b8 is_sign_bit_set(T value) {

@@ -16,14 +16,16 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/bits.h>
 #include <basecode/core/assert.h>
 #include <basecode/core/memory/system/bump.h>
 
 namespace basecode::memory::bump {
     static u32 fini(alloc_t* alloc) {
         auto sc = &alloc->subclass.bump;
-        sc->buf    = {};
-        sc->offset = sc->end_offset = {};
+        sc->buf        = {};
+        sc->offset     = {};
+        sc->end_offset = {};
         return alloc->total_allocated;
     }
 
@@ -35,16 +37,19 @@ namespace basecode::memory::bump {
                 sc->buf = cfg->backing.buf;
                 break;
             case bump_type_t::allocator:
+                sc->buf = {};
                 alloc->backing  = cfg->backing.alloc;
                 BC_ASSERT_NOT_NULL(alloc->backing);
                 break;
         }
-        sc->offset = sc->end_offset = {};
+        sc->offset     = {};
+        sc->end_offset = {};
     }
 
     static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
         auto sc = &alloc->subclass.bump;
-        if (!sc->buf || sc->offset + (size + align) > sc->end_offset) {
+        const auto next_offset = sc->offset + size + (align * 2);
+        if (!sc->buf || next_offset > sc->end_offset) {
             auto r = memory::internal::alloc(alloc->backing, size, align);
             sc->buf        = r.mem;
             sc->offset     = {};
@@ -77,8 +82,9 @@ namespace basecode::memory::bump {
         BC_ASSERT_MSG(a && a->system->type == alloc_type_t::bump,
                       "expected a non-null bump allocator");
         auto sc = &a->subclass.bump;
-        sc->buf    = {};
-        sc->offset = sc->end_offset = {};
+        sc->buf        = {};
+        sc->offset     = {};
+        sc->end_offset = {};
     }
 
     u0 buf(alloc_t* alloc, u0* buf, u32 size) {

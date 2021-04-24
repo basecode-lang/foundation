@@ -45,8 +45,7 @@ TEST_CASE("basecode::str_array basics") {
             str::reset(temp);
         });
 
-    //format::print("{}\n", array);
+//    format::print("{}\n", array);
 
     REQUIRE(array.size == 100);
-    REQUIRE(array.buf.size == (100 * 33));
 }

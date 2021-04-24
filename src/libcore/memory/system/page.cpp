@@ -20,15 +20,27 @@
 #include <basecode/core/memory/system/page.h>
 
 namespace basecode::memory::page {
+    static page_header_t* grow(alloc_t* alloc);
+
+    static u0 remove(alloc_t* alloc, page_header_t* page);
+
+    static page_header_t* move_back(alloc_t* alloc, page_header_t* page);
+
+    [[maybe_unused]]
+    static page_header_t* move_front(alloc_t* alloc, page_header_t* page);
+
     static u32 fini(alloc_t* alloc) {
         auto sc        = &alloc->subclass.page;
         auto curr_page = sc->head;
+        page_header_t* to_free[sc->count];
         u32 total_freed{};
+        u32 idx{};
         while (curr_page) {
-            auto prev_page = curr_page->prev;
-            total_freed += memory::internal::free(alloc->backing, curr_page);
-            curr_page = prev_page;
+            to_free[idx++] = curr_page;
+            curr_page = curr_page->next;
         }
+        for (page_header_t* page : to_free)
+            total_freed += memory::internal::free(alloc->backing, page);
         return total_freed;
     }
 
@@ -39,13 +51,27 @@ namespace basecode::memory::page {
     }
 
     static u32 free(alloc_t* alloc, u0* mem) {
-        auto sc   = &alloc->subclass.page;
         auto page = (page_header_t*) mem - 1;
-        if (page->next) page->next->prev = page->prev;
-        if (page->prev) page->prev->next = page->next;
-        if (sc->head == mem) sc->head    = page->next;
-        if (sc->tail == mem) sc->tail    = page->prev;
+        remove(alloc, page);
         return memory::internal::free(alloc->backing, mem);
+    }
+
+    static page_header_t* grow(alloc_t* alloc) {
+        auto       sc = &alloc->subclass.page;
+        const auto r  = memory::internal::alloc(alloc->backing,
+                                                sc->page_size,
+                                                alignof(page_header_t));
+        std::memset(r.mem, 0, sizeof(page_header_t));
+        sc->count++;
+        return move_back(alloc, (page_header_t*) r.mem);
+    }
+
+    static u0 remove(alloc_t* alloc, page_header_t* page) {
+        auto sc = &alloc->subclass.page;
+        if (page->next)         page->next->prev = page->prev;
+        if (page->prev)         page->prev->next = page->next;
+        if (sc->head == page)   sc->head         = page->next;
+        if (sc->tail == page)   sc->tail         = page->prev;
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
@@ -63,33 +89,20 @@ namespace basecode::memory::page {
     }
 
     static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
-        UNUSED(size); UNUSED(align);
-        auto sc      = &alloc->subclass.page;
-        auto backing = alloc->backing;
-        page_header_t* page{};
-        if (sc->cursor) {
-            page = sc->cursor;
-            sc->cursor = sc->cursor->next;
-        }
+        UNUSED(size);
+        UNUSED(align);
+        auto sc = &alloc->subclass.page;
         mem_result_t r{};
-        if (!page) {
-            r = memory::internal::alloc(backing,
-                                        sc->page_size,
-                                        alignof(page_header_t));
-            page = (page_header_t*) r.mem;
-            sc->count++;
-            if (!sc->tail) {
-                sc->tail = page;
-            }
-            if (sc->head) {
-                page->prev     = sc->head;
-                sc->head->next = page;
-            } else {
-                page->prev = page->next = {};
-            }
-            sc->head = page;
+        if (sc->cursor) {
+            r.mem = (u8*) sc->cursor + sizeof(page_header_t);
+            r.size     = 0;
+            sc->cursor = sc->cursor->next;
+        } else {
+            auto page = grow(alloc);
+            r.mem  = (u8*) page + sizeof(page_header_t);
+            r.size = sc->page_size;
         }
-        return mem_result_t{++page, r.size};
+        return r;
     }
 
     alloc_system_t g_system{
@@ -107,10 +120,46 @@ namespace basecode::memory::page {
         BC_ASSERT_MSG(a && a->system->type == alloc_type_t::page,
                       "expected a non-null page allocator");
         auto sc = &a->subclass.page;
-        sc->cursor = sc->tail;
+        sc->cursor = sc->head;
     }
 
     alloc_system_t* system() {
         return &g_system;
+    }
+
+    static page_header_t* move_back(alloc_t* alloc, page_header_t* page) {
+        auto sc = &alloc->subclass.page;
+        if (sc->tail == page)
+            return sc->tail;
+        remove(alloc, page);
+        page->next = {};
+        if (sc->tail) {
+            sc->tail->next = page;
+            page->prev = sc->tail;
+            if (!sc->head)
+                sc->head = sc->tail;
+        } else {
+            sc->head = page;
+        }
+        sc->tail = page;
+        return sc->tail;
+    }
+
+    static page_header_t* move_front(alloc_t* alloc, page_header_t* page) {
+        auto sc  = &alloc->subclass.page;
+        if (sc->head == page)
+            return page;
+        remove(alloc, page);
+        page->prev = {};
+        if (sc->head) {
+            sc->head->prev = page;
+            page->next     = sc->head;
+            if (!sc->tail)
+                sc->tail   = sc->head;
+        } else {
+            sc->tail = page;
+        }
+        sc->head = page;
+        return sc->head;
     }
 }

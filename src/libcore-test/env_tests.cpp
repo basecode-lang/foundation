@@ -52,7 +52,7 @@ TEST_CASE("basecode::env basics") {
 
     TIME_BLOCK("basecode::env expand macros"_ss,
                auto root_env = env::system::get_root();
-               format_env(root_env);
+//               format_env(root_env);
                auto val = env::set(root_env,
                                    "HOME_TEST"_ss,
                                    "$HOMEDRIVE$HOMEPATH"_ss);
