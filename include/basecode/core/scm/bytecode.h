@@ -23,12 +23,6 @@
 #include <basecode/core/scm/basic_block.h>
 
 namespace basecode::scm::bytecode {
-    bb_t& leave(bb_t& bb);
-
-    bb_t& enter(bb_t& bb, u32 locals);
-
-    u0 free_stack(bb_t& bb, u32 words);
-
     u0 todo(bb_t& bb, str::slice_t msg);
 
     compile_result_t ffi(compiler_t& comp,
@@ -80,8 +74,6 @@ namespace basecode::scm::bytecode {
                                   obj_t* args);
 
     compile_result_t lookup(compiler_t& comp, const context_t& c);
-
-    u0 alloc_stack(bb_t& bb, u32 words, var_version_t** base_addr);
 
     compile_result_t self_eval(compiler_t& comp, const context_t& c);
 
