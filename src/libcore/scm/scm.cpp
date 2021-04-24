@@ -416,8 +416,17 @@ namespace basecode::scm {
     }
 
     obj_t* eval2(ctx_t* ctx, obj_t* obj) {
+        auto& vm = ctx->vm;
         auto comp_result = compiler::compile(ctx->compiler, ctx, obj);
-        UNUSED(comp_result);
+        if (comp_result.obj) {
+            check_type(ctx, comp_result.obj, obj_type_t::proc);
+            auto proc = PROC(comp_result.obj);
+            PC = u64(vm::mem_area::base_addr(*proc->bytecode));
+            auto status = vm::step(ctx->vm, ctx);
+            if (!OK(status))
+                return error(ctx, "[eval2] vm returned non-success status");
+            return (obj_t*) G(comp_result.var->reg);
+        }
         return ctx->nil;
     }
 
