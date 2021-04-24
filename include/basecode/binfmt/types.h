@@ -25,6 +25,7 @@
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode::binfmt {
+    struct ar_t;
     struct reloc_t;
     struct group_t;
     struct module_t;
