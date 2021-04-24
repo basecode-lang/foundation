@@ -41,6 +41,10 @@ namespace basecode::binfmt {
     system_t                    g_binfmt_sys{};
 
     // N.B. forward declare back-end accessor functions
+    namespace ar {
+        io_system_t* system();
+    }
+
     namespace pe {
         io_system_t* system();
     }
@@ -55,13 +59,6 @@ namespace basecode::binfmt {
 
     namespace macho {
         io_system_t* system();
-    }
-
-    namespace archive {
-        io_system_t* system();
-    }
-
-    namespace io {
     }
 
     namespace name_map {
@@ -179,7 +176,7 @@ namespace basecode::binfmt {
                          module_t* module,
                          const path_t& path,
                          machine::type_t machine,
-                         type_t bin_type,
+                         format_type_t bin_type,
                          file_type_t output_type) {
             return add_file(s,
                             module,
@@ -192,7 +189,7 @@ namespace basecode::binfmt {
 
         file_t* add_file(session_t& s,
                          const path_t& path,
-                         type_t bin_type,
+                         format_type_t bin_type,
                          file_type_t file_type) {
             return add_file(s,
                             path::c_str(path),
@@ -203,7 +200,7 @@ namespace basecode::binfmt {
 
         file_t* add_file(session_t& s,
                          const s8* path,
-                         type_t bin_type,
+                         format_type_t bin_type,
                          file_type_t file_type,
                          s32 path_len) {
             auto file = &array::append(s.files);
@@ -221,7 +218,7 @@ namespace basecode::binfmt {
                          module_t* module,
                          const s8* path,
                          machine::type_t machine,
-                         type_t bin_type,
+                         format_type_t bin_type,
                          file_type_t output_type,
                          s32 path_len) {
             auto file = &array::append(s.files);
@@ -244,8 +241,10 @@ namespace basecode::binfmt {
 
     namespace system {
         u0 fini() {
-            for (auto sys : g_binfmt_sys.systems)
-                sys->fini();
+            for (auto sys : g_binfmt_sys.systems) {
+                if (sys)
+                    sys->fini();
+            }
             for (auto section : g_binfmt_sys.sections)
                 section::free(*section);
             for (auto mod : g_binfmt_sys.modules)
@@ -262,12 +261,15 @@ namespace basecode::binfmt {
             stable_array::init(g_binfmt_sys.modules, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.symbols, g_binfmt_sys.alloc);
             stable_array::init(g_binfmt_sys.sections, g_binfmt_sys.alloc);
-            g_binfmt_sys.systems[u32(type_t::ar)]    = archive::system();
-            g_binfmt_sys.systems[u32(type_t::pe)]    = pe::system();
-            g_binfmt_sys.systems[u32(type_t::elf)]   = elf::system();
-            g_binfmt_sys.systems[u32(type_t::coff)]  = coff::system();
-            g_binfmt_sys.systems[u32(type_t::macho)] = macho::system();
+            g_binfmt_sys.systems[u32(format_type_t::none)]  = nullptr;
+            g_binfmt_sys.systems[u32(format_type_t::ar)]    = ar::system();
+            g_binfmt_sys.systems[u32(format_type_t::pe)]    = pe::system();
+            g_binfmt_sys.systems[u32(format_type_t::elf)]   = elf::system();
+            g_binfmt_sys.systems[u32(format_type_t::coff)]  = coff::system();
+            g_binfmt_sys.systems[u32(format_type_t::macho)] = macho::system();
             for (auto sys : g_binfmt_sys.systems) {
+                if (!sys)
+                    continue;
                 auto status = sys->init(alloc);
                 if (!OK(status))
                     return status;
@@ -301,6 +303,9 @@ namespace basecode::binfmt {
         }
     }
 
+    namespace member {
+    }
+
     namespace import {
         u0 add_symbol(import_t* import, symbol_t* symbol) {
             auto idx = array::contains(import->symbols, symbol);
@@ -317,24 +322,26 @@ namespace basecode::binfmt {
         u0 free(section_t& section) {
             switch (section.type) {
                 case section::type_t::reloc:
-                    array::free(section.subclass.relocs);
+                    array::free(section.as_relocs());
                     break;
                 case section::type_t::group:
-                    array::free(section.subclass.group.sections);
+                    array::free(section.as_group().sections);
                     break;
-                case section::type_t::import:
-                    for (auto& import : section.subclass.imports)
+                case section::type_t::import: {
+                    auto& imports = section.as_imports();
+                    for (auto& import : imports)
                         array::free(import.symbols);
-                    array::free(section.subclass.imports);
+                    array::free(imports);
                     break;
+                }
                 case section::type_t::data:
                     if (!section.flags.strings)
                         break;
                 case section::type_t::strtab:
-                    string_table::free(section.subclass.strtab);
+                    string_table::free(section.as_strtab());
                     break;
                 case section::type_t::symtab:
-                    symbol_table::free(section.subclass.symtab);
+                    symbol_table::free(section.as_symtab());
                     break;
                 default:
                     break;
@@ -358,30 +365,30 @@ namespace basecode::binfmt {
                     if (section->flags.strings) {
                         goto init_strtab;
                     } else {
-                        section->subclass.data = {};
+                        section->as_data() = {};
                     }
                     break;
                 case section::type_t::text:
                 case section::type_t::custom:
-                    section->subclass.data = {};
+                    section->as_data() = {};
                     break;
                 case section::type_t::reloc:
-                    array::init(section->subclass.relocs, section->alloc);
+                    array::init(section->as_relocs(), section->alloc);
                     break;
                 case section::type_t::group:
-                    array::init(section->subclass.group.sections,
+                    array::init(section->as_group().sections,
                                 section->alloc);
                     break;
                 case section::type_t::import:
-                    array::init(section->subclass.imports, section->alloc);
+                    array::init(section->as_imports(), section->alloc);
                     break;
                 case section::type_t::strtab:
                 init_strtab: if (!opts.strtab.buf) {
-                        auto status = string_table::init(section->subclass.strtab);
+                        auto status = string_table::init(section->as_strtab());
                         if (!OK(status))
                             return status;
                     } else {
-                        auto status = string_table::init(section->subclass.strtab,
+                        auto status = string_table::init(section->as_strtab(),
                                                          opts.strtab.buf,
                                                          opts.strtab.size_in_bytes);
                         if (!OK(status))
@@ -389,7 +396,7 @@ namespace basecode::binfmt {
                     }
                     break;
                 case section::type_t::symtab:
-                    symbol_table::init(section->subclass.symtab);
+                    symbol_table::init(section->as_symtab());
                     break;
                 default:
                     break;
@@ -445,19 +452,22 @@ namespace basecode::binfmt {
 
     namespace module {
         u0 free(module_t& module) {
+            array::free(module.sections);
             switch (module.type) {
                 case module_type_t::archive: {
-                    auto& sc = module.subclass.archive;
-                    array::free(sc.members);
-                    array::free(sc.offsets);
+                    auto sc = module.as_archive();
+                    array::free(sc->members);
+                    bitset::free(sc->bitmap);
+                    hashtab::free(sc->index);
+                    sc->extended_symtab = {};
                     break;
                 }
                 case module_type_t::object: {
-                    auto& sc = module.subclass.object;
-                    array::free(sc.sections);
                     break;
                 }
             }
+            module.strtab = {};
+            module.symtab = {};
         }
 
         section_t* make_import(module_t& module) {
@@ -472,17 +482,20 @@ namespace basecode::binfmt {
         u0 find_sections(const module_t& module,
                          str::slice_t name,
                          section_ptr_array_t& list) {
-            if (module.type != module_type_t::object)
+            switch (module.type) {
+                case module_type_t::archive:
+                    break;
+                case module_type_t::object:
+                    break;
+            }
+            if (!module.strtab)
                 return;
-            auto& sc = module.subclass.object;
-            if (!sc.strtab)
-                return;
-            auto name_offset = string_table::find(sc.strtab->subclass.strtab,
+            auto name_offset = string_table::find(module.strtab->as_strtab(),
                                                   name);
             if (name_offset == -1)
                 return;
             array::reset(list);
-            for (const auto section : sc.sections) {
+            for (const auto section : module.sections) {
                 if (name_offset == section->name_offset)
                     array::append(list, section);
             }
@@ -491,17 +504,12 @@ namespace basecode::binfmt {
         section_t* make_section(module_t& module,
                                 section::type_t type,
                                 const section_opts_t& opts) {
-            if (module.type != module_type_t::object) {
-                error::report::add(status_t::invalid_section_type,
-                                   error_report_level_t::error);
-                return nullptr;
-            }
-            if (type == section::type_t::custom && opts.name_offset == 0) {
+            if (type == section::type_t::custom
+            &&  opts.name_offset == 0) {
                 error::report::add(status_t::spec_section_custom_name,
                                    error_report_level_t::error);
                 return nullptr;
             }
-            auto& sc = module.subclass.object;
             auto section = &stable_array::append(g_binfmt_sys.sections);
             section->module = &module;
             auto status = section::init(section, type, opts);
@@ -509,8 +517,8 @@ namespace basecode::binfmt {
                 error::report::add(status, error_report_level_t::error);
                 return nullptr;
             }
-            array::append(sc.sections, section);
-            section->number = sc.sections.size;
+            array::append(module.sections, section);
+            section->number = module.sections.size;
             return section;
         }
 
@@ -525,8 +533,28 @@ namespace basecode::binfmt {
         }
 
         section_t* get_section(const module_t& module, u32 idx) {
-            auto msc = &module.subclass.object;
-            return idx < msc->sections.size ? msc->sections[idx] : nullptr;
+            return idx < module.sections.size ? module.sections[idx] : nullptr;
+        }
+
+        member_t* make_member(module_t& module, str::slice_t name) {
+            if (module.type != module_type_t::archive) {
+                error::report::add(status_t::cannot_add_member_to_object,
+                                   error_report_level_t::error);
+            }
+            auto sc = module.as_archive();
+            auto member = &array::append(sc->members);
+            member->id     = sc->members.size;
+            member->buf    = {};
+            member->gid    = {};
+            member->uid    = {};
+            member->mode   = {};
+            member->date   = {};
+            member->name   = name;
+            member->owner  = &module;
+            member->module = {};
+            member->offset = {};
+            member->format_type = format_type_t::none;
+            return member;
         }
 
         section_t* make_data(module_t& module, u8* data, u32 size) {
@@ -562,27 +590,25 @@ namespace basecode::binfmt {
         }
 
         section_t* make_default_string_table(module_t& module) {
-            auto sc = &module.subclass.object;
             section_opts_t opts{};
             auto section = make_section(module, section::type_t::strtab, opts);
-            sc->strtab = section;
+            module.strtab = section;
             return section;
         }
 
         section_t* make_default_symbol_table(module_t& module) {
-            auto sc = &module.subclass.object;
             section_opts_t opts{};
-            if (!sc->strtab) {
+            if (!module.strtab) {
                 auto strtab_section = make_default_string_table(module);
                 if (!strtab_section) {
                     // XXX: need an error condition here
                     return nullptr;
                 }
-                sc->strtab = strtab_section;
+                module.strtab = strtab_section;
             }
-            opts.link = sc->strtab;
+            opts.link = module.strtab;
             auto section = make_section(module, section::type_t::symtab, opts);
-            sc->symtab = section;
+            module.symtab = section;
             return section;
         }
 
@@ -603,35 +629,50 @@ namespace basecode::binfmt {
         }
 
         status_t reserve_sections(module_t& module, u32 num_sections) {
-            auto msc = &module.subclass.object;
-            array::resize(msc->sections, num_sections);
+            array::resize(module.sections, num_sections);
             for (u32 i = 0; i < num_sections; ++i) {
                 auto section = &stable_array::append(g_binfmt_sys.sections);
                 std::memset(section, 0, sizeof(section_t));
                 section->module = &module;
                 section->number = i + 1;
-                msc->sections[i] = section;
+                module.sections[i] = section;
             }
             return status_t::ok;
         }
 
         status_t init(module_t& module, module_type_t type, module_id id) {
-            module.alloc = g_binfmt_sys.alloc;
-            module.id    = id;
-            module.type  = type;
+            module.id     = id;
+            module.type   = type;
+            module.alloc  = g_binfmt_sys.alloc;
+            module.strtab = {};
+            module.symtab = {};
+            array::init(module.sections, module.alloc);
             switch (module.type) {
                 case module_type_t::archive: {
-                    auto& sc = module.subclass.archive;
-                    array::init(sc.members, module.alloc);
-                    array::init(sc.offsets, module.alloc);
+                    auto sc = module.as_archive();
+                    array::init(sc->members, module.alloc);
+                    bitset::init(sc->bitmap, module.alloc);
+                    hashtab::init(sc->index, module.alloc);
+                    sc->extended_symtab = {};
                     break;
                 }
-                case module_type_t::object:
-                    auto& sc = module.subclass.object;
-                    array::init(sc.sections, module.alloc);
+                case module_type_t::object: {
                     break;
+                }
             }
             return status_t::ok;
+        }
+
+        u0 find_members(const module_t& module,
+                        str::slice_t name,
+                        member_ptr_array_t& list) {
+            if (module.type != module_type_t::archive)
+                return;
+            auto sc = const_cast<module_t&>(module).as_archive();
+            for (auto& member : sc->members) {
+                if (member.name == name)
+                    array::append(list, &member);
+            }
         }
     }
 
@@ -713,10 +754,12 @@ namespace basecode::binfmt {
 
         u32 append(string_table_t& table, str::slice_t str) {
             const auto offset = append_offs(table);
-            const auto len = str.length + 1;
+            const auto len = str.length;
             if (table.mode == string_table_mode_t::exclusive
-                && (table.buf.size + len > table.buf.capacity)) {
-                reserve_buf(table, table.buf.capacity * 2 + 8);
+            && (table.buf.size + len + 1 > table.buf.capacity)) {
+                auto new_capacity = std::max<u32>(table.buf.size + len,
+                                                  table.buf.capacity);
+                reserve_buf(table, new_capacity * 2 + 8);
             }
             auto data = table.buf.data + offset;
             if (str.length > 0)
@@ -736,10 +779,8 @@ namespace basecode::binfmt {
             const __m256i last  = _mm256_set1_epi8(str[str.length - 1]);
 
             for (u64 i = 0; i < table.buf.size; i += 32) {
-                const __m256i hay_first = _mm256_loadu_si256(
-                    (const __m256i*) (table.buf.data + i));
-                const __m256i hay_last  = _mm256_loadu_si256(
-                    (const __m256i*) (table.buf.data + i + (str.length - 1)));
+                const __m256i hay_first = _mm256_loadu_si256((const __m256i*) (table.buf.data + i));
+                const __m256i hay_last  = _mm256_loadu_si256((const __m256i*) (table.buf.data + i + (str.length - 1)));
                 u32 match_mask = _mm256_movemask_epi8(
                     _mm256_and_si256(_mm256_cmpeq_epi8(first, hay_first),
                                      _mm256_cmpeq_epi8(last, hay_last)));
@@ -770,7 +811,7 @@ namespace basecode::binfmt {
             }
             if (new_capacity == table.buf.capacity)
                 return;
-            new_capacity = std::max(table.buf.size, new_capacity);
+            new_capacity = std::max(table.buf.capacity, new_capacity);
             table.buf.data = (u8*) memory::realloc(table.alloc,
                                                    table.buf.data,
                                                    new_capacity);
@@ -785,7 +826,7 @@ namespace basecode::binfmt {
             }
             if (new_capacity == table.offs.capacity)
                 return;
-            new_capacity = std::max(table.offs.size, new_capacity);
+            new_capacity = std::max(table.offs.capacity, new_capacity);
             table.offs.data = (u32*) memory::realloc(table.alloc,
                                                      table.offs.data,
                                                      new_capacity * sizeof(u32),

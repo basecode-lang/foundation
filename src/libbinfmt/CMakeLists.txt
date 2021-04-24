@@ -46,27 +46,11 @@ configure_file(
 set(
     BINFMT_SOURCES
 
-    archive/ar_backend.cpp
-    archive/ar.cpp ${INC_DIR}/ar.h
-
+    backends/backends.cpp
     binfmt.cpp ${INC_DIR}/binfmt.h
 
-    coff/coff_backend.cpp
-    coff/coff.cpp ${INC_DIR}/coff.h
-
     cv.cpp ${INC_DIR}/cv.h
-
-    elf/elf_backend.cpp
-    elf/elf.cpp ${INC_DIR}/elf.h
-
-    macho/macho_backend.cpp
-    macho/macho.cpp ${INC_DIR}/macho.h
-
     ${INC_DIR}/pdb.h
-
-    pe/pe_backend.cpp
-    pe/pe.cpp ${INC_DIR}/pe.h
-
     ${INC_DIR}/types.h
 )
 add_library(${LIBRARY_TARGET} ${BINFMT_SOURCES})

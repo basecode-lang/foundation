@@ -21,6 +21,232 @@
 #include <basecode/binfmt/types.h>
 
 namespace basecode::binfmt {
+    namespace pe {
+        namespace base_reloc {
+            namespace type {
+                constexpr u8 unknown  = 0;
+            }
+        }
+
+        namespace dir_entry {
+            u0 free(pe_t& pe, pe_dir_type_t type);
+
+            status_t init(pe_t& pe, pe_dir_type_t type);
+        }
+
+        u0 free(pe_t& pe);
+
+        status_t init(pe_t& pe, const pe_opts_t& opts);
+
+        status_t write_section_data(file_t& file,
+                                    pe_t& pe,
+                                    coff_header_t& hdr);
+
+        status_t build_sections(file_t& file, pe_t& pe);
+
+        status_t write_pe_header(file_t& file, pe_t& pe);
+
+        status_t write_dos_header(file_t& file, pe_t& pe);
+
+        status_t write_sections_data(file_t& file, pe_t& pe);
+
+        status_t write_optional_header(file_t& file, pe_t& pe);
+
+        status_t build_section(file_t& file, pe_t& pe, coff_header_t& hdr);
+    }
+
+    namespace elf {
+        namespace file {
+            str::slice_t class_name(u8 cls);
+
+            str::slice_t os_abi_name(u8 os_abi);
+
+            str::slice_t version_name(u8 version);
+
+            str::slice_t file_type_name(u16 type);
+
+            str::slice_t endianess_name(u8 endianess);
+        }
+
+        namespace machine {
+            str::slice_t name(u16 type);
+        }
+
+        namespace dynamic {
+            namespace type {
+                str::slice_t name(u32 type);
+            }
+        }
+
+        namespace section {
+            namespace type {
+                str::slice_t name(u32 type);
+            }
+
+            namespace flags {
+                const s8* name(u32 flag);
+
+                u0 chars(u32 flags, s8* chars);
+
+                u0 names(u32 flags, const s8* names[13]);
+            }
+        }
+
+        namespace symtab {
+            u64 hash_name(str::slice_t str);
+
+            elf_sym_t* get(const elf_t& elf, u32 sect_num, u32 sym_idx);
+        }
+
+        u0 free(elf_t& elf);
+
+        status_t read(elf_t& elf, file_t& file);
+
+        status_t write(elf_t& elf, file_t& file);
+
+        status_t get_section_name(const module_t* module,
+                                  const binfmt::section_t* section,
+                                  str::slice_t& name);
+
+        status_t init(elf_t& elf, const elf_opts_t& opts);
+
+        u0 format_report(str_buf_t& buf, const elf_t& elf);
+
+        u32 section_alignment(const binfmt::section_t* section);
+
+        u32 section_file_size(const binfmt::section_t* section);
+    }
+
+    namespace coff {
+        namespace unwind {
+            status_t get(const coff_t& coff,
+                         const coff_header_t& hdr,
+                         u32 idx,
+                         coff_unwind_t& u);
+        }
+
+        namespace reloc {
+            namespace type::x86_64 {
+                str::slice_t name(u16 type);
+            }
+
+            namespace type::aarch64 {
+                str::slice_t name(u16 type);
+            }
+
+            coff_reloc_t get(const coff_t& coff,
+                             const coff_header_t& hdr,
+                             u32 idx);
+        }
+
+        namespace section {
+            coff_sym_t* get_symbol(coff_t& coff, coff_header_t& hdr);
+        }
+
+        namespace flags {
+            str::slice_t name(u32 flag);
+        }
+
+        namespace comdat {
+            str::slice_t name(u32 sel);
+        }
+
+        namespace strtab {
+            u0 free(coff_t& coff);
+
+            u0 init(coff_t& coff, alloc_t* alloc);
+
+            u32 add(coff_t& coff, str::slice_t str);
+
+            const s8* get(coff_t& coff, u64 offset);
+        }
+
+        namespace symtab {
+            namespace sclass {
+                str::slice_t name(u8 sclass);
+            }
+
+            u0 free(coff_t& sym);
+
+            u0 init(coff_t& sym, alloc_t* alloc);
+
+            coff_sym_t* make_symbol(coff_t& coff);
+
+            coff_sym_t* make_aux(coff_t& coff,
+                                 coff_sym_t* sym,
+                                 coff_sym_type_t type);
+
+            coff_sym_t* find_symbol(coff_t& coff, u64 name);
+
+            coff_sym_t* make_symbol(coff_t& coff, str::slice_t name);
+
+            coff_sym_t* get_aux(coff_t& coff, coff_sym_t* sym, u32 idx);
+
+            coff_sym_t* make_symbol(coff_t& coff, u64 name, u32 offset);
+        }
+
+        namespace line_num {
+            coff_line_num_t get(const coff_t& coff,
+                                const coff_header_t& hdr,
+                                u32 idx);
+        }
+
+        u0 free(coff_t& coff);
+
+        u0 update_symbol_table(coff_t& coff);
+
+        status_t build_section(file_t& file,
+                               coff_t& coff,
+                               coff_header_t& hdr);
+
+        status_t get_section_name(const binfmt::section_t* section,
+                                  str::slice_t& name);
+
+        status_t write_section_data(file_t& file,
+                                    coff_t& coff,
+                                    coff_header_t& hdr);
+
+        status_t read_header(file_t& file, coff_t& coff);
+
+        status_t write_section_header(file_t& file,
+                                      coff_t& coff,
+                                      coff_header_t& hdr);
+
+        status_t write_header(file_t& file, coff_t& coff);
+
+        status_t build_sections(file_t& file, coff_t& coff);
+
+        u0 set_section_flags(file_t& file, coff_header_t& hdr);
+
+        status_t read_symbol_table(file_t& file, coff_t& coff);
+
+        status_t write_string_table(file_t& file, coff_t& coff);
+
+        status_t write_symbol_table(file_t& file, coff_t& coff);
+
+        status_t write_sections_data(file_t& file, coff_t& coff);
+
+        status_t init(coff_t& coff, file_t& file, alloc_t* alloc);
+
+        status_t read_section_headers(file_t& file, coff_t& coff);
+
+        status_t write_section_headers(file_t& file, coff_t& coff);
+    }
+
+    namespace macho {
+        u0 free(macho_t& macho);
+
+        status_t read(macho_t& macho, file_t& file);
+
+        status_t write(macho_t& macho, file_t& file);
+
+        status_t get_section_name(const module_t* module,
+                                  const binfmt::section_t* section,
+                                  str::slice_t& name);
+
+        status_t init(macho_t& macho, const macho_opts_t& opts);
+    }
+
     namespace file {
         u0 free(file_t& file);
 
@@ -59,20 +285,20 @@ namespace basecode::binfmt {
 
         file_t* add_file(session_t& s,
                          const s8* path,
-                         type_t bin_type,
+                         format_type_t bin_type,
                          file_type_t file_type,
                          s32 path_len = -1);
 
         file_t* add_file(session_t& s,
                          const path_t& path,
-                         type_t bin_type,
+                         format_type_t bin_type,
                          file_type_t file_type);
 
         file_t* add_file(session_t& s,
                          module_t* module,
                          const s8* path,
                          machine::type_t machine,
-                         type_t bin_type,
+                         format_type_t bin_type,
                          file_type_t output_type,
                          s32 path_len = -1);
 
@@ -80,12 +306,12 @@ namespace basecode::binfmt {
                          module_t* module,
                          const path_t& path,
                          machine::type_t machine,
-                         type_t bin_type,
+                         format_type_t bin_type,
                          file_type_t output_type);
 
         file_t* add_file(session_t& s,
                          const String_Concept auto& path,
-                         type_t bin_type,
+                         format_type_t bin_type,
                          file_type_t file_type) {
             return add_file(s,
                             (const s8*) path.data,
@@ -98,7 +324,7 @@ namespace basecode::binfmt {
                          module_t* module,
                          const String_Concept auto& path,
                          machine::type_t machine,
-                         type_t bin_type,
+                         format_type_t bin_type,
                          file_type_t output_type) {
             return add_file(s,
                             module,
@@ -125,6 +351,9 @@ namespace basecode::binfmt {
         module_t* make_module(module_type_t type, module_id id);
 
         status_t init(alloc_t* alloc = context::top()->alloc.main);
+    }
+
+    namespace member {
     }
 
     namespace import {
@@ -154,6 +383,10 @@ namespace basecode::binfmt {
     namespace module {
         u0 free(module_t& module);
 
+        u0 find_members(const module_t& module,
+                        str::slice_t name,
+                        member_ptr_array_t& list);
+
         u0 find_sections(const module_t& module,
                          str::slice_t name,
                          section_ptr_array_t& list);
@@ -171,6 +404,8 @@ namespace basecode::binfmt {
         section_t* make_default_symbol_table(module_t& module);
 
         section_t* get_section(const module_t& module, u32 idx);
+
+        member_t* make_member(module_t& module, str::slice_t name);
 
         section_t* make_data(module_t& module, u8* data, u32 size);
 

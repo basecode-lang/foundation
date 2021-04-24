@@ -82,7 +82,7 @@ TEST_CASE("basecode::binfmt ELF read obj file") {
 
     auto backend_obj = binfmt::session::add_file(s,
                                                  backend_obj_path,
-                                                 binfmt::type_t::elf,
+                                                 binfmt::format_type_t::elf,
                                                  binfmt::file_type_t::obj);
     REQUIRE(backend_obj);
     REQUIRE(!backend_obj->module);
@@ -109,7 +109,7 @@ TEST_CASE("basecode::binfmt ELF round trip obj file") {
 
     auto source_obj = binfmt::session::add_file(read_session,
                                                 source_obj_path,
-                                                binfmt::type_t::elf,
+                                                binfmt::format_type_t::elf,
                                                 binfmt::file_type_t::obj);
     REQUIRE(source_obj);
     REQUIRE(!source_obj->module);
@@ -213,7 +213,7 @@ TEST_CASE("basecode::binfmt ELF write rot13_elf.exe file") {
                                                     &mod,
                                                     rot13_exe_path,
                                                     binfmt::machine::type_t::x86_64,
-                                                    binfmt::type_t::elf,
+                                                    binfmt::format_type_t::elf,
                                                     binfmt::file_type_t::exe);
     rot13_exe_file->versions.linker.major = 6;
     rot13_exe_file->versions.linker.minor = 0;

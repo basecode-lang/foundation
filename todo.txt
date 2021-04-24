@@ -11,8 +11,6 @@ HIGH
           elf backend were full of garbage as was the strtab in the coff backend.
 - binfmt(ar): write function needs to be written so archives
           can be round tripped.
-- binfmt(ar): rework the read + static functions to use the FILE_PTR()
-          interface instead of directly using the buf_crsr_t.
 - binfmt(ar): parse_ecoff_symbol_table function is marked as not done.
           need to review and finish.
 - binfmt(ar): add a hashtab_t to the ar_t struct to index member names
@@ -48,6 +46,8 @@ MEDIUM
 
 LOW
 ---------
+- binfmt(ar): rework the read + static functions to use the FILE_PTR()
+          interface instead of directly using the buf_crsr_t.
 - review and improve symtab_t if possible
 - rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
     * add ca_hashtab_t and ca_set_t using chaining via linked list?

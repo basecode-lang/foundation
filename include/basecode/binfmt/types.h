@@ -44,15 +44,11 @@ namespace basecode::binfmt {
     struct member_t;
     struct section_t;
     struct version_t;
-    struct symbol_offs_t;
     enum class status_t : u32;
 
     struct file_t;
     struct session_t;
     struct name_map_t;
-
-    struct ar_t;
-    struct ar_member_t;
 
     struct coff_sym_t;
     struct coff_reloc_t;
@@ -77,12 +73,9 @@ namespace basecode::binfmt {
     using import_array_t        = array_t<import_t>;
     using member_array_t        = array_t<member_t>;
     using sym_ptr_array_t       = array_t<symbol_t*>;
-    using sym_offs_array_t      = array_t<symbol_offs_t>;
+    using ar_index_table_t      = hashtab_t<str::slice_t, u32>;
+    using member_ptr_array_t    = array_t<member_t*>;
     using section_ptr_array_t   = array_t<section_t*>;
-
-    using ar_member_array_t     = array_t<ar_member_t>;
-    using ar_symbol_table_t     = hashtab_t<str::slice_t, u32>;
-    using ar_member_ptr_array_t = array_t<ar_member_t*>;
 
     using coff_sym_array_t      = array_t<coff_sym_t>;
     using coff_str_array_t      = array_t<str::slice_t>;
@@ -130,6 +123,7 @@ namespace basecode::binfmt {
         invalid_file_type,
         elf_unsupported_section,
         invalid_relocation_type,
+        cannot_add_member_to_object     // FIXME
     };
 
     namespace symbol {
@@ -346,7 +340,8 @@ namespace basecode::binfmt {
         }
     }
 
-    enum class type_t : u8 {
+    enum class format_type_t : u8 {
+        none,
         ar,
         pe,
         elf,
@@ -395,17 +390,12 @@ namespace basecode::binfmt {
         object,
     };
 
-    enum class member_type_t : u8 {
-        module,
-        raw
-    };
-
     enum class string_table_mode_t : u8 {
         shared,
         exclusive,
     };
 
-    constexpr u32 max_type_count        = 5;
+    constexpr u32 max_type_count        = 6;
     constexpr u32 max_dir_entry_count   = 16;
 
     struct coff_rva_t final {
@@ -483,7 +473,7 @@ namespace basecode::binfmt {
             version_t           linker;
             version_t           min_os;
         }                       versions;
-        type_t                  bin_type;
+        format_type_t           bin_type;
         file_type_t             file_type;
     };
 
@@ -497,7 +487,7 @@ namespace basecode::binfmt {
         fini_callback_t         fini;
         read_callback_t         read;
         write_callback_t        write;
-        type_t                  type;
+        format_type_t           type;
     };
 
     struct coff_sym_t final {
@@ -807,33 +797,6 @@ namespace basecode::binfmt {
         u64                     base_addr;
         u64                     heap_reserve;
         u64                     stack_reserve;
-    };
-
-    struct ar_member_t final {
-        str::slice_t            name;
-        str::slice_t            content;
-        struct {
-            u32                 header;
-            u32                 data;
-        }                       offset;
-        u32                     date;
-        u32                     uid;
-        u32                     gid;
-        u32                     mode;
-    };
-
-    struct ar_t final {
-        alloc_t*                alloc;
-        buf_t                   buf;
-        ar_member_array_t       members;
-        ar_symbol_table_t       symbol_map;
-        bitset_t                symbol_module_bitmap;
-        struct {
-            u8                  long_names;
-            u8                  symbol_table;
-            u8                  ecoff_symbol_table;
-            u8                  pad;
-        }                       known;
     };
 
     struct elf_file_header_t final {
@@ -1153,7 +1116,6 @@ namespace basecode::binfmt {
         const macho_opts_t*     opts;
         macho_file_header_t*    file_header;
     };
-
 
     namespace ar {
         constexpr u32 header_size   = 60;
@@ -1968,11 +1930,6 @@ namespace basecode::binfmt {
         symbol::visibility_t    visibility;
     };
 
-    struct symbol_offs_t final {
-        symbol_t*               symbol;
-        u32                     offset;
-    };
-
     struct import_t final {
         sym_ptr_array_t         symbols;
         symbol_t*               module_symbol;
@@ -2053,6 +2010,13 @@ namespace basecode::binfmt {
         u32                     name_offset;
         section::flags_t        flags;
         section::type_t         type;
+
+        inline auto& as_data()      { return subclass.data;     }
+        inline auto& as_group()     { return subclass.group;    }
+        inline auto& as_relocs()    { return subclass.relocs;   }
+        inline auto& as_strtab()    { return subclass.strtab;   }
+        inline auto& as_symtab()    { return subclass.symtab;   }
+        inline auto& as_imports()   { return subclass.imports;  }
     };
 
     struct section_opts_t final {
@@ -2069,34 +2033,44 @@ namespace basecode::binfmt {
         }                       strtab;
     };
 
-    union member_subclass_t final {
-        str::slice_t            raw;
-        module_t*               module;
-    };
-
     struct member_t final {
+        str::slice_t            buf;
         str::slice_t            name;
-        member_subclass_t       subclass;
+        module_t*               owner;
+        module_t*               module;
         member_id               id;
-        member_type_t           type;
+        u32                     uid;
+        u32                     gid;
+        u32                     date;
+        u32                     mode;
+        struct {
+            u32                 data;
+            u32                 header;
+        }                       offset;
+        format_type_t           format_type;
     };
 
     union module_subclass_t final {
         struct {
-            section_ptr_array_t sections;
-            section_t*          strtab;
-            section_t*          symtab;
-        }                       object;
-        struct {
+            section_t*          extended_symtab;
             member_array_t      members;
-            sym_offs_array_t    offsets;
+            ar_index_table_t    index;
+            bitset_t            bitmap;
+            u32                 long_names;
+            u32                 coff_table;
         }                       archive;
     };
 
     struct module_t final {
         alloc_t*                alloc;
+        section_t*              strtab;
+        section_t*              symtab;
         module_subclass_t       subclass;
+        section_ptr_array_t     sections;
         module_id               id;
         module_type_t           type;
+
+        inline auto       as_archive()          { return &subclass.archive; }
+        inline const auto as_archive() const    { return &subclass.archive; }
     };
 }

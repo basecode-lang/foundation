@@ -42,8 +42,12 @@
 #define CRSR_NEWLINE(c)         SAFE_SCOPE((c).column = 0; ++(c).line;)
 
 #define FILE_ALIAS(f)           auto& file = f
+#define FILE_EOF()              (!CRSR_MORE(file.crsr))
 #define FILE_POS()              CRSR_POS(file.crsr)
 #define FILE_PTR()              CRSR_PTR(file.crsr)
+#define FILE_NEXT()             CRSR_NEXT(file.crsr)
+#define FILE_PEEK(o)            (file.crsr[file.crsr.pos + (o)])
+#define FILE_PTR_OFFS(o)        (file.crsr.buf->data + (o))
 #define FILE_POP_POS()          SAFE_SCOPE(buf::cursor::pop(file.crsr);)
 #define FILE_PUSH_POS()         SAFE_SCOPE(buf::cursor::push(file.crsr);)
 #define FILE_SEEK(p)            SAFE_SCOPE(                 \

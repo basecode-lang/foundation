@@ -16,23 +16,17 @@
 //
 // ----------------------------------------------------------------------------
 
-#pragma once
-
-#include <basecode/core/buf.h>
+#include <basecode/core/utf.h>
+#include <basecode/binfmt/cv.h>
+#include <basecode/core/bits.h>
+#include <basecode/core/string.h>
+#include <basecode/core/numbers.h>
 #include <basecode/binfmt/binfmt.h>
+#include <basecode/core/stopwatch.h>
+#include <basecode/core/slice_utils.h>
 
-namespace basecode::binfmt::ar {
-    u0 free(ar_t& ar);
-
-    u0 reset(ar_t& ar);
-
-    status_t read(ar_t& ar, const path_t& path);
-
-    status_t write(ar_t& ar, const path_t& path);
-
-    u0 add_member(ar_t& ar, const ar_member_t& member);
-
-    status_t init(ar_t& ar, alloc_t* alloc = context::top()->alloc.main);
-
-    u0 find_member(ar_t& ar, str::slice_t name, ar_member_ptr_array_t& list);
-}
+#include "ar.cpp"
+#include "coff.cpp"
+#include "elf.cpp"
+#include "macho.cpp"
+#include "pe.cpp"

@@ -16,12 +16,6 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/utf.h>
-#include <basecode/core/bits.h>
-#include <basecode/binfmt/pe.h>
-#include <basecode/core/string.h>
-#include <basecode/binfmt/binfmt.h>
-
 namespace basecode::binfmt::pe {
     static u8 s_dos_stub[64] = {
         0x0e, 0x1f, 0xba, 0x0e, 0x00, 0xb4, 0x09, 0xcd, 0x21, 0xb8, 0x01, 0x4c,
@@ -487,5 +481,111 @@ namespace basecode::binfmt::pe {
         }
 
         return status_t::ok;
+    }
+
+    namespace internal {
+        static u0 fini() {
+        }
+
+        static status_t read(file_t& file) {
+            UNUSED(file);
+            return status_t::ok;
+        }
+
+        static status_t write(file_t& file) {
+            const auto module = file.module;
+
+            pe_opts_t opts{};
+            opts.alloc         = module->alloc;
+            opts.file          = &file;
+            opts.base_addr     = file.opts.base_addr;
+            opts.heap_reserve  = file.opts.heap_reserve;
+            opts.stack_reserve = file.opts.stack_reserve;
+
+            status_t status;
+
+            pe_t pe{};
+            status = pe::init(pe, opts);
+            if (!OK(status))
+                return status;
+            defer(pe::free(pe));
+
+            auto& coff = pe.coff;
+
+            switch (file.file_type) {
+                case file_type_t::none:
+                case file_type_t::obj:
+                    return status_t::invalid_output_type;
+                case file_type_t::exe:
+                    // XXX: relocs_stripped can be determined from file once we have field in the struct
+                    // XXX: large_address_aware is (probably?) a fixed requirement for x64
+                    coff.flags.image = coff::flags::relocs_stripped
+                                       | coff::flags::executable_type
+                                       | coff::flags::large_address_aware;
+                    break;
+                case file_type_t::dll:
+                    pe.flags.dll = 0; // XXX: FIXME!
+                    coff.flags.image |= coff::flags::dll_type;
+                    break;
+            }
+
+            // XXX: FIXME
+            file.buf.mode = buf_mode_t::alloc;
+
+            pe.opts.include_symbol_table = true;    // XXX: temporary for testing
+
+            status = pe::build_sections(file, pe);
+            if (!OK(status))
+                return status;
+
+            status = pe::write_dos_header(file, pe);
+            if (!OK(status))
+                return status;
+
+            status = pe::write_pe_header(file, pe);
+            if (!OK(status))
+                return status;
+
+            status = coff::write_header(file, coff);
+            if (!OK(status))
+                return status;
+
+            status = pe::write_optional_header(file, pe);
+            if (!OK(status))
+                return status;
+
+            status = coff::write_section_headers(file, coff);
+            if (!OK(status))
+                return status;
+
+            status = pe::write_sections_data(file, pe);
+            if (!OK(status))
+                return status;
+
+            if (pe.opts.include_symbol_table) {
+                status = coff::write_symbol_table(file, coff);
+                if (!OK(status))
+                    return status;
+            }
+
+            return status_t::ok;
+        }
+
+        static status_t init(alloc_t* alloc) {
+            UNUSED(alloc);
+            return status_t::ok;
+        }
+
+        io_system_t                 g_pe_sys {
+            .init   = init,
+            .fini   = fini,
+            .read   = read,
+            .write  = write,
+            .type   = format_type_t::pe
+        };
+    }
+
+    io_system_t* system() {
+        return &internal::g_pe_sys;
     }
 }

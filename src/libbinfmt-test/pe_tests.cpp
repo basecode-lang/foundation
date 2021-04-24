@@ -195,7 +195,7 @@ TEST_CASE("basecode::binfmt rot13 to PE/COFF exe") {
                                                     mod,
                                                     rot13_exe_path,
                                                     binfmt::machine::type_t::x86_64,
-                                                    binfmt::type_t::pe,
+                                                    binfmt::format_type_t::pe,
                                                     binfmt::file_type_t::exe);
     rot13_exe_file->versions.linker.major = 6;
     rot13_exe_file->versions.linker.minor = 0;

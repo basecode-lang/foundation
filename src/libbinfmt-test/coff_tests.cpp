@@ -31,7 +31,7 @@ TEST_CASE("basecode::binfmt COFF read obj file") {
 
     auto backend_obj = binfmt::session::add_file(s,
                                                  backend_obj_path,
-                                                 binfmt::type_t::coff,
+                                                 binfmt::format_type_t::coff,
                                                  binfmt::file_type_t::obj);
     REQUIRE(backend_obj);
     REQUIRE(OK(binfmt::session::read(s)));

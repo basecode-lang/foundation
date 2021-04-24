@@ -16,11 +16,6 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <basecode/core/bits.h>
-#include <basecode/binfmt/elf.h>
-#include <basecode/core/string.h>
-#include <basecode/binfmt/binfmt.h>
-
 namespace basecode::binfmt::elf {
     namespace bf = basecode::binfmt;
 
@@ -885,8 +880,6 @@ namespace basecode::binfmt::elf {
             section->link = bf::module::get_section(*module, hdr.link - 1);
         }
 
-        auto msc = &module->subclass.object;
-
         switch (section->type) {
             case bf::section::type_t::bss: {
                 break;
@@ -960,13 +953,13 @@ namespace basecode::binfmt::elf {
             }
             case bf::section::type_t::strtab: {
                 if (num == elf.file_header->strtab_ndx)
-                    msc->strtab = section;
+                    module->strtab = section;
                 break;
             }
             case bf::section::type_t::symtab: {
                 if (hdr.link > 0
                 &&  hdr.link == elf.file_header->strtab_ndx) {
-                    msc->symtab = section;
+                    module->symtab = section;
                 }
                 const auto symtab_count = hdr.size / hdr.entity_size;
                 for (u32 j = 1; j < symtab_count; ++j) {
@@ -1123,7 +1116,6 @@ namespace basecode::binfmt::elf {
         const auto& opts = *elf.opts;
         auto fh     = elf.file_header;
         auto module = file.module;
-        auto msc    = &module->subclass.object;
 
         fh->magic[0]                       = 0x7f;
         fh->magic[1]                       = 'E';
@@ -1149,8 +1141,8 @@ namespace basecode::binfmt::elf {
 
         u32 num_segments = 0;
 
-        if (msc->sections.size > 0) {
-            fh->sect_hdr_count  = msc->sections.size + 1;
+        if (module->sections.size > 0) {
+            fh->sect_hdr_count  = module->sections.size + 1;
             fh->sect_hdr_size   = section::header_size;
             fh->sect_hdr_offset = opts.header_offset;
             elf.sections = (elf_sect_header_t*) (buf + fh->sect_hdr_offset);
@@ -1194,7 +1186,7 @@ namespace basecode::binfmt::elf {
         u32 sect_idx    = 1;
         b8  inc_vaddr   = false;
 
-        for (const auto section : msc->sections) {
+        for (const auto section : module->sections) {
             auto& hdr = elf.sections[sect_idx];
             hdr.flags       = {};
             hdr.addr        = virt_addr;
@@ -1314,8 +1306,8 @@ namespace basecode::binfmt::elf {
                     hdr.type        = section::type::strtab;
                     hdr.entity_size = 1;
                     if (fh->strtab_ndx == 0
-                    &&  msc->strtab
-                    &&  msc->strtab->number == sect_idx) {
+                    &&  module->strtab
+                    &&  module->strtab->number == sect_idx) {
                         fh->strtab_ndx = sect_idx;
                     }
                     data_offset = align(data_offset + hdr.size, 8);
@@ -1604,5 +1596,258 @@ namespace basecode::binfmt::elf {
         }
 
         return size;
+    }
+
+    namespace internal {
+        struct elf_system_t final {
+            alloc_t*            alloc;
+            name_array_t        section_names;
+            name_array_t        segment_names;
+        };
+
+        elf_system_t            g_elf_sys{};
+
+        static u0 fini() {
+            name_map::free(g_elf_sys.section_names);
+            name_map::free(g_elf_sys.segment_names);
+        }
+
+        static status_t read(file_t& file) {
+            elf_t elf{};
+
+            TIME_BLOCK(
+                "binfmt ELF read obj time"_ss,
+                if (file.file_type != file_type_t::obj)
+                    return status_t::invalid_input_type;
+
+                status_t status;
+
+                status = binfmt::file::map_existing(file);
+                if (!OK(status))
+                    return status;
+
+                elf_opts_t opts{};
+                opts.file        = &file;
+                opts.alloc       = g_elf_sys.alloc;
+                opts.entry_point = {};
+
+                status = elf::init(elf, opts);
+                if (!OK(status))
+                    return status;
+                defer(elf::free(elf));
+
+                status = elf::read(elf, file);
+                if (!OK(status))
+                    return status);
+
+            return status_t::ok;
+        }
+
+        static status_t write(file_t& file) {
+            stopwatch_t timer{};
+            stopwatch::start(timer);
+
+            status_t status{};
+            auto module = file.module;
+
+            elf_opts_t opts{};
+            opts.file         = &file;
+            opts.alloc        = g_elf_sys.alloc;
+            opts.entry_point  = file.opts.base_addr;
+
+            // XXX: these need to come in on the file!
+            opts.clazz       = elf::class_64;
+            opts.endianess   = elf::data_2lsb;
+            opts.os_abi      = elf::os_abi_sysv;
+            opts.abi_version = 0;
+            opts.version     = elf::version_current;
+
+            u32 data_size       {};
+            u32 num_segments    {};
+            u32 num_sections    {module->sections.size + 1};
+
+            for (auto section : module->sections) {
+                const auto alignment = elf::section_alignment(section);
+                const auto size = elf::section_file_size(section);
+                data_size = align(data_size + size, alignment);
+            }
+
+            opts.header_offset = elf::file::header_size + data_size;
+            usize file_size = opts.header_offset
+                              + (num_segments * segment::header_size)
+                              + (num_sections * section::header_size);
+
+            status = binfmt::file::map_new(file, file_size);
+            if (!OK(status))
+                return status;
+
+            elf_t elf{};
+            defer(elf::free(elf);
+                      binfmt::file::unmap(file);
+                      stopwatch::stop(timer);
+                      stopwatch::print_elapsed("binfmt ELF write time"_ss, 40, timer));
+
+            status = elf::init(elf, opts);
+            if (!OK(status))
+                return status;
+
+            status = elf::write(elf, file);
+            if (!OK(status))
+                return status;
+
+            return status_t::ok;
+        }
+
+        static status_t init(alloc_t* alloc) {
+            using type_t = binfmt::section::type_t;
+
+            g_elf_sys.alloc = alloc;
+            name_map::init(g_elf_sys.section_names, g_elf_sys.alloc);
+            name_map::init(g_elf_sys.segment_names, g_elf_sys.alloc);
+
+            name_map::add(g_elf_sys.section_names,
+                          type_t::init,
+                          {
+                              .write = true,
+                          },
+                          ".init"_ss);
+
+            name_map::add(g_elf_sys.section_names,
+                          type_t::text,
+                          {
+                              .exec = true,
+                          },
+                          ".text"_ss);
+
+            name_map::add(g_elf_sys.section_names,
+                          type_t::data,
+                          {
+                              .exec = false,
+                              .write = true,
+                          },
+                          ".data"_ss);
+
+            name_map::add(g_elf_sys.section_names,
+                          type_t::data,
+                          {
+                              .exec = false,
+                              .write = false,
+                          },
+                          ".rodata"_ss);
+
+            name_map::add(g_elf_sys.section_names,
+                          type_t::bss,
+                          {
+                              .exec = false,
+                              .write = true,
+                          },
+                          ".bss"_ss);
+
+            name_map::add(g_elf_sys.section_names,
+                          type_t::reloc,
+                          {},
+                          ".rela"_ss);
+
+            name_map::add(g_elf_sys.section_names,
+                          type_t::group,
+                          {},
+                          ".group"_ss);
+
+            name_map::add(g_elf_sys.section_names,
+                          type_t::unwind,
+                          {
+                              .exec = false,
+                              .write = false,
+                          },
+                          ".eh_frame"_ss);
+
+            return status_t::ok;
+        }
+
+        io_system_t                 g_elf_backend {
+            .init   = init,
+            .fini   = fini,
+            .read   = read,
+            .write  = write,
+            .type   = format_type_t::elf
+        };
+    }
+
+    io_system_t* system() {
+        return &internal::g_elf_backend;
+    }
+
+    status_t get_section_name(const module_t* module,
+                              const binfmt::section_t* section,
+                              str::slice_t& name) {
+        using section_type_t = binfmt::section::type_t;
+
+        if (section->name_offset > 0) {
+            if (!module->strtab)
+                return status_t::cannot_map_section_name;
+            const auto str = binfmt::string_table::get(module->strtab->as_strtab(),
+                                                       section->name_offset);
+            name.data   = (const u8*) str;
+            name.length = strlen(str);
+            return status_t::ok;
+        }
+
+        name_flags_t flags{};
+        flags.pad   = {};
+        flags.exec  = section->flags.exec;
+        flags.write = section->flags.write;
+
+        switch (section->type) {
+            case section_type_t::reloc: {
+                const auto entry = name_map::find(internal::g_elf_sys.section_names,
+                                                  section->type,
+                                                  flags);
+                if (!entry)
+                    return status_t::cannot_map_section_name;
+                if (!section->info) {
+                    name = entry->name;
+                    break;
+                }
+
+                auto linked_section = binfmt::module::get_section(*module,
+                                                                  section->info + 1);
+                if (!linked_section)
+                    return status_t::missing_linked_section;
+
+                if (linked_section->type == section_type_t::custom) {
+                    const auto tmp = format::format("{}.custom", entry->name);
+                    name = string::interned::fold(tmp);
+                } else {
+                    flags.exec  = linked_section->flags.exec;
+                    flags.write = linked_section->flags.write;
+                    const auto linked_entry = name_map::find(internal::g_elf_sys.section_names,
+                                                             linked_section->type,
+                                                             flags);
+                    if (!linked_entry)
+                        return status_t::cannot_map_section_name;
+
+                    const auto tmp = format::format("{}{}",
+                                                    entry->name,
+                                                    linked_entry->name);
+                    name = string::interned::fold(tmp);
+                }
+                break;
+            }
+            case section_type_t::custom: {
+                name = string::interned::fold(".custom");
+                break;
+            }
+            default: {
+                const auto entry = name_map::find(internal::g_elf_sys.section_names,
+                                                  section->type,
+                                                  flags);
+                if (!entry)
+                    return status_t::cannot_map_section_name;
+                name = entry->name;
+                break;
+            }
+        }
+
+        return status_t::ok;
     }
 }
