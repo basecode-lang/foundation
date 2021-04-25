@@ -68,6 +68,10 @@ namespace basecode {
             u0 set(field_dict_t& dict, u8 key, u32 value);
         }
 
+        b8 next_field(cursor_t& cursor, u32& value, u8 type = 0);
+
+        b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor);
+
         u0 free(bass_t& storage);
 
         u0 init(bass_t& storage,
@@ -105,7 +109,7 @@ namespace basecode {
 
         b8 write_field(cursor_t& cursor, u8 type, u32 value);
 
-        b8 next_field(cursor_t& cursor, u32& value, u8 type = 0);
+        b8 next_field(cursor_t& cursor, u32& value, u8 type);
 
         b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor);
 

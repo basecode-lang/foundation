@@ -70,7 +70,13 @@ namespace basecode::thread {
         status_t init(alloc_t* alloc) {
             g_system.alloc = alloc;
             g_main_thread    = pthread_self();
+            // FIXME: need to figure out how this is going to work under
+            //        pure mingw
+#ifdef _WIN32
             g_main_thread_id = pthread_getthreadid_np();
+#else
+            g_main_thread_id = {};
+#endif
             slab_config_t slab_config{};
             slab_config.name          = "thread::worker_slab";
             slab_config.buf_size      = 128;        // FIXME!
@@ -121,7 +127,12 @@ namespace basecode::thread {
     }
 
     s32 thread_id() {
+        // FIXME: need to fix this for pure mingw
+#ifdef _WIN32
         return pthread_getthreadid_np();
+#else
+        return 0;
+#endif
     }
 
     thread_t& self() {

@@ -340,7 +340,11 @@ namespace basecode::gfx::app {
             return status_t::save_config_error;
         path::append(path, app.short_name);
         if (!OK(filesys::exists(path))) {
-            if (!OK(filesys::_mkdir(path, true)))
+#ifdef _WIN32
+            if (!OK(filesys::mkdir(path, true)))
+#else
+            if (!OK(filesys::mkdir(path, true)))
+#endif
                 return status_t::save_config_error;
         }
         return status_t::ok;

@@ -76,6 +76,7 @@ else ()
         -Wno-inconsistent-missing-override
         -Wno-c99-designator
         -Wno-deprecated-declarations
+        -Wno-missing-braces
     )
 
     set(CLANG_CXX_FLAGS -fcolor-diagnostics)
@@ -106,10 +107,7 @@ if (MSVC)
         set(ZLIB_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/zlibstatic.lib")
     endif ()
     include_directories("${CMAKE_BINARY_DIR}/ext/zlib-1.2.11")
-else ()
-    set(ZLIB_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libz.a")
 endif()
-#set(ZLIB_LIBRARIES "${ZLIB_LIBRARY}")
 
 # bzip2
 set(

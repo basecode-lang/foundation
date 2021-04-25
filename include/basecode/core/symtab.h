@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/defer.h>
+#include <basecode/core/buf.h>
 #include <basecode/core/format.h>
 #include <basecode/core/context.h>
 #include <basecode/core/graphviz/gv.h>
@@ -338,7 +337,7 @@ namespace basecode {
                                                      symtab::node_type_name(node->type)));
                 node::shape(*trie_node, shape_t::record);
                 node::style(*trie_node, node_style_t::filled);
-                node::fill_color(*trie_node, color_t::aliceblue);
+                node::fill_color(*trie_node, graphviz::color_t::aliceblue);
                 node_ids[idx] = trie_node->id;
                 ++idx;
             }

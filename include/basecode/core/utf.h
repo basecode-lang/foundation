@@ -24,6 +24,13 @@
 #include <basecode/core/context.h>
 
 namespace basecode::utf {
+    template <Utf_String_Concept T,
+              typename Value_Type = typename T::Value_Type>
+    u0 reserve(T& str, u32 new_capacity);
+
+    template <Utf_String_Concept T>
+    u0 grow(T& str, u32 min_capacity = 8);
+
     template <Utf_String_Concept T>
     inline u0 append(T& str, utf32_codepoint_t cp);
 
@@ -80,11 +87,11 @@ namespace basecode::utf {
         // XXX: this implementation is pretty wonky and isn't correct.
         //      for a few limited cases, this interpretation of "length"
         //      will work but it won't fit general use cases.
-        if constexpr (str.Is_Utf32) {
+        if constexpr (T::Is_Utf32) {
             str.length = str.size / 4;
-        } else if constexpr (str.Is_Utf16) {
+        } else if constexpr (T::Is_Utf16) {
             str.length = str.size / 2;
-        } else if constexpr (str.Is_Utf8) {
+        } else if constexpr (T::Is_Utf8) {
             utf8proc_int32_t cp32{};
             auto p = str.data;
             str.length = {};
@@ -107,8 +114,14 @@ namespace basecode::utf {
         return (const s8*) str.data;
     }
 
-    template <Utf_String_Concept T,
-              typename Value_Type = typename T::Value_Type>
+    template <Utf_String_Concept T>
+    u0 grow(T& str, u32 min_capacity) {
+        auto new_capacity = std::max(str.capacity,
+                                     std::max<u32>(min_capacity, 8));
+        reserve(str, new_capacity * 2 + 8);
+    }
+
+    template <Utf_String_Concept T, typename Value_Type>
     u0 reserve(T& str, u32 new_capacity) {
         if (new_capacity == str.capacity)
             return;
@@ -128,32 +141,25 @@ namespace basecode::utf {
             str.size = new_capacity;
     }
 
-    template <Utf_String_Concept T>
-    u0 grow(T& str, u32 min_capacity = 8) {
-        auto new_capacity = std::max(str.capacity,
-                                     std::max<u32>(min_capacity, 8));
-        reserve(str, new_capacity * 2 + 8);
-    }
-
     template <Utf_String_Concept U, String_Concept S>
     inline u0 append(U& str, const S& value) {
         if (str.size + value.length > str.capacity)
             grow(str, str.capacity + value.length);
-        if constexpr (str.Is_Utf32) {
+        if constexpr (U::Is_Utf32) {
             auto actual_size = utf8proc_decompose(value.data,
                                                   value.length,
                                                   str.data + str.size,
                                                   value.length,
                                                   0);
             str.size += actual_size;
-        } else if constexpr (str.Is_Utf16) {
+        } else if constexpr (U::Is_Utf16) {
             for (auto ch : value) {
                 utf16_codepoint_t cp;
                 cp.high = 0;
                 cp.low  = ch;
                 append(str, cp);
             }
-        } else if constexpr (str.Is_Utf8) {
+        } else if constexpr (U::Is_Utf8) {
             std::memcpy(str.data + str.size, value.data, value.length);
             str.size += value.length;
         }
@@ -177,24 +183,24 @@ namespace basecode::utf {
 
     template <Utf_String_Concept T>
     inline u0 append(T& str, utf32_codepoint_t cp) {
-        if constexpr (str.Is_Utf32) {
+        if constexpr (T::Is_Utf32) {
             if (str.size + 1 > str.capacity)
                 grow(str);
             str.data[str.size++] = cp;
-        } else if constexpr (str.Is_Utf16) {
+        } else if constexpr (T::Is_Utf16) {
             append(str, utf32_to_utf16(cp));
-        } else if constexpr (str.Is_Utf8) {
+        } else if constexpr (T::Is_Utf8) {
             append(str, utf32_to_utf8(cp));
         }
     }
 
     template <Utf_String_Concept T>
     inline u0 append(T& str, const utf8_codepoint_t& cp) {
-        if constexpr (str.Is_Utf32) {
+        if constexpr (T::Is_Utf32) {
             append(str, utf8_to_utf32(cp));
-        } else if constexpr (str.Is_Utf16) {
+        } else if constexpr (T::Is_Utf16) {
             append(str, utf8_to_utf16(cp));
-        } else if constexpr (str.Is_Utf8) {
+        } else if constexpr (T::Is_Utf8) {
             if (str.size + cp.len > str.capacity)
                 grow(str, str.capacity + cp.len);
             std::memcpy(str.data + str.size, cp.data, cp.len);
@@ -204,15 +210,15 @@ namespace basecode::utf {
 
     template <Utf_String_Concept T>
     inline u0 append(T& str, const utf16_codepoint_t& cp) {
-        if constexpr (str.Is_Utf32) {
+        if constexpr (T::Is_Utf32) {
             append(str, utf16_to_utf32(cp));
-        } else if constexpr (str.Is_Utf16) {
+        } else if constexpr (T::Is_Utf16) {
             if (str.size + 2 > str.capacity)
                 grow(str, str.capacity + 2);
             str.data[str.size++] = cp.low;
             if (cp.high != 0)
                 str.data[str.size++] = cp.high;
-        } else if constexpr (str.Is_Utf8) {
+        } else if constexpr (T::Is_Utf8) {
             append(str, utf16_to_utf8(cp));
         }
     }
@@ -244,7 +250,7 @@ namespace basecode::utf {
         len = len != -1 ? len : char16_length(value);
         if (str.size + len > str.capacity)
             grow(str, str.capacity + len);
-        if constexpr (str.Is_Utf32) {
+        if constexpr (T::Is_Utf32) {
             const char16_t* p = value;
             for(; *p; ++p) {
                 utf16_codepoint_t cp16{};
@@ -252,9 +258,9 @@ namespace basecode::utf {
                 cp16.high = cp16.low == 0xffff ? u16(*(++p)) : 0;
                 utf::append(str, utf16_to_utf32(cp16));
             }
-        } else if constexpr (str.Is_Utf16) {
+        } else if constexpr (T::Is_Utf16) {
             std::memcpy(str.data + str.size, value, len);
-        } else if constexpr (str.Is_Utf8) {
+        } else if constexpr (T::Is_Utf8) {
             const char16_t* p = value;
             for(; *p; ++p) {
                 utf16_codepoint_t cp16{};
@@ -270,13 +276,13 @@ namespace basecode::utf {
         len = len != -1 ? len : char32_length(value);
         if (str.size + len > str.capacity)
             grow(str, str.capacity + len);
-        if constexpr (str.Is_Utf32) {
+        if constexpr (T::Is_Utf32) {
             std::memcpy(str.data + str.size, value, len);
-        } else if constexpr (str.Is_Utf16) {
+        } else if constexpr (T::Is_Utf16) {
             const char32_t* p = value;
             for(; *p; ++p)
                 append(str, utf32_to_utf16(*p));
-        } else if constexpr (str.Is_Utf8) {
+        } else if constexpr (T::Is_Utf8) {
             const char32_t* p = value;
             for(; *p; ++p)
                 append(str, utf32_to_utf8(*p));
@@ -311,12 +317,12 @@ namespace basecode::utf {
         str_t new_str{};
         str::init(new_str, alloc);
         str::reserve(new_str, str.size);
-        if constexpr (str.Is_Utf32) {
+        if constexpr (T::Is_Utf32) {
             for (u32 i = 0; i < str.size; ++i) {
                 auto cp8 = utf32_to_utf8(str.data[i]);
                 str::append(new_str, cp8.data, cp8.len);
             }
-        } else if constexpr (str.Is_Utf16) {
+        } else if constexpr (T::Is_Utf16) {
             u16* p = str.data;
             u16* e = p + str.size;
             while (p != e) {
@@ -326,7 +332,7 @@ namespace basecode::utf {
                 auto cp8 = utf16_to_utf8(cp16);
                 str::append(new_str, cp8.data, cp8.len);
             }
-        } else if constexpr (str.Is_Utf8) {
+        } else if constexpr (T::Is_Utf8) {
             str::append(new_str, str.data, str.size);
         }
         return new_str;

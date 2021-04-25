@@ -64,12 +64,6 @@ if (MSVC)
     else ()
         set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16_static.lib")
     endif ()
-else ()
-    if (CMAKE_BUILD_TYPE MATCHES Debug)
-        set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16d.a")
-    else ()
-        set(PNG_LIBRARY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/libpng16.a")
-    endif ()
 endif ()
 
 # freetype

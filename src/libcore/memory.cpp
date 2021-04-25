@@ -21,6 +21,7 @@
 #       include <sysinfoapi.h>
 #   endif
 #endif
+#include <atomic>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <basecode/core/array.h>
@@ -248,7 +249,8 @@ namespace basecode::memory {
             const auto size_freed = sys->fini(alloc);
             if (size_freed > alloc->total_allocated) {
                 format::print(stderr,
-                              "fini of {} allocator freed {} bytes vs {} in total_allocated!\n",
+                              "fini of {} allocator freed {} "
+                              "bytes vs {} in total_allocated!",
                               type_name(alloc->system->type),
                               size_freed,
                               alloc->total_allocated);

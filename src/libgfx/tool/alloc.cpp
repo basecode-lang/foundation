@@ -64,6 +64,7 @@ namespace basecode::gfx::tool::alloc {
         ImGui::EndChild();
     }
 
+    [[maybe_unused]]
     static u0 draw_details(alloc_win_t& win) {
         if (!win.selected)
             return;

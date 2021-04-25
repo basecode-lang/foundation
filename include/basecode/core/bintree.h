@@ -33,6 +33,9 @@ namespace basecode {
     };
 
     namespace bintree {
+        inline u0 make_nil_node(graphviz::graph_t& g,
+                                u32 id, str::slice_t label);
+
         inline graphviz::edge_t* make_edge(graphviz::graph_t& g,
                                            u32 first,
                                            u32 second,

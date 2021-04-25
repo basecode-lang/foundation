@@ -167,6 +167,8 @@ namespace basecode::scm::vm {
     }
 
     namespace mem_area {
+        u0 grow(mem_area_t& area, u32 new_capacity = 16);
+
         status_t init(mem_area_t& area,
                       vm_t* vm,
                       u32 id,
@@ -249,13 +251,13 @@ namespace basecode::scm::vm {
 
         u0 resize(mem_area_t& area, u32 new_size);
 
+        u0 grow(mem_area_t& area, u32 new_capacity);
+
         str::slice_t type_name(mem_area_type_t type);
 
         u0 reserve(mem_area_t& area, u32 new_capacity);
 
         u0 reset(mem_area_t& area, b8 zero_mem = false);
-
-        u0 grow(mem_area_t& area, u32 new_capacity = 16);
 
         u0 shrink_to_size(mem_area_t& area, u32 new_size);
     }
