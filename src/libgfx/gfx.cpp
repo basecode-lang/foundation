@@ -73,7 +73,7 @@ namespace basecode::gfx {
     u0 text_right_align(const s8* text_begin, const s8* text_end) {
         const auto text_size = ImGui::CalcTextSize(text_begin, text_end);
         const auto rect_size = ImGui::GetContentRegionAvail();
-        ImGui::SameLine(rect_size.x - text_size.x);
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (rect_size.x - text_size.x));
         ImGui::TextUnformatted(text_begin);
     }
 

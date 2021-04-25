@@ -19,6 +19,8 @@
 #pragma once
 
 #include <basecode/core/types.h>
+#include <basecode/core/array.h>
+#include <basecode/core/hashtab.h>
 
 #define COL32_R_SHIFT           ((u32)0)
 #define COL32_G_SHIFT           ((u32)8)
@@ -37,6 +39,33 @@ struct ImPlotContext;
 
 namespace basecode {
     struct alloc_info_t;
+    struct prop_decl_t;
+    struct prop_editor_t;
+    struct prop_decl_cmd_t;
+    struct prop_decl_fld_t;
+
+    using cmd_activate_t        = b8 (*)(prop_editor_t*, prop_decl_cmd_t*);
+    using prop_decl_table_t     = hashtab_t<u32, prop_decl_t*>;
+    using prop_decl_cmd_array_t = array_t<prop_decl_cmd_t>;
+    using prop_decl_fld_array_t = array_t<prop_decl_fld_t>;
+
+    enum prop_fld_type_t : u8 {
+        none,
+    };
+
+    enum prop_editor_type_t : u8 {
+        drag,
+        color,
+        label,
+        range,
+        slider,
+        list_box,
+        combo_box,
+        check_box,
+        input_int,
+        input_box,
+        input_float3,
+    };
 
     struct rect_t final {
         f32                     x;
@@ -83,6 +112,33 @@ namespace basecode {
         s32                     min_width   = 800;
         s32                     min_height  = 600;
         b8                      focused     {};
+    };
+
+    struct prop_decl_cmd_t final {
+        str::slice_t            name;
+        cmd_activate_t          on_activate;
+    };
+
+    union prop_fld_value_t final {
+    };
+
+    struct prop_decl_fld_t final {
+        prop_fld_value_t        value;
+        prop_fld_type_t         type;
+    };
+
+    struct prop_decl_t final {
+        str::slice_t            name;
+        str::slice_t            description;
+        prop_decl_fld_array_t   fields;
+        prop_decl_cmd_array_t   commands;
+        u32                     family_id;
+    };
+
+    struct property_editor_t final {
+        u0*                     selected;
+        prop_decl_table_t       decltab;
+        b8                      visible;
     };
 
     namespace gfx {
