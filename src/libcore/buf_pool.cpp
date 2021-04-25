@@ -23,16 +23,19 @@
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode::buf_pool {
-    constexpr u32 max_pool_count = 7;
+    constexpr u32 max_pool_count            = 10;
 
     static u32 s_pool_sizes[max_pool_count] = {
+        16,
         32,
+        64,
         128,
+        256,
         512,
+        1024,
         2048,
         4096,
         8192,
-        16384,
     };
 
     using lease_map_t           = hashtab_t<u64, lease_t>;
@@ -83,19 +86,18 @@ namespace basecode::buf_pool {
     }
 
     u8* retain(u32 size) {
-        for (u32 i = 0 ; i < max_pool_count; ++i) {
-            if (size > s_pool_sizes[i])
-                continue;
-            auto alloc = g_system.pools[i];
-            auto buf   = (u8*) memory::alloc(alloc);
-            const auto key = (u64) buf;
-            auto lease = hashtab::emplace(g_system.leases, key);
-            lease->buf   = buf;
-            lease->size  = size;
-            lease->alloc = alloc;
-            return buf;
-        }
-        return nullptr;
+        const auto np2 = std::max<u32>(16, next_power_of_two(size));
+        const auto idx = 31U - __builtin_clz(np2);
+        if (idx > 13)
+            return nullptr;
+        auto alloc = g_system.pools[idx - 4];
+        auto buf   = (u8*) memory::alloc(alloc);
+        const auto key = (u64) buf;
+        auto lease = hashtab::emplace(g_system.leases, key);
+        lease->buf   = buf;
+        lease->size  = size;
+        lease->alloc = alloc;
+        return buf;
     }
 
     const lease_t* lease_for(const u8* buf) {
