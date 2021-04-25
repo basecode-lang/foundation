@@ -198,6 +198,11 @@ namespace basecode {
                                                 mem ? size : 0 );
         }
 
+        if (gfx::begin_status_bar()) {
+            ImGui::TextUnformatted("Ready.");
+            gfx::end_status_bar();
+        }
+
         return true;
     }
 

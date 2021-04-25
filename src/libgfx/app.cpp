@@ -236,7 +236,13 @@ namespace basecode::gfx::app {
 
     status_t init(app_t& app, alloc_t* alloc) {
         app.alloc     = alloc;
-        app.bg_color  = {0.45f, 0.55f, 0.60f, 1.00f};
+        f32 sc = 1.0f / 255.0f;
+        app.bg_color  = {
+            f32(96 * sc),
+            f32(80 * sc),
+            f32(120 * sc),
+            f32(255 * sc)
+        };
         str::init(app.scratch, app.alloc);
         str::reserve(app.scratch, 64);
         return status_t::ok;

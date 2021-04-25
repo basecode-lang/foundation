@@ -21,16 +21,8 @@
 #include <basecode/core/types.h>
 #include <basecode/core/array.h>
 #include <basecode/core/hashtab.h>
+#include <basecode/gfx/imgui/imgui.h>
 
-#define COL32_R_SHIFT           ((u32)0)
-#define COL32_G_SHIFT           ((u32)8)
-#define COL32_B_SHIFT           ((u32)16)
-#define COL32_A_SHIFT           ((u32)24)
-#define COL32_A_MASK            0xff000000
-#define COL32(R,G,B,A)          (((u32)(A)<<COL32_A_SHIFT)                      \
-                                | ((u32)(B)<<COL32_B_SHIFT)                     \
-                                | ((u32)(G)<<COL32_G_SHIFT)                     \
-                                | ((u32)(R)<<COL32_R_SHIFT))
 #define PT_TO_PX(pt)            ((pt) * 1.3281472327365263157894736842105)
 
 struct ImFont;
@@ -80,7 +72,7 @@ namespace basecode {
         u8                      b;
         u8                      a;
 
-        explicit operator u32() const { return COL32(r, g, b, a); }
+        explicit operator u32() const   { return IM_COL32(r, g, b, a); }
     };
 
     struct vector2_t final {
@@ -161,11 +153,35 @@ namespace basecode {
             struct strings_win_t;
         }
 
+        // example usage:
+        //
+        // const ImU32 col = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
+        // const ImU32 bg  = ImGui::GetColorU32(ImGuiCol_Button);
+        //
+        // gfx::spinner("##spinner", 15, 6, col);
+        // gfx::buffering_bar("##buffer_bar", 0.7f, ImVec2(400, 6), bg, col);
+        //
+
+        u0 end_status_bar();
+
+        b8 begin_status_bar();
+
+        b8 spinner(const s8* label,
+                   f32 radius,
+                   s32 thickness,
+                   const ImU32& color);
+
         b8 menu_item_with_icon(const s8* icon,
                                const s8* label,
                                const s8* shortcut,
                                b8* p_selected,
                                b8 enabled);
+
+        b8 buffering_bar(const s8* label,
+                         f32 value,
+                         const ImVec2& size_arg,
+                         const ImU32& bg_col,
+                         const ImU32& fg_col);
 
         b8 begin_menu_with_icon(const s8* icon,
                                 const s8* label,

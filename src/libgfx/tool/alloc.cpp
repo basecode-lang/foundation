@@ -234,22 +234,22 @@ namespace basecode::gfx::tool::alloc {
         if (!win.visible)
             return false;
         ImGui::Begin(ICON_FA_MEMORY "  Allocators", &win.visible);
-        const auto region_size = ImGui::GetContentRegionAvail();
-        win.height = region_size.y;
-        if ((win.table_size == 0 && win.graph_size == 0)
-        ||  (win.table_size + win.graph_size < region_size.x)
-        ||  (win.table_size + win.graph_size > region_size.x)) {
-            win.table_size = region_size.x * .5;
-            win.graph_size = region_size.x * .5;
-        }
         alloc_info_t* node_clicked{};
-        gfx::splitter(true,
-                      8.0f,
-                      &win.table_size,
-                      &win.graph_size,
-                      8,
-                      8,
-                      win.height);
+//        const auto region_size = ImGui::GetContentRegionAvail();
+//        win.height = region_size.y;
+//        if ((win.table_size == 0 && win.graph_size == 0)
+//        ||  (win.table_size + win.graph_size < region_size.x)
+//        ||  (win.table_size + win.graph_size > region_size.x)) {
+//            win.table_size = region_size.x * .5;
+//            win.graph_size = region_size.x * .5;
+//        }
+//        gfx::splitter(true,
+//                      8.0f,
+//                      &win.table_size,
+//                      &win.graph_size,
+//                      8,
+//                      8,
+//                      win.height);
         ImGui::BeginChild("Allocators",
                           ImVec2(win.table_size, win.height),
                           true);
@@ -279,8 +279,8 @@ namespace basecode::gfx::tool::alloc {
             }
         }
 
-        ImGui::SameLine();
-        draw_details(win);
+//        ImGui::SameLine();
+//        draw_details(win);
 
         ImGui::End();
 

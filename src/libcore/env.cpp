@@ -115,14 +115,14 @@ namespace basecode::env {
             if (CRSR_READ(c) == '#')
                 continue;
             array::append(pairs, (s8*) CRSR_PTR(c));
-            while (CRSR_READ(c) != '=')
+            while (CRSR_MORE(c) && CRSR_READ(c) != '=')
                 CRSR_NEXT(c);
             // move past the =
             CRSR_NEXT(c);
             // skip the first "
-            if (CRSR_READ(c) == '"')
+            if (CRSR_MORE(c) && CRSR_READ(c) == '"')
                 CRSR_NEXT(c);
-            while (true) {
+            while (CRSR_MORE(c)) {
                 auto ch = CRSR_READ(c);
                 if (ch == '\n' || ch == '"')
                     break;
