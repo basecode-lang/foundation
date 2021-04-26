@@ -42,24 +42,10 @@ namespace basecode::timer {
         t_available_timer = timer;
     }
 
-    u0 update(s64 ticks, u0* ctx) {
-        for (u32 i = 0; i < timer_max_count; ++i) {
-            auto timer = &t_timers[i];
-            if (!timer->active || ticks < timer->expiry || !timer->callback)
-                continue;
-
-            const auto effective_ctx = timer->context ? timer->context : ctx;
-            auto kill = !timer->callback(timer, effective_ctx);
-            if (kill) {
-                timer->active = false;
-                t_available_timer = timer;
-            } else {
-                timer->expiry = ticks + timer->duration;
-            }
-        }
-    }
-
-    timer_t* start(s64 ticks, s64 duration, timer_callback_t callback, u0* context) {
+    timer_t* start(s64 ticks,
+                   s64 duration,
+                   timer_callback_t callback,
+                   u0* context) {
         if (!t_available_timer)
             return {};
         auto timer = t_available_timer;
@@ -76,5 +62,22 @@ namespace basecode::timer {
             }
         }
         return timer;
+    }
+
+    u0 update(s64 ticks, u0* ctx) {
+        for (u32 i = 0; i < timer_max_count; ++i) {
+            auto timer = &t_timers[i];
+            if (!timer->active || ticks < timer->expiry || !timer->callback)
+                continue;
+
+            const auto effective_ctx = timer->context ? timer->context : ctx;
+            auto kill = !timer->callback(timer, effective_ctx);
+            if (kill) {
+                timer->active = false;
+                t_available_timer = timer;
+            } else {
+                timer->expiry = ticks + timer->duration;
+            }
+        }
     }
 }

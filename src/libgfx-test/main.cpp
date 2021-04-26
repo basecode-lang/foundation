@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/gfx/ed.h>
 #include <basecode/core/env.h>
 #include <basecode/core/log.h>
 #include <basecode/core/ffi.h>
@@ -201,10 +202,16 @@ s32 main(s32 argc, const s8** argv) {
                    path::free(config_path);
                    path::free(load_path));
 
+    TIME_BLOCK("gfx::ed::system::init"_ss,
+               gfx::ed::system::init());
+
     TIME_BLOCK("memory::system::mark_initialized"_ss,
                memory::system::mark_initialized());
 
     s32 rc = run(argc, argv);
+
+    TIME_BLOCK("gfx::ed::system::fini"_ss,
+               gfx::ed::system::fini());
 
     TIME_BLOCK("scm::module::cxx::system::fini"_ss,
                scm::module::cxx::system::fini());

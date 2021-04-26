@@ -181,8 +181,8 @@ namespace basecode::gfx::app {
         while (!glfwWindowShouldClose(app.window.backing)) {
             glfwPollEvents();
 
-            const auto ticks = profiler::get_time() * timer_mult;
-            timer::update(ticks);
+            app.ticks = profiler::get_time() * timer_mult;
+            timer::update(app.ticks);
             memory::meta::system::update(io.DeltaTime);
 
             ImGui_ImplOpenGL3_NewFrame();

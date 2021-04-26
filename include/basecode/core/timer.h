@@ -36,9 +36,12 @@ namespace basecode {
 
         u0 stop(timer_t* timer);
 
-        u0 update(s64 ticks, u0* ctx = {});
+        timer_t* start(s64 ticks,
+                       s64 duration,
+                       timer_callback_t callback,
+                       u0* context = {});
 
-        timer_t* start(s64 ticks, s64 duration, timer_callback_t callback, u0* context = {});
+        u0 update(s64 ticks, u0* ctx = {});
     }
 }
 

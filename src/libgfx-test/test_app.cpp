@@ -207,6 +207,54 @@ namespace basecode {
     }
 
     s32 run(s32 argc, const s8** argv) {
+//        ImVec4 colors[] = {
+//            ImVec4(0.0f, 0.0f, 0.0f, 1.0f),
+//            ImVec4(0.55f, 0.55f, 0.55f, 1.0f),
+//            ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
+//            ImVec4(.9f, .1f, .1f, 1.0f),
+//            ImVec4(.55f, .55f, .55f, 1.0f),
+//            ImVec4(.4f, .4f, .4f, .55f),
+//            ImVec4(.55f, .55f, .55f, 1.0f),
+//            ImVec4(1.0 - .02f, 1.0 - .02f, 1.0 - .02f, 0.0f),
+//            ImVec4(.13f, .4f, .13f, 1.0f),
+//            ImVec4(.13f, 0.6f, .13f, 1.0f),
+//            ImVec4(130.0f / 255.0f, 140.0f / 255.0f, 230.0f / 255.0f, 1.0f),
+//            ImVec4(1.0f, 1.0f, 1.0f, .9f),
+//            ImVec4(.85f, .85f, .85f, 1.0f),
+//            ImVec4(.80f, .80f, .80f, 1.0f),
+//            ImVec4(1.0f, 1.0f, 1.0f, 1.0f),
+//            ImVec4(0.0f, 0.0f, 0.0f, 1.0f),
+//            ImVec4(.49f, 0.60f, 0.45f, 1.0f),
+//            ImVec4(.2f, 0.8f, 0.2f, 1.0f),
+//            ImVec4(0.0f, 0.0f, 0.0f, 1.0f),
+//            ImVec4(0.0f, 0.0f, 0.0f, 1.0f),
+//            ImVec4(0.1f, .4f, .1f, 1.0f),
+//            ImVec4(0.1f, .2f, .3f, 1.0f),
+//            ImVec4(0.2f, .2f, .1f, 1.0f),
+//            ImVec4(0.1f, .3f, .2f, 1.0f),
+//            ImVec4(0.1f, .1f, .4f, 1.0f),
+//            ImVec4(0.2f, .2f, .2f, 1.0f),
+//            ImVec4(0.89f, .2f, .15f, 1.0f),
+//            ImVec4(0.15f, .2f, .89f, 1.0f),
+//            ImVec4(0.15f, .85f, .15f, 1.0f),
+//            ImVec4(.55f, .55f, .55f, 1.0f),
+//            ImVec4(.9f, .1f, .1f, 1.0f),
+//            ImVec4(.5f, .5f, .5f, 1.0f),
+//            ImVec4(.55f, .55f, .55f, 1.0f),
+//            ImVec4(.9f, .1f, .1f, 1.0f),
+//            ImVec4(.8f, .8f, .8f, 1.0f),
+//            ImVec4(0.8f, .4f, .05f, 1.0f),
+//        };
+//
+//        for (ImVec4 color : colors) {
+//            auto col32 = ImGui::ColorConvertFloat4ToU32(color);
+//            format::print("IM_COL32({}, {}, {}, {})\n",
+//                          ((col32 >> IM_COL32_R_SHIFT) & 0xff),
+//                          ((col32 >> IM_COL32_G_SHIFT) & 0xff),
+//                          ((col32 >> IM_COL32_B_SHIFT) & 0xff),
+//                          ((col32 >> IM_COL32_A_SHIFT) & 0xff));
+//        }
+//
         gfx::app_t app{};
         gfx::app::init(app);
         app.title      = string::interned::fold("Gfx Library Test Harness");

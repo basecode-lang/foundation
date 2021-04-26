@@ -100,6 +100,7 @@
 #define KB(x)                   (1024 * (x))
 #define MB(x)                   (1024 * KB(x))
 #define GB(x)                   (1024 * MB(x))
+#define MS_TO_NS(x)             (1000000 * (x))
 
 #define FORMAT_TYPE(Type, Code)                                                 \
     template <>                                                                 \

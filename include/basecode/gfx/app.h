@@ -33,7 +33,8 @@ namespace basecode::gfx {
         str::slice_t            title;
         str_t                   scratch;
         window_t                window;
-        vector4_t               bg_color;
+        vec4_t                  bg_color;
+        s64                     ticks;
         s32                     dock_root;
     };
 

@@ -217,20 +217,21 @@ set(GFX_SOURCES
 
     app.cpp ${GFX_INC_DIR}/app.h
 
-    tool/alloc.cpp ${GFX_INC_DIR}/tool/alloc.h
-    tool/errors.cpp ${GFX_INC_DIR}/tool/errors.h
-    tool/strings.cpp ${GFX_INC_DIR}/tool/strings.h
+    ed.cpp ${GFX_INC_DIR}/ed.h
 
     font.cpp ${GFX_INC_DIR}/font.h
-
-    gfx.cpp ${GFX_INC_DIR}/gfx.h
-
     ${GFX_INC_DIR}/fonts/IconsKenney.h
     ${GFX_INC_DIR}/fonts/IconsFontaudio.h
     ${GFX_INC_DIR}/fonts/IconsForkAwesome.h
     ${GFX_INC_DIR}/fonts/IconsFontAwesome4.h
     ${GFX_INC_DIR}/fonts/IconsFontAwesome5.h
     ${GFX_INC_DIR}/fonts/IconsFontAwesome5Brands.h
+
+    gfx.cpp ${GFX_INC_DIR}/gfx.h
+
+    tool/alloc.cpp ${GFX_INC_DIR}/tool/alloc.h
+    tool/errors.cpp ${GFX_INC_DIR}/tool/errors.h
+    tool/strings.cpp ${GFX_INC_DIR}/tool/strings.h
 )
 
 add_library(
