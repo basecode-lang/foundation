@@ -26,23 +26,6 @@
 #include <basecode/core/hash_common.h>
 
 namespace basecode {
-    template <typename T>
-    concept Hash_Bag = hash::Hashable<T> && requires(const T& t) {
-        typename                T::Item_Type;
-        typename                T::Value_Type;
-        typename                T::Is_Pointer;
-        typename                T::Value_Type_Base;
-
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.flags}               -> same_as<u64*>;
-        {t.hashes}              -> same_as<u64*>;
-        {t.counts}              -> same_as<u32*>;
-        {t.values}              -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
-        {t.load_factor}         -> same_as<f32>;
-    };
-
     struct bag_buf_size_t final {
         u32                     total_size;
         u32                     size_of_flags;

@@ -149,7 +149,7 @@ namespace basecode::filesys {
             return status_t::invalid_user_place;
         auto utf8_str = utf::utf16_to_utf8(known_path);
         defer(utf::free(utf8_str);
-                  CoTaskMemFree(known_path));
+              CoTaskMemFree(known_path));
         path::set(path, utf::c_str(utf8_str), utf::length(utf8_str));
 #else
         auto home = env::get(t_file_sys.root_env, "HOME"_ss);

@@ -20,6 +20,8 @@ set(GFX_INC_DIR     "${INC_DIR_BASE}/basecode/gfx")
 #
 # -----------------------------------------------------------------------------
 
+set(SKIP_INSTALL_ALL ON)
+
 # glfw
 option(GLFW_BUILD_EXAMPLES  "" OFF)
 option(GLFW_BUILD_TESTS     "" OFF)
@@ -71,7 +73,6 @@ option(FT_WITH_ZLIB         "" ON)
 option(FT_WITH_BZIP2        "" ON)
 option(FT_WITH_PNG          "" ON)
 #option(FT_WITH_HARFBUZZ     "" ON)
-set(SKIP_INSTALL_ALL ON)
 add_subdirectory(freetype EXCLUDE_FROM_ALL)
 
 # -----------------------------------------------------------------------------
@@ -90,9 +91,10 @@ configure_file (
 # libbasecode-gfx static library
 #
 # -----------------------------------------------------------------------------
+set(FRAMEWORKS "")
 
 if (APPLE)
-    set(FRAMEWORKS
+    list(APPEND FRAMEWORKS
 
        "-framework OpenGL"
        "-framework Cocoa"
@@ -102,12 +104,13 @@ if (APPLE)
        "-framework WebKit"
     )
 elseif (WIN32)
-    set(FRAMEWORKS
+    list(APPEND FRAMEWORKS
 
         shcore
     )
-else()
-    set(FRAMEWORKS "")
+    if (NOT MSVC)
+        list(APPEND FRAMEWORKS imm32)
+    endif()
 endif()
 
 set(HARFBUZZ_SOURCES
@@ -244,9 +247,7 @@ target_include_directories(
 
     PRIVATE ${INC_DIR_BASE}
             ${GFX_INC_DIR}
-            ${GFX_INC_DIR}/clip
             ${GFX_INC_DIR}/gl3w
-            ${GFX_INC_DIR}/imgui
             ${PROJECT_SOURCE_DIR}
             ${PROJECT_SOURCE_DIR}/harfbuzz/src
             ${PROJECT_SOURCE_DIR}/freetype/include
@@ -279,9 +280,7 @@ target_include_directories(
 
     INTERFACE   ${INC_DIR_BASE}
                 ${GFX_INC_DIR}
-                ${GFX_INC_DIR}/clip
                 ${GFX_INC_DIR}/gl3w
-                ${GFX_INC_DIR}/imgui
                 ${CMAKE_BINARY_DIR}/include
                 ${PROJECT_SOURCE_DIR}/harfbuzz/src
                 ${PROJECT_SOURCE_DIR}/freetype/include

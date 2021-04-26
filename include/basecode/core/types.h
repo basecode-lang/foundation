@@ -18,6 +18,12 @@
 
 #pragma once
 
+#ifdef __has_include
+#   if __has_include(<version>)
+#       include <version>
+#   endif
+#endif
+
 #include <bit>
 #include <cmath>
 #include <cstdio>
@@ -26,6 +32,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
+#include <csignal>
 #include <unistd.h>
 #include <functional>
 #include <sys/types.h>
@@ -39,7 +46,11 @@
 #endif
 
 #if defined(__GNUC__)
-#   define DEBUG_TRAP()         __builtin_trap()
+#   if defined(__MINGW64__)
+#       define DEBUG_TRAP()     __asm__ volatile("int $0x03");
+#   else
+#       define DEBUG_TRAP()     raise(SIGTRAP)
+#   endif
 #   define FORCE_INLINE         inline __attribute__((always_inline, unused))
 #   define NEVER_INLINE         inline __attribute__((noinline, unused))
 #   ifndef LIKELY
@@ -114,7 +125,7 @@
         }                                                                       \
     }
 
-#if defined(__GNUC__) && defined(__clang__)
+#if !defined(__cpp_lib_bit_cast)
 namespace std {
     template <typename To, typename From> requires (sizeof(From) == sizeof(To)
                                                     && std::is_trivially_constructible_v<From>
@@ -123,6 +134,24 @@ namespace std {
         return __builtin_bit_cast(To, src);
     }
 }
+#endif
+
+#if !defined(__cpp_concepts)
+namespace std {
+    template <typename From, typename To>
+    concept convertible_to = std::is_convertible_v<From, To>
+                             && requires(std::add_rvalue_reference_t<From> (&f)()) {
+        static_cast<To>(f());
+    };
+
+    template <typename T, typename U>
+    concept same_helper = std::is_same_v<T, U>;
+
+    template <typename T, typename U>
+    concept same_as = same_helper<T, U> && same_helper<U, T>;
+}
+#else
+#   include <concepts>
 #endif
 
 struct sqlite3;
@@ -198,18 +227,6 @@ namespace basecode {
     };
 #endif
 
-    template <typename From, typename To>
-    concept convertible_to = std::is_convertible_v<From, To>
-                             && requires(std::add_rvalue_reference_t<From> (&f)()) {
-        static_cast<To>(f());
-    };
-
-    template <typename T, typename U>
-    concept same_helper = std::is_same_v<T, U>;
-
-    template <typename T, typename U>
-    concept same_as = same_helper<T, U> && same_helper<U, T>;
-
     template <typename T>
     concept Integer_Concept = std::is_integral_v<T>;
 
@@ -271,8 +288,8 @@ namespace basecode {
         template <typename K> u64 hash64(const K& value);
 
         template <typename T> concept Hashable = requires(T hashable) {
-            { hash::hash32(hashable) } -> convertible_to<u32>;
-            { hash::hash64(hashable) } -> convertible_to<u64>;
+            { hash::hash32(hashable) } -> std::convertible_to<u32>;
+            { hash::hash64(hashable) } -> std::convertible_to<u64>;
         };
     }
 
@@ -287,30 +304,30 @@ namespace basecode {
     struct slice_t;
 
     template <typename T>
-    concept Slice_Concept = same_as<typename T::Is_Static,
-                                    std::true_type>
+    concept Slice_Concept = std::same_as<typename T::Is_Static,
+                                         std::true_type>
                             && requires(const T& t) {
-        {t.data}        -> same_as<const u8*>;
-        {t.length}      -> same_as<u32>;
+        {t.data}        -> std::same_as<const u8*>;
+        {t.length}      -> std::same_as<u32>;
     };
 
     template <typename T>
-    concept Static_String_Concept = same_as<typename T::Is_Static,
-                                            std::true_type>
+    concept Static_String_Concept = std::same_as<typename T::Is_Static,
+                                                 std::true_type>
                                     && requires(const T& t) {
-        {t.data}        -> same_as<u8*>;
-        {t.length}      -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
+        {t.data}        -> std::same_as<u8*>;
+        {t.length}      -> std::same_as<u32>;
+        {t.capacity}    -> std::same_as<u32>;
     };
 
     template <typename T>
-    concept Dynamic_String_Concept  = same_as<typename T::Is_Static,
-                                              std::false_type>
+    concept Dynamic_String_Concept  = std::same_as<typename T::Is_Static,
+                                                   std::false_type>
                                       && requires(const T& t) {
-        {t.alloc}       -> same_as<alloc_t*>;
-        {t.data}        -> same_as<u8*>;
-        {t.length}      -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
+        {t.alloc}       -> std::same_as<alloc_t*>;
+        {t.data}        -> std::same_as<u8*>;
+        {t.length}      -> std::same_as<u32>;
+        {t.capacity}    -> std::same_as<u32>;
     };
 
     template <typename T>
@@ -335,33 +352,33 @@ namespace basecode {
         typename                T::Size_Per_16;
         typename                T::Backing_Array;
 
-        {t.backing}             -> same_as<typename T::Backing_Array>;
-        {t.start}               -> same_as<u32>;
-        {t.size}                -> same_as<u32>;
+        {t.backing}             -> std::same_as<typename T::Backing_Array>;
+        {t.start}               -> std::same_as<u32>;
+        {t.size}                -> std::same_as<u32>;
     };
 
     template <typename T>
-    concept Static_Array_Concept = same_as<typename T::Is_Static, std::true_type>
+    concept Static_Array_Concept = std::same_as<typename T::Is_Static, std::true_type>
                                    && requires(const T& t) {
         typename                T::Is_Static;
         typename                T::Value_Type;
 
-        {t.data}                -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
+        {t.data}                -> std::same_as<typename T::Value_Type*>;
+        {t.size}                -> std::same_as<u32>;
+        {t.capacity}            -> std::same_as<u32>;
     };
 
     template <typename T>
-    concept Dynamic_Array_Concept = same_as<typename T::Is_Static, std::false_type>
+    concept Dynamic_Array_Concept = std::same_as<typename T::Is_Static, std::false_type>
                                     && requires(const T& t) {
          typename                T::Is_Static;
          typename                T::Value_Type;
          typename                T::Size_Per_16;
 
-         {t.alloc}               -> same_as<alloc_t*>;
-         {t.data}                -> same_as<typename T::Value_Type*>;
-         {t.size}                -> same_as<u32>;
-         {t.capacity}            -> same_as<u32>;
+         {t.alloc}               -> std::same_as<alloc_t*>;
+         {t.data}                -> std::same_as<typename T::Value_Type*>;
+         {t.size}                -> std::same_as<u32>;
+         {t.capacity}            -> std::same_as<u32>;
     };
 
     template <typename T>
@@ -400,11 +417,11 @@ namespace basecode {
     concept Stable_Array = requires(const T& t) {
         typename                T::Value_Type;
 
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.slab}                -> same_as<alloc_t*>;
-        {t.data}                -> same_as<typename T::Value_Type**>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.slab}                -> std::same_as<alloc_t*>;
+        {t.data}                -> std::same_as<typename T::Value_Type**>;
+        {t.size}                -> std::same_as<u32>;
+        {t.capacity}            -> std::same_as<u32>;
     };
 
     template <typename T>
@@ -475,6 +492,23 @@ namespace basecode {
     //
     // ------------------------------------------------------------------------
     template <typename T>
+    concept Hash_Bag = hash::Hashable<T> && requires(const T& t) {
+        typename                T::Item_Type;
+        typename                T::Value_Type;
+        typename                T::Is_Pointer;
+        typename                T::Value_Type_Base;
+
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.flags}               -> std::same_as<u64*>;
+        {t.hashes}              -> std::same_as<u64*>;
+        {t.counts}              -> std::same_as<u32*>;
+        {t.values}              -> std::same_as<typename T::Value_Type*>;
+        {t.size}                -> std::same_as<u32>;
+        {t.capacity}            -> std::same_as<u32>;
+        {t.load_factor}         -> std::same_as<f32>;
+    };
+
+    template <typename T>
     struct bag_t;
 
     struct bag_buf_size_t;
@@ -528,11 +562,11 @@ namespace basecode {
         typename                T::Node_Type;
         typename                T::Value_Type;
 
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.node_slab}           -> same_as<alloc_t*>;
-        {t.value_slab}          -> same_as<alloc_t*>;
-        {t.root}                -> same_as<typename T::Node_Type>;
-        {t.size}                -> same_as<u32>;
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.node_slab}           -> std::same_as<alloc_t*>;
+        {t.value_slab}          -> std::same_as<alloc_t*>;
+        {t.root}                -> std::same_as<typename T::Node_Type>;
+        {t.size}                -> std::same_as<u32>;
     };
 
     template <Binary_Tree Tree_Type,
@@ -569,10 +603,10 @@ namespace basecode {
     // ------------------------------------------------------------------------
     template <typename T>
     concept Buffer_Concept = String_Concept<T> || requires(const T& t) {
-        {t.alloc}       -> same_as<alloc_t*>;
-        {t.data}        -> same_as<u8*>;
-        {t.length}      -> same_as<u32>;
-        {t.capacity}    -> same_as<u32>;
+        {t.alloc}       -> std::same_as<alloc_t*>;
+        {t.data}        -> std::same_as<u8*>;
+        {t.length}      -> std::same_as<u32>;
+        {t.capacity}    -> std::same_as<u32>;
     };
 
     struct buf_t;
@@ -620,15 +654,15 @@ namespace basecode {
         typename                T::Edge_Pair_Array;
         typename                T::Component_Array;
 
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.node_slab}           -> same_as<alloc_t*>;
-        {t.edge_slab}           -> same_as<alloc_t*>;
-        {t.nodes}               -> same_as<typename T::Node_Array>;
-        {t.edges}               -> same_as<typename T::Edge_Array>;
-        {t.outgoing}            -> same_as<typename T::Edge_Set>;
-        {t.incoming}            -> same_as<typename T::Edge_Set>;
-        {t.size}                -> same_as<u32>;
-        {t.id}                  -> same_as<u32>;
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.node_slab}           -> std::same_as<alloc_t*>;
+        {t.edge_slab}           -> std::same_as<alloc_t*>;
+        {t.nodes}               -> std::same_as<typename T::Node_Array>;
+        {t.edges}               -> std::same_as<typename T::Edge_Array>;
+        {t.outgoing}            -> std::same_as<typename T::Edge_Set>;
+        {t.incoming}            -> std::same_as<typename T::Edge_Set>;
+        {t.size}                -> std::same_as<u32>;
+        {t.id}                  -> std::same_as<u32>;
     };
 
     template <typename V>
@@ -689,7 +723,9 @@ namespace basecode {
     //
     // ------------------------------------------------------------------------
     template <typename T>
-    concept Error_Id = std::is_enum_v<T> || same_as<T, u32> || same_as<T, s32>;
+    concept Error_Id = std::is_enum_v<T>
+                       || std::same_as<T, u32>
+                       || std::same_as<T, s32>;
 
     enum class error_report_level_t : u8 {
         warning,
@@ -737,17 +773,13 @@ namespace basecode {
     // ------------------------------------------------------------------------
     template <typename...>
     struct family_t final {
-    private:
-        inline static u32       id;
-
-        template <typename...>
-        inline static const u32 inner_id = id++;
+        inline static u32       id  {};
 
     public:
         using Family_Type       = u32;
 
         template <typename... Type>
-        inline static const Family_Type type = inner_id<std::decay_t<Type>...>;
+        inline static const Family_Type type = id++;
     };
 
     // ------------------------------------------------------------------------
@@ -905,14 +937,14 @@ namespace basecode {
         typename                T::Pair_Type;
         typename                T::Value_Type;
 
-        {t.flags}               -> same_as<u64*>;
-        {t.hashes}              -> same_as<u64*>;
-        {t.keys}                -> same_as<typename T::Key_Type*>;
-        {t.values}              -> same_as<typename T::Value_Type*>;
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
-        {t.load_factor}         -> same_as<f32>;
+        {t.flags}               -> std::same_as<u64*>;
+        {t.hashes}              -> std::same_as<u64*>;
+        {t.keys}                -> std::same_as<typename T::Key_Type*>;
+        {t.values}              -> std::same_as<typename T::Value_Type*>;
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.size}                -> std::same_as<u32>;
+        {t.capacity}            -> std::same_as<u32>;
+        {t.load_factor}         -> std::same_as<f32>;
     };
 
     template <typename K, typename V>
@@ -1020,13 +1052,13 @@ namespace basecode {
         typename                T::Node_Array;
         typename                T::Value_Array;
 
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.nodes}               -> same_as<typename T::Node_Array>;
-        {t.values}              -> same_as<typename T::Value_Array>;
-        {t.head}                -> same_as<u32>;
-        {t.tail}                -> same_as<u32>;
-        {t.free}                -> same_as<u32>;
-        {t.size}                -> same_as<u32>;
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.nodes}               -> std::same_as<typename T::Node_Array>;
+        {t.values}              -> std::same_as<typename T::Value_Array>;
+        {t.head}                -> std::same_as<u32>;
+        {t.tail}                -> std::same_as<u32>;
+        {t.free}                -> std::same_as<u32>;
+        {t.size}                -> std::same_as<u32>;
     };
 
     struct list_node_t;
@@ -1468,13 +1500,13 @@ namespace basecode {
         typename                T::Is_Pointer;
         typename                T::Value_Type_Base;
 
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.flags}               -> same_as<u64*>;
-        {t.hashes}              -> same_as<u64*>;
-        {t.values}              -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
-        {t.load_factor}         -> same_as<f32>;
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.flags}               -> std::same_as<u64*>;
+        {t.hashes}              -> std::same_as<u64*>;
+        {t.values}              -> std::same_as<typename T::Value_Type*>;
+        {t.size}                -> std::same_as<u32>;
+        {t.capacity}            -> std::same_as<u32>;
+        {t.load_factor}         -> std::same_as<f32>;
     };
 
     struct set_buf_size_t;
@@ -1501,9 +1533,9 @@ namespace basecode {
         typename                T::Value_Type;
         typename                T::Base_Value_Type;
 
-        {t.data}                -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
+        {t.data}                -> std::same_as<typename T::Value_Type*>;
+        {t.size}                -> std::same_as<u32>;
+        {t.capacity}            -> std::same_as<u32>;
     };
 
     template <typename T>
@@ -1511,10 +1543,10 @@ namespace basecode {
         typename                T::Value_Type;
         typename                T::Base_Value_Type;
 
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.data}                -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.data}                -> std::same_as<typename T::Value_Type*>;
+        {t.size}                -> std::same_as<u32>;
+        {t.capacity}            -> std::same_as<u32>;
     };
 
     template <typename T>
@@ -1582,10 +1614,10 @@ namespace basecode {
         typename                T::Node_Type;
         typename                T::Node_Array;
 
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.nodes}               -> same_as<typename T::Node_Array>;
-        {t.values}              -> same_as<typename T::Value_Array>;
-        {t.size}                -> same_as<u32>;
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.nodes}               -> std::same_as<typename T::Node_Array>;
+        {t.values}              -> std::same_as<typename T::Value_Array>;
+        {t.size}                -> std::same_as<u32>;
     };
 
     enum class symtab_node_type_t : u8 {
@@ -1758,17 +1790,17 @@ namespace basecode {
     //
     // ------------------------------------------------------------------------
     template <typename T>
-    concept Utf_String_Concept = (same_as<typename T::Value_Type, u8>
-                                  || same_as<typename T::Value_Type, u32>
-                                  || same_as<typename T::Value_Type, u16>)
+    concept Utf_String_Concept = (std::same_as<typename T::Value_Type, u8>
+                                  || std::same_as<typename T::Value_Type, u32>
+                                  || std::same_as<typename T::Value_Type, u16>)
                                  && requires(const T& t) {
         typename                T::Value_Type;
 
-        {t.alloc}               -> same_as<alloc_t*>;
-        {t.data}                -> same_as<typename T::Value_Type*>;
-        {t.size}                -> same_as<u32>;
-        {t.length}              -> same_as<u32>;
-        {t.capacity}            -> same_as<u32>;
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.data}                -> std::same_as<typename T::Value_Type*>;
+        {t.size}                -> std::same_as<u32>;
+        {t.length}              -> std::same_as<u32>;
+        {t.capacity}            -> std::same_as<u32>;
     };
 
     using utf32_codepoint_t     = u32;

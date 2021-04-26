@@ -26,16 +26,16 @@ Index of this file:
 #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#include "imgui.h"
+#include <basecode/gfx/imgui/imgui.h>
 #ifndef IMGUI_DISABLE
 
 #ifndef IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
 
-#include "imgui_internal.h"
+#include <basecode/gfx/imgui/imgui_internal.h>
 #ifdef IMGUI_ENABLE_FREETYPE
-#include "imgui_freetype.h"
+#include <basecode/gfx/imgui/imgui_freetype.h>
 #endif
 
 #include <stdio.h>      // vsnprintf, sscanf, printf
@@ -131,7 +131,7 @@ namespace IMGUI_STB_NAMESPACE
 #ifdef IMGUI_STB_RECT_PACK_FILENAME
 #include IMGUI_STB_RECT_PACK_FILENAME
 #else
-#include "imstb_rectpack.h"
+#include <basecode/gfx/imgui/imstb_rectpack.h>
 #endif
 #endif
 

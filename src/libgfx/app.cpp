@@ -34,6 +34,9 @@
 
 #ifdef _WIN32
 #   include <shellscalingapi.h>
+#   ifdef __MINGW64__
+STDAPI SetProcessDpiAwareness(PROCESS_DPI_AWARENESS value);
+#   endif
 #endif
 
 namespace basecode::gfx::app {

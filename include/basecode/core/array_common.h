@@ -58,7 +58,7 @@ namespace basecode {
                   typename Dst_Value_Type = typename Dst::Value_Type,
                   typename Src_Value_Type = typename Src::Value_Type>
         u0 copy(Dst& dst, const Src& src) {
-            if constexpr (!same_as<Src_Value_Type, Dst_Value_Type>) {
+            if constexpr (!std::same_as<Src_Value_Type, Dst_Value_Type>) {
                 static_assert("array::copy only supported between equivalent types");
             }
             if constexpr (Dst_Is_Static) {

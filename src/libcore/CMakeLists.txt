@@ -272,7 +272,6 @@ if (WIN32)
         ${PLATFORM_SRC_DIR}/dirent.cpp ${PLATFORM_INC_DIR}/dirent.h
         ${PLATFORM_SRC_DIR}/syslog.cpp ${PLATFORM_INC_DIR}/syslog.h
         ${PLATFORM_SRC_DIR}/win32_locale.cpp ${PLATFORM_INC_DIR}/win32_locale.h
-        #        ${PLATFORM_SRC_DIR}/pthread.cpp ${PLATFORM_INC_DIR}/pthread.h
     )
     if (MSVC)
         set (

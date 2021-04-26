@@ -247,19 +247,16 @@ namespace basecode::memory {
             if (!sys || !sys->fini)
                 return 0;
             const auto size_freed = sys->fini(alloc);
-            if (size_freed > alloc->total_allocated) {
-                format::print(stderr,
-                              "fini of {} allocator freed {} "
-                              "bytes vs {} in total_allocated!",
-                              type_name(alloc->system->type),
-                              size_freed,
-                              alloc->total_allocated);
-            } else {
-                alloc->total_allocated -= size_freed;
-                BC_ASSERT_MSG(alloc->total_allocated == 0,
-                              "allocator is leaking memory: {}",
-                              alloc->total_allocated);
-            }
+            BC_ASSERT_MSG(size_freed <= alloc->total_allocated,
+                          "fini of {} allocator freed {} bytes vs {}"
+                          " in total_allocated!",
+                          type_name(alloc->system->type),
+                          size_freed,
+                          alloc->total_allocated);
+            alloc->total_allocated -= size_freed;
+            BC_ASSERT_MSG(alloc->total_allocated == 0,
+                          "allocator is leaking memory: {}",
+                          alloc->total_allocated);
             meta::system::untrack(alloc);
             alloc->backing = {};
             return size_freed;

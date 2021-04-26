@@ -4,9 +4,9 @@
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
 
-#include "clip.h"
-#include "clip_common.h"
-#include "clip_lock_impl.h"
+#include <basecode/gfx/clip/clip.h>
+#include <basecode/gfx/clip/clip_common.h>
+#include <basecode/gfx/clip/clip_lock_impl.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -16,7 +16,7 @@
 
 #include <windows.h>
 
-#include "clip_win_wic.h"
+#include <basecode/gfx/clip/clip_win_wic.h>
 
 #ifndef LCS_WINDOWS_COLOR_SPACE
 #define LCS_WINDOWS_COLOR_SPACE 'Win '

@@ -108,9 +108,9 @@ namespace basecode::utf {
 
     template <Utf_String_Concept T>
     inline const s8* c_str(T& str) {
-        if (str.length + 1 > str.capacity)
+        if (str.size + 1 > str.capacity)
             grow(str);
-        str.data[str.length] = '\0';
+        str.data[str.size] = '\0';
         return (const s8*) str.data;
     }
 
@@ -163,6 +163,7 @@ namespace basecode::utf {
             std::memcpy(str.data + str.size, value.data, value.length);
             str.size += value.length;
         }
+        str.length = {};
     }
 
     inline s32 char16_length(const char16_t* str) {
@@ -192,6 +193,7 @@ namespace basecode::utf {
         } else if constexpr (T::Is_Utf8) {
             append(str, utf32_to_utf8(cp));
         }
+        str.length = {};
     }
 
     template <Utf_String_Concept T>
@@ -206,6 +208,7 @@ namespace basecode::utf {
             std::memcpy(str.data + str.size, cp.data, cp.len);
             str.size += cp.len;
         }
+        str.length = {};
     }
 
     template <Utf_String_Concept T>
@@ -221,6 +224,7 @@ namespace basecode::utf {
         } else if constexpr (T::Is_Utf8) {
             append(str, utf16_to_utf8(cp));
         }
+        str.length = {};
     }
 
     u0 resize(Utf_String_Concept auto& str, u32 new_size) {
@@ -269,6 +273,7 @@ namespace basecode::utf {
                 utf::append(str, utf16_to_utf8(cp16));
             }
         }
+        str.length = {};
     }
 
     template <Utf_String_Concept T>
@@ -287,6 +292,7 @@ namespace basecode::utf {
             for(; *p; ++p)
                 append(str, utf32_to_utf8(*p));
         }
+        str.length = {};
     }
 
     inline utf16_codepoint_t utf32_to_utf16(utf32_codepoint_t cp) {

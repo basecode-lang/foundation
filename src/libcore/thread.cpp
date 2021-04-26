@@ -17,9 +17,11 @@
 // ----------------------------------------------------------------------------
 
 #include <cerrno>
-#if defined(__APPLE__) || defined(__linux__)
+#if defined(__APPLE__)
 #   include <zconf.h>
 #   include <syscall.h>
+#elif defined(__linux__)
+#   include <sys/types.h>
 #endif
 #include <pthread.h>
 #include <basecode/core/thread.h>
@@ -70,12 +72,14 @@ namespace basecode::thread {
         status_t init(alloc_t* alloc) {
             g_system.alloc = alloc;
             g_main_thread    = pthread_self();
-            // FIXME: need to figure out how this is going to work under
-            //        pure mingw
-#ifdef _WIN32
+#if defined(_MSC_VER)
             g_main_thread_id = pthread_getthreadid_np();
+#elif defined(__MINGW64__)
+            g_main_thread_id = (s32) g_main_thread;
+#elif defined(__linux__)
+            g_main_thread_id = gettid();
 #else
-            g_main_thread_id = {};
+            static_assert(false, "pthread support is lacking on this platform");
 #endif
             slab_config_t slab_config{};
             slab_config.name          = "thread::worker_slab";
@@ -127,11 +131,14 @@ namespace basecode::thread {
     }
 
     s32 thread_id() {
-        // FIXME: need to fix this for pure mingw
-#ifdef _WIN32
+#ifdef _MSC_VER
         return pthread_getthreadid_np();
+#elif defined(__linux__)
+        return gettid();
+#elif defined(__APPLE__) || defined(__MINGW64__)
+        return (s32) pthread_self();
 #else
-        return 0;
+        static_assert(false, "pthread support is lacking on this platform");
 #endif
     }
 
@@ -140,13 +147,7 @@ namespace basecode::thread {
     }
 
     b8 is_main_thread() {
-#ifdef __linux__
-        return syscall(SYS_gettid) == getpid();
-#elif __APPLE__
-        return pthread_main_np() == 1;
-#else
         return pthread_equal(pthread_self(), g_main_thread);
-#endif
     }
 
     s32 main_thread_id() {

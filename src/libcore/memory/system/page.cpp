@@ -39,8 +39,15 @@ namespace basecode::memory::page {
             to_free[idx++] = curr_page;
             curr_page = curr_page->next;
         }
-        for (page_header_t* page : to_free)
-            total_freed += memory::internal::free(alloc->backing, page);
+        for (page_header_t* page : to_free) {
+            memory::internal::free(alloc->backing, page);
+            // N.B. we don't rely on the size returned from the call to
+            //      internal::free above because, depending on the backing
+            //      allocator, it may report the "wrong" value for our
+            //      purposes here.  in the context of the page allocator
+            //      this is always the size of the memory we just freed.
+            total_freed += sc->page_size;
+        }
         return total_freed;
     }
 
