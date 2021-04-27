@@ -65,11 +65,89 @@ namespace basecode::gfx::app {
     static u0 glfw_win_resize(GLFWwindow* window, s32 width, s32 height);
 
     u0 free(app_t& app) {
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+
+        if (!OK(save_config(app))) {
+            log::error("save_config failed");
+        }
+
+        glfwDestroyWindow(app.window.backing);
+        glfwTerminate();
+
         str::free(app.scratch);
     }
 
     status_t run(app_t& app) {
         BC_ASSERT_NOT_NULL(app.on_render);
+
+        auto& io = ImGui::GetIO();
+
+        s32 dw{};
+        s32 dh{};
+
+        while (!glfwWindowShouldClose(app.window.backing)) {
+            glfwPollEvents();
+
+            app.ticks += io.DeltaTime;
+            timer::update(app.ticks * 1000000000.0);
+            memory::meta::system::update(io.DeltaTime);
+
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+            if (!app.on_render(app))
+                break;
+            ImGui::Render();
+
+            glfwGetFramebufferSize(app.window.backing, &dw, &dh);
+            glViewport(0, 0, dw, dh);
+            glClearColor(app.bg_color.x,
+                         app.bg_color.y,
+                         app.bg_color.z,
+                         app.bg_color.w);
+            glClear(GL_COLOR_BUFFER_BIT);
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+                auto backup_current_context = glfwGetCurrentContext();
+                ImGui::UpdatePlatformWindows();
+                ImGui::RenderPlatformWindowsDefault();
+                glfwMakeContextCurrent(backup_current_context);
+            }
+
+            glfwSwapBuffers(app.window.backing);
+        }
+
+        return status_t::ok;
+    }
+
+    static u0 glfw_key(GLFWwindow* window,
+                       s32 key,
+                       s32 scan_code,
+                       s32 action,
+                       s32 mods) {
+        UNUSED(window);
+        UNUSED(key);
+        UNUSED(scan_code);
+        UNUSED(action);
+        UNUSED(mods);
+    }
+
+    status_t init(app_t& app, alloc_t* alloc) {
+        const f32 sc = 1.0f / 255.0f;
+
+        app.alloc     = alloc;
+        app.bg_color  = {
+            f32(96 * sc),
+            f32(80 * sc),
+            f32(120 * sc),
+            f32(255 * sc)
+        };
+
+        str::init(app.scratch, app.alloc);
+        str::reserve(app.scratch, 64);
 
         if (!OK(load_config(app))) {
             log::error("load_config failed");
@@ -170,84 +248,10 @@ namespace basecode::gfx::app {
 
         app.large_font = io.Fonts->AddFontFromFileTTF(
             "../share/fonts/SEGOEUI.TTF",
-            PT_TO_PX(24));
+            PT_TO_PX(32));
 
         ImGuiFreeType::BuildFontAtlas(io.Fonts);
 
-        s32 dw{};
-        s32 dh{};
-        f64 timer_mult = profiler::calibration_mult();
-
-        while (!glfwWindowShouldClose(app.window.backing)) {
-            glfwPollEvents();
-
-            app.ticks = profiler::get_time() * timer_mult;
-            timer::update(app.ticks);
-            memory::meta::system::update(io.DeltaTime);
-
-            ImGui_ImplOpenGL3_NewFrame();
-            ImGui_ImplGlfw_NewFrame();
-            ImGui::NewFrame();
-            if (!app.on_render(app))
-                break;
-            ImGui::Render();
-
-            glfwGetFramebufferSize(app.window.backing, &dw, &dh);
-            glViewport(0, 0, dw, dh);
-            glClearColor(app.bg_color.x,
-                         app.bg_color.y,
-                         app.bg_color.z,
-                         app.bg_color.w);
-            glClear(GL_COLOR_BUFFER_BIT);
-            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-                auto backup_current_context = glfwGetCurrentContext();
-                ImGui::UpdatePlatformWindows();
-                ImGui::RenderPlatformWindowsDefault();
-                glfwMakeContextCurrent(backup_current_context);
-            }
-
-            glfwSwapBuffers(app.window.backing);
-        }
-
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplGlfw_Shutdown();
-        ImGui::DestroyContext();
-
-        if (!OK(save_config(app))) {
-            log::error("save_config failed");
-        }
-
-        glfwDestroyWindow(app.window.backing);
-        glfwTerminate();
-
-        return status_t::ok;
-    }
-
-    static u0 glfw_key(GLFWwindow* window,
-                       s32 key,
-                       s32 scan_code,
-                       s32 action,
-                       s32 mods) {
-        UNUSED(window);
-        UNUSED(key);
-        UNUSED(scan_code);
-        UNUSED(action);
-        UNUSED(mods);
-    }
-
-    status_t init(app_t& app, alloc_t* alloc) {
-        app.alloc     = alloc;
-        f32 sc = 1.0f / 255.0f;
-        app.bg_color  = {
-            f32(96 * sc),
-            f32(80 * sc),
-            f32(120 * sc),
-            f32(255 * sc)
-        };
-        str::init(app.scratch, app.alloc);
-        str::reserve(app.scratch, 64);
         return status_t::ok;
     }
 

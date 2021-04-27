@@ -27,6 +27,7 @@
 namespace basecode {
     struct test_app_t final {
         alloc_t*                alloc;
+        gfx::msg_stack_t        msg_stack;
         gfx::tool::alloc_win_t  alloc_window;
         MemoryEditor            memory_editor;
         s8                      buf[128];

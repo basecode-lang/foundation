@@ -18,7 +18,5 @@
 
 #include <basecode/gfx/font.h>
 
-namespace basecode {
-
-
+namespace basecode::gfx::font {
 }

@@ -1595,7 +1595,6 @@ namespace basecode {
 
         inline str::slice_t operator[](u32 i) const;
     };
-
     static_assert(sizeof(str_array_t) <= 40,
                   "str_array_t is now greater than 40 bytes!");
 
@@ -1787,6 +1786,16 @@ namespace basecode {
     struct timer_t;
 
     using timer_callback_t      = b8 (*)(timer_t*, u0*);
+
+    struct timer_t final {
+        u0*                     user;
+        timer_callback_t        callback;
+        s64                     expiry;
+        s64                     duration;
+        b8                      active;
+    };
+    static_assert(sizeof(timer_t) <= 40,
+                  "timer_t is now greater than 40 bytes!");
 
     namespace timer {
         enum class status_t : u8 {

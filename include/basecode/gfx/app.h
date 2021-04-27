@@ -22,32 +22,15 @@
 #include <basecode/core/str.h>
 #include <basecode/core/path.h>
 
-namespace basecode::gfx {
-    using render_callback_t = std::function<b8 (app_t&)>;
+namespace basecode::gfx::app {
+    u0 free(app_t& app);
 
-    struct app_t final {
-        alloc_t*                alloc;
-        ImFont*                 large_font;
-        render_callback_t       on_render;
-        str::slice_t            short_name;
-        str::slice_t            title;
-        str_t                   scratch;
-        window_t                window;
-        vec4_t                  bg_color;
-        s64                     ticks;
-        s32                     dock_root;
-    };
+    status_t run(app_t& app);
 
-    namespace app {
-        u0 free(app_t& app);
+    status_t save_config(app_t& app);
 
-        status_t run(app_t& app);
+    status_t load_config(app_t& app);
 
-        status_t save_config(app_t& app);
-
-        status_t load_config(app_t& app);
-
-        status_t init(app_t& app,
-                      alloc_t* alloc = context::top()->alloc.main);
-    }
+    status_t init(app_t& app,
+                  alloc_t* alloc = context::top()->alloc.main);
 }

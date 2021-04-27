@@ -18,6 +18,7 @@
 
 #include <basecode/gfx/app.h>
 #include <basecode/core/string.h>
+#include <basecode/gfx/msg_stack.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/gfx/fonts/IconsFontAwesome5.h>
 #include "test_app.h"
@@ -29,6 +30,8 @@ namespace basecode {
 
     b8 on_render(gfx::app_t& app) {
         auto& io = ImGui::GetIO();
+
+        gfx::msg_stack::draw(s_test_app.msg_stack);
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("View")) {
@@ -101,6 +104,17 @@ namespace basecode {
                                         nullptr,
                                         &s_test_app.show_fps,
                                         true);
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Test")) {
+                if (gfx::menu_item_with_icon(ICON_FA_BEER,
+                                             "Enqueue to Message Stack",
+                                             nullptr,
+                                             nullptr,
+                                             true)) {
+                    gfx::msg_stack::push(s_test_app.msg_stack,
+                                         "This is a test message!"_ss);
+                }
                 ImGui::EndMenu();
             }
             if (s_test_app.show_fps) {
@@ -186,7 +200,6 @@ namespace basecode {
                         break;
                     }
                     case alloc_type_t::dlmalloc: {
-                        auto sc = &tracked->subclass.dl;
                         break;
                     }
                     default:
@@ -256,21 +269,24 @@ namespace basecode {
 //        }
 //
         gfx::app_t app{};
-        gfx::app::init(app);
         app.title      = string::interned::fold("Gfx Library Test Harness");
         app.on_render  = on_render;
         app.short_name = string::interned::fold("libgfx-test");
+        gfx::app::init(app);
 
         s_test_app.alloc = memory::system::main_alloc();
         gfx::tool::alloc::init(s_test_app.alloc_window,
                                &app,
                                s_test_app.alloc);
 
+        gfx::msg_stack::init(s_test_app.msg_stack, app.large_font, 0);
+
         auto status = gfx::app::run(app);
         s32 rc = !OK(status);
 
-        gfx::app::free(app);
         gfx::tool::alloc::free(s_test_app.alloc_window);
+        gfx::msg_stack::free(s_test_app.msg_stack);
+        gfx::app::free(app);
 
         return rc;
     }

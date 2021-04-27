@@ -229,6 +229,8 @@ set(GFX_SOURCES
 
     gfx.cpp ${GFX_INC_DIR}/gfx.h
 
+    ${GFX_INC_DIR}/msg_stack.h
+
     tool/alloc.cpp ${GFX_INC_DIR}/tool/alloc.h
     tool/errors.cpp ${GFX_INC_DIR}/tool/errors.h
     tool/strings.cpp ${GFX_INC_DIR}/tool/strings.h

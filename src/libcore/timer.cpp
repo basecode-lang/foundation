@@ -18,10 +18,9 @@
 
 #include <cstring>
 #include <basecode/core/timer.h>
-#include <basecode/core/profiler.h>
 
 namespace basecode::timer {
-    static constexpr u32        timer_max_count = 256;
+    static constexpr u32        timer_max_count = 32;
     thread_local timer_t        t_timers[timer_max_count];
     thread_local timer_t*       t_available_timer = &t_timers[0];
 
@@ -37,7 +36,8 @@ namespace basecode::timer {
     }
 
     u0 stop(timer_t* timer) {
-        if (!timer) return;
+        if (!timer)
+            return;
         timer->active = false;
         t_available_timer = timer;
     }
@@ -45,15 +45,15 @@ namespace basecode::timer {
     timer_t* start(s64 ticks,
                    s64 duration,
                    timer_callback_t callback,
-                   u0* context) {
+                   u0* user) {
         if (!t_available_timer)
             return {};
         auto timer = t_available_timer;
-        timer->active = true;
-        timer->context = context;
+        timer->user     = user;
+        timer->active   = true;
+        timer->expiry   = ticks + duration;
         timer->duration = duration;
         timer->callback = callback;
-        timer->expiry = ticks + duration;
         t_available_timer = {};
         for (u32 i = 0; i < timer_max_count; ++i) {
             if (!t_timers[i].active) {
@@ -64,14 +64,14 @@ namespace basecode::timer {
         return timer;
     }
 
-    u0 update(s64 ticks, u0* ctx) {
+    u0 update(s64 ticks, u0* user) {
         for (u32 i = 0; i < timer_max_count; ++i) {
             auto timer = &t_timers[i];
             if (!timer->active || ticks < timer->expiry || !timer->callback)
                 continue;
 
-            const auto effective_ctx = timer->context ? timer->context : ctx;
-            auto kill = !timer->callback(timer, effective_ctx);
+            const auto eff_user = timer->user ? timer->user : user;
+            auto kill = !timer->callback(timer, eff_user);
             if (kill) {
                 timer->active = false;
                 t_available_timer = timer;

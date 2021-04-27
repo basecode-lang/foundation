@@ -46,12 +46,7 @@ namespace basecode::profiler {
         const auto r0 = get_time();
         _mm_lfence();
 
-#   ifdef _WIN32
-        HANDLE mutex = CreateEventEx(0, 0, 0, EVENT_ALL_ACCESS);
-        WaitForSingleObjectEx(mutex, 50, FALSE);
-#   else
-        std::this_thread::sleep_for(milliseconds(50));
-#   endif
+        std::this_thread::sleep_for(milliseconds(250));
 
         _mm_mfence();
         const auto t1 = high_resolution_clock::now();

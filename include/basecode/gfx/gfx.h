@@ -32,35 +32,9 @@ struct ImFont;
 struct GLFWwindow;
 struct ImPlotContext;
 
-namespace basecode {
-    struct prop_decl_t;
-    struct alloc_info_t;
+namespace basecode::gfx {
+    struct app_t;
     struct prop_editor_t;
-    struct prop_decl_cmd_t;
-    struct prop_decl_fld_t;
-
-    using cmd_activate_t        = b8 (*)(prop_editor_t*, prop_decl_cmd_t*);
-    using prop_decl_table_t     = hashtab_t<u32, prop_decl_t*>;
-    using prop_decl_cmd_array_t = array_t<prop_decl_cmd_t>;
-    using prop_decl_fld_array_t = array_t<prop_decl_fld_t>;
-
-    enum prop_fld_type_t : u8 {
-        none,
-    };
-
-    enum prop_editor_type_t : u8 {
-        drag,
-        color,
-        label,
-        range,
-        slider,
-        list_box,
-        combo_box,
-        check_box,
-        input_int,
-        input_box,
-        input_float3,
-    };
 
     // ------------------------------------------------------------------------
     //
@@ -254,37 +228,57 @@ namespace basecode {
         b8                      focused     {};
     };
 
+    // ----------------------------------------------------------------
+    //
+    // app
+    //
+    // ----------------------------------------------------------------
+
+    using render_callback_t = std::function<b8 (app_t&)>;
+
+    struct app_t final {
+        alloc_t*                alloc;
+        ImFont*                 large_font;
+        render_callback_t       on_render;
+        str::slice_t            short_name;
+        str::slice_t            title;
+        str_t                   scratch;
+        window_t                window;
+        vec4_t                  bg_color;
+        f64                     ticks;
+        s32                     dock_root;
+    };
+
     // ------------------------------------------------------------------------
     //
     // property editor
     //
     // ------------------------------------------------------------------------
 
-    struct prop_decl_cmd_t final {
-        str::slice_t            name;
-        cmd_activate_t          on_activate;
-    };
-
-    union prop_fld_value_t final {
-    };
-
-    struct prop_decl_fld_t final {
-        prop_fld_value_t        value;
-        prop_fld_type_t         type;
-    };
-
-    struct prop_decl_t final {
-        str::slice_t            name;
-        str::slice_t            description;
-        prop_decl_fld_array_t   fields;
-        prop_decl_cmd_array_t   commands;
-        u32                     family_id;
-    };
-
     struct property_editor_t final {
         u0*                     selected;
-        prop_decl_table_t       decltab;
         b8                      visible;
+    };
+
+    // ------------------------------------------------------------------------
+    //
+    // message stack
+    //
+    // ------------------------------------------------------------------------
+    constexpr u32 msg_stack_depth = 32;
+
+    struct msg_t final {
+        u8*                     data;
+        u32                     length;
+        u32                     color;
+        u32                     alpha;
+    };
+
+    struct msg_stack_t final {
+        timer_t*                timer;
+        ImFont*                 font;
+        msg_t                   data[msg_stack_depth];
+        u32                     sp;
     };
 
     // ------------------------------------------------------------------------
@@ -292,6 +286,7 @@ namespace basecode {
     // ed
     //
     // ------------------------------------------------------------------------
+
     struct ed_t;
     struct ed_cmd_t;
     struct ed_buf_t;
@@ -791,168 +786,194 @@ namespace basecode {
         u8                      pad:            7;
     };
 
-    namespace gfx {
-        struct app_t;
-
-        namespace ed {
-            enum class status_t : u32 {
-                ok,
-                error
-            };
-
-            namespace mod_keys {
-                constexpr u8 none       = 0b00000000;
-                constexpr u8 ctrl       = 0b00000001;
-                constexpr u8 alt        = 0b00000010;
-                constexpr u8 shift      = 0b00000100;
-            }
-
-            namespace node_flags {
-                constexpr u8 none       = 0b00000000;
-                constexpr u8 folder     = 0b00000001;
-            }
-
-            namespace mode_flags {
-                constexpr u8 none       = 0b00000000;
-                constexpr u8 insert_undo= 0b00000001;
-                constexpr u8 stay_insert= 0b00000010;
-            }
-
-            namespace file_flags {
-                constexpr u16 stripped_cr    = 0b0000000000000001;
-                constexpr u16 null_terminated= 0b0000000000000010;
-                constexpr u16 read_only      = 0b0000000000000100;
-                constexpr u16 locked         = 0b0000000000001000;
-                constexpr u16 dirty          = 0b0000000000010000;
-                constexpr u16 has_warnings   = 0b0000000000100000;
-                constexpr u16 has_errors     = 0b0000000001000000;
-                constexpr u16 default_buffer = 0b0000000010000000;
-                constexpr u16 has_tabs       = 0b0000000100000000;
-                constexpr u16 has_spaces     = 0b0000001000000000;
-                constexpr u16 insert_tabs    = 0b0000010000000000;
-            }
-
-            namespace search_types {
-                constexpr u8 full_word  = 0b00000001;
-                constexpr u8 begin      = 0b00000010;
-                constexpr u8 end        = 0b00000100;
-                constexpr u8 word       = 0b00001000;
-                constexpr u8 line       = 0b00010000;
-            }
-
-            namespace range_markers {
-                namespace type {
-                    constexpr u8 mark       = 0b00000001;
-                    constexpr u8 search     = 0b00000010;
-                    constexpr u8 widget     = 0b00000100;
-                    constexpr u8 line_widget= 0b00001000;
-                    constexpr u8 all        = (mark | search | widget | line_widget);
-                }
-
-                namespace disp_types {
-                    constexpr u8 hidden             = 0b00000000;
-                    constexpr u8 underline          = 0b00000001;
-                    constexpr u8 background         = 0b00000010;
-                    constexpr u8 tool_tip           = 0b00000100;
-                    constexpr u8 tool_tip_line      = 0b00001000;
-                    constexpr u8 cursor_tip         = 0b00010000;
-                    constexpr u8 cursor_tip_line    = 0b00100000;
-                    constexpr u8 indicator          = 0b01000000;
-                    constexpr u8 timed              = 0b10000000;
-                    constexpr u8 compile_error      = tool_tip
-                                                      | cursor_tip
-                                                      | indicator
-                                                      | background;
-                    constexpr u8 background_mark    = background;
-                    constexpr u8 all                = underline
-                                                      | tool_tip
-                                                      | tool_tip_line
-                                                      | cursor_tip
-                                                      | cursor_tip_line
-                                                      | indicator
-                                                      | background;
-                }
-            }
-
-            namespace region_flags {
-                constexpr u8 fixed  = 0b00000001;
-                constexpr u8 expand = 0b00000010;
-                constexpr u8 align  = 0b00000100;
-            }
-
-            namespace window_flags {
-                constexpr u16 none                  = 0b0000000000000000;
-                constexpr u16 show_white_space      = 0b0000000000000001;
-                constexpr u16 show_cr               = 0b0000000000000010;
-                constexpr u16 show_line_numbers     = 0b0000000000000100;
-                constexpr u16 show_indicators       = 0b0000000000001000;
-                constexpr u16 hide_scroll_bar       = 0b0000000000010000;
-                constexpr u16 modal                 = 0b0000000000100000;
-                constexpr u16 wrap_text             = 0b0000000001000000;
-                constexpr u16 hide_split_mark       = 0b0000000010000000;
-                constexpr u16 grid_style            = 0b0000000100000000;
-            }
-        }
-
-        namespace app {
-            enum class status_t : u32 {
-                ok,
-                error,
-                load_config_error,
-                save_config_error,
-                gl3w_init_failure,
-                glfw_init_failure,
-            };
-        }
-
-        namespace tool {
-            struct alloc_win_t;
-            struct errors_win_t;
-            struct strings_win_t;
-        }
-
-        // example usage:
+    namespace tool {
+        // ----------------------------------------------------------------
         //
-        // const ImU32 col = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
-        // const ImU32 bg  = ImGui::GetColorU32(ImGuiCol_Button);
+        // allocators tool window
         //
-        // gfx::spinner("##spinner", 15, 6, col);
-        // gfx::buffering_bar("##buffer_bar", 0.7f, ImVec2(400, 6), bg, col);
+        // ----------------------------------------------------------------
+
+        struct alloc_win_t final {
+            alloc_t*                alloc;
+            app_t*                  app;
+            ImPlotContext*          ctx;
+            alloc_info_t*           selected;
+            f32                     table_size;
+            f32                     graph_size;
+            f32                     height;
+            b8                      visible;
+            b8                      mem_editor;
+        };
+
+        // ----------------------------------------------------------------
         //
+        // strings tool window
+        //
+        // ----------------------------------------------------------------
 
-        u0 end_status_bar();
+        struct errors_win_t;
 
-        b8 begin_status_bar();
+        // ----------------------------------------------------------------
+        //
+        // errors tool window
+        //
+        // ----------------------------------------------------------------
 
-        b8 spinner(const s8* label,
-                   f32 radius,
-                   s32 thickness,
-                   const ImU32& color);
-
-        b8 menu_item_with_icon(const s8* icon,
-                               const s8* label,
-                               const s8* shortcut,
-                               b8* p_selected,
-                               b8 enabled);
-
-        b8 buffering_bar(const s8* label,
-                         f32 value,
-                         const ImVec2& size_arg,
-                         const ImU32& bg_col,
-                         const ImU32& fg_col);
-
-        b8 begin_menu_with_icon(const s8* icon,
-                                const s8* label,
-                                b8 enabled = true);
-
-        b8 splitter(b8 split_vertically,
-                    f32 thickness,
-                    f32* size1,
-                    f32* size2,
-                    f32 min_size1,
-                    f32 min_size2,
-                    f32 splitter_long_axis_size = -1.0f);
-
-        u0 text_right_align(const s8* text_begin, const s8* text_end = {});
+        struct strings_win_t;
     }
+
+    namespace ed {
+        enum class status_t : u32 {
+            ok,
+            error
+        };
+
+        namespace mod_keys {
+            constexpr u8 none       = 0b00000000;
+            constexpr u8 ctrl       = 0b00000001;
+            constexpr u8 alt        = 0b00000010;
+            constexpr u8 shift      = 0b00000100;
+        }
+
+        namespace node_flags {
+            constexpr u8 none       = 0b00000000;
+            constexpr u8 folder     = 0b00000001;
+        }
+
+        namespace mode_flags {
+            constexpr u8 none       = 0b00000000;
+            constexpr u8 insert_undo= 0b00000001;
+            constexpr u8 stay_insert= 0b00000010;
+        }
+
+        namespace file_flags {
+            constexpr u16 stripped_cr    = 0b0000000000000001;
+            constexpr u16 null_terminated= 0b0000000000000010;
+            constexpr u16 read_only      = 0b0000000000000100;
+            constexpr u16 locked         = 0b0000000000001000;
+            constexpr u16 dirty          = 0b0000000000010000;
+            constexpr u16 has_warnings   = 0b0000000000100000;
+            constexpr u16 has_errors     = 0b0000000001000000;
+            constexpr u16 default_buffer = 0b0000000010000000;
+            constexpr u16 has_tabs       = 0b0000000100000000;
+            constexpr u16 has_spaces     = 0b0000001000000000;
+            constexpr u16 insert_tabs    = 0b0000010000000000;
+        }
+
+        namespace search_types {
+            constexpr u8 full_word  = 0b00000001;
+            constexpr u8 begin      = 0b00000010;
+            constexpr u8 end        = 0b00000100;
+            constexpr u8 word       = 0b00001000;
+            constexpr u8 line       = 0b00010000;
+        }
+
+        namespace range_markers {
+            namespace type {
+                constexpr u8 mark       = 0b00000001;
+                constexpr u8 search     = 0b00000010;
+                constexpr u8 widget     = 0b00000100;
+                constexpr u8 line_widget= 0b00001000;
+                constexpr u8 all        = (mark | search | widget | line_widget);
+            }
+
+            namespace disp_types {
+                constexpr u8 hidden             = 0b00000000;
+                constexpr u8 underline          = 0b00000001;
+                constexpr u8 background         = 0b00000010;
+                constexpr u8 tool_tip           = 0b00000100;
+                constexpr u8 tool_tip_line      = 0b00001000;
+                constexpr u8 cursor_tip         = 0b00010000;
+                constexpr u8 cursor_tip_line    = 0b00100000;
+                constexpr u8 indicator          = 0b01000000;
+                constexpr u8 timed              = 0b10000000;
+                constexpr u8 compile_error      = tool_tip
+                                                  | cursor_tip
+                                                  | indicator
+                                                  | background;
+                constexpr u8 background_mark    = background;
+                constexpr u8 all                = underline
+                                                  | tool_tip
+                                                  | tool_tip_line
+                                                  | cursor_tip
+                                                  | cursor_tip_line
+                                                  | indicator
+                                                  | background;
+            }
+        }
+
+        namespace region_flags {
+            constexpr u8 fixed  = 0b00000001;
+            constexpr u8 expand = 0b00000010;
+            constexpr u8 align  = 0b00000100;
+        }
+
+        namespace window_flags {
+            constexpr u16 none                  = 0b0000000000000000;
+            constexpr u16 show_white_space      = 0b0000000000000001;
+            constexpr u16 show_cr               = 0b0000000000000010;
+            constexpr u16 show_line_numbers     = 0b0000000000000100;
+            constexpr u16 show_indicators       = 0b0000000000001000;
+            constexpr u16 hide_scroll_bar       = 0b0000000000010000;
+            constexpr u16 modal                 = 0b0000000000100000;
+            constexpr u16 wrap_text             = 0b0000000001000000;
+            constexpr u16 hide_split_mark       = 0b0000000010000000;
+            constexpr u16 grid_style            = 0b0000000100000000;
+        }
+    }
+
+    namespace app {
+        enum class status_t : u32 {
+            ok,
+            error,
+            load_config_error,
+            save_config_error,
+            gl3w_init_failure,
+            glfw_init_failure,
+        };
+    }
+
+    // example usage:
+    //
+    // const ImU32 col = ImGui::GetColorU32(ImGuiCol_ButtonHovered);
+    // const ImU32 bg  = ImGui::GetColorU32(ImGuiCol_Button);
+    //
+    // gfx::spinner("##spinner", 15, 6, col);
+    // gfx::buffering_bar("##buffer_bar", 0.7f, ImVec2(400, 6), bg, col);
+    //
+
+    u0 end_status_bar();
+
+    b8 begin_status_bar();
+
+    b8 spinner(const s8* label,
+               f32 radius,
+               s32 thickness,
+               const ImU32& color);
+
+    b8 menu_item_with_icon(const s8* icon,
+                           const s8* label,
+                           const s8* shortcut,
+                           b8* p_selected,
+                           b8 enabled);
+
+    b8 buffering_bar(const s8* label,
+                     f32 value,
+                     const ImVec2& size_arg,
+                     const ImU32& bg_col,
+                     const ImU32& fg_col);
+
+    b8 begin_menu_with_icon(const s8* icon,
+                            const s8* label,
+                            b8 enabled = true);
+
+    b8 splitter(b8 split_vertically,
+                f32 thickness,
+                f32* size1,
+                f32* size2,
+                f32 min_size1,
+                f32 min_size2,
+                f32 splitter_long_axis_size = -1.0f);
+
+    u0 text_right_align(const s8* text_begin, const s8* text_end = {});
 }

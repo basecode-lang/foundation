@@ -20,28 +20,18 @@
 
 #include <basecode/core/types.h>
 
-namespace basecode {
-    struct timer_t final {
-        u0*                     context;
-        timer_callback_t        callback;
-        s64                     expiry;
-        s64                     duration;
-        b8                      active;
-    };
+namespace basecode::timer {
+    u0 fini();
 
-    namespace timer {
-        u0 fini();
+    status_t init();
 
-        status_t init();
+    u0 stop(timer_t* timer);
 
-        u0 stop(timer_t* timer);
+    timer_t* start(s64 ticks,
+                   s64 duration,
+                   timer_callback_t callback,
+                   u0* user = {});
 
-        timer_t* start(s64 ticks,
-                       s64 duration,
-                       timer_callback_t callback,
-                       u0* context = {});
-
-        u0 update(s64 ticks, u0* ctx = {});
-    }
+    u0 update(s64 ticks, u0* user = {});
 }
 

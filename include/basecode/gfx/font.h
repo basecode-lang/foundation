@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/gfx/gfx.h>
 
-namespace basecode {
+namespace basecode::gfx::font {
 
 }
