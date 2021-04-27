@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/core/assert.h>
 
 #define WITH_ALLOC(Alloc, Code)                                     \
         do {                                                        \
@@ -45,26 +45,28 @@
             }                                                       \
         } while (false)
 
-namespace basecode {
-    struct context_t {
-        struct {
-            alloc_t*        main;
-            alloc_t*        temp;
-            alloc_t*        scratch;
-        }                   alloc;
-        logger_t*           logger;
-        u0*                 user;
-        const s8**          argv;
-        s32                 argc;
-    };
+namespace basecode::context {
+    constexpr u32 stack_size = 512;
 
-    namespace context {
-        u0 pop();
+    static inline thread_local u32             t_index = stack_size;
+    static inline thread_local context_t*      t_stack[stack_size];
 
-        context_t* top();
+    inline u0 pop() {
+        BC_ASSERT_MSG(t_index < stack_size, "context stack underflow");
+        t_index++;
+    }
 
-        u0 push(context_t* ctx);
+    inline context_t* top() {
+        BC_ASSERT_MSG(t_index < stack_size, "context stack underflow");
+        return t_stack[t_index];
+    }
 
-        context_t make(s32 argc, const s8** argv);
+    inline u0 push(context_t* ctx) {
+        BC_ASSERT_MSG(t_index > 0, "context stack overflow");
+        t_stack[--t_index] = ctx;
+    }
+
+    inline context_t make(s32 argc, const s8** argv) {
+        return {.argv = argv, .argc = argc};
     }
 }

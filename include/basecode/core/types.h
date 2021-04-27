@@ -625,10 +625,64 @@ namespace basecode {
 
     // ------------------------------------------------------------------------
     //
+    // log
+    //
+    // ------------------------------------------------------------------------
+    struct logger_t;
+    struct logger_config_t;
+    struct logger_system_t;
+    union logger_subclass_t;
+
+    enum class logger_type_t : u8 {
+        default_                = 240,
+        spdlog,
+        syslog,
+    };
+
+    enum class log_level_t : u8 {
+        emergency,
+        alert,
+        critical,
+        error,
+        warn,
+        notice,
+        info,
+        debug,
+    };
+
+    using logger_array_t        = array_t<logger_t*>;
+    using shared_logger_t       = std::shared_ptr<::spdlog::logger>;
+
+    using logger_fini_callback_t = u0 (*)(logger_t*);
+    using logger_init_callback_t = u0 (*)(logger_t*, logger_config_t*);
+    using logger_emit_callback_t = u0 (*)(logger_t*, log_level_t,
+                                          fmt_str_t, const fmt_args_t&);
+
+    namespace log {
+        enum class status_t : u8 {
+            ok,
+            invalid_logger,
+            invalid_logger_system,
+            invalid_default_logger,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
     // context
     //
     // ------------------------------------------------------------------------
-    struct context_t;
+    struct context_t {
+        struct {
+            alloc_t*        main;
+            alloc_t*        temp;
+            alloc_t*        scratch;
+        }                   alloc;
+        logger_t*           logger;
+        u0*                 user;
+        const s8**          argv;
+        s32                 argc;
+    };
 
     // ------------------------------------------------------------------------
     //
@@ -1077,50 +1131,6 @@ namespace basecode {
     namespace locale{
         enum class status_t : u8 {
             ok,
-        };
-    }
-
-    // ------------------------------------------------------------------------
-    //
-    // log
-    //
-    // ------------------------------------------------------------------------
-    struct logger_t;
-    struct logger_config_t;
-    struct logger_system_t;
-    union logger_subclass_t;
-
-    enum class logger_type_t : u8 {
-        default_                = 240,
-        spdlog,
-        syslog,
-    };
-
-    enum class log_level_t : u8 {
-        emergency,
-        alert,
-        critical,
-        error,
-        warn,
-        notice,
-        info,
-        debug,
-    };
-
-    using logger_array_t        = array_t<logger_t*>;
-    using shared_logger_t       = std::shared_ptr<::spdlog::logger>;
-
-    using logger_fini_callback_t = u0 (*)(logger_t*);
-    using logger_init_callback_t = u0 (*)(logger_t*, logger_config_t*);
-    using logger_emit_callback_t = u0 (*)(logger_t*, log_level_t,
-                                          fmt_str_t, const fmt_args_t&);
-
-    namespace log {
-        enum class status_t : u8 {
-            ok,
-            invalid_logger,
-            invalid_logger_system,
-            invalid_default_logger,
         };
     }
 

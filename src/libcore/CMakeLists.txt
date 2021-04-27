@@ -92,7 +92,7 @@ set(
 
     buf_pool.cpp ${CORE_INC_DIR}/buf_pool.h
 
-    context.cpp ${CORE_INC_DIR}/context.h
+    ${CORE_INC_DIR}/context.h
 
     cxx/scope.cpp
     cxx/module.cpp
