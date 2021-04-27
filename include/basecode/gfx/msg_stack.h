@@ -54,13 +54,13 @@ namespace basecode::gfx::msg_stack {
             draw_list->AddText(stack.font,
                                stack.font->FontSize,
                                ImVec2(pos.x + 14, pos.y),
-                               (entry.alpha << IM_COL32_A_SHIFT) | entry.color,
+                               IM_COL32(80, 80, 80, entry.alpha),
                                (const s8*) entry.data,
                                (const s8*) entry.data + entry.length);
             draw_list->AddText(stack.font,
                                stack.font->FontSize,
                                ImVec2(pos.x + 16, pos.y - 2),
-                               IM_COL32(0xff, 0xff, 0xff, entry.alpha),
+                               (entry.alpha << IM_COL32_A_SHIFT) | entry.color,
                                (const s8*) entry.data,
                                (const s8*) entry.data + entry.length);
             pos.y += stack.font->FontSize + 4;
