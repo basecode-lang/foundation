@@ -43,6 +43,14 @@
 
 using namespace basecode;
 
+u0 imgui_free(u0* mem, u0* user) {
+    memory::free((alloc_t*) user, mem);
+}
+
+u0* imgui_alloc(size_t size, u0* user) {
+    return memory::alloc((alloc_t*) user, size, alignof(u64));
+}
+
 s32 main(s32 argc, const s8** argv) {
     // N.B. must init the profiler first so the stopwatch_t
     //      gives us meaningful results.
@@ -88,6 +96,14 @@ s32 main(s32 argc, const s8** argv) {
     ctx.alloc.temp    = temp_alloc;
     ctx.alloc.scratch = scratch_alloc;
     context::push(&ctx);
+
+    alloc_t* imgui_heap; {
+        dl_config_t imgui_cfg{};
+        imgui_cfg.name      = "imgui heap";
+        imgui_cfg.heap_size = 2_mb;
+        imgui_heap = memory::system::make(&imgui_cfg);
+        ImGui::SetAllocatorFunctions(imgui_alloc, imgui_free, imgui_heap);
+    }
 
     TIME_BLOCK("memory::proxy::init"_ss,
                if (!OK(memory::proxy::init()))
