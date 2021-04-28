@@ -25,9 +25,6 @@
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode::error {
-    using error_report_list_t   = array_t<error_report_t>;
-    using localized_error_map_t = hashtab_t<locale_key_t, error_def_t*>;
-
     struct system_t final {
         alloc_t*                alloc;
         alloc_t*                error_slab;
@@ -52,7 +49,10 @@ namespace basecode::error {
                 format::format_to(str_buf, "ERROR: ");
                 break;
         }
-        fmt::vformat_to(str_buf, fmt_msg, report.args);
+        fmt_dyn_args_t args{};
+//        for (auto& arg : report.args)
+//            args.push_back(any_cast(&arg));
+        fmt::vformat_to(str_buf, fmt_msg, args);
         format::format_to(str_buf, "\n");
     }
 
@@ -92,7 +92,10 @@ namespace basecode::error {
                                       "\n{:<{}}^ ",
                                       " ",
                                       10 + report.src_info.start.column);
-                    fmt::vformat_to(str_buf, fmt_msg, report.args);
+                    fmt_dyn_args_t args{};
+//                    for (auto& arg : report.args)
+//                        args.push_back(arg);
+                    fmt::vformat_to(str_buf, fmt_msg, args);
                     term::reset_all(g_err_sys.term);
                     term::refresh(g_err_sys.term, str_buf);
                 }
@@ -109,10 +112,8 @@ namespace basecode::error {
 
     namespace system {
         u0 fini() {
-            for (auto& report : g_err_sys.reports) {
-                auto args = &report.args;
-                args->~fmt_dyn_args_t();
-            }
+            for (auto& report : g_err_sys.reports)
+                array::free(report.args);
             array::free(g_err_sys.reports);
             hashtab::free(g_err_sys.errors);
             memory::system::free(g_err_sys.error_slab);
@@ -154,7 +155,9 @@ namespace basecode::error {
 
         error_report_t* append() {
             scoped_lock_t lock(&g_err_sys.lock);
-            return &array::append(g_err_sys.reports);
+            auto report = &array::append(g_err_sys.reports);
+            array::init(report->args, g_err_sys.alloc);
+            return report;
         }
 
         b8 format(str_t& buf, u32 id) {

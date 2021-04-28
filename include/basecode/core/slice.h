@@ -32,46 +32,6 @@
         }(Slice)                                                    \
 
 namespace basecode {
-    template<typename T>
-    struct slice_t final {
-        using Is_Static     = std::integral_constant<b8, true>;
-
-        const T*            data;
-        u32                 length;
-
-        const T* end() const                 { return data + length; }
-        const T* rend() const                { return data;          }
-        const T* begin() const               { return data;          }
-        const T* rbegin() const              { return data + length; }
-        const T& operator[](u32 index) const { return data[index];   }
-        operator std::string_view () const   { return std::string_view(
-                                                         (const s8*) data,
-                                                         length); }
-    };
-    static_assert(sizeof(slice_t<u8>) <= 16,
-                  "slice_t<T> is now larger than 16 bytes!");
-
-    template <typename T>
-    inline b8 operator<(const slice_t<T>& lhs, const slice_t<T>& rhs) {
-        if (&lhs == &rhs) return false;
-        if (lhs.length < rhs.length) return true;
-        return std::memcmp(lhs.data, rhs.data, lhs.length) < 0;
-    }
-
-    template <typename T>
-    inline b8 operator>(const slice_t<T>& lhs, const slice_t<T>& rhs) {
-        if (&lhs == &rhs) return false;
-        if (lhs.length > rhs.length) return true;
-        return std::memcmp(lhs.data, rhs.data, lhs.length) > 0;
-    }
-
-    template <typename T>
-    inline b8 operator==(const slice_t<T>& lhs, const slice_t<T>& rhs) {
-        if (&lhs == &rhs) return true;
-        return lhs.length == rhs.length
-               && std::memcmp(lhs.data, rhs.data, lhs.length) == 0;
-    }
-
     namespace slice {
         inline b8 contains(const str::slice_t& slice, s8 ch) {
             for (u32 i = 0; i < slice.length; ++i) {
@@ -96,6 +56,27 @@ namespace basecode {
                 .length = length == -1 ? u32(strlen(str)) : length
             };
         }
+    }
+
+    template <typename T>
+    inline b8 operator<(const slice_t<T>& lhs, const slice_t<T>& rhs) {
+        if (&lhs == &rhs) return false;
+        if (lhs.length < rhs.length) return true;
+        return std::memcmp(lhs.data, rhs.data, lhs.length) < 0;
+    }
+
+    template <typename T>
+    inline b8 operator>(const slice_t<T>& lhs, const slice_t<T>& rhs) {
+        if (&lhs == &rhs) return false;
+        if (lhs.length > rhs.length) return true;
+        return std::memcmp(lhs.data, rhs.data, lhs.length) > 0;
+    }
+
+    template <typename T>
+    inline b8 operator==(const slice_t<T>& lhs, const slice_t<T>& rhs) {
+        if (&lhs == &rhs) return true;
+        return lhs.length == rhs.length
+               && std::memcmp(lhs.data, rhs.data, lhs.length) == 0;
     }
 
     namespace hash {

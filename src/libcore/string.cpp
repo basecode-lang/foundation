@@ -25,9 +25,6 @@
 #include <basecode/core/hashtab.h>
 
 namespace basecode::string {
-    using interned_array_t      = array_t<intern::result_t>;
-    using localized_strtab_t    = hashtab_t<locale_key_t, str::slice_t>;
-
     struct system_t final {
         alloc_t*                alloc;
         intern_t                pool;
@@ -53,6 +50,14 @@ namespace basecode::string {
             array::init(g_str_sys.interned, g_str_sys.alloc);
             hashtab::init(g_str_sys.localized, g_str_sys.alloc);
             return status_t::ok;
+        }
+
+        const interned_array_t& interned() {
+            return g_str_sys.interned;
+        }
+
+        const localized_strtab_t& localized() {
+            return g_str_sys.localized;
         }
     }
 

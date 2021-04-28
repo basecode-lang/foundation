@@ -1,5 +1,7 @@
 HIGH
 ---------
+- FIRST THING!!! fix the libfmt args formatting in errors.cpp
+
 - macro: text macro system
 
 - binfmt: pe/coff backend is missing section name mapping; not sure

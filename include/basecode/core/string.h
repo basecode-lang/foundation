@@ -26,6 +26,10 @@ namespace basecode::string {
     namespace system {
         u0 fini();
 
+        const interned_array_t& interned();
+
+        const localized_strtab_t& localized();
+
         status_t init(alloc_t* alloc = context::top()->alloc.main);
     }
 

@@ -22,35 +22,17 @@
 #include <basecode/core/context.h>
 #include <basecode/core/hash/murmur.h>
 
-namespace basecode {
-    struct locale_key_t final {
-        u32                     id;
-        s8                      locale[8];
+namespace basecode::locale {
+    namespace system {
+        u0 fini();
 
-        b8 operator==(const locale_key_t& other) const {
-            return id == other.id
-                   && strncmp(locale, other.locale, sizeof(locale)) == 0;
-        }
-    };
-
-    namespace hash {
-        inline u64 hash64(const locale_key_t& key) {
-            return murmur::hash64(&key, sizeof(locale_key_t));
-        }
+        status_t init(alloc_t* alloc = context::top()->alloc.main);
     }
 
-    namespace locale {
-        namespace system {
-            u0 fini();
+    str::slice_t locale();
 
-            status_t init(alloc_t* alloc = context::top()->alloc.main);
-        }
+    locale_key_t make_key(u32 id);
 
-        str::slice_t locale();
-
-        locale_key_t make_key(u32 id);
-
-        locale_key_t make_key(u32 id, str::slice_t locale);
-    }
+    locale_key_t make_key(u32 id, str::slice_t locale);
 }
 

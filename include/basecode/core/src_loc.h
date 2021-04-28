@@ -20,24 +20,6 @@
 
 #include <basecode/core/types.h>
 
-namespace basecode {
-    struct source_loc_t final {
-        u32                     line    {};
-        u32                     column  {};
-    };
-
-    struct source_pos_t final {
-        u32                     end     {};
-        u32                     start   {};
-    };
-
-    struct source_info_t final {
-        source_pos_t            pos;
-        source_loc_t            start;
-        source_loc_t            end;
-    };
-}
-
 FORMAT_TYPE(basecode::source_info_t,
             format_to(ctx.out(),
                       "[S: {:>06}, E: {:>06}, [SL: {:>04}, SC: {:>03}, EL: {:>04}, EC: {:>04}]]",

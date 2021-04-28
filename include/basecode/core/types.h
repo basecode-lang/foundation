@@ -24,6 +24,7 @@
 #   endif
 #endif
 
+#include <any>
 #include <bit>
 #include <cmath>
 #include <cstdio>
@@ -302,9 +303,6 @@ namespace basecode {
     struct str_t;
 
     template <typename T>
-    struct slice_t;
-
-    template <typename T>
     concept Slice_Concept = std::same_as<typename T::Is_Static,
                                          std::true_type>
                             && requires(const T& t) {
@@ -335,6 +333,25 @@ namespace basecode {
     concept String_Concept = Slice_Concept<T>
                              || Static_String_Concept<T>
                              || Dynamic_String_Concept<T>;
+
+    template<typename T>
+    struct slice_t final {
+        using Is_Static     = std::integral_constant<b8, true>;
+
+        const T*            data;
+        u32                 length;
+
+        const T* end() const                 { return data + length; }
+        const T* rend() const                { return data;          }
+        const T* begin() const               { return data;          }
+        const T* rbegin() const              { return data + length; }
+        const T& operator[](u32 index) const { return data[index];   }
+        operator std::string_view () const   { return std::string_view(
+                (const s8*) data,
+                length); }
+    };
+    static_assert(sizeof(slice_t<u8>) <= 16,
+                  "slice_t<T> is now larger than 16 bytes!");
 
     namespace str {
         using slice_t = slice_t<u8>;
@@ -387,11 +404,55 @@ namespace basecode {
                             || Dynamic_Array_Concept<T>
                             || Proxy_Array<T>;
 
-    template <typename T, u32 Capacity = 8>
-    struct static_array_t;
+    template <typename T, u32 Capacity>
+    struct static_array_t final {
+        using Is_Static         [[maybe_unused]] = std::integral_constant<b8, true>;
+        using Value_Type        = T;
+        using Size_Per_16       [[maybe_unused]] = std::integral_constant<u32, 16 / sizeof(T)>;
 
-    template <typename T>
-    struct array_t;
+        Value_Type              data[Capacity];
+        u32                     size     = 0;
+        u32                     capacity = Capacity;
+
+        Value_Type& operator[](u32 index)               { return data[index];       }
+        const Value_Type& operator[](u32 index) const   { return data[index];       }
+
+        T* end()                                        { return data + size;       }
+        T* rend()                                       { return data - 1;          }
+        T* begin()                                      { return data;              }
+        T* rbegin()                                     { return data + size - 1;   }
+        [[nodiscard]] const T* end() const              { return data + size;       }
+        [[nodiscard]] const T* rend() const             { return data - 1;          }
+        [[nodiscard]] const T* begin() const            { return data;              }
+        [[nodiscard]] const T* rbegin() const           { return data + size - 1;   }
+    };
+
+    template<typename T>
+    struct array_t final {
+        using Is_Static         [[maybe_unused]] = std::integral_constant<b8, false>;
+        using Value_Type        = T;
+        using Size_Per_16       [[maybe_unused]] = std::integral_constant<u32, 16 / sizeof(T)>;
+
+        alloc_t*                alloc;
+        Value_Type*             data;
+        u32                     size;
+        u32                     capacity;
+
+        Value_Type& operator[](u32 index)               { return data[index];       }
+        const Value_Type& operator[](u32 index) const   { return data[index];       }
+
+        T* end()                                        { return data + size;       }
+        T* rend()                                       { return data - 1;          }
+        T* begin()                                      { return data;              }
+        T* rbegin()                                     { return data + size - 1;   }
+        [[nodiscard]] const T* end() const              { return data + size;       }
+        [[nodiscard]] const T* rend() const             { return data - 1;          }
+        [[nodiscard]] const T* begin() const            { return data;              }
+        [[nodiscard]] const T* rbegin() const           { return data + size - 1;   }
+    };
+    static_assert(sizeof(array_t<s32>) <= 24, "array_t<T> is now larger than 24 bytes!");
+
+    using slice_array_t         = array_t<str::slice_t>;
 
     namespace slice {
         template <typename T>
@@ -406,8 +467,6 @@ namespace basecode {
             return slice_t{.data = array.data, .length = array.size};
         }
     }
-
-    using slice_array_t         = array_t<str::slice_t>;
 
     // ------------------------------------------------------------------------
     //
@@ -774,37 +833,6 @@ namespace basecode {
 
     // ------------------------------------------------------------------------
     //
-    // error
-    //
-    // ------------------------------------------------------------------------
-    template <typename T>
-    concept Error_Id = std::is_enum_v<T>
-                       || std::same_as<T, u32>
-                       || std::same_as<T, s32>;
-
-    enum class error_report_level_t : u8 {
-        warning,
-        error,
-    };
-
-    enum class error_report_type_t : u8 {
-        default_,
-        source,
-    };
-
-    struct error_def_t;
-    struct error_report_t;
-
-    namespace error {
-        enum class status_t : u8 {
-            ok                  = 0,
-            localized_dup_key,
-            localized_not_found,
-        };
-    }
-
-    // ------------------------------------------------------------------------
-    //
     // event
     //
     // ------------------------------------------------------------------------
@@ -1033,6 +1061,8 @@ namespace basecode {
         struct result_t;
     }
 
+    using interned_array_t      = array_t<intern::result_t>;
+
     // ------------------------------------------------------------------------
     //
     // ipc
@@ -1126,7 +1156,17 @@ namespace basecode {
     // locale
     //
     // ------------------------------------------------------------------------
-    struct locale_key_t;
+    struct locale_key_t final {
+        u32                     id;
+        s8                      locale[8];
+
+        b8 operator==(const locale_key_t& other) const {
+            return id == other.id
+                   && strncmp(locale, other.locale, sizeof(locale)) == 0;
+        }
+    };
+
+    using localized_strtab_t    = hashtab_t<locale_key_t, str::slice_t>;
 
     namespace locale{
         enum class status_t : u8 {
@@ -1530,9 +1570,21 @@ namespace basecode {
     // src_loc
     //
     // ------------------------------------------------------------------------
-    struct source_loc_t;
-    struct source_pos_t;
-    struct source_info_t;
+    struct source_loc_t final {
+        u32                     line    {};
+        u32                     column  {};
+    };
+
+    struct source_pos_t final {
+        u32                     end     {};
+        u32                     start   {};
+    };
+
+    struct source_info_t final {
+        source_pos_t            pos;
+        source_loc_t            start;
+        source_loc_t            end;
+    };
 
     // ------------------------------------------------------------------------
     //
@@ -1896,10 +1948,65 @@ namespace basecode {
 
     // ------------------------------------------------------------------------
     //
+    // error
+    //
+    // ------------------------------------------------------------------------
+    using error_arg_array_t     = array_t<std::any>;
+
+    template <typename T>
+    concept Error_Id = std::is_enum_v<T>
+                       || std::same_as<T, u32>
+                       || std::same_as<T, s32>;
+
+    enum class error_report_level_t : u8 {
+        warning,
+        error,
+    };
+
+    enum class error_report_type_t : u8 {
+        default_,
+        source,
+    };
+
+    struct error_def_t final {
+        str::slice_t            code;
+        str::slice_t            locale;
+        u32                     id;
+        u32                     lc_str_id;
+    };
+
+    struct error_report_t final {
+        buf_t*                  buf;
+        error_arg_array_t       args;
+        time_t                  ts;
+        source_info_t           src_info;
+        u32                     id;
+        u32                     args_size;
+        error_report_type_t     type;
+        error_report_level_t    level;
+    };
+
+    using error_report_list_t   = array_t<error_report_t>;
+    using localized_error_map_t = hashtab_t<locale_key_t, error_def_t*>;
+
+    namespace error {
+        enum class status_t : u8 {
+            ok                  = 0,
+            localized_dup_key,
+            localized_not_found,
+        };
+    }
+
+    // ------------------------------------------------------------------------
+    //
     // hashable implementation/prototypes
     //
     // ------------------------------------------------------------------------
     namespace hash {
+        namespace murmur {
+            u64 hash64(const u0* src, usize len);
+        }
+
         static const u64 s_fixed_random = std::chrono::steady_clock::now()
             .time_since_epoch()
             .count();
@@ -1988,5 +2095,9 @@ namespace basecode {
         inline u64 hash64(const locale_key_t& key);
 
         inline u64 hash64(const token_type_t& key);
+
+        inline u64 hash64(const locale_key_t& key) {
+            return murmur::hash64(&key, sizeof(locale_key_t));
+        }
     }
 }
