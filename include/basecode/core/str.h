@@ -102,18 +102,28 @@ namespace basecode {
             if (this != &other) {
                 if (alloc)
                     memory::free(alloc, data);
-                data = other.data;
-                length = other.length;
+                data     = other.data;
+                length   = other.length;
                 capacity = other.capacity;
                 alloc    = other.alloc;
-                other.data = {};
-                other.length = other.capacity = {};
+                other.data     = {};
+                other.length   = {};
+                other.capacity = {};
             }
             return *this;
         }
 
         inline str_t& operator+(const str_t& other) {
             str::append(*this, other);
+            return *this;
+        }
+
+        str_t& operator=(const str::slice_t& other) {
+            BC_ASSERT_NOT_NULL(alloc);
+            const auto n = other.length;
+            str::grow(*this, n);
+            std::memcpy(data, other.data, n * sizeof(u8));
+            length = n;
             return *this;
         }
 

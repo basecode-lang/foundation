@@ -36,8 +36,7 @@ namespace basecode::gfx::tool::prop_editor {
         b8 selected = editor.prop_id == id;
         ImGui::Selectable(name, &selected);
         if (selected) {
-            str::reset(editor.help_heading);
-            str::append(editor.help_heading, name);
+            editor.help_heading = slice::make(name);
             editor.prop_id = id;
         }
         ImGui::TableSetColumnIndex(1);
