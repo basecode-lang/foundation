@@ -21,12 +21,24 @@
 #include <basecode/core/memory.h>
 
 namespace basecode {
+    struct slab_t final {
+        u0*                     page;
+        u0*                     free_list;
+        slab_t*                 prev;
+        slab_t*                 next;
+        u32                     buf_count;
+        u0*                     pad[3];
+    };
+    static_assert(sizeof(slab_t) <= 64, "slab_t is now larger than 64 bytes!");
+
+    constexpr u32 slab_size     = sizeof(slab_t);
+
     struct slab_config_t : alloc_config_t {
         slab_config_t() : alloc_config_t(alloc_type_t::slab) {}
 
-        u32                 buf_size;
-        u8                  buf_align;
-        u8                  num_pages = 1;
+        u32                     buf_size;
+        u8                      buf_align;
+        u8                      num_pages = 1;
     };
 
     namespace memory::slab {

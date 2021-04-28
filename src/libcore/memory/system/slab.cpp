@@ -20,21 +20,7 @@
 #include <basecode/core/assert.h>
 #include <basecode/core/memory/system/slab.h>
 
-namespace basecode {
-    struct slab_t final {
-        u0*             page;
-        u0*             free_list;
-        slab_t*         prev;
-        slab_t*         next;
-        u32             buf_count;
-        u0*             pad[3];
-    };
-    static_assert(sizeof(slab_t) <= 64, "slab_t is now larger than 64 bytes!");
-}
-
 namespace basecode::memory::slab {
-    constexpr auto slab_size = sizeof(slab_t);
-
     static u0 remove(alloc_t* alloc, slab_t* slab) {
         auto sc                                      = &alloc->subclass.slab;
         if (slab->next)             slab->next->prev = slab->prev;
