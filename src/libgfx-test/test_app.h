@@ -18,17 +18,19 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/gfx/tool/alloc.h>
+#include <basecode/gfx/gfx.h>
 #include <basecode/gfx/imgui/imgui.h>
 #include <basecode/gfx/imgui/imgui_internal.h>
 #include <basecode/gfx/imgui/imgui_memory_editor.h>
 
 namespace basecode {
+    using namespace gfx::tool;
+
     struct test_app_t final {
         alloc_t*                alloc;
         gfx::msg_stack_t        msg_stack;
-        gfx::tool::alloc_win_t  alloc_window;
+        prop_editor_t           prop_editor;
+        alloc_win_t             alloc_window;
         MemoryEditor            memory_editor;
         s8                      buf[128];
         b8                      show_fps;

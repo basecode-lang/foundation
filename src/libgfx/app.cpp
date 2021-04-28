@@ -234,21 +234,24 @@ namespace basecode::gfx::app {
         ImGui_ImplOpenGL3_Init(glsl_version);
 
         io.FontDefault = io.Fonts->AddFontFromFileTTF(
-            "../share/fonts/SEGOEUI.TTF",
-            PT_TO_PX(20));
+            "../share/fonts/hack/hack-regular.ttf",
+            PT_TO_PX(16));
         ImWchar icons_range[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
         ImFontConfig icons_config;
         icons_config.MergeMode  = true;
         icons_config.PixelSnapH = true;
         io.Fonts->AddFontFromFileTTF(
             "../share/fonts/" FONT_ICON_FILE_NAME_FAS,
-            PT_TO_PX(20),
+            PT_TO_PX(16),
             &icons_config,
             icons_range);
 
+        app.bold_font  = io.Fonts->AddFontFromFileTTF(
+            "../share/fonts/hack/hack-bold.ttf",
+            PT_TO_PX(16));
         app.large_font = io.Fonts->AddFontFromFileTTF(
-            "../share/fonts/SEGOEUI.TTF",
-            PT_TO_PX(32));
+            "../share/fonts/bebas-neue/bebas-neue-bold.TTF",
+            PT_TO_PX(24));
 
         ImGuiFreeType::BuildFontAtlas(io.Fonts);
 

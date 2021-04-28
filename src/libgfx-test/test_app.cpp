@@ -19,7 +19,9 @@
 #include <basecode/gfx/app.h>
 #include <basecode/core/string.h>
 #include <basecode/gfx/msg_stack.h>
+#include <basecode/gfx/tool/alloc.h>
 #include <basecode/core/memory/meta.h>
+#include <basecode/gfx/tool/prop_editor.h>
 #include <basecode/gfx/fonts/IconsFontAwesome5.h>
 #include "test_app.h"
 
@@ -28,10 +30,199 @@ namespace basecode {
     static usize                s_scratch_free      {};
     static usize                s_scratch_alloc     {};
 
+    static u0 allocator_props(prop_editor_t* editor, alloc_t* alloc) {
+        if (prop_editor::begin_nested(*editor, "##system", "System")) {
+            if (prop_editor::read_only(*editor, "Type", memory::type_name(alloc->system->type))) {
+                prop_editor::description(*editor,
+                                         "The type of system used by this allocator."_ss);
+            }
+            switch (alloc->system->type) {
+                case alloc_type_t::bump: {
+                    auto sc = &alloc->subclass.bump;
+                    if (prop_editor::read_only(*editor, "Buffer Pointer", (u0*) sc->buf)) {
+                        prop_editor::description(*editor,
+                                                 "Pointer to the backing memory this bump allocator "
+                                                 "will parcel out."_ss);
+                    }
+                    if (prop_editor::read_only(*editor, "Buffer Offset", sc->offset)) {
+                        prop_editor::description(*editor,
+                                                 "The offset from the Buffer Pointer that "
+                                                 "will be the base pointer for the next allocation."_ss);
+                    }
+                    if (prop_editor::read_only(*editor, "Buffer End Offset", sc->end_offset)) {
+                        prop_editor::description(*editor,
+                                                 "Any allocation that would exceed this offset forces "
+                                                 "this system to request more memory from the backing allocator."_ss);
+                    }
+                    break;
+                }
+                case alloc_type_t::page: {
+                    auto sc = &alloc->subclass.page;
+                    prop_editor::read_only(*editor,
+                                           "Page Size",
+                                           sc->page_size);
+                    prop_editor::read_only(*editor,
+                                           "Number of Pages/Alloc",
+                                           sc->num_pages);
+                    prop_editor::read_only(*editor,
+                                           "Page Cursor",
+                                           (u0*) sc->cursor);
+                    prop_editor::read_only(*editor,
+                                           "Head Page",
+                                           (u0*) sc->head);
+                    prop_editor::read_only(*editor,
+                                           "Tail Page",
+                                           (u0*) sc->tail);
+                    prop_editor::read_only(*editor,
+                                           "Active Pages",
+                                           sc->count);
+                    break;
+                }
+                case alloc_type_t::slab: {
+                    auto sc = &alloc->subclass.slab;
+                    prop_editor::read_only(*editor,
+                                           "Page Size",
+                                           sc->page_size);
+                    prop_editor::read_only(*editor,
+                                           "Number of Pages/Slab",
+                                           sc->num_pages);
+                    prop_editor::read_only(*editor,
+                                           "Head Slab",
+                                           (u0*) sc->head);
+                    prop_editor::read_only(*editor,
+                                           "Tail Slab",
+                                           (u0*) sc->tail);
+                    prop_editor::read_only(*editor,
+                                           "Buffer Size",
+                                           sc->buf_size);
+                    prop_editor::read_only(*editor,
+                                           "Buffer Align",
+                                           sc->buf_align);
+                    prop_editor::read_only(*editor,
+                                           "Number of Slabs",
+                                           sc->count);
+                    prop_editor::read_only(*editor,
+                                           "Max Buffers/Slab",
+                                           sc->buf_max_count);
+                    break;
+                }
+                case alloc_type_t::proxy: {
+                    auto sc = &alloc->subclass.proxy;
+                    b8 owner = sc->owner;
+                    prop_editor::read_only(*editor,
+                                           "Owns Backing",
+                                           owner);
+                    break;
+                }
+                case alloc_type_t::stack: {
+                    auto sc = &alloc->subclass.stack;
+                    prop_editor::read_only(*editor,
+                                           "Max Size",
+                                           sc->max_size);
+                    prop_editor::read_only(*editor,
+                                           "Buffer Pointer",
+                                           (u0*) sc->buf);
+                    prop_editor::read_only(*editor,
+                                           "Free Pointer",
+                                           (u0*) sc->free);
+                    break;
+                }
+                case alloc_type_t::buddy: {
+                    auto sc = &alloc->subclass.buddy;
+                    prop_editor::read_only(*editor,
+                                           "Heap Size",
+                                           sc->size);
+                    prop_editor::read_only(*editor,
+                                           "Min Allocation Size",
+                                           sc->min_allocation);
+                    prop_editor::read_only(*editor,
+                                           "Heap Pointer",
+                                           (u0*) sc->heap);
+                    prop_editor::read_only(*editor,
+                                           "Free Block List",
+                                           (u0*) sc->free_blocks);
+                    prop_editor::read_only(*editor,
+                                           "Max Level",
+                                           sc->max_level);
+                    prop_editor::read_only(*editor,
+                                           "Total Levels",
+                                           sc->total_levels);
+                    prop_editor::read_only(*editor,
+                                           "Max Indexes",
+                                           sc->max_indexes);
+                    break;
+                }
+                case alloc_type_t::scratch: {
+                    auto sc = &alloc->subclass.scratch;
+                    prop_editor::read_only(*editor,
+                                           "Ring Buffer Size",
+                                           sc->size);
+                    prop_editor::read_only(*editor,
+                                           "Ring Begin",
+                                           (u0*) sc->begin);
+                    prop_editor::read_only(*editor,
+                                           "Ring End",
+                                           (u0*) sc->end);
+                    prop_editor::read_only(*editor,
+                                           "Next Pointer",
+                                           (u0*) sc->alloc);
+                    prop_editor::read_only(*editor,
+                                           "Free Pointer",
+                                           (u0*) sc->free);
+                    break;
+                }
+                case alloc_type_t::dlmalloc: {
+                    auto sc = &alloc->subclass.dl;
+                    prop_editor::read_only(*editor,
+                                           "Heap Size",
+                                           sc->size);
+                    prop_editor::read_only(*editor,
+                                           "Space",
+                                           (u0*) sc->heap);
+                    prop_editor::read_only(*editor,
+                                           "Base Pointer",
+                                           (u0*) sc->base);
+                    break;
+                }
+                default:
+                    break;
+            }
+            prop_editor::end_nested(*editor);
+        }
+
+        if (prop_editor::read_only(*editor, "Name", memory::name(alloc))) {
+            prop_editor::description(*editor,
+                                     "The name assigned to this allocator."_ss);
+        }
+
+        if (prop_editor::read_only(*editor, "Total Allocated", alloc->total_allocated)) {
+            prop_editor::description(*editor,
+                                     "The total memory that has been allocated "
+                                     "through this allocator.  In the case of proxy "
+                                     "allocators, this value represents a pass-through "
+                                     "from the backing allocator."_ss);
+        }
+
+        if (!alloc->backing)
+            return;
+        if (prop_editor::begin_nested(*editor, "##backing", "Backing")) {
+            allocator_props(editor, alloc->backing);
+            prop_editor::end_nested(*editor);
+        }
+    }
+
+    static b8 type_editor_alloc_info(prop_editor_t* editor) {
+        auto alloc_info = (alloc_info_t*) editor->selected;
+        auto alloc = alloc_info->tracked;
+        if (prop_editor::begin_category(*editor, "##alloc", "Allocator")) {
+            allocator_props(editor, alloc);
+            prop_editor::end_category(*editor);
+        }
+        return true;
+    }
+
     b8 on_render(gfx::app_t& app) {
         auto& io = ImGui::GetIO();
-
-        gfx::msg_stack::draw(s_test_app.msg_stack);
 
         if (ImGui::BeginMainMenuBar()) {
             if (ImGui::BeginMenu("View")) {
@@ -95,6 +286,11 @@ namespace basecode {
                                              "Memory Editor",
                                              nullptr,
                                              &s_test_app.memory_editor.Open,
+                                             true);
+                    gfx::menu_item_with_icon(ICON_FA_TABLE,
+                                             "Properties",
+                                             nullptr,
+                                             &s_test_app.prop_editor.visible,
                                              true);
                     ImGui::EndMenu();
                 }
@@ -211,6 +407,14 @@ namespace basecode {
                                                 mem ? size : 0 );
         }
 
+        if (s_test_app.alloc_window.selected) {
+            prop_editor::selected<alloc_info_t>(s_test_app.prop_editor,
+                                                s_test_app.alloc_window.selected);
+        }
+
+        gfx::msg_stack::draw(s_test_app.msg_stack);
+        prop_editor::draw(s_test_app.prop_editor);
+
         if (gfx::begin_status_bar()) {
             ImGui::TextUnformatted("Ready.");
             gfx::end_status_bar();
@@ -275,16 +479,16 @@ namespace basecode {
         gfx::app::init(app);
 
         s_test_app.alloc = memory::system::main_alloc();
-        gfx::tool::alloc::init(s_test_app.alloc_window,
-                               &app,
-                               s_test_app.alloc);
-
         gfx::msg_stack::init(s_test_app.msg_stack, app.large_font, 0);
-
+        alloc::init(s_test_app.alloc_window, &app, s_test_app.alloc);
+        prop_editor::init(s_test_app.prop_editor, &app, s_test_app.alloc);
+        prop_editor::register_type_editor<alloc_info_t>(s_test_app.prop_editor,
+                                                        type_editor_alloc_info);
         auto status = gfx::app::run(app);
         s32 rc = !OK(status);
 
-        gfx::tool::alloc::free(s_test_app.alloc_window);
+        prop_editor::free(s_test_app.prop_editor);
+        alloc::free(s_test_app.alloc_window);
         gfx::msg_stack::free(s_test_app.msg_stack);
         gfx::app::free(app);
 

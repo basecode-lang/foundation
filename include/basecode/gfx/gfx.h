@@ -34,7 +34,6 @@ struct ImPlotContext;
 
 namespace basecode::gfx {
     struct app_t;
-    struct prop_editor_t;
 
     // ------------------------------------------------------------------------
     //
@@ -238,6 +237,7 @@ namespace basecode::gfx {
 
     struct app_t final {
         alloc_t*                alloc;
+        ImFont*                 bold_font;
         ImFont*                 large_font;
         render_callback_t       on_render;
         str::slice_t            short_name;
@@ -247,17 +247,6 @@ namespace basecode::gfx {
         vec4_t                  bg_color;
         f64                     ticks;
         s32                     dock_root;
-    };
-
-    // ------------------------------------------------------------------------
-    //
-    // property editor
-    //
-    // ------------------------------------------------------------------------
-
-    struct property_editor_t final {
-        u0*                     selected;
-        b8                      visible;
     };
 
     // ------------------------------------------------------------------------
@@ -820,6 +809,31 @@ namespace basecode::gfx {
         // ----------------------------------------------------------------
 
         struct strings_win_t;
+
+        // ------------------------------------------------------------------------
+        //
+        // property editor
+        //
+        // ------------------------------------------------------------------------
+        struct prop_editor_t;
+
+        using type_editor_t         = b8 (*)(prop_editor_t*);
+        using type_editor_table_t   = hashtab_t<u32, type_editor_t>;
+
+        struct prop_editor_t final {
+            app_t*                  app;
+            u0*                     selected;
+            type_editor_table_t     typetab;
+            str_t                   help_heading;
+            str_t                   help_text;
+            ImVec2                  size;
+            u32                     item_id;
+            u32                     type_id;
+            u32                     prop_id;
+            f32                     cmd_height;
+            f32                     grid_height;
+            b8                      visible;
+        };
     }
 
     namespace ed {

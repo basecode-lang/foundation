@@ -234,6 +234,7 @@ set(GFX_SOURCES
     tool/alloc.cpp ${GFX_INC_DIR}/tool/alloc.h
     tool/errors.cpp ${GFX_INC_DIR}/tool/errors.h
     tool/strings.cpp ${GFX_INC_DIR}/tool/strings.h
+    tool/prop_editor.cpp ${GFX_INC_DIR}/tool/prop_editor.h
 )
 
 add_library(
