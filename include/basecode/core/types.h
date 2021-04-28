@@ -1981,7 +1981,6 @@ namespace basecode {
         time_t                  ts;
         source_info_t           src_info;
         u32                     id;
-        u32                     args_size;
         error_report_type_t     type;
         error_report_level_t    level;
     };

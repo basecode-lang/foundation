@@ -19,6 +19,7 @@
 #pragma once
 
 #include <basecode/core/slice.h>
+#include <basecode/core/array.h>
 #include <basecode/core/context.h>
 #include <basecode/core/src_loc.h>
 
@@ -60,7 +61,6 @@ namespace basecode::error {
             report->src_info  = src_info;
             report->id        = u32(id);
             report->ts        = std::time(nullptr);
-            report->args_size = 0;
             (internal::add_arg(report, args), ...);
         }
 
@@ -79,7 +79,6 @@ namespace basecode::error {
             report->src_info  = {};
             report->id        = u32(id);
             report->ts        = std::time(nullptr);
-            report->args_size = 0;
             (internal::add_arg(report, args), ...);
         }
     }

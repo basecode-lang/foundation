@@ -1,7 +1,6 @@
 HIGH
 ---------
-- FIRST THING!!! fix the libfmt args formatting in errors.cpp
-
+- macro: need an any/variant type that doesn't suck
 - macro: text macro system
 
 - binfmt: pe/coff backend is missing section name mapping; not sure
@@ -45,6 +44,8 @@ HIGH
 
 MEDIUM
 ---------
+- error: once i've written my own any/variant type, revisit this and swap out
+         std::any.
 
 LOW
 ---------
@@ -63,6 +64,9 @@ LOW
 
 DONE
 ----
+- error: temporarily switch error_report_t to use an array_t<std::any> for the
+         args.  i don't like this, but it decouples the errors implementation
+         from libfmt at the interface.
 - str_array: refactor to use page + bump allocators to simplify interface with
     stable pointers to strings.
 - page allocator: implement free list so pages can recycle

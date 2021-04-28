@@ -36,6 +36,38 @@ namespace basecode::error {
 
     system_t                    g_err_sys;
 
+    // XXX: FIXME
+    //      temporarily switched to using an array_t of std::any
+    //      but i really don't like the interface for std::any and would
+    //      like to find a better way to do this.  i suspect i will need to
+    //      make my own any/variant type for the macro system, so that may be
+    //      a good time to revisit this.
+    static fmt_dyn_args_t make_fmt_args(const error_arg_array_t& args) {
+        fmt_dyn_args_t dyn{};
+        for (auto& arg : args) {
+            if (arg.type() == typeid(u32)) {
+                dyn.push_back(std::any_cast<u32>(arg));
+            } else if (arg.type() == typeid(str_t)) {
+                dyn.push_back(std::any_cast<str_t>(arg));
+            } else if (arg.type() == typeid(str::slice_t)) {
+                dyn.push_back(std::any_cast<str::slice_t>(arg));
+            } else if (arg.type() == typeid(s32)) {
+                dyn.push_back(std::any_cast<s32>(arg));
+            } else if (arg.type() == typeid(f32)) {
+                dyn.push_back(std::any_cast<f32>(arg));
+            } else if (arg.type() == typeid(f64)) {
+                dyn.push_back(std::any_cast<f64>(arg));
+            } else if (arg.type() == typeid(const s8*)) {
+                dyn.push_back(std::any_cast<const s8*>(arg));
+            } else {
+                BC_ASSERT_MSG(false,
+                              "unknown type in error_arg_array_t: {}",
+                              arg.type().name());
+            }
+        }
+        return dyn;
+    }
+
     static u0 format_report_header(const error_report_t& report,
                                    error_def_t* def,
                                    const s8* fmt_msg,
@@ -49,10 +81,7 @@ namespace basecode::error {
                 format::format_to(str_buf, "ERROR: ");
                 break;
         }
-        fmt_dyn_args_t args{};
-//        for (auto& arg : report.args)
-//            args.push_back(any_cast(&arg));
-        fmt::vformat_to(str_buf, fmt_msg, args);
+        fmt::vformat_to(str_buf, fmt_msg, make_fmt_args(report.args));
         format::format_to(str_buf, "\n");
     }
 
@@ -92,10 +121,7 @@ namespace basecode::error {
                                       "\n{:<{}}^ ",
                                       " ",
                                       10 + report.src_info.start.column);
-                    fmt_dyn_args_t args{};
-//                    for (auto& arg : report.args)
-//                        args.push_back(arg);
-                    fmt::vformat_to(str_buf, fmt_msg, args);
+                    fmt::vformat_to(str_buf, fmt_msg, make_fmt_args(report.args));
                     term::reset_all(g_err_sys.term);
                     term::refresh(g_err_sys.term, str_buf);
                 }
