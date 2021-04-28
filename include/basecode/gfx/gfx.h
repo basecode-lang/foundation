@@ -977,6 +977,12 @@ namespace basecode::gfx {
                      const ImU32& bg_col,
                      const ImU32& fg_col);
 
+    b8 input_text(const s8* label,
+                  str_t* str,
+                  ImGuiInputTextFlags flags = 0,
+                  ImGuiInputTextCallback callback = nullptr,
+                  u0* user_data = nullptr);
+
     b8 begin_menu_with_icon(const s8* icon,
                             const s8* label,
                             b8 enabled = true);
@@ -988,6 +994,20 @@ namespace basecode::gfx {
                 f32 min_size1,
                 f32 min_size2,
                 f32 splitter_long_axis_size = -1.0f);
+
+    b8 input_text_multiline(const s8* label,
+                            str_t* str,
+                            const ImVec2& size = ImVec2(0, 0),
+                            ImGuiInputTextFlags flags = 0,
+                            ImGuiInputTextCallback callback = nullptr,
+                            u0* user_data = nullptr);
+
+    b8 input_text_with_hint(const s8* label,
+                            const s8* hint,
+                            str_t* str,
+                            ImGuiInputTextFlags flags = 0,
+                            ImGuiInputTextCallback callback = nullptr,
+                            u0* user_data = nullptr);
 
     u0 text_right_align(const s8* text_begin, const s8* text_end = {});
 }

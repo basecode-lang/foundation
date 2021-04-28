@@ -20,6 +20,25 @@
 #include <basecode/gfx/imgui/imgui_internal.h>
 
 namespace basecode::gfx {
+    struct input_text_callback_t {
+        str_t*                  str;
+        ImGuiInputTextCallback  chain;
+        u0*                     chain_user_data;
+    };
+
+    static s32 input_text_callback(ImGuiInputTextCallbackData* data) {
+        auto user_data = (input_text_callback_t*)data->UserData;
+        if (data->EventFlag == ImGuiInputTextFlags_CallbackResize) {
+            str_t* str = user_data->str;
+            str::resize(*str, data->BufTextLen);
+            data->Buf = (s8*) str::c_str(*str);
+        } else if (user_data->chain) {
+            data->UserData = user_data->chain_user_data;
+            return user_data->chain(data);
+        }
+        return 0;
+    }
+
     u0 end_status_bar() {
         ImGuiWindow* window = ImGui::GetCurrentWindow();
         if (window->SkipItems)
@@ -307,5 +326,69 @@ namespace basecode::gfx {
         }
         ImGui::SetCursorPosX(icon_max_width * 1.5);
         return ImGui::BeginMenu(label, enabled);
+    }
+
+    b8 input_text(const s8* label,
+                  str_t* str,
+                  ImGuiInputTextFlags flags,
+                  ImGuiInputTextCallback callback,
+                  u0* user_data) {
+        IM_ASSERT((flags & ImGuiInputTextFlags_CallbackResize) == 0);
+        flags |= ImGuiInputTextFlags_CallbackResize;
+
+        input_text_callback_t cb;
+        cb.str             = str;
+        cb.chain           = callback;
+        cb.chain_user_data = user_data;
+        return ImGui::InputText(label,
+                                (s8*) str::c_str(*str),
+                                str->capacity + 1,
+                                flags,
+                                input_text_callback,
+                                &cb);
+    }
+
+    b8 input_text_multiline(const s8* label,
+                            str_t* str,
+                            const ImVec2& size,
+                            ImGuiInputTextFlags flags,
+                            ImGuiInputTextCallback callback,
+                            u0* user_data) {
+        IM_ASSERT((flags & ImGuiInputTextFlags_CallbackResize) == 0);
+        flags |= ImGuiInputTextFlags_CallbackResize;
+
+        input_text_callback_t cb;
+        cb.str             = str;
+        cb.chain           = callback;
+        cb.chain_user_data = user_data;
+        return ImGui::InputTextMultiline(label,
+                                         (s8*) str::c_str(*str),
+                                         str->capacity + 1,
+                                         size,
+                                         flags,
+                                         input_text_callback,
+                                         &cb);
+    }
+
+    b8 input_text_with_hint(const s8* label,
+                            const s8* hint,
+                            str_t* str,
+                            ImGuiInputTextFlags flags,
+                            ImGuiInputTextCallback callback,
+                            u0* user_data) {
+        IM_ASSERT((flags & ImGuiInputTextFlags_CallbackResize) == 0);
+        flags |= ImGuiInputTextFlags_CallbackResize;
+
+        input_text_callback_t cb;
+        cb.str             = str;
+        cb.chain           = callback;
+        cb.chain_user_data = user_data;
+        return ImGui::InputTextWithHint(label,
+                                        hint,
+                                        (s8*) str::c_str(*str),
+                                        str->capacity + 1,
+                                        flags,
+                                        input_text_callback,
+                                        &cb);
     }
 }
