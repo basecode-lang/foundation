@@ -17,13 +17,13 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/gfx/app.h>
+#include <basecode/gfx/icons.h>
 #include <basecode/core/string.h>
 #include <basecode/gfx/msg_stack.h>
 #include <basecode/gfx/tool/alloc.h>
 #include <basecode/gfx/tool/errors.h>
 #include <basecode/gfx/tool/strings.h>
 #include <basecode/core/memory/meta.h>
-#include <basecode/gfx/icons_texture.h>
 #include <basecode/gfx/tool/prop_editor.h>
 #include "test_app.h"
 
@@ -37,32 +37,32 @@ namespace basecode {
     static u0 draw_menu_bar(gfx::app_t& app) {
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu("View")) {
-                if (gfx::begin_menu_with_texture(*app.icons_atlas, FRAME_TOOLBOX_WITH_TOOLS, "Tool Windows")) {
+                if (gfx::begin_menu_with_texture(*app.icons_atlas, ICONS_TOOLBOX_WITH_TOOLS, "Tool Windows")) {
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        FRAME_RAM,
+                        ICONS_RAM,
                         "Allocators",
                         nullptr,
                         &s_test_app.alloc_window.visible,
                         true);
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        FRAME_CURRENCY_DOLLAR,
+                        ICONS_CURRENCY_DOLLAR,
                         "Strings",
                         nullptr,
                         &s_test_app.strings_window.visible,
                         true);
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        FRAME_LIST_ERRORS,
+                        ICONS_LIST_ERRORS,
                         "Errors",
                         nullptr,
                         &s_test_app.errors_window.visible,
                         true);
-                    if (gfx::begin_menu_with_texture(*app.icons_atlas, FRAME_SCRIPT, "Scheme")) {
+                    if (gfx::begin_menu_with_texture(*app.icons_atlas, ICONS_SCRIPT, "Scheme")) {
                         gfx::menu_item_with_texture(
                             *app.icons_atlas,
-                            FRAME_COMMAND_PROMPT,
+                            ICONS_COMMAND_PROMPT,
                             "REPL",
                             nullptr,
                             &s_test_app.scm_repl_visible,
@@ -70,7 +70,7 @@ namespace basecode {
                         ImGui::Separator();
                         gfx::menu_item_with_texture(
                             *app.icons_atlas,
-                            FRAME_DATASHEET_VIEW,
+                            ICONS_DATASHEET_VIEW,
                             "Environment",
                             nullptr,
                             &s_test_app.scm_env_visible,
@@ -79,35 +79,35 @@ namespace basecode {
                     }
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        FRAME_PROCEDURE,
+                        ICONS_PROCEDURE,
                         "Jobs",
                         nullptr,
                         &s_test_app.jobs_visible,
                         true);
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        FRAME_PROCESS,
+                        ICONS_PROCESS,
                         "Threads",
                         nullptr,
                         &s_test_app.threads_visible,
                         true);
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        FRAME_CALL_STACK,
+                        ICONS_CALL_STACK,
                         "FFI",
                         nullptr,
                         &s_test_app.ffi_visible,
                         true);
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        FRAME_OBJECT_BROWSER,
+                        ICONS_OBJECT_BROWSER,
                         "Object Pools",
                         nullptr,
                         &s_test_app.obj_pools_visible,
                         true);
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        FRAME_TASK_SCHEDULE,
+                        ICONS_TASK_SCHEDULE,
                         "Timers",
                         nullptr,
                         &s_test_app.timers_visible,
@@ -115,14 +115,14 @@ namespace basecode {
                     ImGui::Separator();
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        FRAME_PROCESSOR,
+                        ICONS_PROCESSOR,
                         "Memory Editor",
                         nullptr,
                         &s_test_app.memory_editor.Open,
                         true);
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        FRAME_PROPERTY,
+                        ICONS_PROPERTY,
                         "Properties",
                         nullptr,
                         &s_test_app.prop_editor.visible,
@@ -132,7 +132,7 @@ namespace basecode {
                 ImGui::Separator();
                 gfx::menu_item_with_texture(
                     *app.icons_atlas,
-                    FRAME_CHART_AXES,
+                    ICONS_CHART_AXES,
                     "Frame Time & Rate",
                     nullptr,
                     &s_test_app.show_fps,
@@ -142,7 +142,7 @@ namespace basecode {
             if (ImGui::BeginMenu("Test")) {
                 if (gfx::menu_item_with_texture(
                     *app.icons_atlas,
-                    FRAME_COMMENT,
+                    ICONS_COMMENT,
                     "Enqueue to Message Stack",
                     nullptr,
                     nullptr,

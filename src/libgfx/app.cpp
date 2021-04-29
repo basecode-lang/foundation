@@ -18,12 +18,12 @@
 
 #include <basecode/gfx/app.h>
 #include <basecode/core/log.h>
+#include <basecode/gfx/icons.h>
 #include <basecode/core/timer.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/scm/types.h>
 #include <basecode/core/scm/system.h>
 #include <basecode/core/memory/meta.h>
-#include <basecode/gfx/icons_texture.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/gfx/imgui/imgui_freetype.h>
 #include <basecode/gfx/imgui/imgui_internal.h>
@@ -265,10 +265,10 @@ namespace basecode::gfx::app {
         status = texture_atlas::make_gpu_texture(*app.icons_atlas);
         if (!OK(status))
             return status;
-        array::resize(app.icons_atlas->frames, NUM_FRAMES);
+        array::resize(app.icons_atlas->frames, ICONS_NUM_FRAMES);
         std::memcpy(app.icons_atlas->frames.data,
-                    icons_texture::get_frames(),
-                    sizeof(texture_frame_t) * NUM_FRAMES);
+                    icons::get_frames(),
+                    sizeof(texture_frame_t) * ICONS_NUM_FRAMES);
         return status_t::ok;
     }
 

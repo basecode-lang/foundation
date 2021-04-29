@@ -229,7 +229,7 @@ set(GFX_SOURCES
 
     gfx.cpp ${GFX_INC_DIR}/gfx.h
 
-    icons_texture.cpp ${GFX_INC_DIR}/icons_texture.h
+    icons.cpp ${GFX_INC_DIR}/icons.h
 
     ${GFX_INC_DIR}/msg_stack.h
 
