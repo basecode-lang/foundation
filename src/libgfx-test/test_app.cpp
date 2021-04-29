@@ -23,8 +23,8 @@
 #include <basecode/gfx/tool/errors.h>
 #include <basecode/gfx/tool/strings.h>
 #include <basecode/core/memory/meta.h>
+#include <basecode/gfx/icons_texture.h>
 #include <basecode/gfx/tool/prop_editor.h>
-#include <basecode/gfx/fonts/IconsFontAwesome5.h>
 #include "test_app.h"
 
 namespace basecode {
@@ -34,91 +34,119 @@ namespace basecode {
     static usize                s_scratch_free      {};
     static usize                s_scratch_alloc     {};
 
-    static u0 draw_menu_bar() {
+    static u0 draw_menu_bar(gfx::app_t& app) {
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu("View")) {
-                if (gfx::begin_menu_with_icon(ICON_FA_TOOLS, "Tool Windows")) {
-                    gfx::menu_item_with_icon(ICON_FA_MEMORY,
-                                             "Allocators",
-                                             nullptr,
-                                             &s_test_app.alloc_window.visible,
-                                             true);
-                    gfx::menu_item_with_icon(ICON_FA_DOLLAR_SIGN,
-                                             "Strings",
-                                             nullptr,
-                                             &s_test_app.strings_window.visible,
-                                             true);
-                    gfx::menu_item_with_icon(ICON_FA_EXCLAMATION_CIRCLE,
-                                             "Errors",
-                                             nullptr,
-                                             &s_test_app.errors_window.visible,
-                                             true);
-                    if (gfx::begin_menu_with_icon(nullptr, "Scheme")) {
-                        gfx::menu_item_with_icon(ICON_FA_TERMINAL,
-                                                 "REPL",
-                                                 nullptr,
-                                                 &s_test_app.scm_repl_visible,
-                                                 true);
+                if (gfx::begin_menu_with_texture(*app.icons_atlas, FRAME_TOOLBOX_WITH_TOOLS, "Tool Windows")) {
+                    gfx::menu_item_with_texture(
+                        *app.icons_atlas,
+                        FRAME_RAM,
+                        "Allocators",
+                        nullptr,
+                        &s_test_app.alloc_window.visible,
+                        true);
+                    gfx::menu_item_with_texture(
+                        *app.icons_atlas,
+                        FRAME_CURRENCY_DOLLAR,
+                        "Strings",
+                        nullptr,
+                        &s_test_app.strings_window.visible,
+                        true);
+                    gfx::menu_item_with_texture(
+                        *app.icons_atlas,
+                        FRAME_LIST_ERRORS,
+                        "Errors",
+                        nullptr,
+                        &s_test_app.errors_window.visible,
+                        true);
+                    if (gfx::begin_menu_with_texture(*app.icons_atlas, FRAME_SCRIPT, "Scheme")) {
+                        gfx::menu_item_with_texture(
+                            *app.icons_atlas,
+                            FRAME_COMMAND_PROMPT,
+                            "REPL",
+                            nullptr,
+                            &s_test_app.scm_repl_visible,
+                            true);
                         ImGui::Separator();
-                        gfx::menu_item_with_icon(ICON_FA_STREAM,
-                                                 "Environment",
-                                                 nullptr,
-                                                 &s_test_app.scm_env_visible,
-                                                 true);
+                        gfx::menu_item_with_texture(
+                            *app.icons_atlas,
+                            FRAME_DATASHEET_VIEW,
+                            "Environment",
+                            nullptr,
+                            &s_test_app.scm_env_visible,
+                            true);
                         ImGui::EndMenu();
                     }
-                    gfx::menu_item_with_icon(ICON_FA_TASKS,
-                                             "Jobs",
-                                             nullptr,
-                                             &s_test_app.jobs_visible,
-                                             true);
-                    gfx::menu_item_with_icon(nullptr,
-                                             "Threads",
-                                             nullptr,
-                                             &s_test_app.threads_visible,
-                                             true);
-                    gfx::menu_item_with_icon(nullptr,
-                                             "FFI",
-                                             nullptr,
-                                             &s_test_app.ffi_visible,
-                                             true);
-                    gfx::menu_item_with_icon(nullptr,
-                                             "Object Pools",
-                                             nullptr,
-                                             &s_test_app.obj_pools_visible,
-                                             true);
-                    gfx::menu_item_with_icon(ICON_FA_CLOCK,
-                                             "Timers",
-                                             nullptr,
-                                             &s_test_app.timers_visible,
-                                             true);
+                    gfx::menu_item_with_texture(
+                        *app.icons_atlas,
+                        FRAME_PROCEDURE,
+                        "Jobs",
+                        nullptr,
+                        &s_test_app.jobs_visible,
+                        true);
+                    gfx::menu_item_with_texture(
+                        *app.icons_atlas,
+                        FRAME_PROCESS,
+                        "Threads",
+                        nullptr,
+                        &s_test_app.threads_visible,
+                        true);
+                    gfx::menu_item_with_texture(
+                        *app.icons_atlas,
+                        FRAME_CALL_STACK,
+                        "FFI",
+                        nullptr,
+                        &s_test_app.ffi_visible,
+                        true);
+                    gfx::menu_item_with_texture(
+                        *app.icons_atlas,
+                        FRAME_OBJECT_BROWSER,
+                        "Object Pools",
+                        nullptr,
+                        &s_test_app.obj_pools_visible,
+                        true);
+                    gfx::menu_item_with_texture(
+                        *app.icons_atlas,
+                        FRAME_TASK_SCHEDULE,
+                        "Timers",
+                        nullptr,
+                        &s_test_app.timers_visible,
+                        true);
                     ImGui::Separator();
-                    gfx::menu_item_with_icon(nullptr,
-                                             "Memory Editor",
-                                             nullptr,
-                                             &s_test_app.memory_editor.Open,
-                                             true);
-                    gfx::menu_item_with_icon(ICON_FA_TABLE,
-                                             "Properties",
-                                             nullptr,
-                                             &s_test_app.prop_editor.visible,
-                                             true);
+                    gfx::menu_item_with_texture(
+                        *app.icons_atlas,
+                        FRAME_PROCESSOR,
+                        "Memory Editor",
+                        nullptr,
+                        &s_test_app.memory_editor.Open,
+                        true);
+                    gfx::menu_item_with_texture(
+                        *app.icons_atlas,
+                        FRAME_PROPERTY,
+                        "Properties",
+                        nullptr,
+                        &s_test_app.prop_editor.visible,
+                        true);
                     ImGui::EndMenu();
                 }
                 ImGui::Separator();
-                gfx::menu_item_with_icon(ICON_FA_CHART_BAR,
-                                         "Frame Time & Rate",
-                                         nullptr,
-                                         &s_test_app.show_fps,
-                                         true);
+                gfx::menu_item_with_texture(
+                    *app.icons_atlas,
+                    FRAME_CHART_AXES,
+                    "Frame Time & Rate",
+                    nullptr,
+                    &s_test_app.show_fps,
+                    true);
                 ImGui::EndMenu();
             }
             if (ImGui::BeginMenu("Test")) {
-                if (gfx::menu_item_with_icon(ICON_FA_BEER,
-                                             "Enqueue to Message Stack",
-                                             nullptr,
-                                             nullptr,
-                                             true)) {
+                if (gfx::menu_item_with_texture(
+                    *app.icons_atlas,
+                    FRAME_COMMENT,
+                    "Enqueue to Message Stack",
+                    nullptr,
+                    nullptr,
+                    true)) {
                     gfx::msg_stack::push(s_test_app.msg_stack,
                                          "This is a test message!"_ss);
                 }
@@ -129,11 +157,13 @@ namespace basecode {
                 const auto size = ImGui::GetContentRegionAvail();
                 ImFormatString(s_test_app.buf,
                                128,
-                               ICON_FA_CHART_BAR "  app average %.2f ms/frame (%.2f FPS)",
+                               "app average %.2f ms/frame (%.2f FPS)",
                                1000.0f / io.Framerate,
                                io.Framerate);
                 auto text_size = ImGui::CalcTextSize(s_test_app.buf);
-                ImGui::SameLine(size.x - (text_size.x - 40));
+                auto x_pos = ImGui::GetCursorPosX();
+                ImGui::SameLine();
+                ImGui::SetCursorPosX(x_pos + (size.x - text_size.x));
                 ImGui::TextUnformatted(s_test_app.buf);
             }
             ImGui::EndMenuBar();
@@ -332,7 +362,7 @@ namespace basecode {
     }
 
     b8 on_render(gfx::app_t& app) {
-        auto& io = ImGui::GetIO();
+//        auto& io = ImGui::GetIO();
 
         auto vp = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(vp->WorkPos);
@@ -356,7 +386,7 @@ namespace basecode {
                          ImVec2(0, 0),
                          ImGuiDockNodeFlags_PassthruCentralNode);
         ImGui::PopStyleVar(3);
-        draw_menu_bar();
+        draw_menu_bar(app);
         ImGui::End();
 
         gfx::tool::alloc::draw(s_test_app.alloc_window);

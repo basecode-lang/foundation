@@ -23,8 +23,10 @@
 #include <basecode/core/scm/types.h>
 #include <basecode/core/scm/system.h>
 #include <basecode/core/memory/meta.h>
+#include <basecode/gfx/icons_texture.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/gfx/imgui/imgui_freetype.h>
+#include <basecode/gfx/imgui/imgui_internal.h>
 #include <basecode/gfx/imgui/imgui_impl_glfw.h>
 #include <basecode/gfx/fonts/IconsFontAwesome5.h>
 #include <basecode/gfx/imgui/imgui_impl_opengl3.h>
@@ -36,71 +38,7 @@ STDAPI SetProcessDpiAwareness(PROCESS_DPI_AWARENESS value);
 #   endif
 #endif
 
-#define STBI_MALLOC(s)          basecode::memory::alloc(                        \
-    basecode::context::top()->alloc.main,                                       \
-    (s))
-#define STBI_REALLOC(m, s)      basecode::memory::realloc(                      \
-    basecode::context::top()->alloc.main,                                       \
-    (m),                                                                        \
-    (s))
-#define STBI_FREE(m)            basecode::memory::free(                         \
-    basecode::context::top()->alloc.main,                                       \
-    (m))
-#define STBI_ASSERT(x)          BC_ASSERT(x)
-#define STBI_ONLY_PNG
-#define STBI_SUPPORT_ZLIB
-#define STB_IMAGE_IMPLEMENTATION
-#include <basecode/gfx/stb_image.h>
-
-#include "icons_texture.cpp"
-
 namespace basecode::gfx::app {
-    namespace texture_atlas {
-        u0 free(texture_atlas_t& atlas) {
-            stbi_image_free(atlas.data);
-            array::free(atlas.frames);
-        }
-
-        u0 init(texture_atlas_t& atlas, alloc_t* alloc) {
-            atlas.alloc = alloc;
-            array::init(atlas.frames, alloc);
-        }
-
-        status_t make_gpu_texture(texture_atlas_t& atlas) {
-            glGenTextures(1, &atlas.texture_id);
-            glBindTexture(GL_TEXTURE_2D, atlas.texture_id);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-//#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
-//            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-//#endif
-            glTexImage2D(GL_TEXTURE_2D,
-                         0,
-                         GL_RGBA,
-                         atlas.width,
-                         atlas.height,
-                         0,
-                         GL_RGBA,
-                         GL_UNSIGNED_BYTE,
-                         atlas.data);
-            return status_t::ok;
-        }
-
-        status_t load_bitmap(texture_atlas_t& atlas, const path_t& path) {
-            s32 x, y, n;
-            atlas.data = stbi_load(path::c_str(path), &x, &y, &n, 0);
-            if (!atlas.data)
-                return status_t::bitmap_load_error;
-            atlas.width    = x;
-            atlas.height   = y;
-            atlas.channels = n;
-            atlas.size     = (atlas.width * atlas.channels) * atlas.height;
-            return status_t::ok;
-        }
-    }
-
     static u0 glfw_key(GLFWwindow* window,
                        s32 key,
                        s32 scan_code,
@@ -138,10 +76,6 @@ namespace basecode::gfx::app {
         glfwTerminate();
 
         str::free(app.scratch);
-
-        for (auto& atlas : app.atlas_list)
-            texture_atlas::free(atlas);
-        array::free(app.atlas_list);
     }
 
     status_t run(app_t& app) {
@@ -213,12 +147,6 @@ namespace basecode::gfx::app {
 
         str::init(app.scratch, app.alloc);
         str::reserve(app.scratch, 64);
-
-        array::init(app.atlas_list, app.alloc);
-
-        // XXX: this is temporary; probably want to use
-        //      a stable_array_t instead
-        array::reserve(app.atlas_list, 32);
 
         if (!OK(load_config(app))) {
             log::error("load_config failed");
@@ -326,7 +254,7 @@ namespace basecode::gfx::app {
 
         ImGuiFreeType::BuildFontAtlas(io.Fonts);
 
-        app.icons_atlas = app::make_texture_atlas(app);
+        app.icons_atlas = gfx::texture_atlas::make();
         texture_atlas::init(*app.icons_atlas, app.alloc);
 
         auto icons_path = "../share/textures/icons.png"_path;
@@ -339,7 +267,7 @@ namespace basecode::gfx::app {
             return status;
         array::resize(app.icons_atlas->frames, NUM_FRAMES);
         std::memcpy(app.icons_atlas->frames.data,
-                    s_frames,
+                    icons_texture::get_frames(),
                     sizeof(texture_frame_t) * NUM_FRAMES);
         return status_t::ok;
     }
@@ -413,12 +341,6 @@ namespace basecode::gfx::app {
 
     static u0 glfw_win_close(GLFWwindow* window) {
         log::info("glfw window close");
-    }
-
-    texture_atlas_t* make_texture_atlas(app_t& app) {
-        auto atlas = &array::append(app.atlas_list);
-        texture_atlas::init(*atlas, app.alloc);
-        return atlas;
     }
 
     static u0 glfw_error(s32 error, const s8* description) {

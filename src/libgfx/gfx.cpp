@@ -17,14 +17,132 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/gfx/gfx.h>
+#include <basecode/core/obj_pool.h>
 #include <basecode/gfx/imgui/imgui_internal.h>
 
+#define STBI_MALLOC(s)          basecode::memory::alloc(                        \
+    basecode::context::top()->alloc.main,                                       \
+    (s))
+#define STBI_REALLOC(m, s)      basecode::memory::realloc(                      \
+    basecode::context::top()->alloc.main,                                       \
+    (m),                                                                        \
+    (s))
+#define STBI_FREE(m)            basecode::memory::free(                         \
+    basecode::context::top()->alloc.main,                                       \
+    (m))
+#define STBI_ASSERT(x)          BC_ASSERT(x)
+#define STBI_ONLY_PNG
+#define STBI_SUPPORT_ZLIB
+#define STB_IMAGE_IMPLEMENTATION
+#include <basecode/gfx/stb_image.h>
+
 namespace basecode::gfx {
+    struct system_t final {
+        alloc_t*                alloc;
+        obj_pool_t              storage;
+        obj_type_t*             atlas_type;
+    };
+
     struct input_text_callback_t {
         str_t*                  str;
         ImGuiInputTextCallback  chain;
         u0*                     chain_user_data;
     };
+
+    system_t                    g_gfx_sys{};
+
+    namespace system {
+        u0 fini() {
+            for (auto atlas : g_gfx_sys.atlas_type->objects)
+                texture_atlas::free(*((texture_atlas_t*) atlas));
+            obj_pool::free(g_gfx_sys.storage);
+        }
+
+        status_t init(alloc_t* alloc) {
+            g_gfx_sys.alloc = alloc;
+            obj_pool::init(g_gfx_sys.storage, g_gfx_sys.alloc);
+            g_gfx_sys.atlas_type = obj_pool::register_type<texture_atlas_t>(g_gfx_sys.storage);
+            return status_t::error;
+        }
+    }
+
+    namespace texture_atlas {
+        texture_atlas_t* make() {
+            auto atlas = obj_pool::make<texture_atlas_t>(g_gfx_sys.storage);
+            texture_atlas::init(*atlas, g_gfx_sys.alloc);
+            return atlas;
+        }
+
+        u0 free(texture_atlas_t& atlas) {
+            stbi_image_free(atlas.data);
+            array::free(atlas.frames);
+            obj_pool::destroy(g_gfx_sys.storage, &atlas);
+        }
+
+        u0 draw(texture_atlas_t& atlas, u32 frame) {
+            const auto& tex_frame = atlas.frames[frame];
+            ImVec2 size(tex_frame.size.x, tex_frame.size.y);
+            ImVec2 offset(tex_frame.offset.x, tex_frame.offset.y);
+
+            ImGuiWindow* window = ImGui::GetCurrentWindow();
+            if (window->SkipItems)
+                return;
+
+            auto pos = window->DC.CursorPos + offset;
+            ImRect bb(pos, pos + size);
+            ImGui::ItemSize(bb);
+            if (!ImGui::ItemAdd(bb, 0))
+                return;
+
+            ImVec2 uv0(tex_frame.uv.tl.x, tex_frame.uv.tl.y);
+            ImVec2 uv1(tex_frame.uv.br.x, tex_frame.uv.br.y);
+            window->DrawList->AddImage((ImTextureID) (uintptr_t) atlas.texture_id,
+                                       bb.Min,
+                                       bb.Max,
+                                       uv0,
+                                       uv1,
+                                       ImGui::GetColorU32(ImVec4(1,1,1,1)));
+        }
+
+        u0 init(texture_atlas_t& atlas, alloc_t* alloc) {
+            atlas.alloc = alloc;
+            array::init(atlas.frames, alloc);
+        }
+
+        status_t make_gpu_texture(texture_atlas_t& atlas) {
+            glGenTextures(1, &atlas.texture_id);
+            glBindTexture(GL_TEXTURE_2D, atlas.texture_id);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#if defined(GL_UNPACK_ROW_LENGTH) && !defined(__EMSCRIPTEN__)
+            glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+#endif
+            glTexImage2D(GL_TEXTURE_2D,
+                         0,
+                         GL_RGBA,
+                         atlas.width,
+                         atlas.height,
+                         0,
+                         GL_RGBA,
+                         GL_UNSIGNED_BYTE,
+                         atlas.data);
+            return status_t::ok;
+        }
+
+        status_t load_bitmap(texture_atlas_t& atlas, const path_t& path) {
+            s32 x, y, n;
+            atlas.data = stbi_load(path::c_str(path), &x, &y, &n, 0);
+            if (!atlas.data)
+                return status_t::bitmap_load_error;
+            atlas.width    = x;
+            atlas.height   = y;
+            atlas.channels = n;
+            atlas.size     = (atlas.width * atlas.channels) * atlas.height;
+            return status_t::ok;
+        }
+    }
 
     static s32 input_text_callback(ImGuiInputTextCallbackData* data) {
         auto user_data = (input_text_callback_t*)data->UserData;
@@ -258,11 +376,11 @@ namespace basecode::gfx {
         return true;
     }
 
-    b8 menu_item_with_icon(const s8* icon,
-                           const s8* label,
-                           const s8* shortcut,
-                           b8* p_selected,
-                           b8 enabled) {
+    b8 menu_item_with_font_icon(const s8* icon,
+                                const s8* label,
+                                const s8* shortcut,
+                                b8* p_selected,
+                                b8 enabled) {
         f32 icon_max_width = ImGui::GetFontSize() * 1.5;
         if (icon) {
             const auto icon_size = ImGui::CalcTextSize(icon);
@@ -312,20 +430,6 @@ namespace basecode::gfx {
         const auto rect_size = ImGui::GetContentRegionAvail();
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (rect_size.x - text_size.x));
         ImGui::TextUnformatted(text_begin);
-    }
-
-    b8 begin_menu_with_icon(const s8* icon, const s8* label, b8 enabled) {
-        f32 icon_max_width = ImGui::GetFontSize() * 1.5;
-        if (icon) {
-            const auto icon_size = ImGui::CalcTextSize(icon);
-            const f32 icon_pos_x = ImGui::GetCursorPosX()
-                                   + ((icon_max_width - icon_size.x) / 2);
-            ImGui::SetCursorPosX(icon_pos_x);
-            ImGui::TextUnformatted(icon);
-            ImGui::SameLine();
-        }
-        ImGui::SetCursorPosX(icon_max_width * 1.5);
-        return ImGui::BeginMenu(label, enabled);
     }
 
     b8 input_text(const s8* label,
@@ -390,5 +494,45 @@ namespace basecode::gfx {
                                         flags,
                                         input_text_callback,
                                         &cb);
+    }
+
+    b8 begin_menu_with_texture(texture_atlas_t& atlas,
+                               u32 texture_id,
+                               const s8* label,
+                               b8 enabled) {
+        auto x_pos = ImGui::GetCursorPosX();
+        texture_atlas::draw(atlas, texture_id);
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(x_pos + 30);
+        ImGui::AlignTextToFramePadding();
+        return ImGui::BeginMenu(label, enabled);
+    }
+
+    b8 menu_item_with_texture(texture_atlas_t& atlas,
+                              u32 texture_id,
+                              const s8* label,
+                              const s8* shortcut,
+                              b8* p_selected,
+                              b8 enabled) {
+        auto x_pos = ImGui::GetCursorPosX();
+        texture_atlas::draw(atlas, texture_id);
+        ImGui::SameLine();
+        ImGui::SetCursorPosX(x_pos + 30);
+        ImGui::AlignTextToFramePadding();
+        return ImGui::MenuItem(label, shortcut, p_selected, enabled);
+    }
+
+    b8 begin_menu_with_font_icon(const s8* icon, const s8* label, b8 enabled) {
+        f32 icon_max_width = ImGui::GetFontSize() * 1.5;
+        if (icon) {
+            const auto icon_size = ImGui::CalcTextSize(icon);
+            const f32 icon_pos_x = ImGui::GetCursorPosX()
+                                   + ((icon_max_width - icon_size.x) / 2);
+            ImGui::SetCursorPosX(icon_pos_x);
+            ImGui::TextUnformatted(icon);
+            ImGui::SameLine();
+        }
+        ImGui::SetCursorPosX(icon_max_width * 1.5);
+        return ImGui::BeginMenu(label, enabled);
     }
 }

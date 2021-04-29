@@ -37,6 +37,16 @@ struct ImPlotContext;
 namespace basecode::gfx {
     struct app_t;
 
+    enum class status_t : u32 {
+        ok,
+        error,
+        bitmap_load_error,
+        load_config_error,
+        save_config_error,
+        gl3w_init_failure,
+        glfw_init_failure,
+    };
+
     // ------------------------------------------------------------------------
     //
     //  vectors
@@ -231,13 +241,13 @@ namespace basecode::gfx {
     //
     // ----------------------------------------------------------------
     struct texture_frame_t;
-    struct texture_atlas_t;
 
     using texture_frame_array_t = array_t<texture_frame_t>;
-    using texture_atlas_array_t = array_t<texture_atlas_t>;
 
     struct texture_frame_t final {
         rect_t                  uv;
+        vec2_t                  size;
+        vec2_t                  offset;
         u8                      rotated:    1;
         u8                      trimmed:    1;
         u8                      pad:        6;
@@ -266,7 +276,6 @@ namespace basecode::gfx {
         ImFont*                 bold_font;
         ImFont*                 large_font;
         texture_atlas_t*        icons_atlas;
-        texture_atlas_array_t   atlas_list;
         render_callback_t       on_render;
         str::slice_t            short_name;
         str::slice_t            title;
@@ -972,16 +981,24 @@ namespace basecode::gfx {
         }
     }
 
-    namespace app {
-        enum class status_t : u32 {
-            ok,
-            error,
-            load_config_error,
-            save_config_error,
-            gl3w_init_failure,
-            glfw_init_failure,
-            bitmap_load_error,
-        };
+    namespace system {
+        u0 fini();
+
+        status_t init(alloc_t* alloc = context::top()->alloc.main);
+    }
+
+    namespace texture_atlas {
+        texture_atlas_t* make();
+
+        u0 free(texture_atlas_t& atlas);
+
+        u0 draw(texture_atlas_t& atlas, u32 frame);
+
+        u0 init(texture_atlas_t& atlas, alloc_t* alloc);
+
+        status_t make_gpu_texture(texture_atlas_t& atlas);
+
+        status_t load_bitmap(texture_atlas_t& atlas, const path_t& path);
     }
 
     // example usage:
@@ -1002,12 +1019,6 @@ namespace basecode::gfx {
                s32 thickness,
                const ImU32& color);
 
-    b8 menu_item_with_icon(const s8* icon,
-                           const s8* label,
-                           const s8* shortcut,
-                           b8* p_selected,
-                           b8 enabled);
-
     b8 buffering_bar(const s8* label,
                      f32 value,
                      const ImVec2& size_arg,
@@ -1020,9 +1031,27 @@ namespace basecode::gfx {
                   ImGuiInputTextCallback callback = nullptr,
                   u0* user_data = nullptr);
 
-    b8 begin_menu_with_icon(const s8* icon,
-                            const s8* label,
-                            b8 enabled = true);
+    b8 menu_item_with_texture(texture_atlas_t& atlas,
+                              u32 texture_id,
+                              const s8* label,
+                              const s8* shortcut,
+                              b8* p_selected,
+                              b8 enabled);
+
+    b8 menu_item_with_font_icon(const s8* icon,
+                                const s8* label,
+                                const s8* shortcut,
+                                b8* p_selected,
+                                b8 enabled);
+
+    b8 begin_menu_with_texture(texture_atlas_t& atlas,
+                               u32 texture_id,
+                               const s8* label,
+                               b8 enabled = true);
+
+    b8 begin_menu_with_font_icon(const s8* icon,
+                                 const s8* label,
+                                 b8 enabled = true);
 
     b8 splitter(b8 split_vertically,
                 f32 thickness,

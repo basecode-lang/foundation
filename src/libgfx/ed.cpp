@@ -23,10 +23,10 @@
 #include <basecode/core/obj_pool.h>
 
 namespace basecode::gfx::ed {
-    constexpr f32 left_border   = 3;
-    constexpr f32 tab_spacing   = 1.0f;
-    constexpr f32 text_border   = 2.0f;
-    constexpr f32 bottom_border = 2.0f;
+    [[maybe_unused]] constexpr f32 left_border   = 3;
+    [[maybe_unused]] constexpr f32 tab_spacing   = 1.0f;
+    [[maybe_unused]] constexpr f32 text_border   = 2.0f;
+    [[maybe_unused]] constexpr f32 bottom_border = 2.0f;
 
     struct system_t final {
         alloc_t*            alloc;
