@@ -2019,7 +2019,9 @@ namespace basecode {
         }
 
         template <String_Concept T>
-        inline u64 hash64(const T& key);
+        inline u64 hash64(const T& key) {
+            return murmur::hash64(key.data, key.length);
+        }
 
         inline u32 hash32(const u8& key) {
             return hash32((u32) key);

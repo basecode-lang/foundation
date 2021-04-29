@@ -251,17 +251,20 @@ namespace basecode::gfx::tool::alloc {
 //                      8,
 //                      8,
 //                      win.height);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
         ImGui::BeginChild("Allocators",
                           ImVec2(win.table_size, win.height),
                           true);
+        ImGui::PopStyleVar();
         if (ImGui::BeginTable("Allocators",
                               3,
-                              ImGuiTableFlags_Borders
-                              | ImGuiTableFlags_RowBg
+                              ImGuiTableFlags_RowBg
+                              | ImGuiTableFlags_ScrollY
                               | ImGuiTableFlags_Resizable
                               | ImGuiTableFlags_PreciseWidths
                               | ImGuiTableFlags_NoBordersInBody,
                               ImVec2(ImGui::GetContentRegionAvailWidth(), -1))) {
+            ImGui::TableSetupScrollFreeze(0, 1);
             ImGui::TableSetupColumn("Name");
             ImGui::TableSetupColumn("Type");
             ImGui::TableSetupColumn("Total Allocated");

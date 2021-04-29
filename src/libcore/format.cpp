@@ -20,20 +20,6 @@
 #include <basecode/core/format.h>
 
 namespace basecode {
-    static inline str::slice_t s_byte_units[] = {
-        "bytes"_ss,
-        "KB"_ss,
-        "MB"_ss,
-        "GB"_ss,
-        "TB"_ss,
-        "PB"_ss,
-        "EB"_ss,
-        "ZB"_ss,
-        "YB"_ss
-    };
-
-    // ------------------------------------------------------------------------
-
     str_buf_t::~str_buf_t() {
         _str->length = size();
     }
@@ -166,10 +152,6 @@ namespace basecode {
             fmt_buf_t buf(fmt_alloc);
             fmt::vformat_to(buf, format_str, args);
             return to_string(buf);
-        }
-
-        str::slice_t byte_unit_name(u32 idx) {
-            return s_byte_units[idx];
         }
     }
 }

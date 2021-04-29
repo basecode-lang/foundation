@@ -21,4 +21,11 @@
 #include <basecode/gfx/gfx.h>
 
 namespace basecode::gfx::tool::strings {
+    u0 free(strings_win_t& win);
+
+    b8 draw(strings_win_t& win);
+
+    u0 init(strings_win_t& win,
+            app_t* app,
+            alloc_t* alloc = context::top()->alloc.main);
 }

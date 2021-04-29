@@ -56,8 +56,6 @@ namespace basecode {
     };
 
     namespace format {
-        str::slice_t byte_unit_name(u32 idx);
-
         u0 vprint(alloc_t* alloc,
                   FILE* file,
                   fmt_str_t format_str,
@@ -148,17 +146,20 @@ namespace basecode {
 
         template <typename Buffer>
         inline u0 unitized_byte_size(Buffer& buf,
-                                     u64 size) {
-            u64 i{};
-            while (size > KB(1)) {
-                size /= KB(1);
-                i++;
+                                     f64 size) {
+            static str::slice_t s_byte_units[] = {
+                "bytes"_ss, "KB"_ss, "MB"_ss, "GB"_ss,
+                "TB"_ss, "PB"_ss, "EB"_ss, "ZB"_ss, "YB"_ss
+            };
+            const f64 one_kb = 1_kb;
+            str::slice_t* unit{};
+            for (u32 i = 0; i < 9; ++i) {
+                unit = &s_byte_units[i];
+                if (size < 1024.0)
+                    break;
+                size /= one_kb;
             }
-            if (i > 1) {
-                format::format_to(buf, "{}.{} {}", size, i, byte_unit_name(i));
-            } else {
-                format::format_to(buf, "{} {}", size, byte_unit_name(i));
-            }
+            format::format_to(buf, "{:.5g} {}", size, *unit);
         }
 
         template <typename... Args>

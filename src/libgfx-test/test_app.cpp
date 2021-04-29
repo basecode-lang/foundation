@@ -20,15 +20,125 @@
 #include <basecode/core/string.h>
 #include <basecode/gfx/msg_stack.h>
 #include <basecode/gfx/tool/alloc.h>
+#include <basecode/gfx/tool/errors.h>
+#include <basecode/gfx/tool/strings.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/gfx/tool/prop_editor.h>
 #include <basecode/gfx/fonts/IconsFontAwesome5.h>
 #include "test_app.h"
 
 namespace basecode {
+    [[maybe_unused]]
+    constexpr u32               toolbar_height      {50};
     static test_app_t           s_test_app          {};
     static usize                s_scratch_free      {};
     static usize                s_scratch_alloc     {};
+
+    static u0 draw_menu_bar() {
+        if (ImGui::BeginMenuBar()) {
+            if (ImGui::BeginMenu("View")) {
+                if (gfx::begin_menu_with_icon(ICON_FA_TOOLS, "Tool Windows")) {
+                    gfx::menu_item_with_icon(ICON_FA_MEMORY,
+                                             "Allocators",
+                                             nullptr,
+                                             &s_test_app.alloc_window.visible,
+                                             true);
+                    gfx::menu_item_with_icon(ICON_FA_DOLLAR_SIGN,
+                                             "Strings",
+                                             nullptr,
+                                             &s_test_app.strings_window.visible,
+                                             true);
+                    gfx::menu_item_with_icon(ICON_FA_EXCLAMATION_CIRCLE,
+                                             "Errors",
+                                             nullptr,
+                                             &s_test_app.errors_window.visible,
+                                             true);
+                    if (gfx::begin_menu_with_icon(nullptr, "Scheme")) {
+                        gfx::menu_item_with_icon(ICON_FA_TERMINAL,
+                                                 "REPL",
+                                                 nullptr,
+                                                 &s_test_app.scm_repl_visible,
+                                                 true);
+                        ImGui::Separator();
+                        gfx::menu_item_with_icon(ICON_FA_STREAM,
+                                                 "Environment",
+                                                 nullptr,
+                                                 &s_test_app.scm_env_visible,
+                                                 true);
+                        ImGui::EndMenu();
+                    }
+                    gfx::menu_item_with_icon(ICON_FA_TASKS,
+                                             "Jobs",
+                                             nullptr,
+                                             &s_test_app.jobs_visible,
+                                             true);
+                    gfx::menu_item_with_icon(nullptr,
+                                             "Threads",
+                                             nullptr,
+                                             &s_test_app.threads_visible,
+                                             true);
+                    gfx::menu_item_with_icon(nullptr,
+                                             "FFI",
+                                             nullptr,
+                                             &s_test_app.ffi_visible,
+                                             true);
+                    gfx::menu_item_with_icon(nullptr,
+                                             "Object Pools",
+                                             nullptr,
+                                             &s_test_app.obj_pools_visible,
+                                             true);
+                    gfx::menu_item_with_icon(ICON_FA_CLOCK,
+                                             "Timers",
+                                             nullptr,
+                                             &s_test_app.timers_visible,
+                                             true);
+                    ImGui::Separator();
+                    gfx::menu_item_with_icon(nullptr,
+                                             "Memory Editor",
+                                             nullptr,
+                                             &s_test_app.memory_editor.Open,
+                                             true);
+                    gfx::menu_item_with_icon(ICON_FA_TABLE,
+                                             "Properties",
+                                             nullptr,
+                                             &s_test_app.prop_editor.visible,
+                                             true);
+                    ImGui::EndMenu();
+                }
+                ImGui::Separator();
+                gfx::menu_item_with_icon(ICON_FA_CHART_BAR,
+                                         "Frame Time & Rate",
+                                         nullptr,
+                                         &s_test_app.show_fps,
+                                         true);
+                ImGui::EndMenu();
+            }
+            if (ImGui::BeginMenu("Test")) {
+                if (gfx::menu_item_with_icon(ICON_FA_BEER,
+                                             "Enqueue to Message Stack",
+                                             nullptr,
+                                             nullptr,
+                                             true)) {
+                    gfx::msg_stack::push(s_test_app.msg_stack,
+                                         "This is a test message!"_ss);
+                }
+                ImGui::EndMenu();
+            }
+            if (s_test_app.show_fps) {
+                auto& io = ImGui::GetIO();
+                const auto size = ImGui::GetContentRegionAvail();
+                ImFormatString(s_test_app.buf,
+                               128,
+                               ICON_FA_CHART_BAR "  app average %.2f ms/frame (%.2f FPS)",
+                               1000.0f / io.Framerate,
+                               io.Framerate);
+                auto text_size = ImGui::CalcTextSize(s_test_app.buf);
+                ImGui::SameLine(size.x - (text_size.x - 40));
+                ImGui::TextUnformatted(s_test_app.buf);
+            }
+            ImGui::EndMenuBar();
+        }
+    }
 
     static u0 allocator_props(prop_editor_t* editor, alloc_t* alloc) {
         if (prop_editor::begin_nested(*editor, "##system", "System")) {
@@ -224,128 +334,35 @@ namespace basecode {
     b8 on_render(gfx::app_t& app) {
         auto& io = ImGui::GetIO();
 
-        if (ImGui::BeginMainMenuBar()) {
-            if (ImGui::BeginMenu("View")) {
-                if (gfx::begin_menu_with_icon(ICON_FA_TOOLS, "Tool Windows")) {
-                    gfx::menu_item_with_icon(ICON_FA_MEMORY,
-                                             "Allocators",
-                                             nullptr,
-                                             &s_test_app.alloc_window.visible,
-                                             true);
-                    gfx::menu_item_with_icon(ICON_FA_DOLLAR_SIGN,
-                                             "Strings",
-                                             nullptr,
-                                             &s_test_app.strings_visible,
-                                             true);
-                    gfx::menu_item_with_icon(ICON_FA_EXCLAMATION_CIRCLE,
-                                             "Errors",
-                                             nullptr,
-                                             &s_test_app.errors_visible,
-                                             true);
-                    if (gfx::begin_menu_with_icon(nullptr, "Scheme")) {
-                        gfx::menu_item_with_icon(ICON_FA_TERMINAL,
-                                                 "REPL",
-                                                 nullptr,
-                                                 &s_test_app.scm_repl_visible,
-                                                 true);
-                        ImGui::Separator();
-                        gfx::menu_item_with_icon(ICON_FA_STREAM,
-                                                 "Environment",
-                                                 nullptr,
-                                                 &s_test_app.scm_env_visible,
-                                                 true);
-                        ImGui::EndMenu();
-                    }
-                    gfx::menu_item_with_icon(ICON_FA_TASKS,
-                                             "Jobs",
-                                             nullptr,
-                                             &s_test_app.jobs_visible,
-                                             true);
-                    gfx::menu_item_with_icon(nullptr,
-                                             "Threads",
-                                             nullptr,
-                                             &s_test_app.threads_visible,
-                                             true);
-                    gfx::menu_item_with_icon(nullptr,
-                                             "FFI",
-                                             nullptr,
-                                             &s_test_app.ffi_visible,
-                                             true);
-                    gfx::menu_item_with_icon(nullptr,
-                                             "Object Pools",
-                                             nullptr,
-                                             &s_test_app.obj_pools_visible,
-                                             true);
-                    gfx::menu_item_with_icon(ICON_FA_CLOCK,
-                                             "Timers",
-                                             nullptr,
-                                             &s_test_app.timers_visible,
-                                             true);
-                    ImGui::Separator();
-                    gfx::menu_item_with_icon(nullptr,
-                                             "Memory Editor",
-                                             nullptr,
-                                             &s_test_app.memory_editor.Open,
-                                             true);
-                    gfx::menu_item_with_icon(ICON_FA_TABLE,
-                                             "Properties",
-                                             nullptr,
-                                             &s_test_app.prop_editor.visible,
-                                             true);
-                    ImGui::EndMenu();
-                }
-                ImGui::Separator();
-                gfx::menu_item_with_icon(ICON_FA_CHART_BAR,
-                                        "Frame Time & Rate",
-                                        nullptr,
-                                        &s_test_app.show_fps,
-                                        true);
-                ImGui::EndMenu();
-            }
-            if (ImGui::BeginMenu("Test")) {
-                if (gfx::menu_item_with_icon(ICON_FA_BEER,
-                                             "Enqueue to Message Stack",
-                                             nullptr,
-                                             nullptr,
-                                             true)) {
-                    gfx::msg_stack::push(s_test_app.msg_stack,
-                                         "This is a test message!"_ss);
-                }
-                ImGui::EndMenu();
-            }
-            if (s_test_app.show_fps) {
-                const auto size = ImGui::GetContentRegionAvail();
-                ImFormatString(s_test_app.buf,
-                               128,
-                               ICON_FA_CHART_BAR "  app average %.2f ms/frame (%.2f FPS)",
-                               1000.0f / io.Framerate,
-                               io.Framerate);
-                auto text_size = ImGui::CalcTextSize(s_test_app.buf);
-                ImGui::SameLine(size.x - (text_size.x - 40));
-                ImGui::TextUnformatted(s_test_app.buf);
-            }
-            ImGui::EndMainMenuBar();
-        }
-
-        ImGuiWindowFlags flags = ImGuiWindowFlags_NoDocking
-                                 | ImGuiWindowFlags_NoTitleBar
-                                 | ImGuiWindowFlags_NoCollapse
-                                 | ImGuiWindowFlags_NoBackground;
         auto vp = ImGui::GetMainViewport();
         ImGui::SetNextWindowPos(vp->WorkPos);
         ImGui::SetNextWindowSize(vp->WorkSize);
         ImGui::SetNextWindowViewport(vp->ID);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
-                            ImVec2(2.0f, 2.0f));
-        ImGui::Begin("dock", nullptr, flags);
-        ImGui::PopStyleVar();
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+        ImGuiWindowFlags flags = ImGuiWindowFlags_MenuBar
+                                 | ImGuiWindowFlags_NoDocking
+                                 | ImGuiWindowFlags_NoTitleBar
+                                 | ImGuiWindowFlags_NoCollapse
+                                 | ImGuiWindowFlags_NoResize
+                                 | ImGuiWindowFlags_NoMove
+                                 | ImGuiWindowFlags_NoBringToFrontOnFocus
+                                 | ImGuiWindowFlags_NoNavFocus
+                                 | ImGuiWindowFlags_NoBackground;
+        ImGui::Begin("dockspace", nullptr, flags);
         app.dock_root = ImGui::GetID("dock_space");
         ImGui::DockSpace(app.dock_root,
                          ImVec2(0, 0),
                          ImGuiDockNodeFlags_PassthruCentralNode);
+        ImGui::PopStyleVar(3);
+        draw_menu_bar();
         ImGui::End();
 
         gfx::tool::alloc::draw(s_test_app.alloc_window);
+        gfx::tool::errors::draw(s_test_app.errors_window);
+        gfx::tool::strings::draw(s_test_app.strings_window);
+
         if (s_test_app.memory_editor.Open) {
             u0* mem     {};
             u32 size    {};
@@ -481,6 +498,8 @@ namespace basecode {
         s_test_app.alloc = memory::system::main_alloc();
         gfx::msg_stack::init(s_test_app.msg_stack, app.large_font, 0);
         alloc::init(s_test_app.alloc_window, &app, s_test_app.alloc);
+        errors::init(s_test_app.errors_window, &app, s_test_app.alloc);
+        strings::init(s_test_app.strings_window, &app, s_test_app.alloc);
         prop_editor::init(s_test_app.prop_editor, &app, s_test_app.alloc);
         prop_editor::register_type_editor<alloc_info_t>(s_test_app.prop_editor,
                                                         type_editor_alloc_info);
@@ -488,6 +507,8 @@ namespace basecode {
         s32 rc = !OK(status);
 
         prop_editor::free(s_test_app.prop_editor);
+        strings::free(s_test_app.strings_window);
+        errors::free(s_test_app.errors_window);
         alloc::free(s_test_app.alloc_window);
         gfx::msg_stack::free(s_test_app.msg_stack);
         gfx::app::free(app);

@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/gfx/tool/prop_editor.h>
+#include <basecode/gfx/imgui/imgui_internal.h>
 #include <basecode/gfx/fonts/IconsFontAwesome5.h>
 
 namespace basecode::gfx::tool::prop_editor {
@@ -31,7 +32,17 @@ namespace basecode::gfx::tool::prop_editor {
             return false;
         editor.item_id = 0;
         str::reset(editor.help_text);
-        ImGui::Begin(ICON_FA_TABLE "  Properties", &editor.visible);
+        ImGui::Begin("   Properties", &editor.visible);
+        auto draw_list = ImGui::GetForegroundDrawList();
+        const auto& frame = editor.app->icons_atlas->frames[3];
+        auto pos = ImGui::GetCurrentWindow()->Pos;
+        pos.x += 30;
+        pos.y += 2;
+        draw_list->AddImage((ImTextureID)(uintptr_t)editor.app->icons_atlas->texture_id,
+                            pos,
+                            ImVec2(pos.x + 24, pos.y + 24),
+                            ImVec2(frame.uv.tl.x, frame.uv.br.y),
+                            ImVec2(frame.uv.br.x, frame.uv.tl.y));
         const auto region_size = ImGui::GetContentRegionAvail();
         if (region_size.x != editor.size.x
         ||  region_size.y != editor.size.y) {

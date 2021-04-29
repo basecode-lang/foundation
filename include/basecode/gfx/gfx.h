@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <GL/gl3w.h>
+#include <GLFW/glfw3.h>
 #include <basecode/core/path.h>
 #include <basecode/core/array.h>
 #include <basecode/core/stack.h>
@@ -40,7 +42,6 @@ namespace basecode::gfx {
     //  vectors
     //
     // ------------------------------------------------------------------------
-
     struct vec2_t final {
         f32                     x;
         f32                     y;
@@ -114,7 +115,6 @@ namespace basecode::gfx {
     //  rect
     //
     // ------------------------------------------------------------------------
-
     struct rect_t final {
         vec2_t                  tl;
         vec2_t                  br;
@@ -198,7 +198,6 @@ namespace basecode::gfx {
     //  color
     //
     // ------------------------------------------------------------------------
-
     struct color_t final {
         u8                      r;
         u8                      g;
@@ -213,7 +212,6 @@ namespace basecode::gfx {
     //  window
     //
     // ------------------------------------------------------------------------
-
     struct window_t final {
         GLFWwindow*             backing     {};
         s32                     x           = -1;
@@ -229,16 +227,46 @@ namespace basecode::gfx {
 
     // ----------------------------------------------------------------
     //
+    // texture
+    //
+    // ----------------------------------------------------------------
+    struct texture_frame_t;
+    struct texture_atlas_t;
+
+    using texture_frame_array_t = array_t<texture_frame_t>;
+    using texture_atlas_array_t = array_t<texture_atlas_t>;
+
+    struct texture_frame_t final {
+        rect_t                  uv;
+        u8                      rotated:    1;
+        u8                      trimmed:    1;
+        u8                      pad:        6;
+    };
+
+    struct texture_atlas_t final {
+        alloc_t*                alloc;
+        u8*                     data;
+        texture_frame_array_t   frames;
+        u32                     size;
+        u32                     width;
+        u32                     height;
+        u32                     channels;
+        GLuint                  texture_id;
+    };
+
+    // ----------------------------------------------------------------
+    //
     // app
     //
     // ----------------------------------------------------------------
-
     using render_callback_t = std::function<b8 (app_t&)>;
 
     struct app_t final {
         alloc_t*                alloc;
         ImFont*                 bold_font;
         ImFont*                 large_font;
+        texture_atlas_t*        icons_atlas;
+        texture_atlas_array_t   atlas_list;
         render_callback_t       on_render;
         str::slice_t            short_name;
         str::slice_t            title;
@@ -275,7 +303,6 @@ namespace basecode::gfx {
     // ed
     //
     // ------------------------------------------------------------------------
-
     struct ed_t;
     struct ed_cmd_t;
     struct ed_buf_t;
@@ -781,7 +808,6 @@ namespace basecode::gfx {
         // allocators tool window
         //
         // ----------------------------------------------------------------
-
         struct alloc_win_t final {
             alloc_t*                alloc;
             app_t*                  app;
@@ -799,16 +825,26 @@ namespace basecode::gfx {
         // strings tool window
         //
         // ----------------------------------------------------------------
-
-        struct errors_win_t;
+        struct errors_win_t final {
+            app_t*                  app;
+            u0*                     selected;
+            ImVec2                  size;
+            b8                      visible;
+        };
 
         // ----------------------------------------------------------------
         //
         // errors tool window
         //
         // ----------------------------------------------------------------
-
-        struct strings_win_t;
+        struct strings_win_t final {
+            app_t*                  app;
+            u0*                     selected;
+            ImVec2                  size;
+            b8                      interned_open;
+            b8                      localized_open;
+            b8                      visible;
+        };
 
         // ------------------------------------------------------------------------
         //
@@ -944,6 +980,7 @@ namespace basecode::gfx {
             save_config_error,
             gl3w_init_failure,
             glfw_init_failure,
+            bitmap_load_error,
         };
     }
 

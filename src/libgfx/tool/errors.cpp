@@ -19,4 +19,17 @@
 #include <basecode/gfx/tool/errors.h>
 
 namespace basecode::gfx::tool::errors {
+    u0 free(errors_win_t& win) {
+        UNUSED(win);
+    }
+
+    b8 draw(errors_win_t& win) {
+        UNUSED(win);
+        return false;
+    }
+
+    u0 init(errors_win_t& win, app_t* app, alloc_t* alloc) {
+        win.app     = app;
+        win.visible = true;
+    }
 }

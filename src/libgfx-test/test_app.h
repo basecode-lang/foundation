@@ -31,15 +31,15 @@ namespace basecode {
         gfx::msg_stack_t        msg_stack;
         prop_editor_t           prop_editor;
         alloc_win_t             alloc_window;
+        errors_win_t            errors_window;
+        strings_win_t           strings_window;
         MemoryEditor            memory_editor;
         s8                      buf[128];
         b8                      show_fps;
         b8                      ffi_visible;
         b8                      jobs_visible;
-        b8                      errors_visible;
         b8                      timers_visible;
         b8                      threads_visible;
-        b8                      strings_visible;
         b8                      scm_env_visible;
         b8                      scm_repl_visible;
         b8                      obj_pools_visible;

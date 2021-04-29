@@ -20,15 +20,15 @@
 
 #include <basecode/core/format_fwd.h>
 
-#define BC_ASSERT_MSG(cond, msg, ...)   SAFE_SCOPE(                                                                     \
-	if (!(cond)) {                                                                                                      \
-        assert_handler("Assertion Failure",                                                                             \
-                       #cond,                                                                                           \
-                       __FILE__,                                                                                        \
-                       __LINE__,                                                                                        \
-                       msg,                                                                                             \
-                       ##__VA_ARGS__);                                                                                  \
-		DEBUG_TRAP();                                                                                                   \
+#define BC_ASSERT_MSG(cond, msg, ...)   SAFE_SCOPE(                            \
+	if (!(cond)) {                                                             \
+        basecode::assert_handler("Assertion Failure",                          \
+                       #cond,                                                  \
+                       __FILE__,                                               \
+                       __LINE__,                                               \
+                       msg,                                                    \
+                       ##__VA_ARGS__);                                         \
+		DEBUG_TRAP();                                                          \
 	})
 #define BC_ASSERT(cond)         BC_ASSERT_MSG(cond, nullptr)
 #define BC_ASSERT_NOT_NULL(ptr) BC_ASSERT_MSG((ptr) != NULL, #ptr " must not be nullptr")
