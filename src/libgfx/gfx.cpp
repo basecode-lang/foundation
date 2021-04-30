@@ -79,28 +79,37 @@ namespace basecode::gfx {
             obj_pool::destroy(g_gfx_sys.storage, &atlas);
         }
 
+        u0 draw_foreground(texture_atlas_t& atlas,
+                           u32 frame,
+                           const vec2_t& pos) {
+            auto draw_list = ImGui::GetForegroundDrawList(ImGui::GetCurrentWindow());
+            const auto& tex_frame = atlas.frames[frame];
+            auto eff_pos = pos + tex_frame.offset;
+            draw_list->AddImage((ImTextureID) (uintptr_t) atlas.texture_id,
+                                eff_pos,
+                                eff_pos + tex_frame.size,
+                                tex_frame.uv.tl,
+                                tex_frame.uv.br,
+                                ImGui::GetColorU32(ImVec4(1, 1, 1, 1)));
+        }
+
         u0 draw(texture_atlas_t& atlas, u32 frame) {
             const auto& tex_frame = atlas.frames[frame];
-            ImVec2 size(tex_frame.size.x, tex_frame.size.y);
-            ImVec2 offset(tex_frame.offset.x, tex_frame.offset.y);
-
             ImGuiWindow* window = ImGui::GetCurrentWindow();
             if (window->SkipItems)
                 return;
 
-            auto pos = window->DC.CursorPos + offset;
-            ImRect bb(pos, pos + size);
+            auto pos = (vec2_t) window->DC.CursorPos + tex_frame.offset;
+            ImRect bb(pos, pos + tex_frame.size);
             ImGui::ItemSize(bb);
             if (!ImGui::ItemAdd(bb, 0))
                 return;
 
-            ImVec2 uv0(tex_frame.uv.tl.x, tex_frame.uv.tl.y);
-            ImVec2 uv1(tex_frame.uv.br.x, tex_frame.uv.br.y);
             window->DrawList->AddImage((ImTextureID) (uintptr_t) atlas.texture_id,
                                        bb.Min,
                                        bb.Max,
-                                       uv0,
-                                       uv1,
+                                       tex_frame.uv.tl,
+                                       tex_frame.uv.br,
                                        ImGui::GetColorU32(ImVec4(1,1,1,1)));
         }
 
@@ -276,7 +285,7 @@ namespace basecode::gfx {
 
     b8 buffering_bar(const s8* label,
                      f32 value,
-                     const ImVec2& size_arg,
+                     const vec2_t& size_arg,
                      const ImU32& bg_col,
                      const ImU32& fg_col) {
         ImGuiWindow* window = ImGui::GetCurrentWindow();
@@ -287,8 +296,8 @@ namespace basecode::gfx {
         const ImGuiStyle& style = g.Style;
         const ImGuiID id = window->GetID(label);
 
-        ImVec2 pos = window->DC.CursorPos;
-        ImVec2 size = size_arg;
+        ImVec2 pos  = window->DC.CursorPos;
+        auto   size = size_arg;
         size.x -= style.FramePadding.x * 2;
 
         const ImRect bb(pos, ImVec2(pos.x + size.x, pos.y + size.y));
@@ -454,7 +463,7 @@ namespace basecode::gfx {
 
     b8 input_text_multiline(const s8* label,
                             str_t* str,
-                            const ImVec2& size,
+                            const vec2_t& size,
                             ImGuiInputTextFlags flags,
                             ImGuiInputTextCallback callback,
                             u0* user_data) {

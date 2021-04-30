@@ -20,6 +20,7 @@
 
 #include <GL/gl3w.h>
 #include <GLFW/glfw3.h>
+#include <basecode/gfx/lmath.h>
 #include <basecode/core/path.h>
 #include <basecode/core/array.h>
 #include <basecode/core/stack.h>
@@ -45,162 +46,6 @@ namespace basecode::gfx {
         save_config_error,
         gl3w_init_failure,
         glfw_init_failure,
-    };
-
-    // ------------------------------------------------------------------------
-    //
-    //  vectors
-    //
-    // ------------------------------------------------------------------------
-    struct vec2_t final {
-        f32                     x;
-        f32                     y;
-
-        vec2_t() : x(), y() {
-        }
-
-        vec2_t(f32 x, f32 y) : x(x), y(y) {
-        }
-
-        explicit vec2_t(f32 v) : x(v), y(v) {
-        }
-
-        inline b8 operator<(const vec2_t& rhs) const {
-            if (x != rhs.x)
-                return x < rhs.x;
-            return y < rhs.y;
-        }
-
-        inline b8 operator==(const vec2_t& rhs) const {
-            return x == rhs.x && y == rhs.y;
-        }
-    };
-
-    inline vec2_t clamp(const vec2_t& val,
-                        const vec2_t& min,
-                        const vec2_t& max) {
-        return vec2_t(std::min(max.x, std::max(min.x, val.x)),
-                      std::min(max.y, std::max(min.y, val.y)));
-    }
-
-    inline vec2_t operator*(const vec2_t& lhs, f32 rhs) {
-        return vec2_t(lhs.x * rhs, lhs.y * rhs);
-    }
-
-    inline vec2_t operator/(const vec2_t& lhs, f32 rhs) {
-        return vec2_t(lhs.x / rhs, lhs.y / rhs);
-    }
-
-    inline vec2_t operator+(const vec2_t& lhs, const vec2_t& rhs) {
-        return vec2_t(lhs.x + rhs.x, lhs.y + rhs.y);
-    }
-
-    inline vec2_t operator-(const vec2_t& lhs, const vec2_t& rhs) {
-        return vec2_t(lhs.x - rhs.x, lhs.y - rhs.y);
-    }
-
-    inline vec2_t operator/(const vec2_t& lhs, const vec2_t& rhs) {
-        return vec2_t(lhs.x / rhs.x, lhs.y / rhs.y);
-    }
-
-    inline vec2_t operator*(const vec2_t& lhs, const vec2_t& rhs) {
-        return vec2_t(lhs.x * rhs.x, lhs.y * rhs.y);
-    }
-
-    struct vec3_t final {
-        f32                     x;
-        f32                     y;
-        f32                     z;
-    };
-
-    struct vec4_t final {
-        f32                     x;
-        f32                     y;
-        f32                     z;
-        f32                     w;
-    };
-
-    // ------------------------------------------------------------------------
-    //
-    //  rect
-    //
-    // ------------------------------------------------------------------------
-    struct rect_t final {
-        vec2_t                  tl;
-        vec2_t                  br;
-
-        inline f32 top() const {
-            return top_right().y;
-        }
-
-        inline b8 empty() const {
-            return (height() == 0.0f || width() == 0.0f);
-        }
-
-        inline f32 left() const {
-            return tl.x;
-        }
-
-        inline f32 width() const {
-            return br.x - tl.x;
-        }
-
-        inline f32 right() const {
-            return top_right().x;
-        }
-
-        inline f32 height() const {
-            return br.y - tl.y;
-        }
-
-        inline f32 bottom() const {
-            return br.y;
-        }
-
-        inline vec2_t size() const {
-            return br - tl;
-        }
-
-        inline vec2_t center() const {
-            return (br + tl) * .5f;
-        }
-
-        inline u0 adjust(f32 x, f32 y) {
-            tl.x += x;
-            tl.y += y;
-            br.x += x;
-            br.y += y;
-        }
-
-        u0 set_size(const vec2_t& size) {
-            br = tl + size;
-        }
-
-        inline vec2_t top_right() const {
-            return vec2_t(br.x, tl.y);
-        }
-
-        inline vec2_t bottom_left() const {
-            return vec2_t(tl.x, br.y);
-        }
-
-        inline b8 contains(const vec2_t& pt) const {
-            return tl.x <= pt.x
-                   && tl.y <= pt.y
-                   && br.x > pt.x
-                   && br.y > pt.y;
-        }
-
-        inline u0 adjust(f32 x, f32 y, f32 z, f32 w) {
-            tl.x += x;
-            tl.y += y;
-            br.x += z;
-            br.y += w;
-        }
-
-        inline b8 operator==(const rect_t& rhs) const {
-            return tl == rhs.tl && br == rhs.br;
-        }
     };
 
     // ------------------------------------------------------------------------
@@ -999,6 +844,8 @@ namespace basecode::gfx {
         status_t make_gpu_texture(texture_atlas_t& atlas);
 
         status_t load_bitmap(texture_atlas_t& atlas, const path_t& path);
+
+        u0 draw_foreground(texture_atlas_t& atlas, u32 frame, const vec2_t& pos);
     }
 
     // example usage:
@@ -1021,7 +868,7 @@ namespace basecode::gfx {
 
     b8 buffering_bar(const s8* label,
                      f32 value,
-                     const ImVec2& size_arg,
+                     const vec2_t& size_arg,
                      const ImU32& bg_col,
                      const ImU32& fg_col);
 
@@ -1063,7 +910,7 @@ namespace basecode::gfx {
 
     b8 input_text_multiline(const s8* label,
                             str_t* str,
-                            const ImVec2& size = ImVec2(0, 0),
+                            const vec2_t& size = vec2_t(0, 0),
                             ImGuiInputTextFlags flags = 0,
                             ImGuiInputTextCallback callback = nullptr,
                             u0* user_data = nullptr);

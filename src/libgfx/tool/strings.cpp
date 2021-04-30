@@ -16,8 +16,10 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/gfx/gfx.h>
+#include <basecode/gfx/icons.h>
 #include <basecode/gfx/tool/strings.h>
-#include <basecode/gfx/fonts/IconsFontAwesome5.h>
+#include <basecode/gfx/imgui/imgui_internal.h>
 
 namespace basecode::gfx::tool::strings {
     u0 free(strings_win_t& win) {
@@ -27,7 +29,11 @@ namespace basecode::gfx::tool::strings {
     b8 draw(strings_win_t& win) {
         if (!win.visible)
             return false;
-        ImGui::Begin(ICON_FA_DOLLAR_SIGN "  Strings", &win.visible);
+        ImGui::Begin("  Strings", &win.visible);
+        auto pos = ImGui::GetCurrentWindow()->Pos;
+        gfx::texture_atlas::draw_foreground(*win.app->icons_atlas,
+                                            ICONS_CURRENCY_DOLLAR,
+                                            pos + ImVec2(25, 1));
         const auto region_size = ImGui::GetContentRegionAvail();
         if (region_size.x != win.size.x
         ||  region_size.y != win.size.y) {

@@ -17,12 +17,13 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/gfx/app.h>
+#include <basecode/gfx/icons.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/format.h>
 #include <basecode/gfx/tool/alloc.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/gfx/implot/implot.h>
-#include <basecode/gfx/fonts/IconsFontAwesome5.h>
+#include <basecode/gfx/imgui/imgui_internal.h>
 
 namespace basecode::gfx::tool::alloc {
     [[maybe_unused]]
@@ -234,7 +235,11 @@ namespace basecode::gfx::tool::alloc {
     b8 draw(alloc_win_t& win) {
         if (!win.visible)
             return false;
-        ImGui::Begin(ICON_FA_MEMORY "  Allocators", &win.visible);
+        ImGui::Begin("   Allocators", &win.visible);
+        auto pos = ImGui::GetCurrentWindow()->Pos;
+        gfx::texture_atlas::draw_foreground(*win.app->icons_atlas,
+                                            ICONS_RAM,
+                                            pos + ImVec2(30, -2));
         alloc_info_t* node_clicked{};
 //        const auto region_size = ImGui::GetContentRegionAvail();
 //        win.height = region_size.y;

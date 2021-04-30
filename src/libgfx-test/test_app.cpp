@@ -449,9 +449,33 @@ namespace basecode {
                         break;
                 }
             }
-            s_test_app.memory_editor.DrawWindow("Memory Editor",
-                                                mem,
-                                                mem ? size : 0 );
+            auto& editor = s_test_app.memory_editor;
+            auto mem_size = mem ? size : 0;
+            size_t base_display_addr = 0x0000;
+            MemoryEditor::Sizes s;
+            editor.CalcSizes(s, mem_size, base_display_addr);
+            ImGui::SetNextWindowSizeConstraints(ImVec2(0.0f, 0.0f),
+                                                ImVec2(s.WindowWidth, FLT_MAX));
+
+            editor.Open = true;
+            if (ImGui::Begin("   Memory Editor",
+                             &editor.Open, ImGuiWindowFlags_NoScrollbar)) {
+                auto pos = ImGui::GetCurrentWindow()->Pos;
+                gfx::texture_atlas::draw_foreground(*app.icons_atlas,
+                                                    ICONS_PROCESSOR,
+                                                    pos + ImVec2(30, -1));
+                if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
+                &&  ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
+                    ImGui::OpenPopup("context");
+                }
+                editor.DrawContents(mem, mem_size, base_display_addr);
+                if (editor.ContentsWidthChanged) {
+                    editor.CalcSizes(s, mem_size, base_display_addr);
+                    ImGui::SetWindowSize(ImVec2(s.WindowWidth,
+                                                ImGui::GetWindowSize().y));
+                }
+            }
+            ImGui::End();
         }
 
         if (s_test_app.alloc_window.selected) {

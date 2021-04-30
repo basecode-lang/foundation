@@ -231,6 +231,8 @@ set(GFX_SOURCES
 
     icons.cpp ${GFX_INC_DIR}/icons.h
 
+    ${GFX_INC_DIR}/lmath.h
+
     ${GFX_INC_DIR}/msg_stack.h
 
     ${GFX_INC_DIR}/stb_image.h
