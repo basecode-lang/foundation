@@ -37,7 +37,9 @@ namespace basecode {
     static u0 draw_menu_bar(gfx::app_t& app) {
         if (ImGui::BeginMenuBar()) {
             if (ImGui::BeginMenu("View")) {
-                if (gfx::begin_menu_with_texture(*app.icons_atlas, ICONS_TOOLBOX_WITH_TOOLS, "Tool Windows")) {
+                if (gfx::begin_menu_with_texture(*app.icons_atlas,
+                                                 ICONS_TOOLBOX_WITH_TOOLS,
+                                                 "Tool Windows")) {
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
                         ICONS_RAM,
@@ -47,7 +49,7 @@ namespace basecode {
                         true);
                     gfx::menu_item_with_texture(
                         *app.icons_atlas,
-                        ICONS_CURRENCY_DOLLAR,
+                        ICONS_DATASHEET_VIEW,
                         "Strings",
                         nullptr,
                         &s_test_app.strings_window.visible,
@@ -59,7 +61,9 @@ namespace basecode {
                         nullptr,
                         &s_test_app.errors_window.visible,
                         true);
-                    if (gfx::begin_menu_with_texture(*app.icons_atlas, ICONS_SCRIPT, "Scheme")) {
+                    if (gfx::begin_menu_with_texture(*app.icons_atlas,
+                                                     ICONS_SCRIPT,
+                                                     "Scheme")) {
                         gfx::menu_item_with_texture(
                             *app.icons_atlas,
                             ICONS_COMMAND_PROMPT,
@@ -70,7 +74,7 @@ namespace basecode {
                         ImGui::Separator();
                         gfx::menu_item_with_texture(
                             *app.icons_atlas,
-                            ICONS_DATASHEET_VIEW,
+                            ICONS_NAME_SPACE,
                             "Environment",
                             nullptr,
                             &s_test_app.scm_env_visible,

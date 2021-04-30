@@ -30,7 +30,7 @@ namespace basecode::gfx::tool::strings {
         if (!win.visible)
             return false;
         gfx::begin_tool_window(*win.app->icons_atlas,
-                               ICONS_CURRENCY_DOLLAR,
+                               ICONS_DATASHEET_VIEW,
                                "Strings",
                                &win.visible);
         const auto region_size = ImGui::GetContentRegionAvail();
