@@ -33,12 +33,10 @@ namespace basecode::gfx::tool::prop_editor {
             return false;
         editor.item_id = 0;
         str::reset(editor.help_text);
-        ImGui::Begin("  Properties", &editor.visible);
-        auto window = ImGui::GetCurrentWindow();
-        auto pos = window->DockNode ? window->DockTabItemRect.Min : window->Pos;
-        gfx::texture_atlas::draw_window_no_clip(*editor.app->icons_atlas,
-                                                ICONS_PROPERTY,
-                                                pos + ImVec2(0, 1));
+        gfx::begin_tool_window(*editor.app->icons_atlas,
+                               ICONS_PROPERTY,
+                               "Properties",
+                               &editor.visible);
         const auto region_size = ImGui::GetContentRegionAvail();
         if (region_size.x != editor.size.x
         ||  region_size.y != editor.size.y) {

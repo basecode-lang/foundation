@@ -548,6 +548,29 @@ namespace basecode::gfx {
         return ImGui::MenuItem(label, shortcut, p_selected, enabled);
     }
 
+    b8 begin_tool_window(texture_atlas_t& atlas,
+                         u32 frame,
+                         const s8* name,
+                         b8* p_open,
+                         ImGuiWindowFlags flags) {
+        s8 temp[128];
+        temp[0] = ' ';
+        temp[1] = ' ';
+        std::strcpy(temp + 2, name);
+        auto is_open = ImGui::Begin(temp, p_open, flags);
+        auto window = ImGui::GetCurrentWindow();
+        vec2_t off{};
+        vec2_t pos{};
+        if (window->DockNode) {
+            pos = window->DockTabItemRect.Min;
+        } else {
+            pos = window->Pos;
+            off = vec2_t(25, 0);
+        }
+        gfx::texture_atlas::draw_window_no_clip(atlas, frame, pos + off);
+        return is_open;
+    }
+
     b8 begin_menu_with_font_icon(const s8* icon, const s8* label, b8 enabled) {
         f32 icon_max_width = ImGui::GetFontSize() * 1.5;
         if (icon) {

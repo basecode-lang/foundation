@@ -884,6 +884,12 @@ namespace basecode::gfx {
                   ImGuiInputTextCallback callback = nullptr,
                   u0* user_data = nullptr);
 
+    b8 begin_tool_window(texture_atlas_t& atlas,
+                         u32 frame,
+                         const s8* name,
+                         b8* p_open = nullptr,
+                         ImGuiWindowFlags flags = 0);
+
     b8 menu_item_with_texture(texture_atlas_t& atlas,
                               u32 texture_id,
                               const s8* label,

@@ -235,12 +235,10 @@ namespace basecode::gfx::tool::alloc {
     b8 draw(alloc_win_t& win) {
         if (!win.visible)
             return false;
-        ImGui::Begin("   Allocators", &win.visible);
-        auto window = ImGui::GetCurrentWindow();
-        auto pos = window->DockNode ? window->DockTabItemRect.Min : window->Pos;
-        gfx::texture_atlas::draw_window_no_clip(*win.app->icons_atlas,
-                                                ICONS_RAM,
-                                                pos + ImVec2(3, -2));
+        gfx::begin_tool_window(*win.app->icons_atlas,
+                               ICONS_RAM,
+                               "Allocators",
+                               &win.visible);
         alloc_info_t* node_clicked{};
 //        const auto region_size = ImGui::GetContentRegionAvail();
 //        win.height = region_size.y;
