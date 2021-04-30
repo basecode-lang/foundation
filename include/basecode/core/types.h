@@ -1051,6 +1051,24 @@ namespace basecode {
     using intern_id             = u32;
     using interned_str_list_t   = array_t<interned_str_t>;
 
+    struct interned_str_t final {
+        str::slice_t            value;
+        u32                     bucket_index;
+    };
+
+    struct intern_t final {
+        alloc_t*                alloc;
+        intern_id*              ids;
+        u64*                    hashes;
+        interned_str_list_t     strings;
+        u32                     size;
+        u32                     cap_idx;
+        u32                     capacity;
+        f32                     load_factor;
+    };
+    static_assert(sizeof(intern_t) <= 88,
+                  "intern_t is now larger than 88 bytes!");
+
     namespace intern {
         enum class status_t : u8 {
             ok                  = 0,
@@ -1058,10 +1076,43 @@ namespace basecode {
             not_found           = 136,
         };
 
-        struct result_t;
+        struct result_t final {
+            u64                 hash        {};
+            str::slice_t        slice       {};
+            intern_id           id          {};
+            status_t            status      {};
+            b8                  new_value   {};
+
+            b8 operator==(const result_t& other) const {
+                return id == other.id;
+            }
+        };
     }
 
     using interned_array_t      = array_t<intern::result_t>;
+
+    // ------------------------------------------------------------------------
+    //
+    // locale
+    //
+    // ------------------------------------------------------------------------
+    struct locale_key_t final {
+        u32                     id;
+        s8                      locale[8];
+
+        b8 operator==(const locale_key_t& other) const {
+            return id == other.id
+                   && strncmp(locale, other.locale, sizeof(locale)) == 0;
+        }
+    };
+
+    using localized_strtab_t    = hashtab_t<locale_key_t, intern::result_t>;
+
+    namespace locale{
+        enum class status_t : u8 {
+            ok,
+        };
+    }
 
     // ------------------------------------------------------------------------
     //
@@ -1150,29 +1201,6 @@ namespace basecode {
 
     template <typename T>
     struct list_t;
-
-    // ------------------------------------------------------------------------
-    //
-    // locale
-    //
-    // ------------------------------------------------------------------------
-    struct locale_key_t final {
-        u32                     id;
-        s8                      locale[8];
-
-        b8 operator==(const locale_key_t& other) const {
-            return id == other.id
-                   && strncmp(locale, other.locale, sizeof(locale)) == 0;
-        }
-    };
-
-    using localized_strtab_t    = hashtab_t<locale_key_t, str::slice_t>;
-
-    namespace locale{
-        enum class status_t : u8 {
-            ok,
-        };
-    }
 
     // ------------------------------------------------------------------------
     //
@@ -1659,7 +1687,8 @@ namespace basecode {
         enum class status_t : u8 {
             ok,
             localized_not_found,
-            localized_duplicate_key
+            localized_duplicate_key,
+            localized_intern_failure,
         };
     }
 

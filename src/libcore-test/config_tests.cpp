@@ -43,39 +43,39 @@ TEST_CASE("basecode::config cvar add & remove", "[!hide]") {
 }
 
 TEST_CASE("basecode::config find localized strings", "[!hide]") {
-    str::slice_t* value{};
+    str::slice_t value{};
 
-    if (!OK(string::localized::find(0, &value)))
+    if (!OK(string::localized::find(0, value)))
         REQUIRE(false);
-    if (*value != "ok"_ss)
-        REQUIRE(false);
-
-    if (!OK(string::localized::find(5000, &value)))
-        REQUIRE(false);
-    if (*value != "US: test localized string: 0={} 1={} 2={}"_ss)
+    if (value != "ok"_ss)
         REQUIRE(false);
 
-    if (!OK(string::localized::find(5001, &value)))
+    if (!OK(string::localized::find(5000, value)))
         REQUIRE(false);
-    if (*value != "duplicate cvar"_ss)
-        REQUIRE(false);
-
-    if (!OK(string::localized::find(5002, &value)))
-        REQUIRE(false);
-    if (*value != "cvar not found"_ss)
+    if (value != "US: test localized string: 0={} 1={} 2={}"_ss)
         REQUIRE(false);
 
-    if (!OK(string::localized::find(5003, &value)))
+    if (!OK(string::localized::find(5001, value)))
         REQUIRE(false);
-    if (*value != "invalid modification of constant: {}"_ss)
-        REQUIRE(false);
-
-    if (!OK(string::localized::find(5004, &value, "en_GB"_ss)))
-        REQUIRE(false);
-    if (*value != "GB: test localized string: 0={} 1={} 2={}"_ss)
+    if (value != "duplicate cvar"_ss)
         REQUIRE(false);
 
-    if (string::localized::find(0, &value, "es_MX"_ss) != string::status_t::localized_not_found)
+    if (!OK(string::localized::find(5002, value)))
+        REQUIRE(false);
+    if (value != "cvar not found"_ss)
+        REQUIRE(false);
+
+    if (!OK(string::localized::find(5003, value)))
+        REQUIRE(false);
+    if (value != "invalid modification of constant: {}"_ss)
+        REQUIRE(false);
+
+    if (!OK(string::localized::find(5004, value, "en_GB"_ss)))
+        REQUIRE(false);
+    if (value != "GB: test localized string: 0={} 1={} 2={}"_ss)
+        REQUIRE(false);
+
+    if (string::localized::find(0, value, "es_MX"_ss) != string::status_t::localized_not_found)
         REQUIRE(false);
 }
 

@@ -863,7 +863,11 @@ namespace basecode::gfx {
     // gfx::buffering_bar("##buffer_bar", 0.7f, ImVec2(400, 6), bg, col);
     //
 
+    u0 end_tool_bar();
+
     u0 end_status_bar();
+
+    b8 begin_tool_bar();
 
     b8 begin_status_bar();
 

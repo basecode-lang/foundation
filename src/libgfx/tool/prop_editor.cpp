@@ -31,47 +31,49 @@ namespace basecode::gfx::tool::prop_editor {
     b8 draw(prop_editor_t& editor) {
         if (!editor.visible)
             return false;
-        editor.item_id = 0;
-        str::reset(editor.help_text);
-        gfx::begin_tool_window(*editor.app->icons_atlas,
-                               ICONS_PROPERTY,
-                               "Properties",
-                               &editor.visible);
-        const auto region_size = ImGui::GetContentRegionAvail();
-        if (region_size.x != editor.size.x
-        ||  region_size.y != editor.size.y) {
-            editor.size = region_size;
-            editor.grid_height = editor.size.y * .75;
-            editor.cmd_height  = editor.size.y - editor.grid_height;
+        auto is_open = gfx::begin_tool_window(*editor.app->icons_atlas,
+                                              ICONS_PROPERTY,
+                                              "Properties",
+                                              &editor.visible);
+        if (is_open) {
+            editor.item_id = 0;
+            str::reset(editor.help_text);
+            const auto region_size = ImGui::GetContentRegionAvail();
+            if (region_size.x != editor.size.x
+            ||  region_size.y != editor.size.y) {
+                editor.size = region_size;
+                editor.grid_height = editor.size.y * .75;
+                editor.cmd_height  = editor.size.y - editor.grid_height;
+            }
+            ImGui::PushStyleColor(ImGuiCol_Separator,
+                                  ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
+            gfx::splitter(false,
+                          8.0f,
+                          &editor.grid_height,
+                          &editor.cmd_height,
+                          8,
+                          8);
+            ImGui::PopStyleColor();
+            ImGui::BeginChild("Grid", ImVec2(-1, editor.grid_height), true);
+            if (editor.selected) {
+                auto type_editor = hashtab::find(editor.typetab, editor.type_id);
+                if (type_editor)
+                    type_editor(&editor);
+            }
+            ImGui::EndChild();
+            ImGui::BeginChild("Command", ImVec2(-1, editor.cmd_height), true);
+            if (!str::empty(editor.help_heading)) {
+                ImGui::PushFont(editor.app->bold_font);
+                ImGui::TextUnformatted(str::c_str(editor.help_heading));
+                ImGui::PopFont();
+                ImGui::Dummy(ImVec2(0, 5));
+            }
+            if (!str::empty(editor.help_text))
+                ImGui::TextWrapped("%s", str::c_str(editor.help_text));
+            ImGui::EndChild();
         }
-        ImGui::PushStyleColor(ImGuiCol_Separator,
-                              ImGui::GetStyleColorVec4(ImGuiCol_WindowBg));
-        gfx::splitter(false,
-                      8.0f,
-                      &editor.grid_height,
-                      &editor.cmd_height,
-                      8,
-                      8);
-        ImGui::PopStyleColor();
-        ImGui::BeginChild("Grid", ImVec2(-1, editor.grid_height), true);
-        if (editor.selected) {
-            auto type_editor = hashtab::find(editor.typetab, editor.type_id);
-            if (type_editor)
-                type_editor(&editor);
-        }
-        ImGui::EndChild();
-        ImGui::BeginChild("Command", ImVec2(-1, editor.cmd_height), true);
-        if (!str::empty(editor.help_heading)) {
-            ImGui::PushFont(editor.app->bold_font);
-            ImGui::TextUnformatted(str::c_str(editor.help_heading));
-            ImGui::PopFont();
-            ImGui::Dummy(ImVec2(0, 5));
-        }
-        if (!str::empty(editor.help_text))
-            ImGui::TextWrapped("%s", str::c_str(editor.help_text));
-        ImGui::EndChild();
         ImGui::End();
-        return true;
+        return is_open;
     }
 
     b8 begin_nested(prop_editor_t& editor,

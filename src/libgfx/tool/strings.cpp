@@ -18,6 +18,7 @@
 
 #include <basecode/gfx/gfx.h>
 #include <basecode/gfx/icons.h>
+#include <basecode/core/string.h>
 #include <basecode/gfx/tool/strings.h>
 #include <basecode/gfx/imgui/imgui_internal.h>
 
@@ -29,22 +30,58 @@ namespace basecode::gfx::tool::strings {
     b8 draw(strings_win_t& win) {
         if (!win.visible)
             return false;
-        gfx::begin_tool_window(*win.app->icons_atlas,
-                               ICONS_DATASHEET_VIEW,
-                               "Strings",
-                               &win.visible);
-        const auto region_size = ImGui::GetContentRegionAvail();
-        if (region_size.x != win.size.x
-        ||  region_size.y != win.size.y) {
-            win.size = region_size;
+        auto is_open = gfx::begin_tool_window(*win.app->icons_atlas,
+                                              ICONS_DATASHEET_VIEW,
+                                              "Strings",
+                                              &win.visible);
+        if (is_open) {
+            const auto region_size = ImGui::GetContentRegionAvail();
+            if (region_size.x != win.size.x
+            ||  region_size.y != win.size.y) {
+                win.size = region_size;
+            }
+            if (gfx::begin_tool_bar()) {
+                gfx::end_tool_bar();
+            }
+            s8 buf[32];
+            if (ImGui::BeginTable("localized",
+                                  5,
+                                  ImGuiTableFlags_RowBg
+                                  | ImGuiTableFlags_ScrollY
+                                  | ImGuiTableFlags_Resizable
+                                  | ImGuiTableFlags_PreciseWidths
+                                  | ImGuiTableFlags_NoBordersInBody,
+                                  ImVec2(region_size.x, -1))) {
+                ImGui::TableSetupScrollFreeze(0, 1);
+                ImGui::TableSetupColumn("ID");
+                ImGui::TableSetupColumn("Locale");
+                ImGui::TableSetupColumn("Intern ID");
+                ImGui::TableSetupColumn("Hash");
+                ImGui::TableSetupColumn("Value");
+                ImGui::TableHeadersRow();
+                const auto& localized = string::system::localized();
+                for (const auto& pair : localized) {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::PushID(pair.key.id);
+                    ImFormatString(buf, 32, "%d", pair.key.id);
+                    ImGui::Selectable(buf);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::Text("%s", pair.key.locale);
+                    ImGui::TableSetColumnIndex(2);
+                    auto& r = pair.value;
+                    ImGui::Text("%d", r.id);
+                    ImGui::TableSetColumnIndex(3);
+                    ImGui::Text("0x%016llX", r.hash);
+                    ImGui::TableSetColumnIndex(4);
+                    ImGui::Text("%s", r.slice.data);
+                    ImGui::PopID();
+                }
+                ImGui::EndTable();
+            }
         }
-        ImGui::BeginChild("##toolbar", ImVec2(0, 50));
-        ImGui::Button("Interned");
-        ImGui::SameLine();
-        ImGui::Button("Localized");
-        ImGui::EndChild();
         ImGui::End();
-        return true;
+        return is_open;
     }
 
     u0 init(strings_win_t& win, app_t* app, alloc_t* alloc) {

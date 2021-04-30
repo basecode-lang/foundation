@@ -64,12 +64,12 @@ namespace basecode::string {
                      s32 len = -1);
 
         status_t find(u32 id,
-                      str::slice_t** value,
+                      str::slice_t& value,
                       const s8* locale = {},
                       s32 len = -1);
 
         status_t find(u32 id,
-                      str::slice_t** value,
+                      str::slice_t& value,
                       const String_Concept auto& locale = {}) {
             if (locale.length == 0)
                 return find(id, value);
@@ -85,8 +85,8 @@ namespace basecode::string {
         }
 
         str::slice_t status_name(Status_Concept auto status) {
-            str::slice_t* s{};
-            return OK(find(u32(status), &s)) ? *s :
+            str::slice_t s{};
+            return OK(find(u32(status), s)) ? s :
                    interned::fold(format::format(
                        "[error] invalid status name id: {}",
                        u32(status)));

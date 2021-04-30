@@ -124,20 +124,27 @@ namespace basecode::string {
             auto slice = hashtab::find(g_str_sys.localized, key);
             if (slice)
                 return status_t::localized_duplicate_key;
-            const auto val = slice::make(value, len == -1 ? strlen(value) : len);
-            hashtab::insert(g_str_sys.localized, key, val);
+            auto r = intern::fold(g_str_sys.pool, value, len);
+            if (!OK(r.status))
+                return status_t::localized_intern_failure;
+            hashtab::insert(g_str_sys.localized, key, r);
             return status_t::ok;
         }
 
-        status_t find(u32 id, str::slice_t** value, const s8* locale, s32 len) {
-            *value = nullptr;
+        status_t find(u32 id, str::slice_t& value, const s8* locale, s32 len) {
+            intern::result_t* r{};
             if (!locale) {
-                *value = hashtab::find(g_str_sys.localized, locale::make_key(id));
+                r = hashtab::find(g_str_sys.localized, locale::make_key(id));
             } else {
-                const auto lc = slice::make(locale, len == -1 ? strlen(locale) : len);
-                *value = hashtab::find(g_str_sys.localized, locale::make_key(id, lc));
+                const auto lc = slice::make(locale,
+                                            len == -1 ? strlen(locale) : len);
+                r = hashtab::find(g_str_sys.localized, locale::make_key(id, lc));
             }
-            return !*value ? status_t::localized_not_found : status_t::ok;
+            if (r && OK(r->status)) {
+                value = r->slice;
+                return status_t::ok;
+            }
+            return status_t::localized_not_found;
         }
     }
 }

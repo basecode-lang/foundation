@@ -317,9 +317,9 @@ namespace basecode::job {
     }
 
     str::slice_t state_name(job_state_t state) {
-        str::slice_t* s{};
-        string::localized::find(u32(state), &s);
-        return *s;
+        str::slice_t s{};
+        string::localized::find(u32(state), s);
+        return s;
     }
 
     u0 init(job_t& job, job_id id, u32 label_id, job_id parent_id) {

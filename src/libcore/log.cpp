@@ -158,9 +158,9 @@ namespace basecode::log {
     }
 
     str::slice_t type_name(logger_type_t type) {
-        str::slice_t* s{};
-        string::localized::find(u32(type), &s);
-        return *s;
+        str::slice_t s{};
+        string::localized::find(u32(type), s);
+        return s;
     }
 
     str::slice_t level_name(log_level_t level) {

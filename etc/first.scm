@@ -22,12 +22,12 @@
 (print (format "Version:  {}.{}" *version-major* *version-minor*))
 (print (format "Platform: {}" *platform*))
 
+(load "core.scm"
+      "binfmt.scm")
+
 (cond
     [(is *product-name* "Basecode Foundation Core Library")
-     (load "core.scm"
-           "core-tests.scm")]
+     (load "core-tests.scm")]
 
     [(is *product-name* "Basecode Foundation Binary Format Library")
-     (load "core.scm"
-           "binfmt.scm"
-           "binfmt-tests.scm")])
+     (load "binfmt-tests.scm")])

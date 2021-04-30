@@ -198,8 +198,8 @@ namespace basecode::error {
                 return false;
             }
 
-            str::slice_t* fmt_msg{};
-            if (!OK(string::localized::find(def->lc_str_id, &fmt_msg))) {
+            str::slice_t fmt_msg{};
+            if (!OK(string::localized::find(def->lc_str_id, fmt_msg))) {
                 format::print(stderr, "localized string not found: {}\n", def->lc_str_id);
                 return false;
             }
@@ -207,12 +207,12 @@ namespace basecode::error {
             str_buf_t str_buf{&buf};
             switch (report.type) {
                 case error_report_type_t::default_: {
-                    format_report_header(report, def, (const s8*) fmt_msg->data, str_buf);
+                    format_report_header(report, def, (const s8*) fmt_msg.data, str_buf);
                     break;
                 }
                 case error_report_type_t::source: {
-                    format_report_header(report, def, (const s8*) fmt_msg->data, str_buf);
-                    format_source_body(report, (const s8*) fmt_msg->data, str_buf);
+                    format_report_header(report, def, (const s8*) fmt_msg.data, str_buf);
+                    format_source_body(report, (const s8*) fmt_msg.data, str_buf);
                     break;
                 }
                 default:
@@ -253,20 +253,20 @@ namespace basecode::error {
                     continue;
                 }
 
-                str::slice_t* fmt_msg{};
-                if (!OK(string::localized::find(def->lc_str_id, &fmt_msg))) {
+                str::slice_t fmt_msg{};
+                if (!OK(string::localized::find(def->lc_str_id, fmt_msg))) {
                     format::print(stderr, "localized string not found: {}\n", def->lc_str_id);
                     continue;
                 }
 
                 switch (report.type) {
                     case error_report_type_t::default_: {
-                        format_report_header(report, def, (const s8*) fmt_msg->data, str_buf);
+                        format_report_header(report, def, (const s8*) fmt_msg.data, str_buf);
                         break;
                     }
                     case error_report_type_t::source: {
-                        format_report_header(report, def, (const s8*) fmt_msg->data, str_buf);
-                        format_source_body(report, (const s8*) fmt_msg->data, str_buf);
+                        format_report_header(report, def, (const s8*) fmt_msg.data, str_buf);
+                        format_source_body(report, (const s8*) fmt_msg.data, str_buf);
                         break;
                     }
                     default:
@@ -279,7 +279,10 @@ namespace basecode::error {
     }
 
     namespace localized {
-        status_t find(u32 id, error_def_t** def, const s8* locale, s32 len) {
+        status_t find(u32 id,
+                      error_def_t** def,
+                      const s8* locale,
+                      s32 len) {
             *def = nullptr;
             if (!locale) {
                 *def = hashtab::find(g_err_sys.errors, locale::make_key(id));
@@ -290,7 +293,12 @@ namespace basecode::error {
             return !*def ? status_t::localized_not_found : status_t::ok;
         }
 
-        status_t add(u32 id, u32 str_id, const s8* locale, u32 locale_len, const s8* code, u32 code_len) {
+        status_t add(u32 id,
+                     u32 str_id,
+                     const s8* locale,
+                     u32 locale_len,
+                     const s8* code,
+                     u32 code_len) {
             auto lc    = slice::make(locale, locale_len);
             auto key   = locale::make_key(id, lc);
             auto slice = hashtab::find(g_err_sys.errors, key);

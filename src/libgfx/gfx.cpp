@@ -182,6 +182,29 @@ namespace basecode::gfx {
         return 0;
     }
 
+    u0 end_tool_bar() {
+    }
+
+    b8 begin_tool_bar() {
+        auto window = ImGui::GetCurrentWindow();
+        if (window->SkipItems)
+            return false;
+
+        auto pos = window->DC.CursorPos;
+        ImRect bb(pos, pos + ImVec2(window->ContentRegionRect.GetWidth(), 50));
+        ImGui::ItemSize(bb);
+        if (!ImGui::ItemAdd(bb, 0))
+            return false;
+
+        auto draw_list = ImGui::GetWindowDrawList();
+        draw_list->AddRectFilled(bb.Min,
+                                 bb.Max,
+                                 IM_COL32(31, 57, 89, 255),
+                                 0.0f,
+                                 ImDrawFlags_None);
+        return true;
+    }
+
     u0 end_status_bar() {
         ImGuiWindow* window = ImGui::GetCurrentWindow();
         if (window->SkipItems)

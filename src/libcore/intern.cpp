@@ -114,13 +114,16 @@ namespace basecode::intern {
     }
 
     result_t fold(intern_t& pool, const s8* data, s32 len) {
-        if (hash_common::requires_rehash(pool.size, pool.capacity, pool.load_factor)) {
+        if (hash_common::requires_rehash(pool.size,
+                                         pool.capacity,
+                                         pool.load_factor)) {
             auto status = rehash(pool);
             if (!OK(status))
                 return result_t{.status = status, .new_value = false};
         }
 
-        const auto value = slice::make(data, s32(len == -1 ? strlen(data) : len));
+        const auto value = slice::make(data, s32(len == -1 ?
+                                                 strlen(data) : len));
         u64 hash         = hash::hash64(value);
         u32 bucket_index = hash_common::range_reduction(hash, pool.capacity);
         if (find_key(pool, hash, value, bucket_index)) {
@@ -134,8 +137,11 @@ namespace basecode::intern {
             };
         }
 
-        if (!hash_common::find_free_bucket(pool.hashes, pool.capacity, bucket_index))
+        if (!hash_common::find_free_bucket(pool.hashes,
+                                           pool.capacity,
+                                           bucket_index)) {
             return result_t{.status = status_t::no_bucket, .new_value = false};
+        }
 
         auto buf = buf_pool::retain(value.length + 1);
         BC_ASSERT_MSG(buf, "buf_pool::retain failed!");
@@ -177,7 +183,9 @@ namespace basecode::intern {
 
         const auto ids_size = new_capacity * sizeof(intern_id);
         const auto buf_size = buffer_size(pool, new_capacity);
-        auto       buf      = (u8*) memory::alloc(pool.alloc, buf_size, alignof(intern_id));
+        auto       buf      = (u8*) memory::alloc(pool.alloc,
+                                                  buf_size,
+                                                  alignof(intern_id));
         std::memset(buf, 0, buf_size);
 
         u32  hashes_align{};
@@ -193,8 +201,11 @@ namespace basecode::intern {
 
             const u64 hash = pool.hashes[i];
             u32 bucket_index = hash_common::range_reduction(hash, new_capacity);
-            if (!hash_common::find_free_bucket(hashes, new_capacity, bucket_index))
+            if (!hash_common::find_free_bucket(hashes,
+                                               new_capacity,
+                                               bucket_index)) {
                 return status_t::no_bucket;
+            }
 
             ids[bucket_index]    = id;
             hashes[bucket_index] = hash;

@@ -235,64 +235,64 @@ namespace basecode::gfx::tool::alloc {
     b8 draw(alloc_win_t& win) {
         if (!win.visible)
             return false;
-        gfx::begin_tool_window(*win.app->icons_atlas,
-                               ICONS_RAM,
-                               "Allocators",
-                               &win.visible);
-        alloc_info_t* node_clicked{};
-//        const auto region_size = ImGui::GetContentRegionAvail();
-//        win.height = region_size.y;
-//        if ((win.table_size == 0 && win.graph_size == 0)
-//        ||  (win.table_size + win.graph_size < region_size.x)
-//        ||  (win.table_size + win.graph_size > region_size.x)) {
-//            win.table_size = region_size.x * .5;
-//            win.graph_size = region_size.x * .5;
-//        }
-//        gfx::splitter(true,
-//                      8.0f,
-//                      &win.table_size,
-//                      &win.graph_size,
-//                      8,
-//                      8,
-//                      win.height);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
-        ImGui::BeginChild("Allocators",
-                          ImVec2(win.table_size, win.height),
-                          true);
-        ImGui::PopStyleVar();
-        if (ImGui::BeginTable("Allocators",
-                              3,
-                              ImGuiTableFlags_RowBg
-                              | ImGuiTableFlags_ScrollY
-                              | ImGuiTableFlags_Resizable
-                              | ImGuiTableFlags_PreciseWidths
-                              | ImGuiTableFlags_NoBordersInBody,
-                              ImVec2(ImGui::GetContentRegionAvailWidth(), -1))) {
-            ImGui::TableSetupScrollFreeze(0, 1);
-            ImGui::TableSetupColumn("Name");
-            ImGui::TableSetupColumn("Type");
-            ImGui::TableSetupColumn("Total Allocated");
-            ImGui::TableHeadersRow();
-            node_clicked = draw_table(win, memory::meta::system::infos());
-            ImGui::EndTable();
-        }
-        ImGui::EndChild();
-
-        if (node_clicked) {
-            if (win.selected != node_clicked) {
-                memory::meta::system::stop_plot(win.selected);
-                win.selected = node_clicked;
-                memory::meta::system::start_plot(win.selected,
-                                                 plot_mode_t::scrolled);
+        auto is_open = gfx::begin_tool_window(*win.app->icons_atlas,
+                                              ICONS_RAM,
+                                              "Allocators",
+                                              &win.visible);
+        if (is_open) {
+            alloc_info_t* node_clicked{};
+    //        const auto region_size = ImGui::GetContentRegionAvail();
+    //        win.height = region_size.y;
+    //        if ((win.table_size == 0 && win.graph_size == 0)
+    //        ||  (win.table_size + win.graph_size < region_size.x)
+    //        ||  (win.table_size + win.graph_size > region_size.x)) {
+    //            win.table_size = region_size.x * .5;
+    //            win.graph_size = region_size.x * .5;
+    //        }
+    //        gfx::splitter(true,
+    //                      8.0f,
+    //                      &win.table_size,
+    //                      &win.graph_size,
+    //                      8,
+    //                      8,
+    //                      win.height);
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+            ImGui::BeginChild("Allocators",
+                              ImVec2(win.table_size, win.height),
+                              false);
+            ImGui::PopStyleVar();
+            if (ImGui::BeginTable("Allocators",
+                                  3,
+                                  ImGuiTableFlags_RowBg
+                                  | ImGuiTableFlags_ScrollY
+                                  | ImGuiTableFlags_Resizable
+                                  | ImGuiTableFlags_PreciseWidths
+                                  | ImGuiTableFlags_NoBordersInBody,
+                                  ImVec2(ImGui::GetContentRegionAvailWidth(), -1))) {
+                ImGui::TableSetupScrollFreeze(0, 1);
+                ImGui::TableSetupColumn("Name");
+                ImGui::TableSetupColumn("Type");
+                ImGui::TableSetupColumn("Total Allocated");
+                ImGui::TableHeadersRow();
+                node_clicked = draw_table(win, memory::meta::system::infos());
+                ImGui::EndTable();
             }
+            ImGui::EndChild();
+
+            if (node_clicked) {
+                if (win.selected != node_clicked) {
+                    memory::meta::system::stop_plot(win.selected);
+                    win.selected = node_clicked;
+                    memory::meta::system::start_plot(win.selected,
+                                                     plot_mode_t::scrolled);
+                }
+            }
+
+    //        ImGui::SameLine();
+    //        draw_details(win);
         }
-
-//        ImGui::SameLine();
-//        draw_details(win);
-
         ImGui::End();
-
-        return true;
+        return is_open;
     }
 
     u0 init(alloc_win_t& win, app_t* app, alloc_t* alloc) {
