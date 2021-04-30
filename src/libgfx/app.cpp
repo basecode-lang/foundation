@@ -377,12 +377,12 @@ namespace basecode::gfx::app {
     static u0 glfw_win_iconify(GLFWwindow* window, s32 iconified) {
         auto win = (window_t*) glfwGetWindowUserPointer(window);
         win->focused   = false;
-        win->iconified = true;
+        win->iconified = iconified;
     }
 
     static u0 glfw_win_maximize(GLFWwindow* window, s32 maximized) {
         auto win = (window_t*) glfwGetWindowUserPointer(window);
-        win->maximized = true;
+        win->maximized = maximized;
         win->iconified = false;
     }
 
@@ -396,7 +396,7 @@ namespace basecode::gfx::app {
 
     static u0 glfw_win_resize(GLFWwindow* window, s32 width, s32 height) {
         auto win = (window_t*) glfwGetWindowUserPointer(window);
-        win->width = width;
+        win->width  = width;
         win->height = height;
     }
 }

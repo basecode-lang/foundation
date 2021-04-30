@@ -79,10 +79,26 @@ namespace basecode::gfx {
             obj_pool::destroy(g_gfx_sys.storage, &atlas);
         }
 
+        u0 draw_window_no_clip(texture_atlas_t& atlas,
+                               u32 frame,
+                               const vec2_t& pos) {
+            auto draw_list = ImGui::GetWindowDrawList();
+            const auto& tex_frame = atlas.frames[frame];
+            auto eff_pos = pos + tex_frame.offset;
+            draw_list->PushClipRectFullScreen();
+            draw_list->AddImage((ImTextureID) (uintptr_t) atlas.texture_id,
+                                eff_pos,
+                                eff_pos + tex_frame.size,
+                                tex_frame.uv.tl,
+                                tex_frame.uv.br,
+                                ImGui::GetColorU32(ImVec4(1, 1, 1, 1)));
+            draw_list->PopClipRect();
+        }
+
         u0 draw_foreground(texture_atlas_t& atlas,
                            u32 frame,
                            const vec2_t& pos) {
-            auto draw_list = ImGui::GetForegroundDrawList(ImGui::GetCurrentWindow());
+            auto draw_list = ImGui::GetForegroundDrawList();
             const auto& tex_frame = atlas.frames[frame];
             auto eff_pos = pos + tex_frame.offset;
             draw_list->AddImage((ImTextureID) (uintptr_t) atlas.texture_id,
@@ -226,12 +242,14 @@ namespace basecode::gfx {
 
         ImGui::SetCurrentViewport(nullptr, viewport);
 
-        g.NextWindowData.MenuBarOffsetMinVal = ImVec2(0.0f, 2.0f);
+        g.NextWindowData.MenuBarOffsetMinVal = ImVec2(0.0f, 0.0f);
         ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar
                                         | ImGuiWindowFlags_NoSavedSettings
                                         | ImGuiWindowFlags_MenuBar;
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-        f32 height = ImGui::GetFrameHeight() + 2.0f;
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 4));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+        f32 height = ImGui::GetFrameHeight();
         b8 is_open = ImGui::BeginViewportSideBar("##main_status_bar",
                                                  viewport,
                                                  ImGuiDir_Down,
@@ -255,10 +273,9 @@ namespace basecode::gfx {
             bar_rect.Max.y += 2;
             const auto border_size = ImMax(window->WindowRounding,
                                            window->WindowBorderSize);
-            ImRect clip_rect(IM_ROUND(bar_rect.Min.x + window->WindowBorderSize),
-                             IM_ROUND(bar_rect.Min.y + window->WindowBorderSize),
-                             IM_ROUND(ImMax(bar_rect.Min.x,
-                                            bar_rect.Max.x - border_size)),
+            ImRect clip_rect(IM_ROUND(bar_rect.Min.x),
+                             IM_ROUND(bar_rect.Min.y),
+                             IM_ROUND(bar_rect.Max.x),
                              IM_ROUND(bar_rect.Max.y));
             clip_rect.ClipWith(window->OuterRectClipped);
             ImGui::PushClipRect(clip_rect.Min, clip_rect.Max, false);
@@ -271,14 +288,14 @@ namespace basecode::gfx {
             window->DC.MenuBarAppending = true;
             ImGui::AlignTextToFramePadding();
             auto draw_list = ImGui::GetWindowDrawList();
-            draw_list->AddRectFilled(ImVec2(bar_rect.Min.x, bar_rect.Min.y + 2),
-                                     ImVec2(bar_rect.Max.x, bar_rect.Min.y + 4),
+            draw_list->AddRectFilled(ImVec2(bar_rect.Min.x, bar_rect.Min.y + 1),
+                                     ImVec2(bar_rect.Max.x, bar_rect.Min.y + 3),
                                      IM_COL32_BLACK);
         } else {
             ImGui::End();
         }
 
-        ImGui::PopStyleVar(1);
+        ImGui::PopStyleVar(3);
 
         return is_open;
     }

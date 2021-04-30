@@ -30,10 +30,11 @@ namespace basecode::gfx::tool::strings {
         if (!win.visible)
             return false;
         ImGui::Begin("  Strings", &win.visible);
-        auto pos = ImGui::GetCurrentWindow()->Pos;
-        gfx::texture_atlas::draw_foreground(*win.app->icons_atlas,
-                                            ICONS_CURRENCY_DOLLAR,
-                                            pos + ImVec2(25, 1));
+        auto window = ImGui::GetCurrentWindow();
+        auto pos = window->DockNode ? window->DockTabItemRect.Min : window->Pos;
+        gfx::texture_atlas::draw_window_no_clip(*win.app->icons_atlas,
+                                                ICONS_CURRENCY_DOLLAR,
+                                                pos + ImVec2(0, 1));
         const auto region_size = ImGui::GetContentRegionAvail();
         if (region_size.x != win.size.x
         ||  region_size.y != win.size.y) {

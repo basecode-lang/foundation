@@ -837,6 +837,14 @@ namespace basecode::gfx {
 
         u0 free(texture_atlas_t& atlas);
 
+        u0 draw_foreground(texture_atlas_t& atlas,
+                           u32 frame,
+                           const vec2_t& pos);
+
+        u0 draw_window_no_clip(texture_atlas_t& atlas,
+                               u32 frame,
+                               const vec2_t& pos);
+
         u0 draw(texture_atlas_t& atlas, u32 frame);
 
         u0 init(texture_atlas_t& atlas, alloc_t* alloc);
@@ -844,8 +852,6 @@ namespace basecode::gfx {
         status_t make_gpu_texture(texture_atlas_t& atlas);
 
         status_t load_bitmap(texture_atlas_t& atlas, const path_t& path);
-
-        u0 draw_foreground(texture_atlas_t& atlas, u32 frame, const vec2_t& pos);
     }
 
     // example usage:

@@ -460,10 +460,11 @@ namespace basecode {
             editor.Open = true;
             if (ImGui::Begin("   Memory Editor",
                              &editor.Open, ImGuiWindowFlags_NoScrollbar)) {
-                auto pos = ImGui::GetCurrentWindow()->Pos;
-                gfx::texture_atlas::draw_foreground(*app.icons_atlas,
-                                                    ICONS_PROCESSOR,
-                                                    pos + ImVec2(30, -1));
+                auto window = ImGui::GetCurrentWindow();
+                auto pos = window->DockNode ? window->DockTabItemRect.Min : window->Pos;
+                gfx::texture_atlas::draw_window_no_clip(*app.icons_atlas,
+                                                        ICONS_PROCESSOR,
+                                                        pos + ImVec2(5, -1));
                 if (ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows)
                 &&  ImGui::IsMouseReleased(ImGuiMouseButton_Right)) {
                     ImGui::OpenPopup("context");
