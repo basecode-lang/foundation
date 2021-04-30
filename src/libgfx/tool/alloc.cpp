@@ -187,44 +187,48 @@ namespace basecode::gfx::tool::alloc {
                                 | ImGuiTreeNodeFlags_OpenOnDoubleClick
                                 | ImGuiTreeNodeFlags_SpanAvailWidth;
         alloc_info_t* node_clicked{};
-        u32 row{};
-        for (auto info : roots) {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::PushID(info);
-            auto node_flags = base_flags;
-            if (info == win.selected)
-                node_flags |= ImGuiTreeNodeFlags_Selected;
-            if (info->children.size == 0)
-                node_flags |= ImGuiTreeNodeFlags_Leaf;
-            auto node_open = ImGui::TreeNodeEx(info,
-                                               node_flags,
-                                               "%s",
-                                               memory::name(info->tracked));
-            if (ImGui::IsItemClicked())
-                node_clicked = info;
-            ImGui::TableSetColumnIndex(1);
-            ImGui::TextUnformatted(memory::type_name(info->tracked->system->type));
-            ImGui::TableSetColumnIndex(2);
-            str::reset(scratch); {
-                str_buf_t buf(&scratch);
-                format::unitized_byte_size(buf,
-                                           info->tracked->total_allocated);
-            }
-            gfx::text_right_align(str::c_str(scratch),
-                                  (const s8*) scratch.end());
-            ++row;
-            if (node_open) {
-                if (info->children.size > 0) {
-                    auto child_clicked = draw_table(win, info->children);
-                    if (child_clicked)
-                        node_clicked = child_clicked;
+        ImGuiListClipper clipper;
+        clipper.Begin(roots.size);
+        while (clipper.Step()) {
+            for (s32 row = clipper.DisplayStart;
+                 row < clipper.DisplayEnd;
+                 ++row) {
+                auto info = roots[row];
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0);
+                ImGui::PushID(info);
+                auto node_flags = base_flags;
+                if (info == win.selected)
+                    node_flags |= ImGuiTreeNodeFlags_Selected;
+                if (info->children.size == 0)
+                    node_flags |= ImGuiTreeNodeFlags_Leaf;
+                auto node_open = ImGui::TreeNodeEx(info,
+                                                   node_flags,
+                                                   "%s",
+                                                   memory::name(info->tracked));
+                if (ImGui::IsItemClicked())
+                    node_clicked = info;
+                ImGui::TableSetColumnIndex(1);
+                ImGui::TextUnformatted(memory::type_name(info->tracked->system->type));
+                ImGui::TableSetColumnIndex(2);
+                str::reset(scratch); {
+                    str_buf_t buf(&scratch);
+                    format::unitized_byte_size(buf,
+                                               info->tracked->total_allocated);
                 }
-                ImGui::TreePop();
+                gfx::text_right_align(str::c_str(scratch),
+                                      (const s8*) scratch.end());
+                if (node_open) {
+                    if (info->children.size > 0) {
+                        auto child_clicked = draw_table(win, info->children);
+                        if (child_clicked)
+                            node_clicked = child_clicked;
+                    }
+                    ImGui::TreePop();
+                }
+                ImGui::PopID();
             }
-            ImGui::PopID();
         }
-
         return node_clicked;
     }
 

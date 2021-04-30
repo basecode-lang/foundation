@@ -691,9 +691,12 @@ namespace basecode::gfx {
         // errors tool window
         //
         // ----------------------------------------------------------------
+        using localized_str_array_t = array_t<localized_strtab_t::Pair_Type>;
+
         struct strings_win_t final {
             app_t*                  app;
             u0*                     selected;
+            localized_str_array_t   pairs;
             ImVec2                  size;
             b8                      interned_open;
             b8                      localized_open;

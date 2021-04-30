@@ -24,7 +24,7 @@
 
 namespace basecode::gfx::tool::strings {
     u0 free(strings_win_t& win) {
-        UNUSED(win);
+        array::free(win.pairs);
     }
 
     b8 draw(strings_win_t& win) {
@@ -60,22 +60,32 @@ namespace basecode::gfx::tool::strings {
                 ImGui::TableSetupColumn("Value");
                 ImGui::TableHeadersRow();
                 const auto& localized = string::system::localized();
-                for (const auto& pair : localized) {
-                    ImGui::TableNextRow();
-                    ImGui::TableSetColumnIndex(0);
-                    ImGui::PushID(pair.key.id);
-                    ImFormatString(buf, 32, "%d", pair.key.id);
-                    ImGui::Selectable(buf);
-                    ImGui::TableSetColumnIndex(1);
-                    ImGui::Text("%s", pair.key.locale);
-                    ImGui::TableSetColumnIndex(2);
-                    auto& r = pair.value;
-                    ImGui::Text("%d", r.id);
-                    ImGui::TableSetColumnIndex(3);
-                    ImGui::Text("0x%016llX", r.hash);
-                    ImGui::TableSetColumnIndex(4);
-                    ImGui::Text("%s", r.slice.data);
-                    ImGui::PopID();
+                array::reset(win.pairs);
+                hashtab::pairs(localized, win.pairs);
+                std::sort(win.pairs.begin(), win.pairs.end());
+                ImGuiListClipper clipper;
+                clipper.Begin(win.pairs.size);
+                while (clipper.Step()) {
+                    for (s32 row = clipper.DisplayStart;
+                         row < clipper.DisplayEnd;
+                         ++row) {
+                        const auto& pair = win.pairs[row];
+                        ImGui::TableNextRow();
+                        ImGui::TableSetColumnIndex(0);
+                        ImGui::PushID(pair.key.id);
+                        ImFormatString(buf, 32, "%d", pair.key.id);
+                        ImGui::Selectable(buf);
+                        ImGui::TableSetColumnIndex(1);
+                        ImGui::Text("%s", pair.key.locale);
+                        ImGui::TableSetColumnIndex(2);
+                        auto& r = pair.value;
+                        ImGui::Text("%d", r.id);
+                        ImGui::TableSetColumnIndex(3);
+                        ImGui::Text("0x%016llX", r.hash);
+                        ImGui::TableSetColumnIndex(4);
+                        ImGui::Text("%s", r.slice.data);
+                        ImGui::PopID();
+                    }
                 }
                 ImGui::EndTable();
             }
@@ -87,5 +97,6 @@ namespace basecode::gfx::tool::strings {
     u0 init(strings_win_t& win, app_t* app, alloc_t* alloc) {
         win.app     = app;
         win.visible = true;
+        array::init(win.pairs, alloc);
     }
 }

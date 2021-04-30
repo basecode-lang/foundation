@@ -47,15 +47,34 @@ namespace basecode {
         u32                     capacity;
         f32                     load_factor;
 
-        Value_Type& operator[](u32 bucket_idx) {
-            return values[bucket_idx];
-        }
-
         struct pair_t final {
             Key_Type            key;
             Value_Type          value;
             u32                 bucket_idx;
+
+            auto operator<(const pair_t& rhs) const {
+                return key < rhs.key;
+            }
         };
+
+        const Pair_Type operator[](u32 idx)  const {
+            b8 ok{};
+            while (idx < capacity) {
+                if (hash_common::read_flag(flags, idx)) {
+                    ok = true;
+                    break;
+                }
+                ++idx;
+            }
+            if (ok) {
+                pair_t p;
+                p.key        = keys[idx];
+                p.value      = values[idx];
+                p.bucket_idx = idx;
+                return p;
+            }
+            return {};
+        }
 
         struct iterator_state_t {
             u32                 pos;
@@ -167,7 +186,7 @@ namespace basecode {
             Array list{};
             array::init(list, table.alloc);
             array::reserve(list, table.size);
-            for (u32 i = 0; i < table.capacity;) {
+            for (u32 i = 0; i < table.capacity; ++i) {
                 if (!hash_common::read_flag(table.flags, i))
                     continue;
                 if constexpr (Is_Pointer) {
@@ -302,6 +321,20 @@ namespace basecode {
             hash_common::write_flag(table.flags, found_index, false);
             --table.size;
             return true;
+        }
+
+        template <Hash_Table T,
+                  typename Pair_Type = typename T::Pair_Type>
+        u0 pairs(T& table, array_t<Pair_Type>& pairs) {
+            array::reserve(pairs, table.size);
+            for (u32 i = 0; i < table.capacity; ++i) {
+                if (!hash_common::read_flag(table.flags, i))
+                    continue;
+                auto& pair = array::append(pairs);
+                pair.key = table.keys[i];
+                pair.value = table.values[i];
+                pair.bucket_idx = i;
+            }
         }
 
         template <Hash_Table T,

@@ -1100,7 +1100,11 @@ namespace basecode {
         u32                     id;
         s8                      locale[8];
 
-        b8 operator==(const locale_key_t& other) const {
+        auto operator<(const locale_key_t& other) const {
+            return id < other.id;
+        }
+
+        auto operator==(const locale_key_t& other) const {
             return id == other.id
                    && strncmp(locale, other.locale, sizeof(locale)) == 0;
         }
