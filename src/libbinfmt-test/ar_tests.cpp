@@ -46,7 +46,7 @@ TEST_CASE("basecode::binfmt ar read test") {
     auto archive = module.as_archive();
 
     str_t s{};
-    str::init(s); {
+    str::init(s, context::top()->alloc.temp); {
         str_buf_t buf(&s);
         for (const auto& member : archive->members) {
             format::format_to(buf, "file . . . . . . . {}\n",

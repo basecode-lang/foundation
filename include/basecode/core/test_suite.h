@@ -21,9 +21,11 @@
 #include <basecode/core/types.h>
 #include <basecode/core/profiler.h>
 #include <basecode/core/stopwatch.h>
+#include <basecode/core/memory/system/temp.h>
 
 namespace basecode {
     struct test_suite_t final {
+        alloc_t*                temp_alloc;
         Catch::Session          session;
         const s8**              argv;
         s32                     argc;

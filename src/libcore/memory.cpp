@@ -31,6 +31,7 @@
 #include <basecode/core/memory/system/dl.h>
 #include <basecode/core/memory/system/page.h>
 #include <basecode/core/memory/system/bump.h>
+#include <basecode/core/memory/system/temp.h>
 #include <basecode/core/memory/system/slab.h>
 #include <basecode/core/memory/system/base.h>
 #include <basecode/core/memory/system/proxy.h>
@@ -343,7 +344,7 @@ namespace basecode::memory {
             case alloc_type_t::bump:        alloc->system = bump::system();     break;
             case alloc_type_t::base:        alloc->system = base::system();     break;
             case alloc_type_t::slab:        alloc->system = slab::system();     break;
-            case alloc_type_t::temp:        break;
+            case alloc_type_t::temp:        alloc->system = temp::system();     break;
             case alloc_type_t::page:        alloc->system = page::system();     break;
             case alloc_type_t::proxy:       alloc->system = proxy::system();    break;
             case alloc_type_t::trace:       alloc->system = trace::system();    break;

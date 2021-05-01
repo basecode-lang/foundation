@@ -19,6 +19,7 @@
 #pragma once
 
 #include <basecode/gfx/gfx.h>
+#include <basecode/core/format.h>
 
 namespace basecode::gfx::tool::prop_editor {
     b8 begin_category(prop_editor_t& editor,
@@ -40,8 +41,8 @@ namespace basecode::gfx::tool::prop_editor {
             editor.prop_id = id;
         }
         ImGui::TableSetColumnIndex(1);
-        auto& scratch = editor.app->scratch;
-        str::reset(scratch); {
+        str_t scratch{};
+        str::init(scratch, context::top()->alloc.temp); {
             str_buf_t buf(&scratch);
             format::format_to(buf, "{}", value);
         }

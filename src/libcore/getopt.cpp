@@ -157,7 +157,7 @@ namespace basecode::getopt {
 
     u0 format(getopt_t& opt) {
         str_t buf{};
-        str::init(buf, opt.alloc);
+        str::init(buf, context::top()->alloc.temp);
         {
             str_buf_t sb{&buf};
             format::format_to(sb,
@@ -339,7 +339,7 @@ namespace basecode::getopt {
 
     u0 format_help(getopt_t& opt, str_t& buf) {
         path_t self{};
-        path::init(self);
+        path::init(self, context::top()->alloc.temp);
         path::set(self, opt.argv[0]);
         defer(path::free(self));
 

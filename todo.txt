@@ -46,9 +46,6 @@ MEDIUM
 
 LOW
 ---------
-- binfmt(ar): rework the read + static functions to use the FILE_PTR()
-          interface instead of directly using the buf_crsr_t.
-
 - review and improve symtab_t if possible
 
 - rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
@@ -65,6 +62,9 @@ LOW
 
 DONE
 ----
+- binfmt(ar): rework the read + static functions to use the FILE_PTR()
+          interface instead of directly using the buf_crsr_t.
+
 - filesys: implement glob function, which will also touch the init and fini functions for the
             filesys module.
 - error: temporarily switch error_report_t to use an array_t<std::any> for the

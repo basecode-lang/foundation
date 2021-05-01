@@ -1873,7 +1873,7 @@ namespace basecode::scm {
 
         obj_t* cl = ctx->call_list;
         str_t str{};
-        str::init(str, ctx->alloc);
+        str::init(str, context::top()->alloc.temp);
         {
             str_buf_t buf(&str);
             format::format_to(buf, "error: ");

@@ -165,6 +165,7 @@ set(
     memory/system/page.cpp ${CORE_INC_DIR}/memory/system/page.h
     memory/system/slab.cpp ${CORE_INC_DIR}/memory/system/slab.h
     memory/system/bump.cpp ${CORE_INC_DIR}/memory/system/bump.h
+    memory/system/temp.cpp ${CORE_INC_DIR}/memory/system/temp.h
     memory/system/base.cpp ${CORE_INC_DIR}/memory/system/base.h
     memory/system/trace.cpp ${CORE_INC_DIR}/memory/system/trace.h
     memory/system/proxy.cpp ${CORE_INC_DIR}/memory/system/proxy.h

@@ -27,7 +27,7 @@ namespace basecode {
                      const s8* msg,
                      const fmt_args_t& args) {
         str_t buf{};
-        str::init(buf); {
+        str::init(buf, memory::system::temp_alloc()); {
             str_buf_t sb(&buf);
             format::format_to(sb, "{}({}): {}: ", file, line, prefix);
             if (condition)

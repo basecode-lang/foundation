@@ -82,7 +82,7 @@ namespace basecode {
         str_t vformat(alloc_t* alloc, fmt_str_t format_str, fmt_args_t args);
 
         FORCE_INLINE str_t to_string(const fmt_buf_t& buf) {
-            str_t str;
+            str_t str{};
             str::init(str, buf.get_allocator().backing);
             str::reserve(str, buf.size());
             std::memcpy(str.data, buf.data(), buf.size());
@@ -92,7 +92,7 @@ namespace basecode {
 
         template <typename... Args>
         inline u0 print(fmt_str_t format_str, const Args&... args) {
-            vprint(context::top()->alloc.main,
+            vprint(context::top()->alloc.temp,
                    stdout,
                    format_str,
                    fmt::make_format_args(args...));
@@ -107,7 +107,7 @@ namespace basecode {
         template <typename... Args>
         inline str_t format(fmt_str_t format_str,
                             const Args&... args) {
-            return vformat(context::top()->alloc.main,
+            return vformat(context::top()->alloc.temp,
                            format_str,
                            fmt::make_format_args(args...));
         }
@@ -116,7 +116,7 @@ namespace basecode {
         inline u0 print(FILE* file,
                         fmt_str_t format_str,
                         const Args&... args) {
-            vprint(context::top()->alloc.main,
+            vprint(context::top()->alloc.temp,
                    file,
                    format_str,
                    fmt::make_format_args(args...));
@@ -186,13 +186,13 @@ namespace basecode {
                                  u32 width,
                                  fmt_str_t format_str,
                                  const Args&... args) {
-            vprint(context::top()->alloc.main,
+            vprint(context::top()->alloc.temp,
                    stdout,
                    "{} {:.<{}} ",
                    fmt::make_format_args(label_str,
                                          ".",
                                          width - label_str.size()));
-            vprint(context::top()->alloc.main,
+            vprint(context::top()->alloc.temp,
                    stdout,
                    format_str,
                    fmt::make_format_args(args...));
@@ -221,7 +221,7 @@ namespace basecode {
 
         FORCE_INLINE str_t to_radix(Integer_Concept auto value,
                                     Radix_Concept auto radix = 10,
-                                    alloc_t* alloc = context::top()->alloc.main) {
+                                    alloc_t* alloc = context::top()->alloc.temp) {
             fmt_alloc_t fmt_alloc(alloc);
             fmt_buf_t buf(fmt_alloc);
             switch (radix) {

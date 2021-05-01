@@ -38,7 +38,7 @@ TEST_CASE("basecode::job basics") {
     s32    inputs[num_workers];
     s32    n = 2;
     str_t  temp{};
-    str::init(temp);
+    str::init(temp, context::top()->alloc.temp);
     str::reserve(temp, 50);
     for (s32 i = 0; i < num_workers; ++i) {
         str::reset(temp);

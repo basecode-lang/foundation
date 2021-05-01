@@ -36,6 +36,7 @@
 #include <basecode/core/scm/modules/cxx.h>
 #include <basecode/core/memory/system/dl.h>
 #include <basecode/core/scm/modules/basic.h>
+#include <basecode/core/memory/system/temp.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/core/log/system/default.h>
 #include <basecode/core/memory/system/proxy.h>
@@ -55,9 +56,13 @@ s32 run(test_suite_t& suite) {
         scratch_config_t scratch_cfg{};
         scratch_cfg.buf_size = KB(256);
 
+        temp_config_t temp_cfg{};
+        temp_cfg.name = "temp/frame";
+        temp_cfg.size = 4_mb;
+
         system_config_t sys_cfg{};
         sys_cfg.main    = &dl_cfg;
-        sys_cfg.temp    = {};
+        sys_cfg.temp    = &temp_cfg;
         sys_cfg.scratch = &scratch_cfg;
 
         auto status = memory::system::init(&sys_cfg);

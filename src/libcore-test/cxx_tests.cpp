@@ -275,7 +275,7 @@ TEST_CASE("basecode::cxx example program") {
     const auto& proxies = memory::proxy::active();
 
     str_t buf{};
-    str::init(buf);
+    str::init(buf, context::top()->alloc.temp);
     {
         str_buf_t fmt_buf(&buf);
         for (auto proxy : proxies) {

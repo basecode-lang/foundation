@@ -238,7 +238,7 @@ namespace basecode::scm::module::basic {
     obj_t* format(str::slice_t* fmt_str, b8 quote, rest_array_t* rest) {
         auto ctx = g_basic_sys.ctx;
         str_t buf{};
-        str::init(buf, ctx->alloc);  {
+        str::init(buf, context::top()->alloc.temp);  {
             str_buf_t str_buf{&buf};
             fmt::dynamic_format_arg_store<fmt::format_context> fmt_args{};
             for (auto arg : *rest) {

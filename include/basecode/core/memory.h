@@ -88,6 +88,12 @@ namespace basecode {
             u32                     end_offset;
         }                           bump;
         struct {
+            u8*                     buf;
+            u8*                     last_alloc;
+            u32                     offset;
+            u32                     end_offset;
+        }                           temp;
+        struct {
             slab_t*                 tail;
             slab_t*                 head;
             u32                     count;

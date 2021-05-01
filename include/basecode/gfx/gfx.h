@@ -124,7 +124,6 @@ namespace basecode::gfx {
         render_callback_t       on_render;
         str::slice_t            short_name;
         str::slice_t            title;
-        str_t                   scratch;
         window_t                window;
         vec4_t                  bg_color;
         f64                     ticks;

@@ -181,6 +181,31 @@ namespace basecode {
                                          "The type of system used by this allocator."_ss);
             }
             switch (alloc->system->type) {
+                case alloc_type_t::temp: {
+                    auto sc = &alloc->subclass.temp;
+                    if (prop_editor::read_only(*editor, "Buffer Pointer", (u0*) sc->buf)) {
+                        prop_editor::description(*editor,
+                                                 "Pointer to the backing memory this temp allocator "
+                                                 "will parcel out."_ss);
+                    }
+                    if (prop_editor::read_only(*editor, "Last Allocated", (u0*) sc->last_alloc)) {
+                        prop_editor::description(*editor,
+                                                 "Pointer to the last allocated block.  Used to "
+                                                 "enable realloc for this most recently allocated block."_ss);
+                    }
+                    if (prop_editor::read_only(*editor, "Buffer Offset", sc->offset)) {
+                        prop_editor::description(*editor,
+                                                 "The offset from the Buffer Pointer that "
+                                                 "will be the base pointer for the next allocation."_ss);
+                    }
+                    if (prop_editor::read_only(*editor, "Buffer End Offset", sc->end_offset)) {
+                        prop_editor::description(*editor,
+                                                 "Any allocation that would exceed this offset will"
+                                                 " assert in debug builds. Don't ever let this condition happen "
+                                                 "in a release build!"_ss);
+                    }
+                    break;
+                }
                 case alloc_type_t::bump: {
                     auto sc = &alloc->subclass.bump;
                     if (prop_editor::read_only(*editor, "Buffer Pointer", (u0*) sc->buf)) {

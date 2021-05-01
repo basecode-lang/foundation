@@ -27,7 +27,7 @@ TEST_CASE("basecode::term basics", "[term]") {
     defer(term::free(term));
 
     str_t str{};
-    str::init(str);
+    str::init(str, context::top()->alloc.temp);
 
     {
         str_buf_t buf(&str);

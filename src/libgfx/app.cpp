@@ -24,6 +24,7 @@
 #include <basecode/core/scm/types.h>
 #include <basecode/core/scm/system.h>
 #include <basecode/core/memory/meta.h>
+#include <basecode/core/memory/system/temp.h>
 #include <basecode/core/scm/modules/config.h>
 #include <basecode/gfx/imgui/imgui_freetype.h>
 #include <basecode/gfx/imgui/imgui_internal.h>
@@ -74,8 +75,6 @@ namespace basecode::gfx::app {
 
         glfwDestroyWindow(app.window.backing);
         glfwTerminate();
-
-        str::free(app.scratch);
     }
 
     status_t run(app_t& app) {
@@ -117,6 +116,7 @@ namespace basecode::gfx::app {
             }
 
             glfwSwapBuffers(app.window.backing);
+            memory::temp::reset(context::top()->alloc.temp);
         }
 
         return status_t::ok;
@@ -144,9 +144,6 @@ namespace basecode::gfx::app {
             f32(120 * sc),
             f32(255 * sc)
         };
-
-        str::init(app.scratch, app.alloc);
-        str::reserve(app.scratch, 64);
 
         if (!OK(load_config(app))) {
             log::error("load_config failed");
