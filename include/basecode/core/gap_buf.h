@@ -20,67 +20,50 @@
 
 #include <basecode/core/memory.h>
 
-namespace basecode {
-    struct gap_t final {
-        u32                     start;
-        u32                     end;
-    };
+namespace basecode::gap_buf {
+    u0 free(gap_buf_t& buf);
 
-    struct gap_buf_t final {
-        alloc_t*                alloc;
-        u8*                     data;
-        gap_t                   gap;
-        u32                     size;
-        u32                     caret;
-        u32                     capacity;
-        u32                     gap_size;
-    };
+    u8 caret_curr(gap_buf_t& buf);
 
-    namespace gap_buf {
-        u0 free(gap_buf_t& buf);
+    u8 caret_next(gap_buf_t& buf);
 
-        u8 caret_curr(gap_buf_t& buf);
+    u8 caret_prev(gap_buf_t& buf);
 
-        u8 caret_next(gap_buf_t& buf);
+    u0 print(const gap_buf_t& buf);
 
-        u8 caret_prev(gap_buf_t& buf);
+    u0 gap_to_caret(gap_buf_t& buf);
 
-        u0 print(const gap_buf_t& buf);
+    u32 caret_offset(gap_buf_t& buf);
 
-        u0 gap_to_caret(gap_buf_t& buf);
+    u32 gap_size(const gap_buf_t& buf);
 
-        u32 caret_offset(gap_buf_t& buf);
+    u0 caret_put(gap_buf_t& buf, u8 value);
 
-        u32 gap_size(const gap_buf_t& buf);
+    u0 caret_insert(gap_buf_t& buf, u8 value);
 
-        u0 caret_put(gap_buf_t& buf, u8 value);
+    u0 caret_move(gap_buf_t& buf, u32 offset);
 
-        u0 caret_insert(gap_buf_t& buf, u8 value);
+    u0 caret_delete(gap_buf_t& buf, u32 size);
 
-        u0 caret_move(gap_buf_t& buf, u32 offset);
+    u0 grow(gap_buf_t& buf, u32 new_capacity);
 
-        u0 caret_delete(gap_buf_t& buf, u32 size);
+    u0 caret_replace(gap_buf_t& buf, u8 value);
 
-        u0 grow(gap_buf_t& buf, u32 new_capacity);
+    u0 gap_expand(gap_buf_t& buf, u32 new_size);
 
-        u0 caret_replace(gap_buf_t& buf, u8 value);
+    u0 reserve(gap_buf_t& buf, u32 new_capacity);
 
-        u0 gap_expand(gap_buf_t& buf, u32 new_size);
+    status_t init(gap_buf_t& buf,
+                  u32 gap_size = 16,
+                  alloc_t* alloc = context::top()->alloc.main);
 
-        u0 reserve(gap_buf_t& buf, u32 new_capacity);
-
-        status_t init(gap_buf_t& buf,
-                      u32 gap_size = 16,
-                      alloc_t* alloc = context::top()->alloc.main);
-
-        u0 caret_insert(gap_buf_t& buf, const String_Concept auto& value) {
-            gap_to_caret(buf);
-            auto length = value.length;
-            if (length > gap_size(buf))
-                gap_expand(buf, length);
-            u32 i{};
-            while (i < length)
-                caret_put(buf, value[i++]);
-        }
+    u0 caret_insert(gap_buf_t& buf, const String_Concept auto& value) {
+        gap_to_caret(buf);
+        auto length = value.length;
+        if (length > gap_size(buf))
+            gap_expand(buf, length);
+        u32 i{};
+        while (i < length)
+            caret_put(buf, value[i++]);
     }
 }

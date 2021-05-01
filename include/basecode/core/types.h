@@ -690,13 +690,52 @@ namespace basecode {
     // assoc_array
     //
     // ------------------------------------------------------------------------
-    template <typename V>
-    struct assoc_pair_t;
+    struct assoc_key_idx_t final {
+        u64                         status: 2;
+        u64                         offset: 31;
+        u64                         length: 31;
+    };
 
     template <typename V>
-    struct assoc_array_t;
+    struct assoc_pair_t final {
+        using Value_Type            = std::remove_pointer_t<V>;
 
-    struct assoc_key_idx_t;
+        str::slice_t                key;
+        Value_Type*                 value;
+    };
+
+    template <typename V>
+    struct assoc_array_t final {
+        using Value_Type            = V;
+
+        alloc_t*                    alloc;
+        Value_Type*                 values;
+        assoc_key_idx_t*            index;
+        struct {
+            u8*                     data;
+            u32                     size;
+            u32                     capacity;
+        }                           keys;
+        u32                         size;
+        u32                         capacity;
+
+        assoc_pair_t<Value_Type> operator[](u32 i) const {
+            const auto& idx = index[i];
+            if constexpr (std::is_pointer_v<Value_Type>) {
+                return assoc_pair_t<V>{
+                    slice::make(keys.data + idx.offset, idx.length),
+                    values[i]
+                };
+            } else {
+                return assoc_pair_t<V>{
+                    slice::make(keys.data + idx.offset, idx.length),
+                    &values[i]
+                };
+            }
+        }
+    };
+    static_assert(sizeof(assoc_array_t<s32>) <= 48,
+                  "assoc_array_t is now greater than 48 bytes!");
 
     // ------------------------------------------------------------------------
     //
@@ -1147,8 +1186,20 @@ namespace basecode {
     // gap_buf
     //
     // ------------------------------------------------------------------------
-    struct gap_t;
-    struct gap_buf_t;
+    struct gap_t final {
+        u32                     start;
+        u32                     end;
+    };
+
+    struct gap_buf_t final {
+        alloc_t*                alloc;
+        u8*                     data;
+        gap_t                   gap;
+        u32                     size;
+        u32                     caret;
+        u32                     capacity;
+        u32                     gap_size;
+    };
 
     namespace gap_buf {
         enum class status_t : u8 {
@@ -1354,7 +1405,11 @@ namespace basecode {
     // leb128
     //
     // ------------------------------------------------------------------------
-    struct leb128_t;
+    struct leb128_t final {
+        u8                      data[16];
+        u32                     size;
+        b8                      is_signed;
+    };
 
     namespace leb {
         constexpr u8 sign_bit         = 0x40;
