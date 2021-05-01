@@ -19,7 +19,6 @@
 #include <catch.hpp>
 #include <basecode/core/list.h>
 #include <basecode/core/defer.h>
-#include <basecode/core/slice.h>
 #include <basecode/core/format.h>
 #include <basecode/core/stopwatch.h>
 #include "test.h"

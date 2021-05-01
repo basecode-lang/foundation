@@ -30,3 +30,6 @@ namespace basecode {
                                                       fmt_alloc_t>;
     using fmt_dyn_args_t    = fmt::dynamic_format_arg_store<fmt_ctx_t>;
 }
+
+FORMAT_TYPE_AS(basecode::str_t, std::string_view);
+FORMAT_TYPE_AS(basecode::str::slice_t, std::string_view);

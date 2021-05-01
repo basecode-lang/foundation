@@ -19,7 +19,6 @@
 #pragma once
 
 #include <basecode/core/types.h>
-#include <basecode/core/slice.h>
 
 namespace basecode::numbers {
     namespace fp {

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/slice.h>
+#include <basecode/core/slice_utils.h>
 
 namespace basecode::slice {
     b8 to_fields(const str::slice_t& value,

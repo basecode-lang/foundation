@@ -30,6 +30,7 @@
 #include <cstdio>
 #include <memory>
 #include <chrono>
+#include <glob.h>
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
@@ -126,6 +127,14 @@
             return fmt::formatter<Base, Char>::format(val, ctx);                \
         }                                                                       \
     }
+
+#define WITH_SLICE_AS_CSTR(Slice, Code) \
+        [&](str::slice_t s) -> void {                                           \
+            s8 Slice[s.length + 1];                                             \
+            std::memcpy(Slice, s.data, s.length);                               \
+            Slice[s.length] = '\0';                                             \
+            Code;                                                               \
+        }(Slice)
 
 #if !defined(__cpp_lib_bit_cast)
 namespace std {
@@ -259,6 +268,36 @@ namespace basecode {
 
     // ------------------------------------------------------------------------
     //
+    // context
+    //
+    // ------------------------------------------------------------------------
+    struct alloc_t;
+    struct logger_t;
+
+    struct context_t {
+        struct {
+            alloc_t*            main;
+            alloc_t*            temp;
+            alloc_t*            scratch;
+        }                       alloc;
+        logger_t*               logger;
+        u0*                     user;
+        const s8**              argv;
+        s32                     argc;
+    };
+
+    namespace context {
+        inline u0 pop();
+
+        inline context_t* top();
+
+        inline u0 push(context_t* ctx);
+
+        inline context_t make(s32 argc, const s8** argv);
+    }
+
+    // ------------------------------------------------------------------------
+    //
     // alloc_t, std_alloc_t
     //
     // ------------------------------------------------------------------------
@@ -300,8 +339,6 @@ namespace basecode {
     // str_t, slice_t
     //
     // ------------------------------------------------------------------------
-    struct str_t;
-
     template <typename T>
     concept Slice_Concept = std::same_as<typename T::Is_Static,
                                          std::true_type>
@@ -353,8 +390,169 @@ namespace basecode {
     static_assert(sizeof(slice_t<u8>) <= 16,
                   "slice_t<T> is now larger than 16 bytes!");
 
+    template <typename T>
+    inline b8 operator<(const slice_t<T>& lhs, const slice_t<T>& rhs) {
+        if (&lhs == &rhs) return false;
+        if (lhs.length < rhs.length) return true;
+        return std::memcmp(lhs.data, rhs.data, lhs.length) < 0;
+    }
+
+    template <typename T>
+    inline b8 operator>(const slice_t<T>& lhs, const slice_t<T>& rhs) {
+        if (&lhs == &rhs) return false;
+        if (lhs.length > rhs.length) return true;
+        return std::memcmp(lhs.data, rhs.data, lhs.length) > 0;
+    }
+
+    template <typename T>
+    inline b8 operator==(const slice_t<T>& lhs, const slice_t<T>& rhs) {
+        if (&lhs == &rhs) return true;
+        return lhs.length == rhs.length
+               && std::memcmp(lhs.data, rhs.data, lhs.length) == 0;
+    }
+
+    struct str_t;
+
     namespace str {
         using slice_t = slice_t<u8>;
+
+        template <String_Concept T,
+                  b8 Is_Static = T::Is_Static::value>
+        u0 free(T& str);
+
+        template <Dynamic_String_Concept T>
+        u0 grow(T& str, u32 min_capacity = 8);
+
+        template <String_Concept D, String_Concept S>
+        inline u0 append(D& str, const S& value);
+
+        template <String_Concept T,
+                  b8 Is_Static = T::Is_Static::value>
+        u0 append(T& str, const u8* value, s32 len = -1);
+
+        template <String_Concept T>
+        inline u0 append(T& str, const s8* value, s32 len = -1);
+
+        str_t make(alloc_t* alloc = context::top()->alloc.main);
+
+        template <String_Concept T,
+                  b8 Is_Static = T::Is_Static::value>
+        u0 init(T& str, alloc_t* alloc = context::top()->alloc.main);
+
+        template <String_Concept T,
+                  b8 Is_Static = T::Is_Static::value>
+        u0 insert(T& str, u32 pos, const u8* value, s32 len = -1);
+    }
+
+    struct str_t final {
+        using Is_Static         = std::integral_constant<b8, false>;
+
+        alloc_t*                alloc{};
+        u8*                     data{};
+        u32                     length{};
+        u32                     capacity{};
+
+        str_t() = default;
+        ~str_t()                                        { str::free(*this); }
+        str_t(str_t&& other) noexcept                   { operator=(other); }
+        str_t(const str_t& other) : alloc(other.alloc)  { operator=(other); }
+
+        explicit str_t(const s8* value,
+                       alloc_t* alloc = context::top()->alloc.main);
+
+        explicit str_t(str::slice_t value,
+                       alloc_t* alloc = context::top()->alloc.main);
+
+        u8* end()                               { return data + length; }
+        u8* rend()                              { return data; }
+        u8* begin()                             { return data; }
+        u8* rbegin()                            { return data + length; }
+        [[nodiscard]]
+        const u8* end() const                   { return data + length; }
+        [[nodiscard]]
+        const u8* rend() const                  { return data; }
+        [[nodiscard]]
+        const u8* begin() const                 { return data; }
+        [[nodiscard]]
+        const u8* rbegin() const                { return data + length; }
+        u8& operator[](u32 index)               { return data[index]; }
+        operator str::slice_t() const           { return str::slice_t{data,
+                                                                      length};  }
+        operator std::string_view () const      { return std::string_view((const s8*) data,
+                                                                          length); }
+        const u8& operator[](u32 index) const   { return data[index]; }
+
+        str_t& operator=(const str_t& other);
+
+        str_t& operator=(str_t&& other) noexcept;
+
+        str_t& operator=(const str::slice_t& other);
+
+        inline str_t& operator+(const str_t& other);
+
+        inline auto operator==(const char* other) const {
+            const auto n = strlen(other);
+            return length == n && std::memcmp(data, other, length) == 0;
+        }
+
+        inline auto operator==(const str_t& other) const {
+            const auto cmp = std::lexicographical_compare_three_way(begin(),
+                                                                    end(),
+                                                                    other.begin(),
+                                                                    other.end());
+            return cmp == std::strong_ordering::equal;
+        }
+
+        inline auto operator<=>(const str_t& other) const {
+            return std::lexicographical_compare_three_way(begin(),
+                                                          end(),
+                                                          other.begin(),
+                                                          other.end());
+        }
+
+        inline auto operator==(const slice_t<u8>& other) const {
+            return length == other.length
+                   && std::memcmp(data, other.data, length) == 0;
+        }
+    };
+    static_assert(sizeof(str_t) <= 24, "str_t is now larger than 24 bytes!");
+
+    namespace slice {
+        template<typename T>
+        inline b8 empty(const slice_t<T>& slice) {
+            return slice.length == 0 || slice.data == nullptr;
+        }
+
+        inline str::slice_t make(const str_t& str) {
+            return str::slice_t{.data = str.data, .length = str.length};
+        }
+
+        inline str::slice_t make(const u8* str, u32 length) {
+            return str::slice_t{.data = str, .length = length};
+        }
+
+        inline b8 contains(const str::slice_t& slice, s8 ch) {
+            for (u32 i = 0; i < slice.length; ++i) {
+                if (slice[i] == ch)
+                    return true;
+            }
+            return false;
+        }
+
+        inline str::slice_t make(const s8* str, s32 length = -1) {
+            return str::slice_t{
+                .data = (const u8*) str,
+                .length = length == -1 ? u32(strlen(str)) : length
+            };
+        }
+    }
+
+    inline str::slice_t operator "" _ss(const s8* value) {
+        return slice::make(value);
+    }
+
+    inline str::slice_t operator "" _ss(const s8* value, std::size_t length) {
+        return slice::make(value, length);
     }
 
     using line_callback_t = std::function<b8 (str::slice_t)>;
@@ -728,23 +926,6 @@ namespace basecode {
 
     // ------------------------------------------------------------------------
     //
-    // context
-    //
-    // ------------------------------------------------------------------------
-    struct context_t {
-        struct {
-            alloc_t*        main;
-            alloc_t*        temp;
-            alloc_t*        scratch;
-        }                   alloc;
-        logger_t*           logger;
-        u0*                 user;
-        const s8**          argv;
-        s32                 argc;
-    };
-
-    // ------------------------------------------------------------------------
-    //
     // decimal
     //
     // ------------------------------------------------------------------------
@@ -927,7 +1108,12 @@ namespace basecode {
     // filesys
     //
     // ------------------------------------------------------------------------
-    struct glob_result_t;
+    struct glob_result_t final {
+        glob_t                  buf;
+        array_t<str_t>          paths;
+    };
+    static_assert(sizeof(glob_result_t) <= 112,
+                  "glob_result_t is now bigger than 112 bytes!");
 
     namespace filesys {
         enum class status_t : u8 {
@@ -2124,7 +2310,9 @@ namespace basecode {
         inline u64 hash64(const decimal_t& key);
 
         template <typename T>
-        inline u64 hash64(const slice_t<T>& key);
+        inline u64 hash64(const slice_t<T>& key) {
+            return murmur::hash64(key.data, key.length);
+        }
 
         inline u64 hash64(const locale_key_t& key);
 

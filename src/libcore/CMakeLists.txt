@@ -217,7 +217,6 @@ set(
     scm/modules/basic.cpp ${CORE_INC_DIR}/scm/modules/basic.h
     scm/modules/config.cpp ${CORE_INC_DIR}/scm/modules/config.h
 
-    ${CORE_INC_DIR}/slice.h
     slice_utils.cpp ${CORE_INC_DIR}/slice_utils.h
 
     ${CORE_INC_DIR}/sql.h

@@ -20,7 +20,6 @@
 
 #include <basecode/core/env.h>
 #include <basecode/core/array.h>
-#include <basecode/core/slice.h>
 #include <basecode/core/format.h>
 #include <basecode/core/hashtab.h>
 

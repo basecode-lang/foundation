@@ -1,5 +1,8 @@
 HIGH
 ---------
+- filesys: implement glob function, which will also touch the init and fini functions for the
+            filesys module.
+
 - macro: need an any/variant type that doesn't suck
 - macro: text macro system
 
@@ -38,9 +41,6 @@ HIGH
 - scm: extend emitter to support append (default) or insert modes
 
 - libgfx: pull in nfd or rewrite based on nfd_extended
-
-- filesys: implement glob function, which will also touch the init and fini functions for the
-            filesys module.
 
 MEDIUM
 ---------

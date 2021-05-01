@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <basecode/core/slice.h>
 #include <basecode/core/scm/scm.h>
 #include <basecode/core/string.h>
 #include <basecode/core/context.h>

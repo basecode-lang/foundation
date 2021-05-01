@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <basecode/core/slice.h>
 #include <basecode/core/intern.h>
 #include <basecode/core/format.h>
 

@@ -57,6 +57,10 @@ namespace basecode {
             }
         };
 
+        Value_Type& operator[](u32 bucket_idx) {
+            return values[bucket_idx];
+        }
+
         const Pair_Type operator[](u32 idx)  const {
             b8 ok{};
             while (idx < capacity) {

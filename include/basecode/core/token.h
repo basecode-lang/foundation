@@ -19,7 +19,6 @@
 #pragma once
 
 #include <basecode/core/types.h>
-#include <basecode/core/slice.h>
 #include <basecode/core/array.h>
 #include <basecode/core/context.h>
 #include <basecode/core/src_loc.h>
