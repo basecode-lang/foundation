@@ -31,3 +31,16 @@ TEST_CASE("basecode::filesys basics") {
         format_env(xdg_env);
     }
 }
+
+#ifdef _WIN32
+TEST_CASE("basecode::filesys glob") {
+    glob_result_t r{};
+    filesys::glob::init(r);
+    defer(filesys::glob::free(r));
+
+    TIME_BLOCK("glob for c:\\temp\\*.png"_ss,
+               REQUIRE(OK(filesys::glob::find(r, "c:\\\\temp\\\\*.png"_ss)));
+               for (const auto& path : r.paths)
+                   format::print("{}\n", path));
+}
+#endif

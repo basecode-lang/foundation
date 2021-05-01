@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <glob.h>
 #include <unistd.h>
 #include <basecode/core/path.h>
 

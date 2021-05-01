@@ -1178,6 +1178,7 @@ namespace basecode {
             xdg_user_dirs_invalid           = 134,
             no_home_path                    = 135,  // FIXME
             invalid_user_place              = 136,  // FIXME
+            glob_no_match                   = 137,  // FIXME
         };
     }
 

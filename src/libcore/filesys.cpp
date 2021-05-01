@@ -29,11 +29,7 @@
 #include <basecode/core/env.h>
 #include <basecode/core/buf.h>
 #include <basecode/core/utf.h>
-#include <basecode/core/array.h>
-#include <basecode/core/symtab.h>
-#include <basecode/core/hashtab.h>
 #include <basecode/core/filesys.h>
-#include <basecode/core/slice_utils.h>
 
 namespace basecode::filesys {
     struct system_t final {
@@ -64,12 +60,20 @@ namespace basecode::filesys {
         }
 
         status_t find(glob_result_t& r, str::slice_t pattern, u32 flags) {
-            if ((flags & GLOB_APPEND) == 0) reset(r);
-            WITH_SLICE_AS_CSTR(pattern,
-                               ::glob(pattern, flags, nullptr, &r.buf));
-            for (u32 i = r.buf.gl_offs; i < r.buf.gl_pathc; ++i)
-                array::append(r.paths, (str_t) r.buf.gl_pathv[i]);
-            return status_t::ok;
+            if ((flags & GLOB_APPEND) == 0)
+                reset(r);
+            str_t temp{};
+            str::init(temp, t_file_sys.alloc);
+            defer(str::free(temp));
+            str::reserve(temp, pattern.length);
+            str::append(temp, pattern);
+            auto rc = ::glob(str::c_str(temp), flags, nullptr, &r.buf);
+            if (rc == 0) {
+                for (u32 i = 0; i < r.buf.gl_pathc; ++i)
+                    array::append(r.paths, (str_t) r.buf.gl_pathv[i]);
+                return status_t::ok;
+            }
+            return status_t::glob_no_match;
         }
     }
 
