@@ -62,8 +62,6 @@ set(
 
     ${CORE_INC_DIR}/avl.h
 
-    ${CORE_INC_DIR}/src_loc.h
-
     ast.cpp ${CORE_INC_DIR}/ast.h
 
     ${CORE_INC_DIR}/array.h

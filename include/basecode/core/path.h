@@ -25,28 +25,6 @@
 #include <basecode/core/array.h>
 
 namespace basecode {
-#ifdef _WIN32
-    constexpr s8 path_sep = '\\';
-#else
-    constexpr s8 path_sep = '/';
-#endif
-
-    struct path_mark_t final {
-        u16                     type:       4;
-        u16                     value:      12;
-    };
-
-    struct path_t final {
-        str_t                   str;
-        path_mark_list_t        marks;
-
-        b8 operator==(const path_t& other) const {
-            return str == other.str;
-        }
-    };
-    static_assert(sizeof(path_t) <= 48,
-                  "path_t is now larger than 48 bytes!");
-
     namespace path {
         u0 free(path_t& path);
 
@@ -175,6 +153,4 @@ namespace basecode {
         return path;
     }
 }
-
-FORMAT_TYPE(basecode::path_t, format_to(ctx.out(), "{}", data.str));
 

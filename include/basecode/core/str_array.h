@@ -47,10 +47,3 @@ namespace basecode {
         }
     }
 }
-
-FORMAT_TYPE(basecode::str_array_t,
-    for (basecode::u32 i = 0; i < data.size; ++i) {
-        if (i > 0) format_to(ctx.out(), ",");
-        format_to(ctx.out(), "{}", data[i]);
-    });
-

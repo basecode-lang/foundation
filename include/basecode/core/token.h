@@ -21,7 +21,6 @@
 #include <basecode/core/types.h>
 #include <basecode/core/array.h>
 #include <basecode/core/context.h>
-#include <basecode/core/src_loc.h>
 #include <basecode/core/hash/murmur.h>
 
 #define TOKEN_CLS(t)            (u32((t)) >> 16U & 0xffffU)

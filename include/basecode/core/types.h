@@ -1610,6 +1610,28 @@ namespace basecode {
     using path_array_t          = array_t<path_t>;
     using path_mark_list_t      = array_t<path_mark_t>;
 
+#ifdef _WIN32
+    constexpr s8 path_sep       = '\\';
+#else
+    constexpr s8 path_sep       = '/';
+#endif
+
+    struct path_mark_t final {
+        u16                     type:       4;
+        u16                     value:      12;
+    };
+
+    struct path_t final {
+        str_t                   str;
+        path_mark_list_t        marks;
+
+        b8 operator==(const path_t& other) const {
+            return str == other.str;
+        }
+    };
+    static_assert(sizeof(path_t) <= 48,
+                  "path_t is now larger than 48 bytes!");
+
     namespace path {
         namespace marks {
             [[maybe_unused]] constexpr u16 none         = 0;
@@ -2131,7 +2153,19 @@ namespace basecode {
     // uuid
     //
     // ------------------------------------------------------------------------
-    struct uuid_t;
+    struct uuid_t final {
+        u32                     data1;
+        u16                     data2;
+        u16                     data3;
+        u8                      data4[8];
+
+        b8 operator==(const uuid_t& other) const {
+            return data1 == other.data1
+                   && data2 == other.data2
+                   && data3 == other.data3
+                   && std::memcmp(data4, other.data4, 8) == 0;
+        }
+    };
 
     namespace uuid {
         enum class status_t : u32 {

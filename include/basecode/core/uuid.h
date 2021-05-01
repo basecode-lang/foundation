@@ -18,39 +18,14 @@
 
 #pragma once
 
-#include <basecode/core/str.h>
+#include <basecode/core/types.h>
 
-namespace basecode {
-    struct uuid_t final {
-        u32                     data1;
-        u16                     data2;
-        u16                     data3;
-        u8                      data4[8];
+namespace basecode::uuid {
+    uuid_t make();
 
-        b8 operator==(const uuid_t& other) const {
-            return data1 == other.data1
-                && data2 == other.data2
-                && data3 == other.data3
-                && std::memcmp(data4, other.data4, 8) == 0;
-        }
-    };
+    status_t parse(const s8* str, uuid_t* u);
 
-    namespace uuid {
-        uuid_t make();
-
-        status_t parse(const s8* str, uuid_t* u);
-
-        status_t parse(const String_Concept auto& str, uuid_t* u) {
-            return parse((const s8*) str.data, u);
-        }
+    status_t parse(const String_Concept auto& str, uuid_t* u) {
+        return parse((const s8*) str.data, u);
     }
 }
-
-FORMAT_TYPE(basecode::uuid_t,
-    format_to(ctx.out(),
-              "{{{:08X}-{:04X}-{:04X}-{:02X}{:02X}-{:02X}{:02X}{:02X}{:02X}{:02X}{:02X}}}",
-              data.data1,
-              data.data2,
-              data.data3,
-              data.data4[0], data.data4[1], data.data4[2], data.data4[3],
-              data.data4[4], data.data4[5], data.data4[6], data.data4[7]));

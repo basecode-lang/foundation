@@ -102,9 +102,11 @@ namespace basecode::path {
     b8 is_only_root(const path_t& path) {
 #ifdef _WIN32
         return path.marks.size == 1
-            && (path.marks[0].type == path::marks::drive_name || path.marks[0].type == path::marks::root_part);
+               && (path.marks[0].type == path::marks::drive_name
+                   || path.marks[0].type == path::marks::root_part);
 #else
-        return path.marks.size == 1 && path.marks[0].type == path::marks::root_part;
+        return path.marks.size == 1
+               && path.marks[0].type == path::marks::root_part;
 #endif
     }
 
@@ -125,7 +127,8 @@ namespace basecode::path {
         else
             ++last_path_idx;
         auto temp = slice::make(path.str.data + last_path_idx,
-                                u32(ext_idx != -1 ? ext_idx - last_path_idx : path.str.length));
+                                u32(ext_idx != -1 ? ext_idx - last_path_idx :
+                                    path.str.length));
         return temp;
     }
 
@@ -136,13 +139,15 @@ namespace basecode::path {
             last_path_idx = 0;
         else
             ++last_path_idx;
-        auto temp = slice::make(path.str.data + last_path_idx, u32(path.str.length - last_path_idx));
+        auto temp = slice::make(path.str.data + last_path_idx,
+                                u32(path.str.length - last_path_idx));
         return temp;
     }
 
     str::slice_t directory(const path_t& path) {
         if (empty(path)) return {};
-        const auto last_path_idx = find_last_mark_index(path, path::marks::path_part);
+        const auto last_path_idx = find_last_mark_index(path,
+                                                        path::marks::path_part);
         if (last_path_idx == -1)
             return {};
         return str::slice_t{.data = path.str.data, .length = u32(last_path_idx)};
@@ -152,7 +157,8 @@ namespace basecode::path {
         if (empty(path))    return {};
         auto ext_idx = find_mark_index(path, path::marks::extension);
         if (ext_idx == -1)  return {};
-        return str::slice_t{.data = path.str.data + ext_idx, .length = u32(path.str.length - ext_idx)};
+        return str::slice_t{.data = path.str.data + ext_idx,
+                            .length = u32(path.str.length - ext_idx)};
     }
 
     status_t init(path_t& path, alloc_t* alloc) {
@@ -207,7 +213,8 @@ namespace basecode::path {
 
     status_t set(path_t& path, const s8* value, s32 len) {
         return set(path,
-                   slice::make((const u8*) value, len == -1 ? strlen(value) : len));
+                   slice::make((const u8*) value,
+                               len == -1 ? strlen(value) : len));
     }
 
     s32 find_last_mark_index(const path_t& path, u8 type) {
@@ -219,8 +226,10 @@ namespace basecode::path {
     }
 
     status_t parent_path(const path_t& path, path_t& new_path) {
-        if (empty(path))                                        return status_t::unexpected_empty_path;
-        if (path.str.length == 1 || array::empty(path.marks))   return status_t::no_parent_path;
+        if (empty(path))
+            return status_t::unexpected_empty_path;
+        if (path.str.length == 1 || array::empty(path.marks))
+            return status_t::no_parent_path;
         auto len = find_last_mark_index(path, path::marks::path_part);
         if (len == -1)
             return status_t::no_parent_path;

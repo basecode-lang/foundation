@@ -20,7 +20,6 @@
 
 #include <basecode/core/array.h>
 #include <basecode/core/context.h>
-#include <basecode/core/src_loc.h>
 
 namespace basecode::error {
     namespace system {
