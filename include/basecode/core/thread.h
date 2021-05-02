@@ -24,34 +24,35 @@
 
 namespace basecode {
     struct proc_base_t {
-        virtual ~proc_base_t() = default;
-
         virtual u0* invoke() = 0;
 
         virtual thread_t* self() = 0;
+
+        virtual ~proc_base_t() = default;
     };
 
     template <typename Proc, typename... Args>
     struct thread_proc_t final : public proc_base_t {
-        static constexpr b8     Is_Void = std::is_void_v<std::invoke_result_t<Proc,
-                                                                              Args...>>;
+        using Result_Type       = std::invoke_result_t<Proc, Args...>;
+        static
+        constexpr b8            Is_Void = std::is_void_v<Result_Type>;
 
-        using proc_t            = Proc;
-        using args_t            = std::tuple<Args...>;
-        using return_t          = typename std::conditional<Is_Void,
+        using Proc_Type         = Proc;
+        using Args_Type         = std::tuple<Args...>;
+        using Return_Type       = typename std::conditional<Is_Void,
                                                             int,
-                                                            std::invoke_result_t<Proc, Args...>>::type;
+                                                            Result_Type>::type;
 
         thread_t*               thread;
-        proc_t                  proc;
-        args_t                  args;
-        return_t                ret_val;
+        Proc_Type               proc;
+        Args_Type               args;
+        Return_Type             ret_val;
 
         thread_proc_t(thread_t* thread,
-                      proc_t proc,
-                      args_t args) : thread(thread),
-                                     proc(proc),
-                                     args(std::move(args)) {
+                      Proc_Type proc,
+                      Args_Type args) : thread(thread),
+                                        proc(proc),
+                                        args(std::move(args)) {
         }
 
         u0* invoke() override {
@@ -120,9 +121,12 @@ namespace basecode {
 
         template <typename Ret>
         status_t join(thread_t& thread, Ret& ret_val) {
-            if (!thread.joinable)   return status_t::not_joinable;
-            if (thread.detached)    return status_t::already_detached;
-            if (thread.joined)      return status_t::already_joined;
+            if (!thread.joinable)
+                return status_t::not_joinable;
+            if (thread.detached)
+                return status_t::already_detached;
+            if (thread.joined)
+                return status_t::already_joined;
             u0* ret{};
             auto status = system::join(thread, &ret);
             if (OK(status))
@@ -146,13 +150,13 @@ namespace basecode {
                 return status_t::name_too_long;
             thread.pad        = 0;
             thread.proc       = {};
+            thread.name       = (str::slice_t) name;
+            thread.state      = thread_state_t::created;
             thread.joined     = false;
             thread.canceled   = false;
             thread.detached   = false;
             thread.joinable   = true;
             thread.cancelable = true;
-            thread.name       = (str::slice_t) name;
-            thread.state      = thread_state_t::created;
             return status_t::ok;
         }
     }

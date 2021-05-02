@@ -26,8 +26,9 @@ namespace basecode {
                      s32 line,
                      const s8* msg,
                      const fmt_args_t& args) {
+        auto alloc = memory::system::temp_alloc();
         str_t buf{};
-        str::init(buf, memory::system::temp_alloc()); {
+        str::init(buf, alloc); {
             str_buf_t sb(&buf);
             format::format_to(sb, "{}({}): {}: ", file, line, prefix);
             if (condition)
@@ -35,7 +36,6 @@ namespace basecode {
             if (msg)
                 fmt::vformat_to(sb, msg, args);
         }
-        format::print(stderr, "{}\n", buf);
-        str::free(buf);
+        format::print(alloc, stderr, "{}\n", buf);
     }
 }

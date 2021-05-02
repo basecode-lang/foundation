@@ -306,7 +306,6 @@ namespace basecode::cxx {
     struct program_t final {
         bass_t                  storage;
         module_array_t          modules;
-        str_t                   scratch;
         alloc_t*                alloc;
         u32                     id;
     };
@@ -315,7 +314,6 @@ namespace basecode::cxx {
         bass_t*                 store;
         alloc_t*                alloc;
         symtab_t<str_t>         modules;
-        str_t                   scratch[2];
         u32                     line;
         u16                     indent;
         u16                     column;

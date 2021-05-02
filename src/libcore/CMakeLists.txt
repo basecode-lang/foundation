@@ -90,7 +90,7 @@ set(
 
     buf_pool.cpp ${CORE_INC_DIR}/buf_pool.h
 
-    ${CORE_INC_DIR}/context.h
+    context.cpp ${CORE_INC_DIR}/context.h
 
     cxx/scope.cpp
     cxx/module.cpp
@@ -246,6 +246,8 @@ set(
     utf.cpp ${CORE_INC_DIR}/utf.h
 
     uuid.cpp ${CORE_INC_DIR}/uuid.h
+
+    ${CORE_INC_DIR}/variant.h
 
     wasm/wasm.cpp ${CORE_INC_DIR}/wasm/wasm.h
     wasm/decoder.cpp ${CORE_INC_DIR}/wasm/decoder.h

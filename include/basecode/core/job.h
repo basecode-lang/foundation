@@ -37,21 +37,25 @@ namespace basecode {
 
     template <typename Proc, typename... Args>
     struct job_task_t : job_task_base_t {
-        static constexpr b8 Is_Void = std::is_void_v<std::invoke_result_t<Proc, Args...>>;
+        using Result_Type       = std::invoke_result_t<Proc, Args...>;
+        static
+        constexpr b8 Is_Void    = std::is_void_v<Result_Type>;
 
-        using proc_t            = Proc;
-        using args_t            = std::tuple<Args...>;
-        using return_t          = typename std::conditional<Is_Void, s32, std::invoke_result_t<Proc, Args...>>::type;
+        using Proc_Type         = Proc;
+        using Args_Type         = std::tuple<Args...>;
+        using Return_Type       = typename std::conditional<Is_Void,
+                                                            s32,
+                                                            Result_Type>::type;
 
         job_t*                  job;
-        proc_t                  proc;
-        args_t                  args;
-        return_t                ret_val;
+        Proc_Type               proc;
+        Args_Type               args;
+        Return_Type             ret_val;
 
-        job_task_t(proc_t proc, args_t args) : job(),
-                                               proc(proc),
-                                               args(std::move(args)),
-                                               ret_val() {
+        job_task_t(Proc_Type proc, Args_Type args) : job(),
+                                                     proc(proc),
+                                                     args(std::move(args)),
+                                                     ret_val() {
         }
 
         u0 run() override {
@@ -101,11 +105,14 @@ namespace basecode {
 
             u0 free_task(job_task_base_t* task);
 
+            status_t make(const s8* label,
+                          s32 len,
+                          job_id& id,
+                          job_id parent_id = {});
+
             status_t start(job_id id, job_task_base_t* task);
 
             status_t init(alloc_t* alloc = context::top()->alloc.main);
-
-            status_t make(const s8* label, s32 len, job_id& id, job_id parent_id = {});
         }
 
         u0 free(job_id id);
@@ -134,11 +141,22 @@ namespace basecode {
         template <typename Proc, typename... Args>
         status_t start(job_id id, Proc proc, Args&&... args) {
             auto mem    = system::alloc_task();
-            auto task   = new(mem) job_task_t(proc, std::forward_as_tuple(args...));
+            auto task   = new(mem) job_task_t(proc,
+                                              std::forward_as_tuple(args...));
             auto status = system::start(id, task);
             if (!OK(status))
                 system::free_task(task);
             return status;
+        }
+
+        status_t make_child(job_id parent_id,
+                            job_id& id,
+                            const String_Concept auto& label = {}) {
+            if (label.length > 0) {
+                return system::make(label.data, label.length, id, parent_id);
+            } else {
+                return system::make(nullptr, 0, id, parent_id);
+            }
         }
 
         u0 init(job_t& job, job_id id, u32 label_id, job_id parent_id);
@@ -148,14 +166,6 @@ namespace basecode {
                 return system::make((const s8*) label.data, label.length, id);
             } else {
                 return system::make(nullptr, 0, id);
-            }
-        }
-
-        status_t make_child(job_id parent_id, job_id& id, const String_Concept auto& label = {}) {
-            if (label.length > 0) {
-                return system::make(label.data, label.length, id, parent_id);
-            } else {
-                return system::make(nullptr, 0, id, parent_id);
             }
         }
     }

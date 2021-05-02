@@ -104,7 +104,7 @@ s32 run(test_suite_t& suite) {
                           log::status_name(status));
         }
 
-        context::top()->logger = log::system::default_logger(););
+        context::top()->logger = log::system::default_logger());
 
     TIME_BLOCK("term::system::init"_ss,
                if (!OK(term::system::init(true)))

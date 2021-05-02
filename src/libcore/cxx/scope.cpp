@@ -91,9 +91,12 @@ namespace basecode::cxx::scope {
         }
 
         u32 float_(scope_t& scope, f64 lit, integral_size_t size) {
-            str_buf_t buf(&scope.pgm->scratch);
-            format::format_to(buf, "{}", lit);
-            auto r = string::interned::fold_for_result(scope.pgm->scratch);
+            str_t scratch{};
+            str::init(scratch, context::top()->alloc.temp); {
+                str_buf_t buf(&scratch);
+                format::format_to(buf, "{}", lit);
+            }
+            auto r = string::interned::fold_for_result(scratch);
             cursor_t c{};
             bass::seek_current(scope.pgm->storage, c);
             bass::new_record(c, element::header::num_lit, 3);
@@ -1147,31 +1150,33 @@ namespace basecode::cxx::scope {
                                  integral_size_t size,
                                  u64 lit,
                                  u32 radix) {
+        str_t scratch{};
+        str::init(scratch, context::top()->alloc.temp);
         switch (size) {
             case integral_size_t::zero:
                 break;
             case integral_size_t::byte:
                 meta_type == meta_type_t::signed_integer ?
-                format::to_radix(scope.pgm->scratch, s8(lit), radix) :
-                format::to_radix(scope.pgm->scratch, u8(lit), radix);
+                    format::to_radix(scratch, s8(lit), radix) :
+                    format::to_radix(scratch, u8(lit), radix);
                 break;
             case integral_size_t::word:
                 meta_type == meta_type_t::signed_integer ?
-                format::to_radix(scope.pgm->scratch, s16(lit), radix) :
-                format::to_radix(scope.pgm->scratch, u16(lit), radix);
+                    format::to_radix(scratch, s16(lit), radix) :
+                    format::to_radix(scratch, u16(lit), radix);
                 break;
             case integral_size_t::dword:
                 meta_type == meta_type_t::signed_integer ?
-                format::to_radix(scope.pgm->scratch, s32(lit), radix) :
-                format::to_radix(scope.pgm->scratch, u32(lit), radix);
+                    format::to_radix(scratch, s32(lit), radix) :
+                    format::to_radix(scratch, u32(lit), radix);
                 break;
             case integral_size_t::qword:
                 meta_type == meta_type_t::signed_integer ?
-                format::to_radix(scope.pgm->scratch, s64(lit), radix) :
-                format::to_radix(scope.pgm->scratch, u64(lit), radix);
+                    format::to_radix(scratch, s64(lit), radix) :
+                    format::to_radix(scratch, u64(lit), radix);
                 break;
         }
-        auto r = string::interned::fold_for_result(scope.pgm->scratch);
+        auto r = string::interned::fold_for_result(scratch);
         cursor_t c{};
         bass::seek_current(scope.pgm->storage, c);
         bass::new_record(c, element::header::num_lit, 4);

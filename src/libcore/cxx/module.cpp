@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/cxx/cxx.h>
-#include <basecode/core/memory/system/proxy.h>
 
 namespace basecode::cxx::module {
     u0 init(module_t& module,

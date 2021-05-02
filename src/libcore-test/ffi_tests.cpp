@@ -54,7 +54,8 @@ TEST_CASE("basecode::ffi basics", "[ffi]") {
         ffi::lib::unload(proc_lib);
         path::free(proc_path);
     });
-    REQUIRE(OK(status));
+    if (!OK(status))
+        REQUIRE(OK(status));
 
     auto u32_type = ffi::param::make_type(param_cls_t::int_, param_size_t::dword);
 
@@ -63,8 +64,10 @@ TEST_CASE("basecode::ffi basics", "[ffi]") {
     ffi::overload::append(dft_overload, ffi::param::make("a"_ss, u32_type));
     ffi::overload::append(dft_overload, ffi::param::make("b"_ss, u32_type));
     status = ffi::proto::append(simple_proto, dft_overload);
-    REQUIRE(OK(status));
-    REQUIRE(dft_overload->func);
+    if (!OK(status))
+        REQUIRE(OK(status));
+    if (!dft_overload->func)
+        REQUIRE(dft_overload->func);
 
     ffi_t vm{};
     ffi::init(vm);
@@ -77,8 +80,10 @@ TEST_CASE("basecode::ffi basics", "[ffi]") {
         ffi::push(vm, 6);
         param_alias_t ret{};
         status = ffi::call(vm, dft_overload, ret);
-        REQUIRE(OK(status));
-        REQUIRE(ret.dw == 30););
+        if (!OK(status))
+            REQUIRE(OK(status));
+        if (ret.dw != 30)
+            REQUIRE(ret.dw == 30););
 }
 
 TEST_CASE("basecode::ffi status names") {

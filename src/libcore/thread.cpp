@@ -37,7 +37,7 @@ namespace basecode::thread {
         auto thread = proc->self();
         t_self = thread;
         auto name = thread->name;
-        WITH_SLICE_AS_CSTR(name, pthread_setname_np(thread->handle, name););
+        WITH_SLICE_AS_CSTR(name, pthread_setname_np(thread->handle, name));
         u0* ret = proc->invoke();
         thread->state = thread_state_t::exited;
         pthread_exit(ret);
@@ -168,8 +168,10 @@ namespace basecode::thread {
     }
 
     status_t cancel(thread_t& thread) {
-        if (!thread.cancelable)  return status_t::not_cancelable;
-        if (thread.canceled)     return status_t::already_canceled;
+        if (!thread.cancelable)
+            return status_t::not_cancelable;
+        if (thread.canceled)
+            return status_t::already_canceled;
         auto rc = pthread_cancel(thread.handle);
         if (rc == 0) {
             thread.canceled = true;

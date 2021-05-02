@@ -53,12 +53,12 @@ namespace basecode::error {
                    const source_info_t& src_info,
                    Args&&... args) {
             auto report = append();
+            report->ts        = std::time(nullptr);
+            report->id        = u32(id);
+            report->buf       = buf;
             report->type      = error_report_type_t::source;
             report->level     = level;
-            report->buf       = buf;
             report->src_info  = src_info;
-            report->id        = u32(id);
-            report->ts        = std::time(nullptr);
             (internal::add_arg(report, args), ...);
         }
 
@@ -71,12 +71,12 @@ namespace basecode::error {
         template <typename ...Args>
         u0 add(Error_Id auto id, error_report_level_t level, Args&&... args) {
             auto report = append();
+            report->ts        = std::time(nullptr);
+            report->id        = u32(id);
+            report->buf       = {};
             report->type      = error_report_type_t::default_;
             report->level     = level;
-            report->buf       = {};
             report->src_info  = {};
-            report->id        = u32(id);
-            report->ts        = std::time(nullptr);
             (internal::add_arg(report, args), ...);
         }
     }

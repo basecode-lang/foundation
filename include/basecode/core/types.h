@@ -2232,6 +2232,35 @@ namespace basecode {
 
     // ------------------------------------------------------------------------
     //
+    // variant
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    struct variant_t final {
+        using Value_Type        = T;
+
+    private:
+        Value_Type              _value;
+
+    public:
+        variant_t() : _value() {
+        }
+        variant_t(const T& value) : _value(value) {
+        }
+        variant_t(const variant_t& other) : _value(other._value) {
+        }
+        ~variant_t() {
+            if constexpr (std::is_destructible_v<Value_Type>) {
+                (&_value)->~Value_Type();
+            }
+        }
+        Value_Type& operator*() {
+            return _value;
+        }
+    };
+
+    // ------------------------------------------------------------------------
+    //
     // env
     //
     // ------------------------------------------------------------------------

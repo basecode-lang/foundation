@@ -394,7 +394,7 @@ namespace basecode::buf {
         &&  buf.path == path) {
             return status_t::cannot_save_over_mapped_path;
         }
-        auto file = fopen(str::c_str(const_cast<str_t&>(path.str)), "wb");
+        auto file = fopen(path::c_str(path), "wb");
         if (!file)
             return status_t::unable_to_open_file;
         defer(fclose(file));

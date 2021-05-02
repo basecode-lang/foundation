@@ -1213,7 +1213,6 @@ namespace basecode::graphviz {
         node_list_t             nodes;
         graph_list_t            subgraphs;
         attr_set_t              attrs;
-        str_t                   scratch;
         intern_id               name;
         graph_type_t            type;
         u8                      subgraph:   1;

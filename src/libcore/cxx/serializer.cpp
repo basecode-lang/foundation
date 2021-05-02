@@ -172,15 +172,9 @@ namespace basecode::cxx::serializer {
         s.store     = &pgm.storage;
         s.tab_width = tab_width;
         symtab::init(s.modules, s.alloc);
-        for (u32 i = 0; i < 2; ++i) {
-            str::init(s.scratch[i], s.alloc);
-            str::reserve(s.scratch[i], 32);
-        }
     }
 
     u0 free(serializer_t& s) {
-        for (u32 i = 0; i < 2; ++i)
-            str::free(s.scratch[i]);
         assoc_array_t<str_t*> pairs{};
         assoc_array::init(pairs, s.alloc);
         symtab::find_prefix(s.modules, pairs);
@@ -233,18 +227,19 @@ namespace basecode::cxx::serializer {
     static status_t decl_var(serializer_t& s,
                              str_buf_t& buf,
                              cursor_t& cursor) {
-        auto&       store  = *s.store;
-        cursor_t    init_cursor{};
-        cursor_t    rhs_cursor{};
-        type_info_t type_info{.name = &s.scratch[0],
-                              .var_suffix = &s.scratch[1]};
-
+        auto& store = *s.store;
+        cursor_t init_cursor{};
+        cursor_t rhs_cursor{};
+        str_t name, suffix;
+        str::init(name, context::top()->alloc.temp);
+        str::init(suffix, context::top()->alloc.temp);
         auto       dict    = bass::dict::make(cursor);
         const auto lhs_id  = DICTV(dict, element::field::lhs);
         const auto rhs_id  = DICTV(dict, element::field::rhs);
         const auto init_id = DICTV(dict, element::field::init);
         const auto type_id = DICTV(dict, element::field::type);
         process_var_flags(s, buf, type_id);
+        type_info_t type_info{&name, &suffix};
         expand_type(store, lhs_id, type_info);
         at_indent(s, buf, "{} ", *type_info.name);
         if (UNLIKELY(!bass::seek_record(store, rhs_id, rhs_cursor)))

@@ -130,7 +130,6 @@ namespace basecode::cxx::program {
     }
 
     u0 free(program_t& pgm) {
-        str::free(pgm.scratch);
         bass::free(pgm.storage);
         for (auto& module : pgm.modules)
             module::free(module);
@@ -179,8 +178,6 @@ namespace basecode::cxx::program {
     u0 init(program_t& pgm, alloc_t* alloc, u32 num_modules) {
         array::init(pgm.modules, alloc);
         array::reserve(pgm.modules, num_modules);
-        str::init(pgm.scratch, alloc);
-        str::reserve(pgm.scratch, 64);
         bass::init(pgm.storage, alloc);
         cursor_t cursor{};
         bass::seek_current(pgm.storage, cursor);

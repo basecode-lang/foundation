@@ -184,55 +184,30 @@ namespace basecode::job {
             array::reserve(g_job_sys.workers, g_job_sys.num_workers);
             log::debug("job::system, number of worker threads: {}",
                        g_job_sys.num_workers);
-            str_t temp{};
-            str::init(temp, g_job_sys.alloc);
-            str::reserve(temp, 32);
             for (u32 i = 0; i < g_job_sys.num_workers; ++i) {
                 auto& worker = array::append(g_job_sys.workers);
                 worker.id         = i + 1;
-                worker.flags      = worker::none;
-                worker.parent_ctx = context::top();
-                worker.started    = event::make(true);
                 worker.wake       = event::make(false);
+                worker.flags      = worker::none;
+                worker.started    = event::make(true);
+                worker.parent_ctx = context::top();
                 mutex::init(worker.pending_mutex);
-                str::reset(temp);
-                {
+                str_t temp{};
+                str::init(temp, context::top()->alloc.temp);
+                str::reserve(temp, 256); {
                     str_buf_t buf(&temp);
                     format::format_to(buf, "job worker:{}", worker.id);
                 }
                 thread::init(worker.thread, string::interned::fold(temp));
                 thread::start(worker.thread, &worker::run, worker);
             }
-            str::free(temp);
             return status_t::ok;
         }
 
-        u0 free_task(job_task_base_t* task) {
-            memory::free(g_job_sys.task_pool, task);
-        }
-
-        status_t start(job_id id, job_task_base_t* task) {
-            scoped_lock_t lock(&g_job_sys.jobs_mutex);
-            if (id == 0 || id > g_job_sys.jobs.size)
-                return status_t::invalid_job_id;
-            auto job = &g_job_sys.jobs[id - 1];
-            if (job->state != job_state_t::created)
-                return status_t::invalid_job_state;
-            task->set_job(job);
-            job->task  = task;
-            job->state = job_state_t::queued;
-            g_job_sys.worker_idx++;
-            const auto worker_idx = g_job_sys.worker_idx % g_job_sys.num_workers;
-            auto& worker = g_job_sys.workers[worker_idx];
-            scoped_lock_t pending_lock(&worker.pending_mutex);
-            event::wait(worker.started);
-            array::append(worker.pending, id);
-            worker::flag(worker, worker::has_pending, true);
-            event::set(worker.wake);
-            return status_t::ok;
-        }
-
-        status_t make(const s8* label, s32 len, job_id& id, job_id parent_id) {
+        status_t make(const s8* label,
+                      s32 len,
+                      job_id& id,
+                      job_id parent_id) {
             scoped_lock_t lock(&g_job_sys.jobs_mutex);
             job_t* parent_job{};
             if (parent_id) {
@@ -252,6 +227,32 @@ namespace basecode::job {
             job::init(*job, id, ir.id, parent_id);
             if (parent_job)
                 array::append(parent_job->children, id);
+            return status_t::ok;
+        }
+
+        u0 free_task(job_task_base_t* task) {
+            memory::free(g_job_sys.task_pool, task);
+        }
+
+        status_t start(job_id id, job_task_base_t* task) {
+            scoped_lock_t lock(&g_job_sys.jobs_mutex);
+            if (id == 0 || id > g_job_sys.jobs.size)
+                return status_t::invalid_job_id;
+            auto job = &g_job_sys.jobs[id - 1];
+            if (job->state != job_state_t::created)
+                return status_t::invalid_job_state;
+            task->set_job(job);
+            job->task  = task;
+            job->state = job_state_t::queued;
+            g_job_sys.worker_idx++;
+            const auto worker_idx = g_job_sys.worker_idx
+                                    % g_job_sys.num_workers;
+            auto& worker = g_job_sys.workers[worker_idx];
+            scoped_lock_t pending_lock(&worker.pending_mutex);
+            event::wait(worker.started);
+            array::append(worker.pending, id);
+            worker::flag(worker, worker::has_pending, true);
+            event::set(worker.wake);
             return status_t::ok;
         }
     }
@@ -304,8 +305,7 @@ namespace basecode::job {
     }
 
     status_t wait(job_id id, s64 timeout) {
-        event_t e;
-        {
+        event_t e; {
             scoped_lock_t lock(&g_job_sys.jobs_mutex);
             if (id == 0 || id > g_job_sys.jobs.size)
                 return status_t::invalid_job_id;
@@ -325,10 +325,10 @@ namespace basecode::job {
     u0 init(job_t& job, job_id id, u32 label_id, job_id parent_id) {
         job.id       = id;
         job.task     = {};
-        job.label_id = label_id;
-        job.parent   = parent_id;
-        job.finished = event::make();
         job.state    = job_state_t::created;
+        job.parent   = parent_id;
+        job.label_id = label_id;
+        job.finished = event::make();
         stopwatch::init(job.time);
         array::init(job.children, g_job_sys.alloc);
     }

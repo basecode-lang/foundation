@@ -48,8 +48,8 @@
 namespace basecode::context {
     constexpr u32 stack_size = 512;
 
-    static inline thread_local u32             t_index = stack_size;
-    static inline thread_local context_t*      t_stack[stack_size];
+    extern thread_local u32             t_index;
+    extern thread_local context_t*      t_stack[stack_size];
 
     inline u0 pop() {
         BC_ASSERT_MSG(t_index < stack_size, "context stack underflow");

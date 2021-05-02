@@ -1204,19 +1204,21 @@ namespace basecode::graphviz {
                                 if (field.label) {
                                     r = string::interned::get(field.label);
                                     if (OK(r.status)) {
-                                        escape_chars(r.slice, g.scratch);
+                                        str_t scratch{};
+                                        str::init(scratch, context::top()->alloc.temp);
+                                        escape_chars(r.slice, scratch);
                                         format::format_to(mb,
                                                           "{}",
-                                                          g.scratch);
+                                                          scratch);
                                     }
                                 }
                             }
                             format::format_to(mb, "\"");
                         } else {
-                            escape_chars(r.slice, g.scratch);
-                            format::format_to(mb,
-                                              "\"{}\"",
-                                              g.scratch);
+                            str_t scratch{};
+                            str::init(scratch, context::top()->alloc.temp);
+                            escape_chars(r.slice, scratch);
+                            format::format_to(mb, "\"{}\"", scratch);
                         }
                     }
                     break;
@@ -1237,10 +1239,10 @@ namespace basecode::graphviz {
                 case attr_type_t::label_font_name: {
                     auto r = string::interned::get(attr.value.dw);
                     if (OK(r.status)) {
-                        escape_chars(r.slice, g.scratch);
-                        format::format_to(mb,
-                                          "\"{}\"",
-                                          g.scratch);
+                        str_t scratch{};
+                        str::init(scratch, context::top()->alloc.temp);
+                        escape_chars(r.slice, scratch);
+                        format::format_to(mb, "\"{}\"", scratch);
                     }
                     break;
                 }
@@ -1945,7 +1947,6 @@ namespace basecode::graphviz {
             array::free(g.nodes);
             array::free(g.subgraphs);
             attr_set::free(g.attrs);
-            str::free(g.scratch);
         }
 
         u0 sep(graph_t& g, f64 v) {
@@ -2085,8 +2086,6 @@ namespace basecode::graphviz {
             g.name   = r.id;
             g.alloc  = alloc;
             g.parent = {};
-            str::init(g.scratch, g.alloc);
-            str::reserve(g.scratch, 64);
             array::init(g.edges, g.alloc);
             array::init(g.nodes, g.alloc);
             array::init(g.subgraphs, g.alloc);
@@ -2096,12 +2095,12 @@ namespace basecode::graphviz {
 
         node_t* make_node(graph_t& g) {
             auto node = &array::append(g.nodes);
-            {
-                str::reset(g.scratch);
-                str_buf_t buf(&g.scratch);
+            str_t scratch{};
+            str::init(scratch, context::top()->alloc.temp); {
+                str_buf_t buf(&scratch);
                 format::format_to(buf, "node_{}_{}", g.name, g.nodes.size);
             }
-            node::init(*node, g.nodes.size, slice::make(g.scratch), g.alloc);
+            node::init(*node, g.nodes.size, slice::make(scratch), g.alloc);
             return node;
         }
 
