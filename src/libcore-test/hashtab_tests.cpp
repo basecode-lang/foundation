@@ -18,6 +18,7 @@
 
 #include <catch.hpp>
 #include <basecode/core/buf.h>
+#include <basecode/core/path.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/str_array.h>

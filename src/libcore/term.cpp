@@ -22,6 +22,7 @@
 #endif
 #include <atomic>
 #include <basecode/core/term.h>
+#include <basecode/core/array.h>
 
 namespace basecode::term {
     struct system_t final {

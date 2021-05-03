@@ -18,6 +18,7 @@
 
 #include <catch.hpp>
 #include <basecode/core/buf.h>
+#include <basecode/core/path.h>
 #include <basecode/core/graphviz/gv.h>
 
 using namespace basecode;

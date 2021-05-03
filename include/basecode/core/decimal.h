@@ -18,25 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/integer.h>
+#include <basecode/core/types.h>
 
-namespace basecode {
-    struct decimal_t final {
-        alloc_t*                alloc;
-        u64*                    data;
-        u32                     size;
-        u32                     capacity;
-    };
-
-    namespace decimal {
-    }
-
-    namespace hash {
-        inline u64 hash64(const decimal_t& key) {
-            u64 hash{};
-            for (u32 i = 0; i < key.size; ++i)
-                hash = 63 * hash + key.data[i];
-            return hash;
-        }
-    }
+namespace basecode::decimal {
 }

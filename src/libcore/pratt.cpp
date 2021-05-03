@@ -18,6 +18,7 @@
 
 #include <basecode/core/ast.h>
 #include <basecode/core/pratt.h>
+#include <basecode/core/token.h>
 #include <basecode/core/hashtab.h>
 
 namespace basecode::pratt {

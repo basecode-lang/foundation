@@ -138,9 +138,10 @@
 
 #if !defined(__cpp_lib_bit_cast)
 namespace std {
-    template <typename To, typename From> requires (sizeof(From) == sizeof(To)
-                                                    && std::is_trivially_constructible_v<From>
-                                                    && std::is_trivially_constructible_v<To>)
+    template <typename To, typename From>
+    requires (sizeof(From) == sizeof(To)
+              && std::is_trivially_constructible_v<From>
+              && std::is_trivially_constructible_v<To>)
     constexpr To bit_cast(const From& src) noexcept {
         return __builtin_bit_cast(To, src);
     }
@@ -974,28 +975,29 @@ namespace basecode {
 
     template<typename T>
     struct array_t final {
-        using Is_Static         [[maybe_unused]] = std::integral_constant<b8, false>;
+        using Is_Static         = std::integral_constant<b8, false>;
         using Value_Type        = T;
-        using Size_Per_16       [[maybe_unused]] = std::integral_constant<u32, 16 / sizeof(T)>;
+        using Size_Per_16       = std::integral_constant<u32, 16 / sizeof(T)>;
 
         alloc_t*                alloc;
         Value_Type*             data;
         u32                     size;
         u32                     capacity;
 
-        Value_Type& operator[](u32 index)               { return data[index];       }
-        const Value_Type& operator[](u32 index) const   { return data[index];       }
+        Value_Type& operator[](u32 index)               { return data[index]; }
+        const Value_Type& operator[](u32 index) const   { return data[index]; }
 
-        T* end()                                        { return data + size;       }
-        T* rend()                                       { return data - 1;          }
-        T* begin()                                      { return data;              }
-        T* rbegin()                                     { return data + size - 1;   }
-        [[nodiscard]] const T* end() const              { return data + size;       }
-        [[nodiscard]] const T* rend() const             { return data - 1;          }
-        [[nodiscard]] const T* begin() const            { return data;              }
-        [[nodiscard]] const T* rbegin() const           { return data + size - 1;   }
+        T* end()                              { return data + size;     }
+        T* rend()                             { return data - 1;        }
+        T* begin()                            { return data;            }
+        T* rbegin()                           { return data + size - 1; }
+        [[nodiscard]] const T* end() const    { return data + size;     }
+        [[nodiscard]] const T* rend() const   { return data - 1;        }
+        [[nodiscard]] const T* begin() const  { return data;            }
+        [[nodiscard]] const T* rbegin() const { return data + size - 1; }
     };
-    static_assert(sizeof(array_t<s32>) <= 24, "array_t<T> is now larger than 24 bytes!");
+    static_assert(sizeof(array_t<s32>) <= 24,
+                  "array_t<T> is now larger than 24 bytes!");
 
     using slice_array_t         = array_t<str::slice_t>;
 
@@ -1144,9 +1146,33 @@ namespace basecode {
             }
         }
 
-        struct node_id_t;
-        struct node_type_t;
-        struct num_lit_flags_t;
+        struct node_id_t final {
+            constexpr node_id_t()       : id(0)      {}
+            constexpr node_id_t(u32 id) : id(id)     {}
+            constexpr operator u32() const           { return id;      }
+            [[nodiscard]] constexpr b8 empty() const { return id == 0; }
+            static constexpr node_id_t null()        { return 0;       }
+        private:
+            u32                     id;
+        };
+
+        struct node_type_t final {
+            constexpr node_type_t()         : type(0)    {}
+            constexpr node_type_t(u8 type)  : type(type) {}
+            constexpr operator u8() const                { return type;      }
+            [[nodiscard]] constexpr b8 empty() const     { return type == 0; }
+            static constexpr node_type_t none()          { return 0;         }
+        private:
+            u8                      type:   5;
+            [[maybe_unused]] u8     pad:    3{};
+        };
+
+        struct num_lit_flags_t final {
+            u8                      sign:       1;
+            u8                      integer:    1;
+            u8                      exponent:   1;
+            [[maybe_unused]] u8     pad:        5;
+        };
     }
 
     // ------------------------------------------------------------------------
@@ -1155,7 +1181,36 @@ namespace basecode {
     //
     // ------------------------------------------------------------------------
     template <typename T>
-    struct avl_t;
+    struct avl_t final {
+        struct node_t;
+
+        using Has_Color         = std::integral_constant<b8, false>;
+        using Node_Type         = node_t*;
+        using Value_Type        = T;
+        static constexpr u32    Value_Type_Size    = sizeof(T);
+        static constexpr u32    Value_Type_Align   = alignof(T);
+
+        struct node_t final {
+            node_t*             lhs;
+            node_t*             rhs;
+            node_t*             parent;
+            Value_Type*         value;
+            s8                  balance;
+        };
+        static_assert(sizeof(node_t) <= 40,
+                      "avl<T>::node_t is now larger than 40 bytes!");
+
+        static constexpr u32    Node_Type_Size     = sizeof(node_t);
+        static constexpr u32    Node_Type_Align    = alignof(node_t);
+
+        alloc_t*                alloc;
+        alloc_t*                node_slab;
+        alloc_t*                value_slab;
+        Node_Type               root;
+        u32                     size;
+    };
+    static_assert(sizeof(avl_t<u32>) <= 40,
+                  "avl_t<u32> is now larger than 40 bytes!");
 
     // ------------------------------------------------------------------------
     //
@@ -1253,7 +1308,7 @@ namespace basecode {
     // ------------------------------------------------------------------------
     //
     // bass
-    // (basecode awesome serialization system)
+    // (basecode awesome storage system)
     //
     // ------------------------------------------------------------------------
     struct bass_t;
@@ -1323,41 +1378,68 @@ namespace basecode {
     // bitset
     //
     // ------------------------------------------------------------------------
-    struct bitset_t;
+    struct bitset_t final {
+        alloc_t*                alloc;
+        u64*                    data;
+        u32                     capacity;
+
+        bitset_t& operator<<(u32 bits);
+
+        bitset_t& operator>>(u32 bits);
+    };
 
     // ------------------------------------------------------------------------
     //
     // bst
     //
     // ------------------------------------------------------------------------
-    template <typename t>
-    struct bst_t;
-
-    // ------------------------------------------------------------------------
-    //
-    // buf
-    //
-    // ------------------------------------------------------------------------
     template <typename T>
-    concept Buffer_Concept = String_Concept<T> || requires(const T& t) {
-        {t.alloc}       -> std::same_as<alloc_t*>;
-        {t.data}        -> std::same_as<u8*>;
-        {t.length}      -> std::same_as<u32>;
-        {t.capacity}    -> std::same_as<u32>;
-    };
+    struct bst_t final {
+        struct node_t;
 
-    struct buf_t;
-    struct buf_crsr_t;
-    struct buf_line_t;
-    struct buf_node_t;
-    struct buf_token_t;
+        using Has_Color         = std::integral_constant<b8, false>;
+        using Node_Type         = node_t*;
+        using Value_Type        = T;
+        static constexpr u32    Value_Type_Size    = sizeof(T);
+        static constexpr u32    Value_Type_Align   = alignof(T);
+
+        struct node_t final {
+            node_t*             lhs;
+            node_t*             rhs;
+            node_t*             parent;
+            Value_Type*         value;
+        };
+        static_assert(sizeof(node_t) <= 32,
+                      "bst<T>::node_t is now larger than 32 bytes!");
+
+        static constexpr u32    Node_Type_Size     = sizeof(node_t);
+        static constexpr u32    Node_Type_Align    = alignof(node_t);
+
+        alloc_t*                alloc;
+        alloc_t*                node_slab;
+        alloc_t*                value_slab;
+        Node_Type               root;
+        u32                     size;
+    };
+    static_assert(sizeof(bst_t<u32>) <= 40,
+                  "bst_t<u32> is now larger than 40 bytes!");
 
     // ------------------------------------------------------------------------
     //
     // buf_pool
     //
     // ------------------------------------------------------------------------
-    struct lease_t;
+    struct lease_t final {
+        alloc_t*                alloc;
+        u8*                     buf;
+        u32                     size;
+    };
+
+    namespace buf_pool {
+        enum class status_t : u8 {
+            ok                  = 0,
+        };
+    }
 
     // ------------------------------------------------------------------------
     //
@@ -1408,7 +1490,12 @@ namespace basecode {
     // decimal
     //
     // ------------------------------------------------------------------------
-    struct decimal_t;
+    struct decimal_t final {
+        alloc_t*                alloc;
+        u64*                    data;
+        u32                     size;
+        u32                     capacity;
+    };
 
     // ------------------------------------------------------------------------
     //
@@ -1742,7 +1829,21 @@ namespace basecode {
     // integer
     //
     // ------------------------------------------------------------------------
-    struct integer_t;
+    struct integer_t final {
+        alloc_t*                alloc;
+        u64*                    data;
+        u32                     size;
+        u32                     offset;
+        u32                     capacity;
+    };
+    static_assert(sizeof(integer_t) <= 32,
+                  "integer_t is now larger than 32 bytes!");
+
+    namespace integer {
+        enum class status_t : u32 {
+            ok
+        };
+    }
 
     // ------------------------------------------------------------------------
     //
@@ -2095,9 +2196,15 @@ namespace basecode {
     struct alloc_system_t;
     struct alloc_config_t;
     struct system_config_t;
-    union alloc_subclass_t;
+    union  alloc_subclass_t;
 
     using mspace                = u0*;
+    using mem_fini_callback_t   = u32 (*)(alloc_t*);
+    using mem_size_callback_t   = u32 (*)(alloc_t*, u0* mem);
+    using mem_free_callback_t   = u32 (*)(alloc_t*, u0* mem);
+    using mem_init_callback_t   = u0  (*)(alloc_t*, alloc_config_t*);
+    using mem_alloc_callback_t  = mem_result_t (*)(alloc_t*, u32 size, u32 align);
+    using mem_realloc_callback_t= mem_result_t (*)(alloc_t*, u0* mem, u32 size, u32 align);
 
     enum class alloc_type_t : u8 {
         none,
@@ -2113,18 +2220,6 @@ namespace basecode {
         scratch,
         dlmalloc,
     };
-
-    using mem_fini_callback_t       = u32 (*)(alloc_t*);
-    using mem_size_callback_t       = u32 (*)(alloc_t*, u0* mem);
-    using mem_free_callback_t       = u32 (*)(alloc_t*, u0* mem);
-    using mem_init_callback_t       = u0  (*)(alloc_t*, alloc_config_t*);
-    using mem_alloc_callback_t      = mem_result_t (*)(alloc_t*,
-                                                       u32 size,
-                                                       u32 align);
-    using mem_realloc_callback_t    = mem_result_t (*)(alloc_t*,
-                                                       u0* mem,
-                                                       u32 size,
-                                                       u32 align);
 
     namespace memory {
         enum class status_t : u8 {
@@ -2608,8 +2703,7 @@ namespace basecode {
     using rule_map_t            = hashtab_t<token_type_t, rule_t>;
     using std_t                 = ast::node_id_t (*)(pratt_ctx_t*);
     using nud_t                 = ast::node_id_t (*)(pratt_ctx_t*);
-    using led_t                 = ast::node_id_t (*)(pratt_ctx_t*,
-                                                     ast::node_id_t);
+    using led_t                 = ast::node_id_t (*)(pratt_ctx_t*, ast::node_id_t);
 
     struct rule_t final {
         std_t                   std;
@@ -2945,6 +3039,82 @@ namespace basecode {
     };
     static_assert(sizeof(stack_t<s32>) <= 24,
                   "stack_t<T> is now larger than 24 bytes!");
+
+    // ------------------------------------------------------------------------
+    //
+    // buf
+    //
+    // ------------------------------------------------------------------------
+    template <typename T>
+    concept Buffer_Concept = String_Concept<T> || requires(const T& t) {
+        {t.alloc}               -> std::same_as<alloc_t*>;
+        {t.data}                -> std::same_as<u8*>;
+        {t.length}              -> std::same_as<u32>;
+        {t.capacity}            -> std::same_as<u32>;
+    };
+
+    struct buf_line_t final {
+        u32                     pos;
+        u32                     len;
+    };
+
+    struct buf_token_t final {
+        u32                     pos;
+        u32                     len;
+    };
+
+    enum class buf_mode_t : u8 {
+        none,
+        alloc,
+        mapped
+    };
+
+    struct buf_t final {
+        alloc_t*                alloc;
+        u8*                     data;
+        array_t<buf_line_t>     lines;
+        array_t<buf_token_t>    tokens;
+        path_t                  path;
+        u32                     length;
+        u32                     capacity;
+        s32                     file;
+        buf_mode_t              mode;
+
+        u8& operator[](u32 idx)      { return data[idx]; }
+        u8 operator[](u32 idx) const { return data[idx]; }
+    };
+    static_assert(sizeof(buf_t) <= 128,
+                  "buf_t is now larger than 128 bytes!");
+
+    struct buf_crsr_t final {
+        buf_t*                  buf;
+        stack_t<u32>            stack;
+        u32                     pos;
+        u32                     line;
+        u32                     column;
+
+        u8* operator*()                 { return buf->data + pos; }
+        u8& operator[](u32 idx)         { return (*buf)[idx];     }
+        u8 operator[](u32 idx) const    { return (*buf)[idx];     }
+    };
+    static_assert(sizeof(buf_crsr_t) <= 56,
+                  "buf_crsr_t is now larger than 56 bytes!");
+
+    namespace buf {
+        enum class status_t : u8 {
+            ok                              = 0,
+            unable_to_open_file             = 100,
+            mmap_error,
+            munmap_error,
+            end_of_buffer,
+            cannot_unmap_buf,
+            buf_already_mapped,
+            unable_to_truncate_file,
+            cannot_reset_mapped_buf,
+            cannot_save_zero_length_buf,
+            cannot_save_over_mapped_path,
+        };
+    }
 
     // ------------------------------------------------------------------------
     //
@@ -3665,9 +3835,19 @@ namespace basecode {
             return splitmix64(s_fixed_random + key);
         }
 
-        inline u64 hash64(const integer_t& key);
+        inline u64 hash64(const integer_t& key) {
+            u64 hash{};
+            for (u32 i = 0; i < key.size; ++i)
+                hash = 63 * hash + key.data[i];
+            return hash;
+        }
 
-        inline u64 hash64(const decimal_t& key);
+        inline u64 hash64(const decimal_t& key) {
+            u64 hash{};
+            for (u32 i = 0; i < key.size; ++i)
+                hash = 63 * hash + key.data[i];
+            return hash;
+        }
 
         inline u64 hash64(option_t* const& key) {
             return murmur::hash64((const u0*) key, sizeof(u0*));
@@ -3677,8 +3857,6 @@ namespace basecode {
         inline u64 hash64(const slice_t<T>& key) {
             return murmur::hash64(key.data, key.length);
         }
-
-        inline u64 hash64(const locale_key_t& key);
 
         inline u64 hash64(const token_type_t& key) {
             u32 value = key;

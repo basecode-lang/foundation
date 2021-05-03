@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <catch.hpp>
+#include <basecode/core/path.h>
 #include <basecode/core/stopwatch.h>
 #include <basecode/core/wasm/decoder.h>
 

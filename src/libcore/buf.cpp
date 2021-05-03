@@ -23,6 +23,7 @@
 #   include <fcntl.h>
 #endif
 #include <basecode/core/buf.h>
+#include <basecode/core/stack.h>
 #include <basecode/core/filesys.h>
 
 namespace basecode::buf {
@@ -78,12 +79,18 @@ namespace basecode::buf {
         }
 
         status_t write_cstr(buf_crsr_t& crsr, str::slice_t slice) {
-            auto status = buf::write(*crsr.buf, crsr.pos, slice.data, slice.length);
+            auto status = buf::write(*crsr.buf,
+                                     crsr.pos,
+                                     slice.data,
+                                     slice.length);
             if (!OK(status))
                 return status;
             crsr.pos += slice.length;
             const u8 zero{};
-            status = buf::write(*crsr.buf, crsr.pos, (const u8*) &zero, sizeof(u8));
+            status = buf::write(*crsr.buf,
+                                crsr.pos,
+                                (const u8*) &zero,
+                                sizeof(u8));
             if (!OK(status))
                 return status;
             crsr.pos += sizeof(u8);
@@ -224,7 +231,10 @@ namespace basecode::buf {
         new_capacity = std::max(buf.length, new_capacity);
         new_capacity = new_capacity + (-new_capacity & 15U);
 #if defined(__AVX2__)
-        buf.data = (u8*) memory::realloc(buf.alloc, buf.data, new_capacity, 32);
+        buf.data = (u8*) memory::realloc(buf.alloc,
+                                         buf.data,
+                                         new_capacity,
+                                         32);
 #elif defined(__SSE4_2__)
         buf.data = (u8*) memory::realloc(buf.alloc, buf.data, new_capacity, 16);
 #else

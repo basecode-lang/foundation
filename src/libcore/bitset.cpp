@@ -16,9 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <cstring>
-#include <algorithm>
 #include <basecode/core/bits.h>
+#include <basecode/core/memory.h>
 #include <basecode/core/bitset.h>
 
 namespace basecode {
@@ -96,7 +95,9 @@ namespace basecode {
             }
             if (set.capacity == new_capacity)
                 return;
-            auto new_data = (u64*) memory::alloc(set.alloc, new_capacity * sizeof(u64), alignof(u64));
+            auto new_data = (u64*) memory::alloc(set.alloc,
+                                                 new_capacity * sizeof(u64),
+                                                 alignof(u64));
             if (set.data)
                 std::memcpy(new_data, set.data, set.capacity * sizeof(u64));
             memory::free(set.alloc, set.data);
@@ -249,7 +250,8 @@ namespace basecode {
         }
 
         u0 union_of(bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (size_t i = 0; i < min_length; ++i)
                 lhs.data[i] |= rhs.data[i];
             if (rhs.capacity > lhs.capacity) {
@@ -262,14 +264,34 @@ namespace basecode {
             }
         }
 
+        u32 symmetric_difference_count(const bitset_t& lhs,
+                                       const bitset_t& rhs) {
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
+            u32 i{};
+            u32 c{};
+            for (; i < min_length; ++i)
+                c += __builtin_popcountll(lhs.data[i] ^ rhs.data[i]);
+            if (rhs.capacity > lhs.capacity) {
+                for (; i < rhs.capacity; ++i)
+                    c += __builtin_popcountll(rhs.data[i]);
+            } else {
+                for (; i < lhs.capacity; ++i)
+                    c += __builtin_popcountll(lhs.data[i]);
+            }
+            return c;
+        }
+
         u0 difference_of(bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (auto i = 0; i < min_length; ++i)
                 lhs.data[i] &= ~(rhs.data[i]);
         }
 
         b8 disjoint(const bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (auto i = 0; i < min_length; i++) {
                 if ((lhs.data[i] & rhs.data[i]) != 0)
                     return false;
@@ -278,7 +300,8 @@ namespace basecode {
         }
 
         u0 intersection_of(bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             u32 i{};
             for (; i < min_length; ++i)
                 lhs.data[i] &= rhs.data[i];
@@ -299,7 +322,8 @@ namespace basecode {
         u32 union_count(const bitset_t& lhs, const bitset_t& rhs) {
             u32 i{};
             u32 c{};
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (; i + 3 < min_length; i += 4) {
                 c += __builtin_popcountll(lhs.data[i]     | rhs.data[i]);
                 c += __builtin_popcountll(lhs.data[i + 1] | rhs.data[i + 1]);
@@ -331,7 +355,8 @@ namespace basecode {
         }
 
         b8 intersection_of(const bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (auto i = 0; i < min_length; i++) {
                 if ((lhs.data[i] & rhs.data[i]) != 0)
                     return true;
@@ -342,7 +367,8 @@ namespace basecode {
         u0 resize(bitset_t& set, u32 new_capacity, b8 pad_with_zeros) {
             new_capacity = std::max<u32>(next_power_of_two(new_capacity), 64);
             const auto capacity_in_words = std::max<u32>(new_capacity / 64, 1);
-            const auto smallest = new_capacity < set.capacity ? new_capacity : set.capacity;
+            const auto smallest = new_capacity < set.capacity ?
+                                  new_capacity : set.capacity;
             if (set.capacity < new_capacity) {
                 u64* new_data;
                 new_data = (u64*) memory::alloc(set.alloc,
@@ -363,7 +389,8 @@ namespace basecode {
         }
 
         u0 symmetric_difference_of(bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             u32 i{};
             for (; i < min_length; ++i)
                 lhs.data[i] ^= rhs.data[i];
@@ -380,7 +407,8 @@ namespace basecode {
         u32 difference_count(const bitset_t& lhs, const bitset_t& rhs) {
             u32 i{};
             u32 c{};
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (; i < min_length; ++i)
                 c += __builtin_popcountll(lhs.data[i] & ~(rhs.data[i]));
             for (; i < lhs.capacity; ++i)
@@ -390,25 +418,10 @@ namespace basecode {
 
         u32 intersection_count(const bitset_t& lhs, const bitset_t& rhs) {
             u32 c{};
-            const size_t min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const size_t min_length = lhs.capacity < rhs.capacity ?
+                                      lhs.capacity : rhs.capacity;
             for (auto i = 0; i < min_length; ++i)
                 c += __builtin_popcountll(lhs.data[i] & rhs.data[i]);
-            return c;
-        }
-
-        u32 symmetric_difference_count(const bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
-            u32 i{};
-            u32 c{};
-            for (; i < min_length; ++i)
-                c += __builtin_popcountll(lhs.data[i] ^ rhs.data[i]);
-            if (rhs.capacity > lhs.capacity) {
-                for (; i < rhs.capacity; ++i)
-                    c += __builtin_popcountll(rhs.data[i]);
-            } else {
-                for (; i < lhs.capacity; ++i)
-                    c += __builtin_popcountll(lhs.data[i]);
-            }
             return c;
         }
     }

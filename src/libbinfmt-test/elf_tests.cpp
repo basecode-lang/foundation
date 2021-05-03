@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <catch.hpp>
+#include <basecode/core/path.h>
 #include <basecode/core/error.h>
 #include <basecode/binfmt/binfmt.h>
 #include "test.h"

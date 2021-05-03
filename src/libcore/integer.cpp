@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/memory.h>
 #include <basecode/core/integer.h>
 
 #define KNUTH_POW2_THRESHOLD_LEN    (6)

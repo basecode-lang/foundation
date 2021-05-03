@@ -18,37 +18,9 @@
 
 #pragma once
 
-#include <basecode/core/token.h>
+#include <basecode/core/types.h>
 
 namespace basecode::ast {
-    struct node_id_t final {
-        constexpr node_id_t()       : id(0)             {}
-        constexpr node_id_t(u32 id) : id(id)            {}
-        constexpr operator u32() const                  { return id;        }
-        [[nodiscard]] constexpr b8 empty() const        { return id == 0;   }
-        static constexpr node_id_t null()               { return 0;         }
-    private:
-        u32                     id;
-    };
-
-    struct node_type_t final {
-        constexpr node_type_t()         : type(0)       {}
-        constexpr node_type_t(u8 type)  : type(type)    {}
-        constexpr operator u8() const                   { return type;        }
-        [[nodiscard]] constexpr b8 empty() const        { return type == 0;   }
-        static constexpr node_type_t none()             { return 0;           }
-    private:
-        u8                      type:   5;
-        [[maybe_unused]] u8     pad:    3{};
-    };
-
-    struct num_lit_flags_t final {
-        u8                      sign:       1;
-        u8                      integer:    1;
-        u8                      exponent:   1;
-        [[maybe_unused]] u8     pad:        5;
-    };
-
     node_id_t make_num_lit(bass_t& ast,
                            token_id_t token,
                            num_lit_flags_t flags,
