@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/plot.h>
+#include <basecode/core/array.h>
 
 namespace basecode::plot {
     namespace rolled {

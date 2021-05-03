@@ -27,6 +27,12 @@
 #include <basecode/core/thread.h>
 #include <basecode/core/memory/system/slab.h>
 
+namespace basecode {
+    auto thread_t::operator==(const thread_t& other) const {
+        return pthread_equal(handle, other.handle) != 0;
+    }
+}
+
 namespace basecode::thread {
     thread_local thread_t*      t_self{};
     pthread_t                   g_main_thread{};
@@ -190,3 +196,4 @@ namespace basecode::thread {
         return system::status_from_errno(rc);
     }
 }
+

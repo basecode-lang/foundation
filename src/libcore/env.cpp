@@ -19,6 +19,7 @@
 #include <basecode/core/env.h>
 #include <basecode/core/buf.h>
 #include <basecode/core/string.h>
+#include <basecode/core/hashtab.h>
 #include <basecode/core/slice_utils.h>
 #include <basecode/core/stable_array.h>
 

@@ -18,6 +18,7 @@
 
 #include <catch.hpp>
 #include <basecode/core/eav.h>
+#include <basecode/core/path.h>
 #include <basecode/core/stopwatch.h>
 
 using namespace basecode;

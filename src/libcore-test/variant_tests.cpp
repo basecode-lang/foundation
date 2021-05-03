@@ -16,28 +16,24 @@
 //
 // ----------------------------------------------------------------------------
 
-#pragma once
+#include <catch.hpp>
+#include <basecode/core/format.h>
+#include <basecode/core/stopwatch.h>
 
-#include <basecode/core/bits.h>
+using namespace basecode;
 
-namespace basecode::hash_common {
-    u32 prime_capacity(u32 idx);
+TEST_CASE("basecode::variant basics") {
+    variant_t one(s32(1));
+    variant_t two(u8(2));
+    variant_t three(f32(3.14));
 
-    b8 read_flag(const u64* data, u32 bit);
+    auto one_val = *one;
+    auto two_val = *two;
+    auto three_val = *three;
 
-    u32 range_reduction(u64 hash, u32 size);
+    REQUIRE(one_val == s32(1));
+    REQUIRE(two_val == u8(2));
+    REQUIRE(three_val == f32(3.14));
 
-    u32 flag_words_for_capacity(u32 capacity);
-
-    u0 write_flag(u64* data, u32 bit, b8 flag);
-
-    u0 print_flags(const u64* flags, u32 size);
-
-    s32 find_nearest_prime_capacity(u32 capacity);
-
-    b8 requires_rehash(u32 size, u32 capacity, f32 load_factor);
-
-    b8 find_free_bucket(const u64* hashes, u32 size, u32& bucket_idx);
-
-    b8 find_free_bucket2(const u64* flags, u32 size, u32& bucket_idx);
+    format::print("one = {}, two = {}, three = {}\n", one, two, three);
 }

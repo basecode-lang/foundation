@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/token.h>
+#include <basecode/core/array.h>
 
 namespace basecode::token::cache {
     u0 free(token_cache_t& cache) {
@@ -37,6 +38,16 @@ namespace basecode::token::cache {
 
     u0 seek_first(token_cache_t& cache) {
         cache.idx = 0;
+    }
+
+    token_id_t append(token_cache_t& cache,
+                      token_type_t type,
+                      const source_info_t& loc) {
+        auto& token = array::append(cache.tokens);
+        token.id   = cache.tokens.size;
+        token.type = type;
+        token.loc  = loc;
+        return token.id;
     }
 
     const token_t& current(token_cache_t& cache) {
@@ -61,14 +72,6 @@ namespace basecode::token::cache {
         auto& token = array::append(cache.tokens);
         token.id   = cache.tokens.size;
         token.type = type;
-        return token.id;
-    }
-
-    token_id_t append(token_cache_t& cache, token_type_t type, const source_info_t& loc) {
-        auto& token = array::append(cache.tokens);
-        token.id   = cache.tokens.size;
-        token.type = type;
-        token.loc  = loc;
         return token.id;
     }
 }

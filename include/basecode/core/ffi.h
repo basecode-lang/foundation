@@ -18,214 +18,146 @@
 
 #pragma once
 
+#include <basecode/core/types.h>
 #include <dyncall/dyncall.h>
 #include <dynload/dynload.h>
-#include <basecode/core/path.h>
-#include <basecode/core/symtab.h>
 
-namespace basecode {
-    struct lib_t final {
-        alloc_t*                alloc;
-        DLLib*                  handle;
-        symtab_t<u0*>           symbols;
-        path_t                  path;
-    } __attribute__((aligned(128)));
+namespace basecode::ffi {
+    namespace lib {
+        status_t unload(lib_t* lib);
 
-    struct param_type_t final {
-        param_cls_t             cls;
-        param_size_t            size;
-        u8                      user;
-    } __attribute__((aligned(4)));
+        status_t load(const path_t& path, lib_t** lib);
 
-    union param_alias_t final {
-        u0*                     p;
-        u8                      b;
-        u16                     w;
-        u32                     dw;
-        u64                     qw;
-        f32                     fdw;
-        f64                     fqw;
-    };
+        u0 syms(const lib_t* lib, symbol_array_t& syms);
 
-    struct param_value_t final {
-        param_alias_t           alias;
-        param_type_t            type;
-    } __attribute__((aligned(16)));
+        status_t symaddr(lib_t* lib, str::slice_t name, u0** address);
+    }
 
-    struct param_t final {
-        param_value_t           value;
-        param_array_t           members;
-        str::slice_t            name;
-        u8                      has_dft:    1;
-        u8                      is_rest:    1;
-        u8                      pad:        6;
-    } __attribute__((aligned(64)));
+    namespace system {
+        u0 fini();
 
-    struct overload_t final {
-        proto_t*                proto;
-        u0*                     func;
-        str_t                   signature;
-        str::slice_t            name;
-        param_array_t           params;
-        param_type_t            ret_type;
-        u32                     req_count;
-        u8                      has_dft:    1;
-        u8                      has_rest:   1;
-        u8                      pad:        6;
-        call_mode_t             mode;
-    } __attribute__((aligned(128)));
+        status_t init(alloc_t* alloc = context::top()->alloc.main,
+                      u8 num_pages = DEFAULT_NUM_PAGES);
+    }
 
-    struct proto_t final {
-        lib_t*                  lib;
-        str::slice_t            name;
-        overload_array_t        overloads;
-        u32                     min_req;
-        u32                     max_req;
-    } __attribute__((aligned(128)));
+    namespace param {
+        u0 free(param_t* param);
 
-    struct ffi_t final {
-        alloc_t*                alloc;
-        DCCallVM*               vm;
-        u32                     heap_size;
-    } __attribute__((aligned(32)));
+        param_t* make(str::slice_t name,
+                      param_type_t type,
+                      b8 rest = {},
+                      param_alias_t* dft_val = {});
 
-    namespace ffi {
-        namespace lib {
-            status_t unload(lib_t* lib);
-
-            status_t load(const path_t& path, lib_t** lib);
-
-            u0 syms(const lib_t* lib, symbol_array_t& syms);
-
-            status_t symaddr(lib_t* lib, str::slice_t name, u0** address);
+        inline param_type_t make_type(param_cls_t cls,
+                                      param_size_t size,
+                                      u8 user = 0) {
+            return param_type_t{.cls = cls, .size = size, .user = user};
         }
+    }
 
-        namespace system {
-            u0 fini();
+    namespace proto {
+        u0 free(proto_t* proto);
 
-            status_t init(alloc_t* alloc = context::top()->alloc.main,
-                          u8 num_pages = DEFAULT_NUM_PAGES);
-        }
+        b8 remove(str::slice_t symbol);
 
-        namespace param {
-            u0 free(param_t* param);
+        proto_t* find(str::slice_t symbol);
 
-            param_t* make(str::slice_t name,
-                          param_type_t type,
-                          b8 rest = {},
-                          param_alias_t* dft_val = {});
+        status_t append(proto_t* proto, overload_t* ol);
 
-            inline param_type_t make_type(param_cls_t cls,
-                                          param_size_t size,
-                                          u8 user = 0) {
-                return param_type_t{.cls = cls, .size = size, .user = user};
-            }
-        }
+        proto_t* make(str::slice_t symbol, lib_t* lib = {});
 
-        namespace proto {
-            u0 free(proto_t* proto);
+        overload_t* match_signature(proto_t* proto, const str_t& candidate);
+    }
 
-            b8 remove(str::slice_t symbol);
+    namespace overload {
+        u0 free(overload_t* ol);
 
-            proto_t* find(str::slice_t symbol);
+        b8 remove(str::slice_t symbol);
 
-            status_t append(proto_t* proto, overload_t* ol);
+        overload_t* make(str::slice_t symbol,
+                         param_type_t ret_type,
+                         u0* func = {});
 
-            proto_t* make(str::slice_t symbol, lib_t* lib = {});
+        overload_t* find(str::slice_t symbol);
 
-            overload_t* match_signature(proto_t* proto, const str_t& candidate);
-        }
+        status_t append(overload_t* ol, param_t* param);
+    }
 
-        namespace overload {
-            u0 free(overload_t* ol);
+    u0 free(ffi_t& ffi);
 
-            b8 remove(str::slice_t symbol);
+    u0 reset(ffi_t& ffi);
 
-            overload_t* make(str::slice_t symbol,
-                             param_type_t ret_type,
-                             u0* func = {});
-
-            overload_t* find(str::slice_t symbol);
-
-            status_t append(overload_t* ol, param_t* param);
-        }
-
-        u0 free(ffi_t& ffi);
-
-        u0 reset(ffi_t& ffi);
-
-        template <typename T> param_value_t arg(T value) {
-            param_value_t arg{};
-            if constexpr (std::is_pointer_v<T>) {
-                arg.type.cls  = param_cls_t::ptr;
-                arg.type.size = param_size_t::qword;
-                arg.alias.p   = value;
-            } else if constexpr (std::is_same_v<T, bool>) {
-                arg.type.cls  = param_cls_t::int_;
+    template <typename T> param_value_t arg(T value) {
+        param_value_t arg{};
+        if constexpr (std::is_pointer_v<T>) {
+            arg.type.cls  = param_cls_t::ptr;
+            arg.type.size = param_size_t::qword;
+            arg.alias.p   = value;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            arg.type.cls  = param_cls_t::int_;
+            arg.type.size = param_size_t::dword;
+            arg.alias.dw  = value;
+        } else if constexpr (std::is_integral_v<T>) {
+            arg.type.cls = param_cls_t::int_;
+            if constexpr (sizeof(T) == 1) {
+                arg.type.size = param_size_t::byte;
+                arg.alias.b   = value;
+            } else if constexpr (sizeof(T) == 2) {
+                arg.type.size = param_size_t::word;
+                arg.alias.w   = value;
+            } else if constexpr (sizeof(T) == 4) {
                 arg.type.size = param_size_t::dword;
                 arg.alias.dw  = value;
-            } else if constexpr (std::is_integral_v<T>) {
-                arg.type.cls = param_cls_t::int_;
-                if constexpr (sizeof(T) == 1) {
-                    arg.type.size = param_size_t::byte;
-                    arg.alias.b   = value;
-                } else if constexpr (sizeof(T) == 2) {
-                    arg.type.size = param_size_t::word;
-                    arg.alias.w   = value;
-                } else if constexpr (sizeof(T) == 4) {
-                    arg.type.size = param_size_t::dword;
-                    arg.alias.dw  = value;
-                } else if constexpr (sizeof(T) == 8) {
-                    arg.type.size = param_size_t::qword;
-                    arg.alias.qw  = value;
-                }
-            } else if constexpr (std::is_floating_point_v<T>) {
-                arg.type.cls = param_cls_t::float_;
-                if constexpr (sizeof(T) == 4) {
-                    arg.type.size = param_size_t::dword;
-                    arg.alias.fdw = value;
-                } else if constexpr (sizeof(T) == 8) {
-                    arg.type.size = param_size_t::qword;
-                    arg.alias.fqw = value;
-                }
-            } else if constexpr (std::is_aggregate_v<T>) {
-                arg.type.cls  = param_cls_t::struct_;
-                arg.type.size = param_size_t::none;
-                arg.alias.p   = (u0*) &value;
+            } else if constexpr (sizeof(T) == 8) {
+                arg.type.size = param_size_t::qword;
+                arg.alias.qw  = value;
             }
-            return arg;
-        }
-
-        status_t push(ffi_t& ffi, const param_value_t& arg);
-
-        template <typename T> u0 push(ffi_t& ffi, T value) {
-            if constexpr (std::is_pointer_v<T>) {
-                dcArgPointer(ffi.vm, value);
-            } else if constexpr (std::is_same_v<T, bool>) {
-                dcArgBool(ffi.vm, value);
-            } else if constexpr (std::is_integral_v<T>) {
-                if constexpr (sizeof(T) == 1) {
-                    dcArgChar(ffi.vm, value);
-                } else if constexpr (sizeof(T) == 2) {
-                    dcArgShort(ffi.vm, value);
-                } else if constexpr (sizeof(T) == 4) {
-                    dcArgInt(ffi.vm, value);
-                } else if constexpr (sizeof(T) == 8) {
-                    dcArgLongLong(ffi.vm, value);
-                }
-            } else if constexpr (std::is_floating_point_v<T>) {
-                if constexpr (sizeof(T) == 4) {
-                    dcArgFloat(ffi.vm, value);
-                } else if constexpr (sizeof(T) == 8) {
-                    dcArgDouble(ffi.vm, value);
-                }
+        } else if constexpr (std::is_floating_point_v<T>) {
+            arg.type.cls = param_cls_t::float_;
+            if constexpr (sizeof(T) == 4) {
+                arg.type.size = param_size_t::dword;
+                arg.alias.fdw = value;
+            } else if constexpr (sizeof(T) == 8) {
+                arg.type.size = param_size_t::qword;
+                arg.alias.fqw = value;
             }
+        } else if constexpr (std::is_aggregate_v<T>) {
+            arg.type.cls  = param_cls_t::struct_;
+            arg.type.size = param_size_t::none;
+            arg.alias.p   = (u0*) &value;
         }
-
-        status_t init(ffi_t& ffi,
-                      u32 heap_size = KB(2),
-                      alloc_t* alloc = context::top()->alloc.main);
-
-        status_t call(ffi_t& ffi, const overload_t* ol, param_alias_t& ret);
+        return arg;
     }
+
+    status_t push(ffi_t& ffi, const param_value_t& arg);
+
+    template <typename T> u0 push(ffi_t& ffi, T value) {
+        if constexpr (std::is_pointer_v<T>) {
+            dcArgPointer(ffi.vm, value);
+        } else if constexpr (std::is_same_v<T, bool>) {
+            dcArgBool(ffi.vm, value);
+        } else if constexpr (std::is_integral_v<T>) {
+            if constexpr (sizeof(T) == 1) {
+                dcArgChar(ffi.vm, value);
+            } else if constexpr (sizeof(T) == 2) {
+                dcArgShort(ffi.vm, value);
+            } else if constexpr (sizeof(T) == 4) {
+                dcArgInt(ffi.vm, value);
+            } else if constexpr (sizeof(T) == 8) {
+                dcArgLongLong(ffi.vm, value);
+            }
+        } else if constexpr (std::is_floating_point_v<T>) {
+            if constexpr (sizeof(T) == 4) {
+                dcArgFloat(ffi.vm, value);
+            } else if constexpr (sizeof(T) == 8) {
+                dcArgDouble(ffi.vm, value);
+            }
+        }
+    }
+
+    status_t init(ffi_t& ffi,
+                  u32 heap_size = KB(2),
+                  alloc_t* alloc = context::top()->alloc.main);
+
+    status_t call(ffi_t& ffi, const overload_t* ol, param_alias_t& ret);
 }

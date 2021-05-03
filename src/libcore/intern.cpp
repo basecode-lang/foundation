@@ -18,7 +18,6 @@
 
 #include <basecode/core/intern.h>
 #include <basecode/core/buf_pool.h>
-#include <basecode/core/hash_common.h>
 
 namespace basecode::intern {
     static status_t rehash(intern_t& pool, s32 new_capacity = -1);

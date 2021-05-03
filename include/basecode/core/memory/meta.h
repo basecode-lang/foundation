@@ -18,52 +18,38 @@
 
 #pragma once
 
-#include <basecode/core/plot.h>
+#include <basecode/core/types.h>
 
-namespace basecode {
-    struct alloc_info_t final {
-        alloc_t*                alloc;
-        alloc_info_t*           parent;
-        alloc_t*                tracked;
-        alloc_info_array_t      children;
-        union {
-            rolled_view_t       rolled;
-            scrolled_view_t     scrolled;
-        }                       plot;
-        plot_mode_t             mode;
-    };
+namespace basecode::memory::meta {
+    namespace system {
+        u0 fini();
 
-    namespace memory::meta {
-        namespace system {
-            u0 fini();
+        u0 update(f32 dt);
 
-            u0 update(f32 dt);
+        u0 track(alloc_t* alloc);
 
-            u0 track(alloc_t* alloc);
+        u0 untrack(alloc_t* alloc);
 
-            u0 untrack(alloc_t* alloc);
+        u0 stop_plot(alloc_info_t* info);
 
-            u0 stop_plot(alloc_info_t* info);
+        const alloc_info_array_t& infos();
 
-            const alloc_info_array_t& infos();
+        const alloc_info_array_t& roots();
 
-            const alloc_info_array_t& roots();
+        u0 start_plot(alloc_info_t* info, plot_mode_t mode);
 
-            u0 start_plot(alloc_info_t* info, plot_mode_t mode);
+        u0 init(alloc_t* alloc = context::top()->alloc.main);
+    }
 
-            u0 init(alloc_t* alloc = context::top()->alloc.main);
-        }
+    namespace alloc_info {
+        u0 free(alloc_info_t& info);
 
-        namespace alloc_info {
-            u0 free(alloc_info_t& info);
+        b8 stop_plot(alloc_info_t& info);
 
-            b8 stop_plot(alloc_info_t& info);
+        u0 init(alloc_info_t& info, alloc_t* alloc);
 
-            u0 init(alloc_info_t& info, alloc_t* alloc);
+        u0 append_point(alloc_info_t& info, f32 x, f32 y);
 
-            u0 append_point(alloc_info_t& info, f32 x, f32 y);
-
-            b8 start_plot(alloc_info_t& info, plot_mode_t mode);
-        }
+        b8 start_plot(alloc_info_t& info, plot_mode_t mode);
     }
 }

@@ -355,7 +355,7 @@ namespace basecode::getopt {
             format::format_to(sb,
                               " [file]{}",
                               opt.file_option->min_required > 1
-                                || opt.file_option->max_allowed > 0 ? "..." : "");
+                              || opt.file_option->max_allowed > 0 ? "..." : "");
         }
         format::format_to(sb, "\n");
         if (!slice::empty(opt.description))

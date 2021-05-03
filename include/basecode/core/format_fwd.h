@@ -62,3 +62,15 @@ FORMAT_TYPE(basecode::uuid_t,
                       data.data4[0], data.data4[1], data.data4[2], data.data4[3],
                       data.data4[4], data.data4[5], data.data4[6], data.data4[7]));
 
+template <typename T>
+struct fmt::formatter<basecode::variant_t<T>> {
+    template <typename FormatContext>
+    auto format(const basecode::variant_t<T>& data,
+                FormatContext& ctx) -> decltype(ctx.out()) {
+        format_to(ctx.out(), "{}", *data);
+        return ctx.out();
+    }
+    template <typename ParseContext> auto parse(ParseContext& ctx) {
+        return ctx.begin();
+    }
+};

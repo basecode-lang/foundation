@@ -47,6 +47,7 @@ add_executable(
     filesys_tests.cpp
     gap_buf_tests.cpp
     hashtab_tests.cpp
+    variant_tests.cpp
     graphviz_tests.cpp
     obj_pool_tests.cpp
     str_array_tests.cpp

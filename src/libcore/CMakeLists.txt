@@ -123,7 +123,7 @@ set(
 
     graphviz/gv.cpp ${CORE_INC_DIR}/graphviz/gv.h
 
-    hash_common.cpp ${CORE_INC_DIR}/hash_common.h
+    hash_common.cpp
 
     hash/crc.cpp ${CORE_INC_DIR}/hash/crc.h
     hash/adler.cpp ${CORE_INC_DIR}/hash/adler.h
@@ -138,8 +138,6 @@ set(
     intern.cpp ${CORE_INC_DIR}/intern.h
 
     ipc.cpp ${CORE_INC_DIR}/ipc.h
-
-    ${CORE_INC_DIR}/iterator.h
 
     job.cpp ${CORE_INC_DIR}/job.h
 

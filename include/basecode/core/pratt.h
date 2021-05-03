@@ -18,74 +18,41 @@
 
 #pragma once
 
-#include <basecode/core/ast.h>
-#include <basecode/core/array.h>
-#include <basecode/core/hashtab.h>
+#include <basecode/core/types.h>
 
-namespace basecode {
-    struct rule_t;
-    struct pratt_ctx_t;
+namespace basecode::pratt {
+    namespace parser {
+        ast::node_id_t expression(pratt_ctx_t& ctx, u32 rbp = 0);
+    }
 
-    struct rule_t final {
-        std_t                   std;
-        nud_t                   nud;
-        led_t                   led;
-        u32                     lbp;
-        u8                      postfix:        1;
-        u8                      suppress_led:   1;
-        u8                      associativity:  2;
-        u8                      pad:            3;
-    };
+    namespace grammar {
+        u0 free(grammar_t& grammar);
 
-    struct grammar_t final {
-        alloc_t*                alloc;
-        rule_map_t              rules;
-        u32*                    operator_types;
-        u32                     default_rbp;
-    };
+        rule_t* infix(grammar_t& grammar,
+                      token_type_t type,
+                      u32 bp,
+                      led_t led);
 
-    struct pratt_ctx_t final {
-        bass_t*                 ast;
-        rule_t*                 rule;
-        const token_t*          token;
-        grammar_t*              grammar;
-        token_cache_t*          token_cache;
-    };
+        rule_t* infixr(grammar_t& grammar,
+                       token_type_t type,
+                       u32 bp,
+                       led_t led);
 
-    namespace pratt {
-        namespace parser {
-            ast::node_id_t expression(pratt_ctx_t& ctx, u32 rbp = 0);
-        }
+        rule_t* postfix(grammar_t& grammar,
+                        token_type_t type,
+                        u32 bp,
+                        led_t led);
 
-        namespace grammar {
-            u0 free(grammar_t& grammar);
+        rule_t* terminal(grammar_t& grammar,
+                         token_type_t type,
+                         u32 bp = 0);
 
-            rule_t* infix(grammar_t& grammar,
-                          token_type_t type,
-                          u32 bp,
-                          led_t led);
+        u0 init(grammar_t& grammar,
+                u32* operator_types,
+                alloc_t* alloc = context::top()->alloc.main);
 
-            rule_t* infixr(grammar_t& grammar,
-                           token_type_t type,
-                           u32 bp,
-                           led_t led);
+        rule_t* stmt(grammar_t& grammar, token_type_t type, std_t std);
 
-            rule_t* postfix(grammar_t& grammar,
-                            token_type_t type,
-                            u32 bp,
-                            led_t led);
-
-            rule_t* terminal(grammar_t& grammar,
-                             token_type_t type,
-                             u32 bp = 0);
-
-            u0 init(grammar_t& grammar,
-                    u32* operator_types,
-                    alloc_t* alloc = context::top()->alloc.main);
-
-            rule_t* stmt(grammar_t& grammar, token_type_t type, std_t std);
-
-            rule_t* prefix(grammar_t& grammar, token_type_t type, nud_t nud);
-        }
+        rule_t* prefix(grammar_t& grammar, token_type_t type, nud_t nud);
     }
 }

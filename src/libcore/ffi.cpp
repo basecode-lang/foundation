@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/ffi.h>
+#include <basecode/core/symtab.h>
 #include <basecode/core/hashtab.h>
 
 namespace basecode::ffi {

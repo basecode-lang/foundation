@@ -17,7 +17,6 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/format.h>
-#include <basecode/core/string.h>
 #include <basecode/core/network.h>
 
 namespace basecode::network {
@@ -25,7 +24,8 @@ namespace basecode::network {
         struct pollfd fd{};
         fd.fd     = sock.socket;
         fd.events = POLLIN;
-        return poll(&fd, 1, timeout) > 0 ? ::recv(sock.socket, (s8*) buf, len, 0) : -1;
+        return poll(&fd, 1, timeout) > 0 ?
+               ::recv(sock.socket, (s8*) buf, len, 0) : -1;
     }
 
     static s32 recv_buffered(socket_t& sock, u0* buf, s32 len, s32 timeout) {
@@ -82,6 +82,19 @@ namespace basecode::network {
             sock.buf_size = sock.buf_free = {};
         }
 
+        u0 init(socket_t& sock,
+                u32 buf_size,
+                socket_close_callback_t close_cb,
+                alloc_t* alloc) {
+            sock.socket   = INVALID_SOCKET;
+            sock.user     = {};
+            sock.alloc    = alloc;
+            sock.close_cb = close_cb;
+            sock.buf_cur  = sock.buf      = (u8*) memory::alloc(sock.alloc,
+                                                                buf_size);
+            sock.buf_size = sock.buf_free = buf_size;
+        }
+
         b8 has_data(socket_t& sock) {
             if (sock.buf_free > 0)
                 return true;
@@ -104,17 +117,12 @@ namespace basecode::network {
         s32 send_buf_size(socket_t& sock) {
             s32 buf_size;
             socklen_t sz = sizeof(buf_size);
-            getsockopt(sock.socket, SOL_SOCKET, SO_SNDBUF, (s8*) &buf_size, &sz);
+            getsockopt(sock.socket,
+                       SOL_SOCKET,
+                       SO_SNDBUF,
+                       (s8*) &buf_size,
+                       &sz);
             return buf_size;
-        }
-
-        u0 init(socket_t& sock, u32 buf_size, socket_close_callback_t close_cb, alloc_t* alloc) {
-            sock.socket   = INVALID_SOCKET;
-            sock.user     = {};
-            sock.alloc    = alloc;
-            sock.close_cb = close_cb;
-            sock.buf_cur  = sock.buf      = (u8*) memory::alloc(sock.alloc, buf_size);
-            sock.buf_size = sock.buf_free = buf_size;
         }
     }
 
@@ -129,7 +137,7 @@ namespace basecode::network {
 
 #if defined __APPLE__
             s32 val = 1;
-        setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &val, sizeof(val));
+            setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &val, sizeof(val));
 #endif
             s32 result;
             s32 reuse = 1;
@@ -183,8 +191,13 @@ namespace basecode::network {
             if (poll(&fd, 1, timeout) <= 0)
                 return nullptr;
             struct sockaddr sa{};
-            socklen_t       sa_len = sizeof(struct sockaddr);
-            len = recvfrom(sock.socket, (s8*) sock.buf, sock.buf_size, 0, &sa, &sa_len);
+            socklen_t sa_len = sizeof(struct sockaddr);
+            len = recvfrom(sock.socket,
+                           (s8*) sock.buf,
+                           sock.buf_size,
+                           0,
+                           &sa,
+                           &sa_len);
             ip_address::set(addr, &sa);
             return sock.buf;
         }
@@ -225,7 +238,10 @@ namespace basecode::network {
             auto buf_ptr   = sock.buf;
             auto buf_start = buf_ptr;
             while (len > 0) {
-                auto write_len = ::send(sock.socket, (const s8*) buf, len, MSG_NOSIGNAL);
+                auto write_len = ::send(sock.socket,
+                                        (const s8*) buf,
+                                        len,
+                                        MSG_NOSIGNAL);
                 if (write_len == -1) return -1;
                 len -= write_len;
                 buf_ptr += write_len;
@@ -249,7 +265,9 @@ namespace basecode::network {
             if (getaddrinfo(nullptr, str::c_str(port_str), &hints, &res) != 0)
                 return status_t::invalid_address_and_port;
 
-            sock.socket = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+            sock.socket = ::socket(res->ai_family,
+                                   res->ai_socktype,
+                                   res->ai_protocol);
             s32 val = 1;
             setsockopt(sock.socket,
                        SOL_SOCKET,
@@ -290,16 +308,21 @@ namespace basecode::network {
 
             str_t addr_str(addr);
             auto port_str = format::format("{}", port);
-            if (getaddrinfo(str::c_str(addr_str), str::c_str(port_str), &hints, &res) != 0)
+            if (getaddrinfo(str::c_str(addr_str),
+                            str::c_str(port_str),
+                            &hints, &res) != 0) {
                 return status_t::invalid_address_and_port;
+            }
 
             s32 socket;
             for (ptr = res; ptr; ptr = ptr->ai_next) {
-                socket  = ::socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+                socket = ::socket(ptr->ai_family,
+                                  ptr->ai_socktype,
+                                  ptr->ai_protocol);
                 if (socket == INVALID_SOCKET) continue;
 #ifdef __APPLE__
                 s32 val = 1;
-            setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &val, sizeof(val));
+                setsockopt(socket, SOL_SOCKET, SO_NOSIGPIPE, &val, sizeof(val));
 #endif
                 if (::connect(socket, ptr->ai_addr, ptr->ai_addrlen) == -1) {
                     ::close(socket);
@@ -325,7 +348,9 @@ namespace basecode::network {
             fd.events = POLLIN;
 
             if (poll(&fd, 1, timeout) > 0) {
-                auto socket = ::accept(listen_sock.socket, (sockaddr*) &remote, &sz);
+                auto socket = ::accept(listen_sock.socket,
+                                       (sockaddr*) &remote,
+                                       &sz);
                 if (socket == INVALID_SOCKET)
                     return false;
 #if defined __APPLE__

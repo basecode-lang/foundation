@@ -18,6 +18,7 @@
 
 #include <basecode/core/rpn.h>
 #include <basecode/core/str.h>
+#include <basecode/core/array.h>
 
 #define SCOPES_TOP()            (t_scopes[t_scope_slot])
 #define SCOPES_POP()            (t_scopes[t_scope_slot++])
@@ -70,6 +71,18 @@ namespace basecode {
 
         u0 free(postfix_t& postfix) {
             array::free(postfix.exprs);
+        }
+
+        status_t init(postfix_t& postfix,
+                      token_cache_t* tokens,
+                      alloc_t* alloc) {
+            if (!postfix.operator_precedences)
+                return status_t::invalid_operator_precedence_array;
+            postfix.alloc  = alloc;
+            postfix.tokens = tokens;
+            array::init(postfix.exprs, postfix.alloc);
+            array::reserve(postfix.exprs, token::cache::size(*postfix.tokens));
+            return status_t::ok;
         }
 
         b8 to_postfix(postfix_t& postfix) {
@@ -132,7 +145,9 @@ namespace basecode {
                         break;
                     case token::cls::param_begin:
                         top_op = &token::cache::peek(*postfix.tokens, 1);
-                        expr->arg_count = top_op && TOKEN_CLS(top_op->type) == token::cls::param_end ? -1 : 0;
+                        expr->arg_count = top_op
+                                          && TOKEN_CLS(top_op->type) == token::cls::param_end ?
+                                             -1 : 0;
                         OPERATORS_PUSH(token);
                         break;
                     case token::cls::scope_begin:
@@ -166,16 +181,6 @@ namespace basecode {
             auto expr = &array::append(postfix.exprs);
             expr::init(*expr, postfix.alloc);
             return expr;
-        }
-
-        status_t init(postfix_t& postfix, token_cache_t* tokens, alloc_t* alloc) {
-            if (!postfix.operator_precedences)
-                return status_t::invalid_operator_precedence_array;
-            postfix.alloc  = alloc;
-            postfix.tokens = tokens;
-            array::init(postfix.exprs, postfix.alloc);
-            array::reserve(postfix.exprs, token::cache::size(*postfix.tokens));
-            return status_t::ok;
         }
     }
 }

@@ -18,53 +18,30 @@
 
 #pragma once
 
-#include <basecode/core/array.h>
+#include <basecode/core/types.h>
 
-namespace basecode {
-    struct data_point_t final {
-        f32                     x, y;
-    };
+namespace basecode::plot {
+    namespace rolled {
+        u0 free(rolled_view_t& view);
 
-    struct rolled_view_t final {
-        data_point_array_t      values;
-        f32                     span;
-        f32                     time;
-        f32                     min_y;
-        f32                     max_y;
-    };
+        u0 append_point(rolled_view_t& view, f32 x, f32 y);
 
-    struct scrolled_view_t final {
-        data_point_array_t      values;
-        f32                     time;
-        f32                     min_y;
-        f32                     max_y;
-        s32                     offset;
-        s32                     max_size;
-    };
+        u0 init(rolled_view_t& view,
+                f32 span = 10.0f,
+                u32 capacity = 1000,
+                alloc_t* alloc = context::top()->alloc.main);
+    }
 
-    namespace plot {
-        namespace rolled {
-            u0 free(rolled_view_t& view);
+    namespace scrolled {
+        u0 free(scrolled_view_t& view);
 
-            u0 append_point(rolled_view_t& view, f32 x, f32 y);
+        u0 erase(scrolled_view_t& view);
 
-            u0 init(rolled_view_t& view,
-                    f32 span = 10.0f,
-                    u32 capacity = 1000,
-                    alloc_t* alloc = context::top()->alloc.main);
-        }
+        u0 append_point(scrolled_view_t& view, f32 x, f32 y);
 
-        namespace scrolled {
-            u0 free(scrolled_view_t& view);
-
-            u0 erase(scrolled_view_t& view);
-
-            u0 append_point(scrolled_view_t& view, f32 x, f32 y);
-
-            u0 init(scrolled_view_t& view,
-                    s32 offset = 0,
-                    s32 max_size = 1000,
-                    alloc_t* alloc = context::top()->alloc.main);
-        }
+        u0 init(scrolled_view_t& view,
+                s32 offset = 0,
+                s32 max_size = 1000,
+                alloc_t* alloc = context::top()->alloc.main);
     }
 }

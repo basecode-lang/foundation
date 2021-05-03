@@ -18,50 +18,32 @@
 
 #pragma once
 
-#include <basecode/core/array.h>
-#include <basecode/core/hashtab.h>
+#include <basecode/core/types.h>
 
-namespace basecode {
-    struct env_value_t final {
-        union {
-            str::slice_t        str;
-            slice_array_t       list;
-        }                       kind;
-        env_value_type_t        type;
-    };
+namespace basecode::env {
+    namespace system {
+        u0 fini();
 
-    struct env_t final {
-        alloc_t*                alloc;
-        env_t*                  parent;
-        str::slice_t            name;
-        envvar_table_t          vartab;
-    };
+        env_t* get_root();
 
-    namespace env {
-        namespace system {
-            u0 fini();
+        env_t* get(str::slice_t name);
 
-            env_t* get_root();
+        status_t init(alloc_t* alloc = context::top()->alloc.main);
 
-            env_t* get(str::slice_t name);
-
-            status_t init(alloc_t* alloc = context::top()->alloc.main);
-
-            env_t* make(str::slice_t name, env_t* parent = {}, s8** pairs = {});
-        }
-
-        env_value_t* set(env_t* env,
-                         str::slice_t key,
-                         const slice_array_t& value);
-
-        status_t parse(env_t* env, s8** pairs);
-
-        status_t load(env_t* env, const path_t& path);
-
-        env_value_t* get(env_t* env, str::slice_t key);
-
-        status_t expand(env_t* env, env_value_t* value, str_t& expanded);
-
-        env_value_t* set(env_t* env, str::slice_t key, str::slice_t value);
+        env_t* make(str::slice_t name, env_t* parent = {}, s8** pairs = {});
     }
+
+    env_value_t* set(env_t* env,
+                     str::slice_t key,
+                     const slice_array_t& value);
+
+    status_t parse(env_t* env, s8** pairs);
+
+    status_t load(env_t* env, const path_t& path);
+
+    env_value_t* get(env_t* env, str::slice_t key);
+
+    status_t expand(env_t* env, env_value_t* value, str_t& expanded);
+
+    env_value_t* set(env_t* env, str::slice_t key, str::slice_t value);
 }

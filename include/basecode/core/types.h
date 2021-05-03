@@ -165,8 +165,67 @@ namespace std {
 #   include <concepts>
 #endif
 
+// ------------------------------------------------------------------------
+//
+// iterator macros
+//
+// ------------------------------------------------------------------------
+#define DECL_ITERS(Container, Type, State)                                  \
+    DECL_MUT_ITER(Container, Type, State)                                   \
+    DECL_CONST_ITER(Container, Type, State)
+
+#define DECL_MUT_ITER(Container, Type, State)                               \
+    using iterator = basecode::iterator<Container, Type, State>;            \
+    iterator begin() { return iterator::begin(this); }                      \
+    iterator end()   { return iterator::end(this);   }
+
+#define DECL_CONST_ITER(Container, Type, State)                                         \
+    using const_iterator = basecode::const_iterator<Container, const Type, State>;      \
+    const_iterator begin() const { return const_iterator::begin(this); }                \
+    const_iterator end()   const { return const_iterator::end(this);   }
+
+#define DECL_RITERS(Container, Type, State)                                             \
+    struct State##_reversed : public State {                                            \
+        inline u0 next (const Container* ref) { State::prev(ref); }                     \
+        inline u0 prev (const Container* ref) { State::next(ref); }                     \
+        inline u0 begin(const Container* ref) { State::end(ref); State::prev(ref);}     \
+        inline u0 end  (const Container* ref) { State::begin(ref); State::prev(ref);}   \
+    };                                                                                  \
+    DECL_MUT_RITER(Container, Type, State)                                              \
+    DECL_CONST_RITER(Container, Type, State)
+
+#define DECL_MUT_RITER(Container, Type, State)                                          \
+    using reverse_iterator = basecode::iterator<Container, Type, State##_reversed >;    \
+    reverse_iterator rbegin() { return reverse_iterator::begin(this); }                 \
+    reverse_iterator rend()   { return reverse_iterator::end(this); }
+
+#define DECL_CONST_RITER(Container, Type, State)                                        \
+    using const_reverse_iterator = basecode::const_iterator<Container, Type, State##_reversed >;\
+    const_reverse_iterator rbegin() const {                                             \
+        return const_reverse_iterator::begin(this);                                     \
+    }                                                                                   \
+    const_reverse_iterator rend() const {                                               \
+        return const_reverse_iterator::end(this);                                       \
+    }
+
+#define DECL_STL_TYPES(Type)                    \
+    using difference_type   = std::ptrdiff_t;   \
+    using size_type         = size_t;           \
+    using value_type        = Type;             \
+    using pointer           = Type*;            \
+    using const_pointer     = const Type*;      \
+    using reference         = Type&;            \
+    using const_reference   = const Type&
+
+// ------------------------------------------------------------------------
+//
+// global forward decls
+//
+// ------------------------------------------------------------------------
 struct sqlite3;
 struct sqlite3_stmt;
+
+using pthread_t = void*;
 
 namespace fmt {
     inline namespace v7 {
@@ -178,6 +237,14 @@ namespace spdlog {
     class logger;
 }
 
+typedef struct DCCallVM_    DCCallVM;
+typedef struct DLLib_       DLLib;
+
+// ------------------------------------------------------------------------
+//
+// basecode core type system
+//
+// ------------------------------------------------------------------------
 namespace basecode {
     using u0                    = void;
     using u8                    = std::uint8_t;
@@ -265,6 +332,286 @@ namespace basecode {
     constexpr u32 operator "" _gb(u64 value) {
         return 1204 * (1024 * (value * 1024));
     }
+
+    // ------------------------------------------------------------------------
+    //
+    // iterators
+    //
+    // ------------------------------------------------------------------------
+    template <class Container, typename Type, class State>
+    struct const_iterator;
+
+    template <class Container, typename Type, class State>
+    struct iterator {
+        friend struct basecode::const_iterator<Container, Type, State>;
+
+        Container*              ref;
+        State                   state;
+
+        static iterator end(Container* ref) {
+            iterator it(ref);
+            it.end();
+            return it;
+        }
+        static iterator begin(Container* ref) {
+            iterator it(ref);
+            it.begin();
+            return it;
+        }
+
+        iterator() {}
+
+        u0 end()                     { state.end(ref);        }
+        u0 next()                    { state.next(ref);       }
+        u0 prev()                    { state.prev(ref);       }
+        u0 begin()                   { state.begin(ref);      }
+        Type get()                   { return state.get(ref); }
+        b8 cmp(const State& s) const { return state.cmp(s);   }
+
+        Type operator*()             { return get();          }
+        iterator& operator++()       { next(); return *this;  }
+        iterator& operator--()       { prev(); return *this;  }
+        iterator operator--(int)     { iterator temp(*this); prev(); return temp;    }
+        iterator operator++(int)     { iterator temp(*this); next(); return temp;    }
+
+        b8 operator!=(const iterator& other) const {
+            return ref != other.ref || cmp(other.state);
+        }
+
+        b8 operator==(const iterator& other) const {
+            return !operator!=(other);
+        }
+
+        b8 operator!=(const const_iterator<Container, Type, State>& other) const {
+            return ref != other.ref || cmd(other.state);
+        }
+
+        b8 operator==(const const_iterator<Container, Type, State>& other) const {
+            return !operator!=(other);
+        }
+
+    protected:
+        iterator(Container* ref) : ref(ref) {}
+    };
+
+    template <class Container, typename Type, class State>
+    struct iterator<Container, Type&, State> {
+        friend struct basecode::const_iterator<Container, Type&, State>;
+
+        Container*              ref;
+        State                   state;
+
+        static iterator end(Container* ref) {
+            iterator it(ref);
+            it.end();
+            return it;
+        }
+        static iterator begin(Container* ref) {
+            iterator it(ref);
+            it.begin();
+            return it;
+        }
+
+        iterator() {}
+
+        u0 end()                        { state.end(ref);        }
+        u0 prev()                       { state.prev(ref);       }
+        u0 next()                       { state.next(ref);       }
+        u0 begin()                      { state.begin(ref);      }
+        Type& get()                     { return state.get(ref); }
+        b8 cmp(const State& s) const    { return state.cmp(s);   }
+
+
+        Type& operator*()               { return get();          }
+        Type* operator->()              { return &get();         }
+        iterator& operator--()          { prev(); return *this;  }
+        iterator& operator++()          { next(); return *this;  }
+        iterator operator++(s32)        { iterator temp(*this); next(); return temp;    }
+        iterator operator--(s32)        { iterator temp(*this); prev(); return temp;    }
+
+        b8 operator!=(const iterator& other) const {
+            return ref != other.ref || cmp(other.state);
+        }
+
+        b8 operator==(const iterator& other) const {
+            return !operator!=(other);
+        }
+
+        b8 operator!=(const const_iterator<Container, Type&, State>& other) const {
+            return ref != other.ref || cmd(other.state);
+        }
+
+        b8 operator==(const const_iterator<Container, Type&, State>& other) const {
+            return !operator!=(other);
+        }
+
+    protected:
+        iterator(Container* ref) : ref(ref) {}
+    };
+
+    template <class Container, typename Type, class State>
+    struct const_iterator {
+        friend struct basecode::iterator<Container, Type, State>;
+
+        const Container*        ref;
+        State                   state;
+
+        static const_iterator end(const Container* ref) {
+            const_iterator it(ref);
+            it.end();
+            return it;
+        }
+        static const_iterator begin(const Container* ref) {
+            const_iterator it(ref);
+            it.begin();
+            return it;
+        }
+
+        const_iterator() {}
+
+        const_iterator(const iterator<Container, Type, State>& other) : ref(other.ref) {
+            state = other.state;
+        }
+
+        u0 end()                        { state.end(ref);        }
+        u0 prev()                       { state.prev(ref);       }
+        u0 next()                       { state.next(ref);       }
+        u0 begin()                      { state.begin(ref);      }
+        const Type get()                { return state.get(ref); }
+        const Type operator*()          { return get();          }
+        b8 cmp(const State& s) const    { return state.cmp(s);   }
+        const_iterator& operator++()    { next(); return *this;  }
+        const_iterator& operator--()    { prev(); return *this;  }
+        const_iterator operator++(int)  { const_iterator temp(*this); next(); return temp;  }
+        const_iterator operator--(int)  { const_iterator temp(*this); prev(); return temp;  }
+
+        b8 operator==(const const_iterator& other) const {
+            return !operator!=(other);
+        }
+
+        b8 operator!=(const const_iterator& other) const {
+            return ref != other.ref || cmp(other.state);
+        }
+
+        b8 operator!=(const iterator<Container, Type, State>& other) const {
+            return ref != other.ref || cmp(other.state);
+        }
+
+        b8 operator==(const iterator<Container, Type, State>& other) const {
+            return !operator!=(other);
+        }
+
+        const_iterator& operator=(const iterator<Container, Type, State>& other) {
+            ref   = other.ref;
+            state = other.state;
+            return *this;
+        }
+
+    protected:
+        const_iterator(const Container* ref) : ref(ref) {}
+    };
+
+    template <class Container, typename Type, class State>
+    struct const_iterator<Container, Type&, State> {
+        friend struct basecode::iterator<Container, Type&, State>;
+
+        const Container*        ref;
+        State                   state;
+
+        static const_iterator end(const Container* ref) {
+            const_iterator it(ref);
+            it.end();
+            return it;
+        }
+        static const_iterator begin(const Container* ref) {
+            const_iterator it(ref);
+            it.begin();
+            return it;
+        }
+
+        const_iterator() {}
+
+        const_iterator(const iterator<Container, Type&, State>& other) : ref(other.ref) {
+            state = other.state;
+        }
+
+        u0 end()                        { state.end(ref);        }
+        u0 next()                       { state.next(ref);       }
+        u0 prev()                       { state.prev(ref);       }
+        u0 begin()                      { state.begin(ref);      }
+        const Type& operator*()         { return get();          }
+        const Type* operator->()        { return &get();         }
+        const Type& get()               { return state.get(ref); }
+        b8 cmp(const State& s) const    { return state.cmp(s);   }
+        const_iterator& operator++()    { next(); return *this;  }
+        const_iterator& operator--()    { prev(); return *this;  }
+        const_iterator operator++(int)  { const_iterator temp(*this); next(); return temp;  }
+        const_iterator operator--(int)  { const_iterator temp(*this); prev(); return temp;  }
+
+        b8 operator!=(const const_iterator& other) const {
+            return ref != other.ref || cmp(other.state);
+        }
+
+        b8 operator==(const const_iterator& other) const {
+            return !operator!=(other);
+        }
+
+        b8 operator!=(const iterator<Container, Type&, State>& other) const {
+            return ref != other.ref || cmp(other.state);
+        }
+
+        b8 operator==(const iterator<Container, Type&, State>& other) const {
+            return !operator!=(other);
+        }
+
+        const_iterator& operator=(const iterator<Container, Type&, State>& other) {
+            ref   = other.ref;
+            state = other.state;
+            return *this;
+        }
+
+    protected:
+        const_iterator(const Container* ref) : ref(ref) {}
+    };
+
+    // ------------------------------------------------------------------------
+    //
+    // common hash{table, set, bag} functionality
+    //
+    // ------------------------------------------------------------------------
+    namespace hash_common {
+        u32 prime_capacity(u32 idx);
+
+        b8 read_flag(const u64* data, u32 bit);
+
+        u32 range_reduction(u64 hash, u32 size);
+
+        u32 flag_words_for_capacity(u32 capacity);
+
+        u0 write_flag(u64* data, u32 bit, b8 flag);
+
+        u0 print_flags(const u64* flags, u32 size);
+
+        s32 find_nearest_prime_capacity(u32 capacity);
+
+        b8 requires_rehash(u32 size, u32 capacity, f32 load_factor);
+
+        b8 find_free_bucket(const u64* hashes, u32 size, u32& bucket_idx);
+
+        b8 find_free_bucket2(const u64* flags, u32 size, u32& bucket_idx);
+    }
+
+    // ------------------------------------------------------------------------
+    //
+    // stopwatch
+    //
+    // ------------------------------------------------------------------------
+    struct stopwatch_t final {
+        u64                     end;
+        u64                     start;
+    };
+
+    using timed_block_callable_t    = std::function<s32()>;
 
     // ------------------------------------------------------------------------
     //
@@ -682,8 +1029,35 @@ namespace basecode {
         {t.capacity}            -> std::same_as<u32>;
     };
 
-    template <typename T>
-    struct stable_array_t;
+    template<typename T>
+    struct stable_array_t final {
+        using Value_Type        = T;
+        using Is_Static         = std::integral_constant<b8, false>;
+        using Size_Per_16       = std::integral_constant<u32,
+                                                         16 / sizeof(Value_Type)>;
+
+        alloc_t*                alloc;
+        alloc_t*                slab;
+        Value_Type**            data;
+        u32                     size;
+        u32                     capacity;
+
+        Value_Type& operator[](u32 index)             { return *data[index]; }
+        const Value_Type& operator[](u32 index) const { return *data[index]; }
+
+        struct iterator_state_t {
+            u32                 pos;
+            inline u0 end(const stable_array_t* ref)       { pos = ref->size;       }
+            inline u0 next(const stable_array_t* ref)      { UNUSED(ref); ++pos;    }
+            inline u0 begin(const stable_array_t* ref)     { UNUSED(ref); pos = 0;  }
+            inline Value_Type* get(stable_array_t* ref)    { return ref->data[pos]; }
+            inline b8 cmp(const iterator_state_t& s) const { return pos != s.pos;   }
+            inline const Value_Type* get(const stable_array_t* ref) {
+                return ref->data[pos];
+            }
+        };
+        DECL_ITERS(stable_array_t, Value_Type*, iterator_state_t);
+    };
 
     // ------------------------------------------------------------------------
     //
@@ -805,10 +1179,76 @@ namespace basecode {
         {t.load_factor}         -> std::same_as<f32>;
     };
 
-    template <typename T>
-    struct bag_t;
+    struct bag_buf_size_t final {
+        u32                     total_size;
+        u32                     size_of_flags;
+        u32                     num_flag_words;
+        u32                     size_of_hashes;
+        u32                     size_of_counts;
+        u32                     size_of_values;
+    };
 
-    struct bag_buf_size_t;
+    template <typename T>
+    struct bag_t final {
+        using Value_Type        = T;
+        using Is_Pointer        = std::integral_constant<b8, std::is_pointer_v<T>>;
+        using Value_Type_Base   = std::remove_pointer_t<T>;
+
+        struct item_t final {
+            Value_Type_Base*    value;
+            u32                 count;
+        };
+        using Item_Type         = item_t;
+
+        alloc_t*                alloc;
+        u64*                    flags;
+        u64*                    hashes;
+        u32*                    counts;
+        Value_Type*             values;
+        u32                     size;
+        u32                     cap_idx;
+        u32                     capacity;
+        f32                     load_factor;
+
+        struct iterator_state_t {
+            u32                 pos;
+
+            inline u0 end(const bag_t* ref) {
+                pos = ref->capacity;
+            }
+
+            inline u0 next(const bag_t* ref) {
+                while (pos < ref->capacity) {
+                    if (ref->hashes[++pos])
+                        break;
+                }
+            }
+
+            inline Item_Type get(bag_t* ref) {
+                return {&ref->values[pos], ref->counts[pos]};
+            }
+
+            inline u0 begin(const bag_t* ref) {
+                pos = 0;
+                while (pos < ref->capacity) {
+                    if (ref->hashes[pos])
+                        break;
+                    ++pos;
+                }
+            }
+
+            inline const Item_Type get(const bag_t* ref) {
+                return {&ref->values[pos], ref->counts[pos]};
+            }
+
+            inline b8 cmp(const iterator_state_t& s) const {
+                return pos != s.pos;
+            }
+        };
+        DECL_ITERS(bag_t, Item_Type, iterator_state_t);
+    };
+    static_assert(sizeof(bag_t<s32>) <= 56,
+                  "bag_t<T> is now larger than 56 bytes!");
 
     // ------------------------------------------------------------------------
     //
@@ -1004,55 +1444,6 @@ namespace basecode {
 
     // ------------------------------------------------------------------------
     //
-    // eav
-    //
-    // ------------------------------------------------------------------------
-    constexpr s32 app_id        = 0x000dead1;
-
-    struct db_t;
-    struct txn_t;
-    struct tuple_t;
-    struct value_t;
-    struct entity_t;
-    union value_data_t;
-    struct tuple_stmt_cache_t;
-    struct simple_stmt_cache_t;
-    struct entity_stmt_cache_t;
-
-    enum class value_type_t : u8 {
-        nil,
-        list,
-        entity,
-        string,
-        boolean,
-        integer,
-        floating_point,
-    };
-
-    using txn_list_t            = stable_array_t<txn_t>;
-    using tuple_list_t          = array_t<tuple_t>;
-    using entity_list_t         = array_t<entity_t>;
-
-    namespace eav {
-        enum class status_t : u8 {
-            ok                  = 0,
-            error               = 101,
-            not_found           = 102,
-            sql_error           = 103,
-            invalid_rowid       = 104,
-            invalid_entity      = 105,
-        };
-
-        namespace entity {
-            namespace status {
-                constexpr u8 dead  = 0;
-                constexpr u8 live  = 1;
-            }
-        }
-    }
-
-    // ------------------------------------------------------------------------
-    //
     // event
     //
     // ------------------------------------------------------------------------
@@ -1084,63 +1475,6 @@ namespace basecode {
         template <typename... Type>
         inline static const Family_Type type = id++;
     };
-
-    // ------------------------------------------------------------------------
-    //
-    // ffi
-    //
-    // ------------------------------------------------------------------------
-    struct ffi_t;
-    struct lib_t;
-    struct param_t;
-    struct proto_t;
-    struct overload_t;
-    struct param_type_t;
-    struct param_value_t;
-    union  param_alias_t;
-
-    using param_array_t         = array_t<param_t*>;
-    using symbol_array_t        = assoc_array_t<u0*>;
-    using overload_array_t      = array_t<overload_t*>;
-    using param_value_array_t   = array_t<param_value_t>;
-
-    enum class call_mode_t : u8 {
-        system                  = 1,
-        variadic,
-    };
-
-    enum class param_cls_t : u8 {
-        ptr                     = 'P',
-        int_                    = 'I',
-        void_                   = 'V',
-        float_                  = 'F',
-        struct_                 = 'S',
-    };
-
-    enum class param_size_t : u8 {
-        none                    = '-',
-        byte                    = 'b',
-        word                    = 'w',
-        dword                   = 'd',
-        qword                   = 'q',
-    };
-
-    namespace ffi {
-        enum class status_t : u8 {
-            ok                                  = 0,
-            address_null                        = 108,
-            prototype_null                      = 109,
-            lib_not_loaded                      = 110,
-            symbol_not_found                    = 111,
-            invalid_int_size                    = 112,
-            invalid_float_size                  = 113,
-            parameter_overflow                  = 117,
-            duplicate_overload                  = 116,
-            load_library_failure                = 114,
-            struct_by_value_not_implemented     = 115,
-            only_one_rest_param_allowed         = 118,  // FIXME
-        };
-    }
 
     // ------------------------------------------------------------------------
     //
@@ -1213,6 +1547,12 @@ namespace basecode {
     // getopt
     //
     // ------------------------------------------------------------------------
+    struct arg_t;
+    struct option_t;
+
+    using arg_array_t           = array_t<arg_t>;
+    using option_array_t        = array_t<option_t>;
+
     enum class arg_type_t : u8 {
         none,
         flag,
@@ -1222,12 +1562,42 @@ namespace basecode {
         decimal,
     };
 
-    struct arg_t;
-    struct getopt_t;
-    struct option_t;
-    union arg_subclass_t;
-    using arg_array_t           = array_t<arg_t>;
-    using option_array_t        = array_t<option_t>;
+    struct option_t final {
+        str::slice_t            long_name;
+        str::slice_t            value_name;
+        str::slice_t            description;
+        s32                     max_allowed;
+        s32                     min_required;
+        u8                      radix;
+        s8                      short_name;
+        arg_type_t              type;
+    };
+
+    union arg_subclass_t final {
+        b8                      flag;
+        str::slice_t            string;
+        s64                     integer;
+        f64                     decimal;
+    };
+
+    struct arg_t final {
+        option_t*               option;
+        arg_subclass_t          subclass;
+        u32                     pos;
+        arg_type_t              type;
+        b8                      extra;
+    };
+
+    struct getopt_t final {
+        alloc_t*                alloc;
+        const s8**              argv;
+        option_t*               file_option;
+        str::slice_t            description;
+        arg_array_t             args;
+        option_array_t          opts;
+        arg_array_t             extras;
+        s32                     argc;
+    };
 
     namespace getopt {
         enum class status_t : u32 {
@@ -1269,7 +1639,103 @@ namespace basecode {
     };
 
     template <typename K, typename V>
-    struct hashtab_t;
+    struct hashtab_t final {
+        struct pair_t;
+
+        using Key_Type          = K;
+        using Pair_Type         = pair_t;
+        using Value_Type        = V;
+
+        u64*                    flags;
+        u64*                    hashes;
+        Key_Type*               keys;
+        Value_Type*             values;
+        alloc_t*                alloc;
+        u32                     size;
+        u32                     cap_idx;
+        u32                     capacity;
+        f32                     load_factor;
+
+        struct pair_t final {
+            Key_Type            key;
+            Value_Type          value;
+            u32                 bucket_idx;
+
+            auto operator<(const pair_t& rhs) const {
+                return key < rhs.key;
+            }
+        };
+
+        Value_Type& operator[](u32 bucket_idx) {
+            return values[bucket_idx];
+        }
+
+        const Pair_Type operator[](u32 idx)  const {
+            b8 ok{};
+            while (idx < capacity) {
+                if (hash_common::read_flag(flags, idx)) {
+                    ok = true;
+                    break;
+                }
+                ++idx;
+            }
+            if (ok) {
+                pair_t p;
+                p.key        = keys[idx];
+                p.value      = values[idx];
+                p.bucket_idx = idx;
+                return p;
+            }
+            return {};
+        }
+
+        struct iterator_state_t {
+            u32                 pos;
+
+            inline u0 end(const hashtab_t* ref) {
+                pos = ref->capacity;
+            }
+
+            inline u0 next(const hashtab_t* ref) {
+                while (pos < ref->capacity) {
+                    if (hash_common::read_flag(ref->flags, ++pos))
+                        break;
+                }
+            }
+
+            inline Pair_Type get(hashtab_t* ref) {
+                pair_t p{};
+                p.key        = ref->keys[pos];
+                p.value      = ref->values[pos];
+                p.bucket_idx = pos;
+                return p;
+            }
+
+            inline u0 begin(const hashtab_t* ref) {
+                pos = 0;
+                while (pos < ref->capacity) {
+                    if (hash_common::read_flag(ref->flags, pos))
+                        break;
+                    ++pos;
+                }
+            }
+
+            inline const Pair_Type get(const hashtab_t* ref) {
+                pair_t p{};
+                p.key        = ref->keys[pos];
+                p.value      = ref->values[pos];
+                p.bucket_idx = pos;
+                return p;
+            }
+
+            inline b8 cmp(const iterator_state_t& s) const {
+                return pos != s.pos;
+            }
+        };
+        DECL_ITERS(hashtab_t, Pair_Type, iterator_state_t);
+    };
+    static_assert(sizeof(hashtab_t<s32, s32>) <= 56,
+                  "hashtab_t<K, V> is now larger than 56 bytes!");
 
     // ------------------------------------------------------------------------
     //
@@ -1350,7 +1816,7 @@ namespace basecode {
 
     using localized_strtab_t    = hashtab_t<locale_key_t, intern::result_t>;
 
-    namespace locale{
+    namespace locale {
         enum class status_t : u8 {
             ok,
         };
@@ -1374,14 +1840,56 @@ namespace basecode {
     //
     // ------------------------------------------------------------------------
     struct job_t;
-    struct job_task_base;
-
-    template <typename Proc, typename... Args>
-    struct job_task_t;
 
     using job_id                = u32;
     using job_list_t            = stable_array_t<job_t>;
     using job_id_list_t         = array_t<job_id>;
+
+    struct job_task_base_t {
+        virtual ~job_task_base_t() = default;
+
+        virtual u0 run() = 0;
+
+        virtual u0* get_ret_val() = 0;
+
+        virtual u0 set_job(job_t* job) = 0;
+    };
+
+    template <typename Proc, typename... Args>
+    struct job_task_t : job_task_base_t {
+        using Result_Type       = std::invoke_result_t<Proc, Args...>;
+        static
+        constexpr b8 Is_Void    = std::is_void_v<Result_Type>;
+
+        using Proc_Type         = Proc;
+        using Args_Type         = std::tuple<Args...>;
+        using Return_Type       = typename std::conditional<Is_Void,
+            s32,
+            Result_Type>::type;
+
+        job_t*                  job;
+        Proc_Type               proc;
+        Args_Type               args;
+        Return_Type             ret_val;
+
+        job_task_t(Proc_Type proc, Args_Type args) : job(),
+                                                     proc(proc),
+                                                     args(std::move(args)),
+                                                     ret_val() {
+        }
+
+        u0 run() override {
+            if constexpr (Is_Void) {
+                std::apply(proc, args);
+                ret_val = {};
+            } else {
+                ret_val = std::apply(proc, args);
+            }
+        }
+
+        u0* get_ret_val() override          { return &ret_val;   }
+        u0 set_job(job_t* value) override   { job = value;       }
+    };
 
     enum class job_state_t : u8 {
         queued                  = 250,
@@ -1389,6 +1897,30 @@ namespace basecode {
         running,
         finished,
     };
+
+    // N.B. job subsystem uses a slab allocator to store instances
+    //      of job_task_t.  because job_task_t's size varies based on
+    //      the types passed at compile time, we don't know the exact
+    //      memory footprint.
+    //
+    //      assume there's 32 bytes of free memory per job_task_t to store
+    //      the parameters passed.
+    constexpr u32 job_task_buffer_size = 64;
+
+    struct job_t final {
+        job_task_base_t*        task;
+        event_t                 finished;
+        stopwatch_t             time;
+        job_id_list_t           children;
+        job_id                  parent;
+        job_id                  id;
+        u32                     label_id;
+        job_state_t             state;
+
+        b8 operator==(const job_t& other) const { return id == other.id; };
+    };
+    static_assert(sizeof(job_t) <= 72,
+                  "sizeof(job_t) is now greater than 72 bytes!");
 
     namespace job {
         enum class status_t : u8 {
@@ -1443,10 +1975,52 @@ namespace basecode {
         {t.size}                -> std::same_as<u32>;
     };
 
-    struct list_node_t;
+    struct list_node_t final {
+        u64                     free    : 1;
+        u64                     prev    : 21;
+        u64                     next    : 21;
+        u64                     value   : 21;
+    };
 
     template <typename T>
-    struct list_t;
+    struct list_t final {
+        using Value_Type        = T;
+        using Node_Array        = array_t<list_node_t>;
+        using Value_Array       = array_t<Value_Type>;
+
+        alloc_t*                alloc;
+        Node_Array              nodes;
+        Value_Array             values;
+        u32                     head;
+        u32                     tail;
+        u32                     free;
+        u32                     size;
+
+        struct iterator_state_t {
+            u32                 pos;
+
+            inline u0 end(const list_t* ref) {
+                pos = ref->nodes.size + 1;
+            }
+            inline u0 next(const list_t* ref) {
+                pos = (&ref->nodes[pos - 1])->next;
+                pos = pos == 0 ? ref->nodes.size + 1 : pos;
+            }
+            inline u0 begin(const list_t* ref) {
+                pos = ref->head;
+            }
+            inline list_node_t* get(list_t* ref) {
+                return &ref->nodes[pos - 1];
+            }
+            inline b8 cmp(const iterator_state_t& s) const {
+                return pos != s.pos;
+            }
+            inline const list_node_t* get(const list_t* ref) {
+                return &ref->nodes[pos - 1];
+            }
+        };
+        DECL_ITERS(list_t, list_node_t*, iterator_state_t);
+    };
 
     // ------------------------------------------------------------------------
     //
@@ -1563,21 +2137,6 @@ namespace basecode {
 
     // ------------------------------------------------------------------------
     //
-    // memory/meta
-    //
-    // ------------------------------------------------------------------------
-    struct alloc_info_t;
-
-    using alloc_info_array_t    = array_t<alloc_info_t*>;
-
-    enum class plot_mode_t : u8 {
-        none,
-        rolled,
-        scrolled,
-    };
-
-    // ------------------------------------------------------------------------
-    //
     // mutex
     //
     // ------------------------------------------------------------------------
@@ -1602,11 +2161,35 @@ namespace basecode {
     // network
     //
     // ------------------------------------------------------------------------
+#ifdef _WIN32
+#   define SOCKET                   unsigned __int64
+#else
+#   define INVALID_SOCKET           (-1)
+#   define SOCKET                   s32
+#endif
+#ifndef MSG_NOSIGNAL
+#   define MSG_NOSIGNAL             0
+#endif
     struct socket_t;
-    struct ip_address_t;
 
     using socket_read_callback_t    = b8 (*)(socket_t&, u0*);
     using socket_close_callback_t   = u0 (*)(socket_t&);
+
+    struct socket_t final {
+        alloc_t*                alloc;
+        u8*                     buf;
+        u8*                     buf_cur;
+        u0*                     user;
+        socket_close_callback_t close_cb;
+        SOCKET                  socket;
+        u32                     buf_free;
+        u32                     buf_size;
+    };
+
+    struct ip_address_t final {
+        u32                     number;
+        s8                      text[17];
+    };
 
     namespace network {
         enum class status_t : u8 {
@@ -1648,6 +2231,22 @@ namespace basecode {
     using obj_array_t           = array_t<u0*>;
     using slab_table_t          = hashtab_t<u32, obj_type_t>;
     using destroy_callback_t    = u0 (*)(const u0*);
+
+    struct obj_type_t final {
+        alloc_t*                alloc;
+        destroy_callback_t      destroyer;
+        u32                     type_id;
+        const s8*               type_name;
+        obj_array_t             objects;
+    };
+
+    struct obj_pool_t final {
+        alloc_t*                alloc;
+        slab_table_t            slabs;
+        u32                     size;
+    };
+    static_assert(sizeof(obj_pool_t) <= 72,
+                  "obj_pool_t is now larger than 72 bytes!");
 
     namespace obj_pool {
         enum class status_t : u32 {
@@ -1713,6 +2312,149 @@ namespace basecode {
 
     // ------------------------------------------------------------------------
     //
+    // eav
+    //
+    // ------------------------------------------------------------------------
+    constexpr s32 app_id        = 0x000dead1;
+
+    struct db_t;
+    struct tuple_t;
+    struct entity_t;
+
+    using tuple_list_t          = array_t<tuple_t>;
+    using entity_list_t         = array_t<entity_t>;
+
+    enum class value_type_t : u8 {
+        nil,
+        list,
+        entity,
+        string,
+        boolean,
+        integer,
+        floating_point,
+    };
+
+    struct entity_t final {
+        constexpr entity_t()        : id(0)         {}
+        constexpr entity_t(s64 id)  : id(id)        {}
+        constexpr operator s64() const              { return id;        }
+        [[nodiscard]] constexpr b8 empty() const    { return id == 0;   }
+    private:
+        s64                     id;
+    };
+
+    union value_data_t final {
+        entity_t                entity;
+        union {
+            u64                 u;
+            f64                 f;
+        }                       number;
+        str_t                   string;
+        entity_list_t           list;
+
+        ~value_data_t()                                         {}
+        value_data_t() : list()                                 {}
+        explicit value_data_t(u64 value) : number({.u = value}) {}
+        explicit value_data_t(f64 value) : number({.f = value}) {}
+        explicit value_data_t(entity_t value) : entity(value)   {}
+    };
+
+    struct value_t final {
+        value_type_t            type;
+        value_data_t            data;
+
+        value_t()          : type(value_type_t::nil), data()                 {}
+        value_t(b8 value)  : type(value_type_t::boolean), data(u64(value))   {}
+        value_t(s8 value)  : type(value_type_t::integer), data(u64(value))   {}
+        value_t(u8 value)  : type(value_type_t::integer), data(u64(value))   {}
+        value_t(u64 value) : type(value_type_t::integer), data(value)        {}
+        value_t(s16 value) : type(value_type_t::integer), data(u64(value))   {}
+        value_t(u16 value) : type(value_type_t::integer), data(u64(value))   {}
+        value_t(s32 value) : type(value_type_t::integer), data(u64(value))   {}
+        value_t(u32 value) : type(value_type_t::integer), data(u64(value))   {}
+        value_t(s64 value) : type(value_type_t::integer), data(u64(value))   {}
+        value_t(f64 value) : type(value_type_t::floating_point), data(value) {}
+        value_t(entity_t value) : type(value_type_t::entity), data(value)    {}
+        explicit value_t(value_type_t type) : type(type), data()             {}
+        value_t(const value_t& other) { operator=(other); }
+
+        constexpr operator u64() const {
+            return data.number.u;
+        }
+
+        value_t& operator=(const value_t& other);
+    };
+    static_assert(sizeof(value_t) <= 32,
+                  "value_t is now larger than 32 bytes!");
+
+    struct tuple_t final {
+        s64                     rowid;
+        entity_t                attr;
+        value_t                 value;
+    };
+    static_assert(sizeof(tuple_t) <= 48,
+                  "tuple_t is now larger than 48 bytes!");
+
+    struct simple_stmt_cache_t final {
+        sqlite3_stmt*           select      {};
+        sqlite3_stmt*           upsert      {};
+        sqlite3_stmt*           delete_     {};
+    };
+
+    struct entity_stmt_cache_t final {
+        sqlite3_stmt*           select      {};
+        sqlite3_stmt*           update      {};
+        sqlite3_stmt*           insert      {};
+    };
+
+    struct tuple_stmt_cache_t final {
+        sqlite3_stmt*           insert      {};
+        sqlite3_stmt*           select_one  {};
+        sqlite3_stmt*           select_all  {};
+        sqlite3_stmt*           update_one  {};
+        sqlite3_stmt*           update_all  {};
+    };
+
+    struct txn_t final {
+        db_t*                   db;
+        str::slice_t            label;
+        u32                     id;
+    };
+
+    using txn_list_t            = stable_array_t<txn_t>;
+
+    struct db_t final {
+        alloc_t*                alloc       {};
+        str_t                   buf;
+        path_t                  path;
+        sqlite3*                handle      {};
+        txn_list_t              txns        {};
+        tuple_stmt_cache_t      tuple       {};
+        simple_stmt_cache_t     config      {};
+        entity_stmt_cache_t     entity      {};
+        simple_stmt_cache_t     symbol      {};
+    };
+
+    namespace eav {
+        enum class status_t : u8 {
+            ok                  = 0,
+            error               = 101,
+            not_found           = 102,
+            sql_error           = 103,
+            invalid_rowid       = 104,
+            invalid_entity      = 105,
+        };
+
+        namespace entity {
+            namespace status {
+                constexpr u8 dead  = 0;
+                constexpr u8 live  = 1;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    //
     // plot
     //
     // ------------------------------------------------------------------------
@@ -1721,6 +2463,75 @@ namespace basecode {
     struct scrolled_view_t;
 
     using data_point_array_t    = array_t<data_point_t>;
+
+    struct data_point_t final {
+        f32                     x, y;
+    };
+
+    struct rolled_view_t final {
+        data_point_array_t      values;
+        f32                     span;
+        f32                     time;
+        f32                     min_y;
+        f32                     max_y;
+    };
+
+    struct scrolled_view_t final {
+        data_point_array_t      values;
+        f32                     time;
+        f32                     min_y;
+        f32                     max_y;
+        s32                     offset;
+        s32                     max_size;
+    };
+
+    // ------------------------------------------------------------------------
+    //
+    // memory/meta
+    //
+    // ------------------------------------------------------------------------
+    struct alloc_info_t;
+
+    using alloc_info_array_t    = array_t<alloc_info_t*>;
+
+    enum class plot_mode_t : u8 {
+        none,
+        rolled,
+        scrolled,
+    };
+
+    struct alloc_info_t final {
+        alloc_t*                alloc;
+        alloc_info_t*           parent;
+        alloc_t*                tracked;
+        alloc_info_array_t      children;
+        union {
+            rolled_view_t       rolled;
+            scrolled_view_t     scrolled;
+        }                       plot;
+        plot_mode_t             mode;
+    };
+
+    // ------------------------------------------------------------------------
+    //
+    // src_loc
+    //
+    // ------------------------------------------------------------------------
+    struct source_loc_t final {
+        u32                     line    {};
+        u32                     column  {};
+    };
+
+    struct source_pos_t final {
+        u32                     end     {};
+        u32                     start   {};
+    };
+
+    struct source_info_t final {
+        source_pos_t            pos;
+        source_loc_t            start;
+        source_loc_t            end;
+    };
 
     // ------------------------------------------------------------------------
     //
@@ -1737,13 +2548,61 @@ namespace basecode {
     using token_list_t          = array_t<token_t>;
     using token_id_list_t       = array_t<token_id_t>;
 
+#define TOKEN_CLS(t)            (u32((t)) >> 16U & 0xffffU)
+#define TOKEN_TYPE(cls, type)   (u32((cls)) << 16U | u32((type)))
+
+    struct token_id_t final {
+        constexpr token_id_t()       : id(0)        {}
+        constexpr token_id_t(u32 id) : id(id)       {}
+        constexpr operator u32() const              { return id;        }
+        [[nodiscard]] constexpr b8 empty() const    { return id == 0;   }
+        static constexpr token_id_t null()          { return 0;         }
+    private:
+        u32                     id;
+    };
+
+    struct token_type_t final {
+        constexpr token_type_t()         : cls(0), type(0) {
+        }
+        constexpr token_type_t(u32 type) : cls(type >> 16U & 0xffffU),
+                                           type(type & 0xffffU) {
+        }
+        constexpr operator u32() const           { return TOKEN_TYPE(cls, type); }
+        [[nodiscard]] constexpr b8 empty() const { return type == 0 && cls == 0; }
+        static constexpr token_type_t none()     { return 0;                     }
+    private:
+        u32                     cls:    16;
+        u32                     type:   16;
+    };
+
+    struct token_t final {
+        token_id_t              id;
+        source_info_t           loc;
+        token_type_t            type;
+    };
+
+    struct token_cache_t final {
+        alloc_t*                alloc;
+        token_list_t            tokens;
+        u32                     idx;
+    };
+
+    struct prefix_rule_t final {
+        token_type_t            plus;
+        token_type_t            minus;
+    };
+
+    struct operator_precedence_t final {
+        u8                      left;
+        u8                      right;
+    };
+
     // ------------------------------------------------------------------------
     //
     // pratt
     //
     // ------------------------------------------------------------------------
     struct rule_t;
-    struct grammar_t;
     struct pratt_ctx_t;
 
     using rule_map_t            = hashtab_t<token_type_t, rule_t>;
@@ -1751,6 +2610,32 @@ namespace basecode {
     using nud_t                 = ast::node_id_t (*)(pratt_ctx_t*);
     using led_t                 = ast::node_id_t (*)(pratt_ctx_t*,
                                                      ast::node_id_t);
+
+    struct rule_t final {
+        std_t                   std;
+        nud_t                   nud;
+        led_t                   led;
+        u32                     lbp;
+        u8                      postfix:        1;
+        u8                      suppress_led:   1;
+        u8                      associativity:  2;
+        u8                      pad:            3;
+    };
+
+    struct grammar_t final {
+        alloc_t*                alloc;
+        rule_map_t              rules;
+        u32*                    operator_types;
+        u32                     default_rbp;
+    };
+
+    struct pratt_ctx_t final {
+        bass_t*                 ast;
+        rule_t*                 rule;
+        const token_t*          token;
+        grammar_t*              grammar;
+        token_cache_t*          token_cache;
+    };
 
     namespace pratt {
         namespace associativity {
@@ -1778,8 +2663,35 @@ namespace basecode {
     // proxy_array
     //
     // ------------------------------------------------------------------------
-    template <typename T, typename Backing_Type = T>
-    struct proxy_array_t;
+    template<typename T, typename Backing_Type = T>
+    struct proxy_array_t final {
+        using Is_Static         = std::integral_constant<b8, true>;
+        using Value_Type        = T;
+        using Size_Per_16       = std::integral_constant<u32, 16 / sizeof(T)>;
+        using Backing_Array     = const array_t<Backing_Type>*;
+
+        Backing_Array           backing;
+        u32                     start;
+        u32                     size;
+
+        const Value_Type& operator[](u32 index) const {
+            return (const Value_Type&) backing->data[start + index];
+        }
+
+        struct iterator_state_t {
+            u32                 pos;
+
+            inline u0 end(const proxy_array_t* ref)               { pos = ref->size;      }
+            inline u0 next(const proxy_array_t* ref)              { UNUSED(ref); ++pos;   }
+            inline Value_Type get(proxy_array_t* ref)             { return (*ref)[pos];   }
+            inline u0 begin(const proxy_array_t* ref)             { UNUSED(ref); pos = 0; }
+            inline b8 cmp(const iterator_state_t& s) const        { return pos != s.pos;  }
+            inline const Value_Type get(const proxy_array_t* ref) { return (*ref)[pos];   }
+        };
+        DECL_ITERS(proxy_array_t, Value_Type, iterator_state_t);
+    };
+    static_assert(sizeof(proxy_array_t<s32>) <= 16,
+                  "proxy_array_t<T> is now larger than 16 bytes!");
 
     // ------------------------------------------------------------------------
     //
@@ -1787,21 +2699,65 @@ namespace basecode {
     //
     // ------------------------------------------------------------------------
     template <typename T>
-    struct queue_t;
+    struct queue_t final {
+        using Value_Type        = T;
+
+        array_t<Value_Type>     items;
+        u32                     size;
+        u32                     offset;
+
+        T& operator[](u32 index) {
+            return items[(index + offset) % items.size];
+        }
+        const T& operator[](u32 index) const {
+            return items[(index + offset) % items.size];
+        }
+    };
+    static_assert(sizeof(queue_t<s32>) <= 32,
+                  "queue_t<T> is now larger than 32 bytes!");
 
     // ------------------------------------------------------------------------
     //
     // rbt
     //
     // ------------------------------------------------------------------------
-    template <typename T>
-    struct rbt_t;
-
     enum class rbt_color_t : u8 {
         none  = bintree::color::none,
         red   = bintree::color::red,
         black = bintree::color::black
     };
+
+    template <typename T>
+    struct rbt_t final {
+        struct node_t;
+
+        using Has_Color         = std::integral_constant<b8, true>;
+        using Node_Type         = node_t*;
+        using Value_Type        = T;
+        static constexpr u32    Value_Type_Size    = sizeof(T);
+        static constexpr u32    Value_Type_Align   = alignof(T);
+
+        struct node_t final {
+            node_t*             lhs;
+            node_t*             rhs;
+            node_t*             parent;
+            Value_Type*         value;
+            rbt_color_t         color;
+        };
+        static_assert(sizeof(node_t) <= 40,
+                      "node_t is now larger than 40 bytes!");
+
+        static constexpr u32    Node_Type_Size     = sizeof(node_t);
+        static constexpr u32    Node_Type_Align    = alignof(node_t);
+
+        alloc_t*                alloc;
+        alloc_t*                node_slab;
+        alloc_t*                value_slab;
+        Node_Type               root;
+        u32                     size;
+    };
+    static_assert(sizeof(rbt_t<u32>) <= 40,
+                  "rbt_t<u32> is now larger than 40 bytes!");
 
     // ------------------------------------------------------------------------
     //
@@ -1812,6 +2768,19 @@ namespace basecode {
     struct postfix_expr_t;
 
     using postfix_expr_list_t   = array_t<postfix_expr_t>;
+
+    struct postfix_expr_t final {
+        token_id_list_t         tokens;
+        u32                     arg_count:  8;
+        u32                     stmt_count: 24;
+    };
+
+    struct postfix_t final {
+        alloc_t*                alloc;
+        token_cache_t*          tokens;
+        operator_precedence_t*  operator_precedences;
+        postfix_expr_list_t     exprs;
+    };
 
     namespace token::cls {
         constexpr u16 none                 = 0;
@@ -1856,31 +2825,68 @@ namespace basecode {
         {t.load_factor}         -> std::same_as<f32>;
     };
 
-    struct set_buf_size_t;
-
-    template <typename t>
-    struct set_t;
-
-    // ------------------------------------------------------------------------
-    //
-    // src_loc
-    //
-    // ------------------------------------------------------------------------
-    struct source_loc_t final {
-        u32                     line    {};
-        u32                     column  {};
+    struct set_buf_size_t final {
+        u32                     total_size;
+        u32                     size_of_flags;
+        u32                     num_flag_words;
+        u32                     size_of_hashes;
+        u32                     size_of_values;
     };
 
-    struct source_pos_t final {
-        u32                     end     {};
-        u32                     start   {};
-    };
+    template <typename T>
+    struct set_t final {
+        using Value_Type        = T;
+        using Is_Pointer        = std::integral_constant<b8, std::is_pointer_v<T>>;
+        using Value_Type_Base   = std::remove_pointer_t<T>;
 
-    struct source_info_t final {
-        source_pos_t            pos;
-        source_loc_t            start;
-        source_loc_t            end;
+        alloc_t*                alloc;
+        u64*                    flags;
+        u64*                    hashes;
+        Value_Type*             values;
+        u32                     size;
+        u32                     cap_idx;
+        u32                     capacity;
+        f32                     load_factor;
+
+        struct iterator_state_t {
+            u32                 pos;
+
+            inline u0 end(const set_t* ref) {
+                pos = ref->capacity;
+            }
+
+            inline u0 next(const set_t* ref) {
+                while (pos < ref->capacity) {
+                    if (ref->hashes[++pos])
+                        break;
+                }
+            }
+
+            inline Value_Type get(set_t* ref) {
+                return ref->values[pos];
+            }
+
+            inline u0 begin(const set_t* ref) {
+                pos = 0;
+                while (pos < ref->capacity) {
+                    if (ref->hashes[pos])
+                        break;
+                    ++pos;
+                }
+            }
+
+            inline const Value_Type get(const set_t* ref) {
+                return ref->values[pos];
+            }
+
+            inline b8 cmp(const iterator_state_t& s) const {
+                return pos != s.pos;
+            }
+        };
+        DECL_ITERS(set_t, Value_Type, iterator_state_t);
     };
+    static_assert(sizeof(set_t<s32>) <= 56,
+                  "set_t<T> is now larger than 56 bytes!");
 
     // ------------------------------------------------------------------------
     //
@@ -1911,17 +2917,34 @@ namespace basecode {
     template <typename T>
     concept Stack = Fixed_Stack<T> || Dynamic_Stack<T>;
 
+    template <typename T, u32 Size = 8>
+    struct fixed_stack_t final {
+        using Value_Type        = T;
+        using Base_Value_Type   = std::remove_pointer_t<T>;
+
+        T                       data[Size];
+        u32                     size;
+        u32                     capacity = Size;
+
+        T& operator[](u32 index)                { return data[index]; }
+        const T& operator[](u32 index) const    { return data[index]; }
+    };
+
     template <typename T>
-    struct stack_t;
+    struct stack_t final {
+        using Value_Type        = T;
+        using Base_Value_Type   = std::remove_pointer_t<T>;
 
-    // ------------------------------------------------------------------------
-    //
-    // stopwatch
-    //
-    // ------------------------------------------------------------------------
-    struct stopwatch_t;
+        alloc_t*                alloc;
+        T*                      data;
+        u32                     size;
+        u32                     capacity;
 
-    using timed_block_callable_t    = std::function<s32()>;
+        T& operator[](u32 index)                { return data[index]; }
+        const T& operator[](u32 index) const    { return data[index]; }
+    };
+    static_assert(sizeof(stack_t<s32>) <= 24,
+                  "stack_t<T> is now larger than 24 bytes!");
 
     // ------------------------------------------------------------------------
     //
@@ -1986,7 +3009,152 @@ namespace basecode {
     };
 
     template <typename V>
-    struct symtab_t;
+    struct symtab_t final {
+        using Value_Type        = V;
+        using Value_Array       = stable_array_t<Value_Type>;
+        using Pair_Array        = assoc_array_t<std::remove_pointer_t<Value_Type>*>;
+
+        struct symtab_node_t final {
+            symtab_node_t*      next;
+            symtab_node_t*      child;
+            Value_Type*         value;
+            u32                 id;
+            s8                  sym;
+            symtab_node_type_t  type;
+        };
+
+        using Node_Type         = symtab_node_t;
+        using Node_Array        = stable_array_t<Node_Type>;
+
+        alloc_t*                alloc;
+        Node_Array              nodes;
+        Value_Array             values;
+        u32                     size;
+    };
+    static_assert(sizeof(symtab_t<s32>) <= 80,
+                  "symtab_t<V> is now larger than 80 bytes!");
+
+    // ------------------------------------------------------------------------
+    //
+    // ffi
+    //
+    // ------------------------------------------------------------------------
+    struct ffi_t;
+    struct lib_t;
+    struct param_t;
+    struct proto_t;
+    struct overload_t;
+    struct param_type_t;
+    struct param_value_t;
+    union  param_alias_t;
+
+    using param_array_t         = array_t<param_t*>;
+    using symbol_array_t        = assoc_array_t<u0*>;
+    using overload_array_t      = array_t<overload_t*>;
+    using param_value_array_t   = array_t<param_value_t>;
+
+    enum class call_mode_t : u8 {
+        system                  = 1,
+        variadic,
+    };
+
+    enum class param_cls_t : u8 {
+        ptr                     = 'P',
+        int_                    = 'I',
+        void_                   = 'V',
+        float_                  = 'F',
+        struct_                 = 'S',
+    };
+
+    enum class param_size_t : u8 {
+        none                    = '-',
+        byte                    = 'b',
+        word                    = 'w',
+        dword                   = 'd',
+        qword                   = 'q',
+    };
+
+    struct lib_t final {
+        alloc_t*                alloc;
+        DLLib*                  handle;
+        symtab_t<u0*>           symbols;
+        path_t                  path;
+    } __attribute__((aligned(128)));
+
+    struct param_type_t final {
+        param_cls_t             cls;
+        param_size_t            size;
+        u8                      user;
+    } __attribute__((aligned(4)));
+
+    union param_alias_t final {
+        u0*                     p;
+        u8                      b;
+        u16                     w;
+        u32                     dw;
+        u64                     qw;
+        f32                     fdw;
+        f64                     fqw;
+    };
+
+    struct param_value_t final {
+        param_alias_t           alias;
+        param_type_t            type;
+    } __attribute__((aligned(16)));
+
+    struct param_t final {
+        param_value_t           value;
+        param_array_t           members;
+        str::slice_t            name;
+        u8                      has_dft:    1;
+        u8                      is_rest:    1;
+        u8                      pad:        6;
+    } __attribute__((aligned(64)));
+
+    struct overload_t final {
+        proto_t*                proto;
+        u0*                     func;
+        str_t                   signature;
+        str::slice_t            name;
+        param_array_t           params;
+        param_type_t            ret_type;
+        u32                     req_count;
+        u8                      has_dft:    1;
+        u8                      has_rest:   1;
+        u8                      pad:        6;
+        call_mode_t             mode;
+    } __attribute__((aligned(128)));
+
+    struct proto_t final {
+        lib_t*                  lib;
+        str::slice_t            name;
+        overload_array_t        overloads;
+        u32                     min_req;
+        u32                     max_req;
+    } __attribute__((aligned(128)));
+
+    struct ffi_t final {
+        alloc_t*                alloc;
+        DCCallVM*               vm;
+        u32                     heap_size;
+    } __attribute__((aligned(32)));
+
+    namespace ffi {
+        enum class status_t : u8 {
+            ok                                  = 0,
+            address_null                        = 108,
+            prototype_null                      = 109,
+            lib_not_loaded                      = 110,
+            symbol_not_found                    = 111,
+            invalid_int_size                    = 112,
+            invalid_float_size                  = 113,
+            parameter_overflow                  = 117,
+            duplicate_overload                  = 116,
+            load_library_failure                = 114,
+            struct_by_value_not_implemented     = 115,
+            only_one_rest_param_allowed         = 118,  // FIXME
+        };
+    }
 
     // ------------------------------------------------------------------------
     //
@@ -2097,16 +3265,72 @@ namespace basecode {
     //
     // ------------------------------------------------------------------------
     struct thread_t;
-    struct proc_base_t;
-
-    template <typename Proc, typename... Args>
-    struct thread_proc_t;
 
     enum class thread_state_t : u8 {
         exited,
         created,
         running,
         canceled,
+    };
+
+    struct proc_base_t {
+        virtual u0* invoke() = 0;
+
+        virtual thread_t* self() = 0;
+
+        virtual ~proc_base_t() = default;
+    };
+
+    template <typename Proc, typename... Args>
+    struct thread_proc_t final : public proc_base_t {
+        using Result_Type       = std::invoke_result_t<Proc, Args...>;
+        static constexpr b8     Is_Void = std::is_void_v<Result_Type>;
+
+        using Proc_Type         = Proc;
+        using Args_Type         = std::tuple<Args...>;
+        using Return_Type       = typename std::conditional<Is_Void,
+            int,
+            Result_Type>::type;
+
+        thread_t*               thread;
+        Proc_Type               proc;
+        Args_Type               args;
+        Return_Type             ret_val;
+
+        thread_proc_t(thread_t* thread,
+                      Proc_Type proc,
+                      Args_Type args) : thread(thread),
+                                        proc(proc),
+                                        args(std::move(args)) {
+        }
+
+        u0* invoke() override {
+            if constexpr (Is_Void) {
+                std::apply(proc, args);
+                ret_val = {};
+                return nullptr;
+            } else {
+                ret_val = std::apply(proc, args);
+                return &ret_val;
+            }
+        }
+
+        thread_t* self() override { return thread; }
+    };
+
+    struct thread_t final {
+        pthread_t               handle;
+        proc_base_t*            proc;
+        str::slice_t            name;
+        thread_state_t          state;
+        u8                      joined:     1;
+        u8                      detached:   1;
+        u8                      joinable:   1;
+        u8                      canceled:   1;
+        u8                      cancelable: 1;
+        u8                      pad:        3;
+
+        auto operator==(const thread_t& other) const;
     };
 
     namespace thread {
@@ -2257,6 +3481,13 @@ namespace basecode {
         Value_Type& operator*() {
             return _value;
         }
+        const Value_Type& operator*() const {
+            return _value;
+        }
+    };
+
+    struct variant_array_t final {
+        hashtab_t<u32, alloc_t*>    values;
     };
 
     // ------------------------------------------------------------------------
@@ -2269,10 +3500,22 @@ namespace basecode {
         array,
     };
 
-    struct env_t;
-    struct env_value_t;
+    struct env_value_t final {
+        union {
+            str::slice_t        str;
+            slice_array_t       list;
+        }                       kind;
+        env_value_type_t        type;
+    };
 
     using envvar_table_t        = hashtab_t<str::slice_t, env_value_t>;
+
+    struct env_t final {
+        alloc_t*                alloc;
+        env_t*                  parent;
+        str::slice_t            name;
+        envvar_table_t          vartab;
+    };
 
     namespace env {
         enum class status_t : u32 {
@@ -2422,11 +3665,13 @@ namespace basecode {
             return splitmix64(s_fixed_random + key);
         }
 
-        inline u64 hash64(option_t* const& key);
-
         inline u64 hash64(const integer_t& key);
 
         inline u64 hash64(const decimal_t& key);
+
+        inline u64 hash64(option_t* const& key) {
+            return murmur::hash64((const u0*) key, sizeof(u0*));
+        }
 
         template <typename T>
         inline u64 hash64(const slice_t<T>& key) {
@@ -2435,7 +3680,10 @@ namespace basecode {
 
         inline u64 hash64(const locale_key_t& key);
 
-        inline u64 hash64(const token_type_t& key);
+        inline u64 hash64(const token_type_t& key) {
+            u32 value = key;
+            return murmur::hash64(&value, sizeof(u32));
+        }
 
         inline u64 hash64(const locale_key_t& key) {
             return murmur::hash64(&key, sizeof(locale_key_t));

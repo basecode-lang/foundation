@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/plot.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/core/memory/meta.h>
 #include <basecode/core/memory/system/slab.h>

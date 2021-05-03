@@ -20,36 +20,21 @@
 
 #include <basecode/core/token.h>
 
-namespace basecode {
-    struct postfix_expr_t final {
-        token_id_list_t         tokens;
-        u32                     arg_count:  8;
-        u32                     stmt_count: 24;
-    };
+namespace basecode::rpn {
+    namespace expr {
+        u0 free(postfix_expr_t& expr);
 
-    struct postfix_t final {
-        alloc_t*                alloc;
-        token_cache_t*          tokens;
-        operator_precedence_t*  operator_precedences;
-        postfix_expr_list_t     exprs;
-    };
-
-    namespace rpn {
-        namespace expr {
-            u0 free(postfix_expr_t& expr);
-
-            u0 init(postfix_expr_t& expr,
-                    alloc_t* alloc = context::top()->alloc.main);
-        }
-
-        u0 free(postfix_t& postfix);
-
-        b8 to_postfix(postfix_t& postfix);
-
-        postfix_expr_t* add_expr(postfix_t& postfix);
-
-        status_t init(postfix_t& postfix,
-                      token_cache_t* tokens,
-                      alloc_t* alloc = context::top()->alloc.main);
+        u0 init(postfix_expr_t& expr,
+                alloc_t* alloc = context::top()->alloc.main);
     }
+
+    u0 free(postfix_t& postfix);
+
+    b8 to_postfix(postfix_t& postfix);
+
+    postfix_expr_t* add_expr(postfix_t& postfix);
+
+    status_t init(postfix_t& postfix,
+                  token_cache_t* tokens,
+                  alloc_t* alloc = context::top()->alloc.main);
 }

@@ -16,8 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/bits.h>
 #include <basecode/core/format.h>
-#include <basecode/core/hash_common.h>
 
 namespace basecode::hash_common {
     static u32 s_prime_capacities[] = {
