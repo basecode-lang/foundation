@@ -35,6 +35,7 @@
 #include <cstddef>
 #include <cstring>
 #include <csignal>
+#include <typeinfo>
 #include <unistd.h>
 #include <functional>
 #include <sys/types.h>
@@ -3629,36 +3630,24 @@ namespace basecode {
     // variant
     //
     // ------------------------------------------------------------------------
-    template <typename T>
-    struct variant_t final {
-        using Value_Type        = T;
+    struct variant_type_t;
 
-    private:
-        Value_Type              _value;
+    using variant_destroyer_t   = u0 (*)(const u0*);
+    using variant_type_table_t  = hashtab_t<u32, variant_type_t>;
 
-    public:
-        variant_t() : _value() {
-        }
-        variant_t(const T& value) : _value(value) {
-        }
-        variant_t(const variant_t& other) : _value(other._value) {
-        }
-        ~variant_t() {
-            if constexpr (std::is_destructible_v<Value_Type>) {
-                (&_value)->~Value_Type();
-            }
-        }
-        Value_Type& operator*() {
-            return _value;
-        }
-        const Value_Type& operator*() const {
-            return _value;
-        }
+    struct variant_type_t final {
+        const type_info*        type_info;
+        alloc_t*                slab_alloc;
+        variant_destroyer_t     destroyer;
+        array_t<u0*>            variants;
     };
 
     struct variant_array_t final {
-        hashtab_t<u32, alloc_t*>    values;
+        variant_type_table_t    values;
+        u32                     size;
     };
+    static_assert(sizeof(variant_array_t) <= 64,
+                  "variant_array_t is now larger than 64 bytes!");
 
     // ------------------------------------------------------------------------
     //

@@ -245,7 +245,7 @@ set(
 
     uuid.cpp ${CORE_INC_DIR}/uuid.h
 
-    ${CORE_INC_DIR}/variant.h
+    variant.cpp ${CORE_INC_DIR}/variant.h
 
     wasm/wasm.cpp ${CORE_INC_DIR}/wasm/wasm.h
     wasm/decoder.cpp ${CORE_INC_DIR}/wasm/decoder.h

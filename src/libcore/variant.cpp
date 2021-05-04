@@ -16,29 +16,25 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch.hpp>
-#include <basecode/core/format.h>
 #include <basecode/core/variant.h>
-#include <basecode/core/stopwatch.h>
 
-using namespace basecode;
-
-struct visitor_t {
-    template <typename T>
-    u0 operator()(T&& t) {
-        format::print("{}\n", t);
+namespace basecode::variant {
+    u0 free(variant_array_t& array) {
+        array.size = {};
+        for (const auto& pair : array.values) {
+            auto type = const_cast<variant_type_t*>(&pair.value);
+            if (type->destroyer) {
+                for (auto v : type->variants)
+                    type->destroyer(v);
+            }
+            array::free(type->variants);
+            memory::system::free(type->slab_alloc);
+        }
+        hashtab::free(array.values);
     }
-};
 
-TEST_CASE("basecode::variant basics") {
-    variant_array_t variants{};
-    variant::init(variants);
-    defer(variant::free(variants));
-
-    variant::append(variants, s32(1));
-    variant::append(variants, u8(2));
-    variant::append(variants, f32(3.14));
-
-    visitor_t visitor{};
-    variant::visit(variants, visitor);
+    u0 init(variant_array_t& array, alloc_t* alloc) {
+        array.size = {};
+        hashtab::init(array.values, alloc);
+    }
 }
