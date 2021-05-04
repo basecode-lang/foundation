@@ -23,10 +23,15 @@
 
 using namespace basecode;
 
-struct visitor_t {
-    template <typename T>
-    u0 operator()(T&& t) {
-        format::print("{}\n", t);
+struct visitor_t : variant_visitor_t {
+    u0 accept(u8 value) override {
+        format::print("{}\n", value);
+    }
+    u0 accept(s32 value) override {
+        format::print("{}\n", value);
+    }
+    u0 accept(f32 value) override {
+        format::print("{}\n", value);
     }
 };
 

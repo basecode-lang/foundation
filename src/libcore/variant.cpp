@@ -23,9 +23,9 @@ namespace basecode::variant {
         array.size = {};
         for (const auto& pair : array.values) {
             auto type = const_cast<variant_type_t*>(&pair.value);
-            if (type->destroyer) {
+            if (type->destroy) {
                 for (auto v : type->variants)
-                    type->destroyer(v);
+                    type->destroy(v);
             }
             array::free(type->variants);
             memory::system::free(type->slab_alloc);

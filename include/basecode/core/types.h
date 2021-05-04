@@ -37,10 +37,12 @@
 #include <csignal>
 #include <typeinfo>
 #include <unistd.h>
+#include <algorithm>
 #include <functional>
 #include <sys/types.h>
 #include <x86intrin.h>
 #include <type_traits>
+#include <string_view>
 
 #if defined(WIN32)
 #   define API_EXPORT           __declspec(dllexport)
@@ -224,10 +226,12 @@ namespace std {
 // global forward decls
 //
 // ------------------------------------------------------------------------
+#ifdef _WIN32
+using pthread_t = void*;
+#endif
+
 struct sqlite3;
 struct sqlite3_stmt;
-
-using pthread_t = void*;
 
 namespace fmt {
     inline namespace v7 {
@@ -3632,13 +3636,38 @@ namespace basecode {
     // ------------------------------------------------------------------------
     struct variant_type_t;
 
+    struct variant_visitor_t {
+        virtual u0 accept(b8 value)             {};
+        virtual u0 accept(s8 value)             {};
+        virtual u0 accept(u8 value)             {};
+        virtual u0 accept(s16 value)            {};
+        virtual u0 accept(u16 value)            {};
+        virtual u0 accept(s32 value)            {};
+        virtual u0 accept(u32 value)            {};
+        virtual u0 accept(s64 value)            {};
+        virtual u0 accept(u64 value)            {};
+        virtual u0 accept(f32 value)            {};
+        virtual u0 accept(f64 value)            {};
+        virtual u0 accept(s128 value)           {};
+        virtual u0 accept(u128 value)           {};
+        virtual u0 accept(str_t& value)         {};
+        virtual u0 accept(uuid_t& value)        {};
+        virtual u0 accept(utf8_str_t& value)    {};
+        virtual u0 accept(utf16_str_t& value)   {};
+        virtual u0 accept(utf32_str_t& value)   {};
+        virtual u0 accept(str::slice_t& value)  {};
+    };
+
+    using variant_visit_t       = u0 (*)(const variant_type_t*,
+                                         variant_visitor_t*);
     using variant_destroyer_t   = u0 (*)(const u0*);
     using variant_type_table_t  = hashtab_t<u32, variant_type_t>;
 
     struct variant_type_t final {
-        const type_info*        type_info;
+        const std::type_info*   type_info;
         alloc_t*                slab_alloc;
-        variant_destroyer_t     destroyer;
+        variant_visit_t         visit;
+        variant_destroyer_t     destroy;
         array_t<u0*>            variants;
     };
 
