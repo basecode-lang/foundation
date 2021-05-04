@@ -23,18 +23,15 @@ namespace basecode::variant {
         array.size = {};
         for (const auto& pair : array.values) {
             auto type = const_cast<variant_type_t*>(&pair.value);
-            if (type->destroy) {
-                for (auto v : type->variants)
-                    type->destroy(v);
-            }
-            array::free(type->variants);
-            memory::system::free(type->slab_alloc);
+            type->storage->free();
         }
         hashtab::free(array.values);
+        array::free(array.sequence);
     }
 
     u0 init(variant_array_t& array, alloc_t* alloc) {
         array.size = {};
+        array::init(array.sequence, alloc);
         hashtab::init(array.values, alloc);
     }
 }

@@ -1,6 +1,5 @@
 HIGH
 ---------
-- macro: need an any/variant type that doesn't suck
 - macro: text macro system
 
 - binfmt: pe/coff backend is missing section name mapping; not sure
@@ -41,8 +40,6 @@ HIGH
 
 MEDIUM
 ---------
-- error: once i've written my own any/variant type, revisit this and swap out
-         std::any.
 
 LOW
 ---------
@@ -62,6 +59,9 @@ LOW
 
 DONE
 ----
+- macro: need an any/variant type that doesn't suck
+- error: once i've written my own any/variant type, revisit this and swap out
+         std::any.
 - binfmt(ar): rework the read + static functions to use the FILE_PTR()
           interface instead of directly using the buf_crsr_t.
 

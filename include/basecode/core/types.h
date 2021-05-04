@@ -24,7 +24,6 @@
 #   endif
 #endif
 
-#include <any>
 #include <bit>
 #include <cmath>
 #include <cstdio>
@@ -3634,7 +3633,9 @@ namespace basecode {
     // variant
     //
     // ------------------------------------------------------------------------
+    struct variant_seq_t;
     struct variant_type_t;
+    struct variant_storage_base_t;
 
     struct variant_visitor_t {
         virtual u0 accept(b8 value)             {};
@@ -3652,31 +3653,53 @@ namespace basecode {
         virtual u0 accept(u128 value)           {};
         virtual u0 accept(str_t& value)         {};
         virtual u0 accept(uuid_t& value)        {};
+        virtual u0 accept(const u0* value)      {};
+        virtual u0 accept(const s8* value)      {};
         virtual u0 accept(utf8_str_t& value)    {};
         virtual u0 accept(utf16_str_t& value)   {};
         virtual u0 accept(utf32_str_t& value)   {};
         virtual u0 accept(str::slice_t& value)  {};
     };
 
-    using variant_visit_t       = u0 (*)(const variant_type_t*,
-                                         variant_visitor_t*);
-    using variant_destroyer_t   = u0 (*)(const u0*);
+    using variant_seq_array_t   = array_t<variant_seq_t>;
     using variant_type_table_t  = hashtab_t<u32, variant_type_t>;
+
+    struct variant_storage_base_t {
+        virtual u0 free() = 0;
+
+        virtual u0 init(alloc_t* alloc) = 0;
+
+        inline virtual u0 visit(variant_visitor_t& visitor, u32 idx) = 0;
+    };
+
+    template <typename T>
+    struct variant_storage_t : variant_storage_base_t {
+        array_t<T>              values;
+
+        u0 free() override;
+
+        u0 init(alloc_t* alloc) override;
+
+        inline u0 visit(variant_visitor_t& visitor, u32 idx) override;
+    };
+
+    struct variant_seq_t final {
+        variant_storage_base_t* storage;
+        u32                     idx;
+    };
 
     struct variant_type_t final {
         const std::type_info*   type_info;
-        alloc_t*                slab_alloc;
-        variant_visit_t         visit;
-        variant_destroyer_t     destroy;
-        array_t<u0*>            variants;
+        variant_storage_base_t* storage;
     };
 
     struct variant_array_t final {
         variant_type_table_t    values;
+        variant_seq_array_t     sequence;
         u32                     size;
     };
-    static_assert(sizeof(variant_array_t) <= 64,
-                  "variant_array_t is now larger than 64 bytes!");
+    static_assert(sizeof(variant_array_t) <= 88,
+                  "variant_array_t is now larger than 88 bytes!");
 
     // ------------------------------------------------------------------------
     //
@@ -3720,8 +3743,6 @@ namespace basecode {
     // error
     //
     // ------------------------------------------------------------------------
-    using error_arg_array_t     = array_t<std::any>;
-
     template <typename T>
     concept Error_Id = std::is_enum_v<T>
                        || std::same_as<T, u32>
@@ -3746,7 +3767,7 @@ namespace basecode {
 
     struct error_report_t final {
         buf_t*                  buf;
-        error_arg_array_t       args;
+        variant_array_t         args;
         time_t                  ts;
         source_info_t           src_info;
         u32                     id;

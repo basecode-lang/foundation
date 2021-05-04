@@ -36,14 +36,15 @@ struct visitor_t : variant_visitor_t {
 };
 
 TEST_CASE("basecode::variant basics") {
-    variant_array_t variants{};
-    variant::init(variants);
-    defer(variant::free(variants));
+    TIME_BLOCK("variant_array_t store/visit time"_ss,
+               variant_array_t variants{};
+               variant::init(variants);
+               defer(variant::free(variants));
 
-    variant::append(variants, s32(1));
-    variant::append(variants, u8(2));
-    variant::append(variants, f32(3.14));
+               variant::append(variants, s32(1));
+               variant::append(variants, u8(2));
+               variant::append(variants, f32(3.14));
 
-    visitor_t visitor{};
-    variant::visit(variants, visitor);
+               visitor_t visitor{};
+               variant::visit(variants, visitor));
 }

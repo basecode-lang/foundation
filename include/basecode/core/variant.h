@@ -20,7 +20,28 @@
 
 #include <basecode/core/types.h>
 #include <basecode/core/hashtab.h>
-#include <basecode/core/memory/system/slab.h>
+
+namespace basecode {
+    template <typename T>
+    u0 variant_storage_t<T>::free() {
+        if constexpr (std::is_destructible_v<T>) {
+            for (auto& value : values)
+                value.~T();
+        }
+        array::free(values);
+    }
+
+    template <typename T>
+    u0 variant_storage_t<T>::init(alloc_t* alloc) {
+        array::init(values, alloc);
+    }
+
+    template <typename T>
+    inline u0 variant_storage_t<T>::visit(variant_visitor_t& visitor,
+                                          u32 idx) {
+        visitor.accept(values[idx]);
+    }
+}
 
 namespace basecode::variant {
     template <typename T>
@@ -32,53 +53,44 @@ namespace basecode::variant {
             alloc_t* alloc = context::top()->alloc.main);
 
     template <typename T>
-    inline u0 append(variant_array_t& array, T&& value) {
+    inline u0 append(variant_array_t& array, const T& value) {
+        using Value_Type   = std::decay_t<T>;
+        using Storage_Type = variant_storage_t<Value_Type>;
+
         auto type = register_type<T>(array);
-        u0* mem = memory::alloc(type->slab_alloc);
-        auto variant = new (mem) T(value);
-        array::append(type->variants, variant);
+        auto storage = (Storage_Type*) type->storage;
+
+        auto& variant = array::append(storage->values);
+        variant = (Value_Type) value;
+
+        auto& seq = array::append(array.sequence);
+        seq.storage = storage;
+        seq.idx     = storage->values.size - 1;
+
         ++array.size;
     }
 
     template <typename T>
-    inline u0 visit(variant_array_t& array, T&& visitor) {
-        for (const auto& pair : array.values) {
-            const variant_type_t* type = &pair.value;
-            type->visit(type, &visitor);
-        }
+    inline u0 visit(const variant_array_t& array, T&& visitor) {
+        for (const auto& seq : array.sequence)
+            seq.storage->visit(visitor, seq.idx);
     }
 
     template <typename T>
     inline variant_type_t* register_type(variant_array_t& array) {
+        using Value_Type   = std::decay_t<T>;
+        using Storage_Type = variant_storage_t<Value_Type>;
+
         auto type_info = &typeid(T);
         auto [type, is_new] = hashtab::emplace2(array.values,
                                                 type_info->hash_code());
         if (is_new) {
-            array::init(type->variants, array.values.alloc);
-            type->destroy = {};
             type->type_info = type_info;
-            auto name = type_info->name();
-            auto slab_name = format::format("variant_array<{}>::slab", name);
-
-            slab_config_t cfg{};
-            cfg.name          = str::c_str(slab_name);
-            cfg.buf_size      = sizeof(T);
-            cfg.buf_align     = alignof(T);
-            cfg.num_pages     = DEFAULT_NUM_PAGES;
-            cfg.backing.alloc = array.values.alloc;
-            type->slab_alloc  = memory::system::make(&cfg);
-
-            if constexpr (std::is_destructible_v<T>) {
-                type->destroy = [](const u0* x) -> u0 {
-                    static_cast<const T*>(x)->~T();
-                };
-            }
-
-            type->visit = [](const variant_type_t* type,
-                             variant_visitor_t* visitor) {
-                for (auto x : type->variants)
-                    visitor->accept(*((T*) x));
-            };
+            auto mem = memory::alloc(array.values.alloc,
+                                     sizeof(Storage_Type),
+                                     alignof(Storage_Type));
+            type->storage = new (mem) Storage_Type();
+            type->storage->init(array.values.alloc);
         }
         return type;
     }

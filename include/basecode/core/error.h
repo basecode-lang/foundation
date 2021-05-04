@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/array.h>
-#include <basecode/core/context.h>
+#include <basecode/core/variant.h>
 
 namespace basecode::error {
     namespace system {
@@ -32,7 +31,7 @@ namespace basecode::error {
         namespace internal {
             template <typename T>
             u0 add_arg(error_report_t* report, const T& arg) {
-                array::append(report->args, arg);
+                variant::append(report->args, arg);
             }
         }
 
