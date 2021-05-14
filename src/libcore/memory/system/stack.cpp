@@ -6,9 +6,9 @@
 // | |_)| (_| \__ \  __/ (_| (_) | (_| |  __/
 // |____/\__,_|___/\___|\___\___/ \__,_|\___|
 //
-// V I R T U A L  M A C H I N E  P R O J E C T
+//      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,31 +16,81 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/assert.h>
 #include <basecode/core/memory/system/stack.h>
 
 namespace basecode::memory::stack {
-    static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
-        auto h = system::header(mem);
-        freed_size = h->size;
-        alloc->total_allocated -= freed_size;
+    static u32 fini(alloc_t* alloc) {
+        auto sc = &alloc->subclass.stack;
+        const auto size = uintptr_t(sc->free) - uintptr_t(sc->buf);
+        memory::internal::free(alloc->backing, sc->buf);
+        sc->buf  = sc->free = {};
+        return size;
     }
 
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& alloc_size) {
-        alloc_size = system::size_with_padding(size, align);
-        auto h = (alloc_header_t*) alloca(alloc_size);
-        auto p = system::data_pointer(h, align);
-        system::fill(h, p, alloc_size);
-        alloc->total_allocated += alloc_size;
-        return p;
+    static u32 free(alloc_t* alloc, u0* mem) {
+        auto sc = &alloc->subclass.stack;
+        const auto size = uintptr_t(sc->free) - uintptr_t(mem);
+        sc->free = mem;
+        return size;
     }
 
-    alloc_system_t                      g_stack_system{
-        .init                           = {},
-        .fini                           = {},
-        .free                           = free,
-        .alloc                          = alloc,
-        .realloc                        = {},
-        .type                           = alloc_type_t::stack,
+    static u0 init(alloc_t* alloc, alloc_config_t* config) {
+        auto sc  = &alloc->subclass.stack;
+        auto cfg = (stack_config_t*) config;
+        sc->max_size   = cfg->max_size;
+        alloc->backing = cfg->backing.alloc;
+
+        auto r = memory::internal::alloc(alloc->backing,
+                                         sc->max_size,
+                                         alignof(u64));
+        sc->buf  = r.mem;
+        sc->free = sc->buf;
+    }
+
+    static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
+        auto sc = &alloc->subclass.stack;
+        BC_ASSERT_MSG(size < sc->max_size,
+                      "attempt to allocate more memory than available");
+        mem_result_t r{};
+        u32 align_adjust{};
+        r.mem    = memory::system::align_forward(sc->free,
+                                                 align,
+                                                 align_adjust);
+        r.size   = size + align_adjust;
+        sc->free = (u8*) sc->free + r.size;
+        return r;
+    }
+
+    static mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
+        auto sc = &alloc->subclass.stack;
+        BC_ASSERT_MSG(size < sc->max_size,
+                      "attempt to realloc more memory than available");
+        mem_result_t r{};
+        if (mem) {
+            const auto old_size = uintptr_t(sc->free) - uintptr_t(mem);
+            r.mem    = mem;
+            r.size   = s32(size - old_size);
+            sc->free = (u8*) mem + size;
+        } else {
+            u32 align_adjust{};
+            r.mem    = memory::system::align_forward(sc->free,
+                                                     align,
+                                                     align_adjust);
+            r.size   = size + align_adjust;
+            sc->free = (u8*) sc->free + size;
+        }
+        return r;
+    }
+
+    alloc_system_t              g_stack_system{
+        .size                   = {},
+        .init                   = init,
+        .fini                   = fini,
+        .free                   = free,
+        .alloc                  = alloc,
+        .realloc                = realloc,
+        .type                   = alloc_type_t::stack,
     };
 
     alloc_system_t* system() {

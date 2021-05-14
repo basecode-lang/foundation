@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/log.h>
+#include <basecode/core/types.h>
 
 namespace basecode {
     struct default_config_t : logger_config_t {

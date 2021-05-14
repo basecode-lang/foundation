@@ -1,5 +1,5 @@
-// dear imgui: Renderer for DirectX12
-// This needs to be used along with a Platform Binding (e.g. Win32)
+// dear imgui: Renderer Backend for DirectX12
+// This needs to be used along with a Platform Backend (e.g. Win32)
 
 // Implemented features:
 //  [X] Renderer: User texture binding. Use 'D3D12_GPU_DESCRIPTOR_HANDLE' as ImTextureID. Read the FAQ about ImTextureID!
@@ -7,17 +7,19 @@
 //      FIXME: The transition from removing a viewport and moving the window in an existing hosted viewport tends to flicker.
 //  [X] Renderer: Support for large meshes (64k+ vertices) with 16-bit indices.
 
-// Important: to compile on 32-bit systems, this back-end requires code to be compiled with '#define ImTextureID ImU64'.
+// Important: to compile on 32-bit systems, this backend requires code to be compiled with '#define ImTextureID ImU64'.
 // This is because we need ImTextureID to carry a 64-bit value and by default ImTextureID is defined as void*.
-// This define is done in the example .vcxproj file and need to be replicated in your app (by e.g. editing imconfig.h)
+// This define is set in the example .vcxproj file and need to be replicated in your app or by adding it to your imconfig.h file.
 
-// You can copy and use unmodified imgui_impl_* files in your project. See main.cpp for an example of using this.
-// If you are new to dear imgui, read examples/README.txt and read the documentation at the top of imgui.cpp.
-// https://github.com/ocornut/imgui
+// You can copy and use unmodified imgui_impl_* files in your project. See examples/ folder for examples of using this.
+// If you are new to Dear ImGui, read documentation from the docs/ folder + read the top of imgui.cpp.
+// Read online: https://github.com/ocornut/imgui/tree/master/docs
 
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
-//  2020-XX-XX: Platform: Added support for multiple windows via the ImGuiPlatformIO interface.
+//  2021-XX-XX: Platform: Added support for multiple windows via the ImGuiPlatformIO interface.
+//  2021-02-18: DirectX12: Change blending equation to preserve alpha in output buffer.
+//  2021-01-11: DirectX12: Improve Windows 7 compatibility (for D3D12On7) by loading d3d12.dll dynamically.
 //  2020-09-16: DirectX12: Avoid rendering calls with zero-sized scissor rectangle since it generates a validation layer warning.
 //  2020-09-08: DirectX12: Clarified support for building on 32-bit systems by redefining ImTextureID.
 //  2019-10-18: DirectX12: *BREAKING CHANGE* Added extra ID3D12DescriptorHeap parameter to ImGui_ImplDX12_Init() function.
@@ -72,7 +74,7 @@ struct ImGui_ImplDX12_FrameContext
 
 // Helper structure we store in the void* RendererUserData field of each ImGuiViewport to easily retrieve our backend data.
 // Main viewport created by application will only use the Resources field.
-// Secondary viewports created by this back-end will use all the fields (including Window fields),
+// Secondary viewports created by this backend will use all the fields (including Window fields),
 struct ImGuiViewportDataDx12
 {
     // Window
@@ -213,7 +215,6 @@ static void ImGui_ImplDX12_SetupRenderState(ImDrawData* draw_data, ID3D12Graphic
 }
 
 // Render function
-// (this used to be set in io.RenderDrawListsFn and called by ImGui::Render(), but you can now call this directly from your main loop)
 void ImGui_ImplDX12_RenderDrawData(ImDrawData* draw_data, ID3D12GraphicsCommandList* ctx)
 {
     // Avoid rendering when minimized
@@ -479,7 +480,7 @@ static void ImGui_ImplDX12_CreateFontsTexture()
 
     // Store our identifier
     static_assert(sizeof(ImTextureID) >= sizeof(g_hFontSrvGpuDescHandle.ptr), "Can't pack descriptor handle into TexID, 32-bit not supported yet.");
-    io.Fonts->TexID = (ImTextureID)g_hFontSrvGpuDescHandle.ptr;
+    io.Fonts->SetTexID((ImTextureID)g_hFontSrvGpuDescHandle.ptr);
 }
 
 bool    ImGui_ImplDX12_CreateDeviceObjects()
@@ -537,8 +538,34 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
             D3D12_ROOT_SIGNATURE_FLAG_DENY_DOMAIN_SHADER_ROOT_ACCESS |
             D3D12_ROOT_SIGNATURE_FLAG_DENY_GEOMETRY_SHADER_ROOT_ACCESS;
 
+        // Load d3d12.dll and D3D12SerializeRootSignature() function address dynamically to facilitate using with D3D12On7.
+        // See if any version of d3d12.dll is already loaded in the process. If so, give preference to that.
+        static HINSTANCE d3d12_dll = ::GetModuleHandleA("d3d12.dll");
+        if (d3d12_dll == NULL)
+        {
+            // Attempt to load d3d12.dll from local directories. This will only succeed if
+            // (1) the current OS is Windows 7, and
+            // (2) there exists a version of d3d12.dll for Windows 7 (D3D12On7) in one of the following directories.
+            // See https://github.com/ocornut/imgui/pull/3696 for details.
+            const char* localD3d12Paths[] = { ".\\d3d12.dll", ".\\d3d12on7\\d3d12.dll", ".\\12on7\\d3d12.dll" }; // A. current directory, B. used by some games, C. used in Microsoft D3D12On7 sample
+            for (int i = 0; i < IM_ARRAYSIZE(localD3d12Paths); i++)
+                if ((d3d12_dll = ::LoadLibraryA(localD3d12Paths[i])) != NULL)
+                    break;
+
+            // If failed, we are on Windows >= 10.
+            if (d3d12_dll == NULL)
+                d3d12_dll = ::LoadLibraryA("d3d12.dll");
+
+            if (d3d12_dll == NULL)
+                return false;
+        }
+
+        PFN_D3D12_SERIALIZE_ROOT_SIGNATURE D3D12SerializeRootSignatureFn = (PFN_D3D12_SERIALIZE_ROOT_SIGNATURE)::GetProcAddress(d3d12_dll, "D3D12SerializeRootSignature");
+        if (D3D12SerializeRootSignatureFn == NULL)
+            return false;
+
         ID3DBlob* blob = NULL;
-        if (D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, NULL) != S_OK)
+        if (D3D12SerializeRootSignatureFn(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, NULL) != S_OK)
             return false;
 
         g_pd3dDevice->CreateRootSignature(0, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&g_pRootSignature));
@@ -643,8 +670,8 @@ bool    ImGui_ImplDX12_CreateDeviceObjects()
         desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
         desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
         desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
-        desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
-        desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+        desc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+        desc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
         desc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
         desc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
     }
@@ -698,13 +725,13 @@ void    ImGui_ImplDX12_InvalidateDeviceObjects()
     SafeRelease(g_pFontTextureResource);
 
     ImGuiIO& io = ImGui::GetIO();
-    io.Fonts->TexID = NULL; // We copied g_pFontTextureView to io.Fonts->TexID so let's clear that as well.
+    io.Fonts->SetTexID(NULL); // We copied g_pFontTextureView to io.Fonts->TexID so let's clear that as well.
 }
 
 bool ImGui_ImplDX12_Init(ID3D12Device* device, int num_frames_in_flight, DXGI_FORMAT rtv_format, ID3D12DescriptorHeap* cbv_srv_heap,
                          D3D12_CPU_DESCRIPTOR_HANDLE font_srv_cpu_desc_handle, D3D12_GPU_DESCRIPTOR_HANDLE font_srv_gpu_desc_handle)
 {
-    // Setup back-end capabilities flags
+    // Setup backend capabilities flags
     ImGuiIO& io = ImGui::GetIO();
     io.BackendRendererName = "imgui_impl_dx12";
     io.BackendFlags |= ImGuiBackendFlags_RendererHasVtxOffset;  // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
@@ -722,7 +749,7 @@ bool ImGui_ImplDX12_Init(ID3D12Device* device, int num_frames_in_flight, DXGI_FO
     ImGuiViewport* main_viewport = ImGui::GetMainViewport();
     main_viewport->RendererUserData = IM_NEW(ImGuiViewportDataDx12)();
 
-    // Setup back-end capabilities flags
+    // Setup backend capabilities flags
     io.BackendFlags |= ImGuiBackendFlags_RendererHasViewports;    // We can create multi-viewports on the Renderer side (optional)
     if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
         ImGui_ImplDX12_InitPlatformInterface();
@@ -762,7 +789,7 @@ void ImGui_ImplDX12_NewFrame()
 
 //--------------------------------------------------------------------------------------------------------
 // MULTI-VIEWPORT / PLATFORM INTERFACE SUPPORT
-// This is an _advanced_ and _optional_ feature, allowing the back-end to create and handle multiple viewports simultaneously.
+// This is an _advanced_ and _optional_ feature, allowing the backend to create and handle multiple viewports simultaneously.
 // If you are new to dear imgui or creating a new binding for dear imgui, it is recommended that you completely ignore this section first..
 //--------------------------------------------------------------------------------------------------------
 
@@ -772,7 +799,7 @@ static void ImGui_ImplDX12_CreateWindow(ImGuiViewport* viewport)
     viewport->RendererUserData = data;
 
     // PlatformHandleRaw should always be a HWND, whereas PlatformHandle might be a higher-level handle (e.g. GLFWWindow*, SDL_Window*).
-    // Some back-ends will leave PlatformHandleRaw NULL, in which case we assume PlatformHandle will contain the HWND.
+    // Some backends will leave PlatformHandleRaw NULL, in which case we assume PlatformHandle will contain the HWND.
     HWND hwnd = viewport->PlatformHandleRaw ? (HWND)viewport->PlatformHandleRaw : (HWND)viewport->PlatformHandle;
     IM_ASSERT(hwnd != 0);
 

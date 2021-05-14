@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/defer.h>
 #include <basecode/core/array.h>
 #include <basecode/core/format.h>
@@ -98,12 +98,36 @@ TEST_CASE("array_t reserve space; fill") {
             return lhs > rhs;
         });
 
-    for (s32 i = 0; i < 4096; i++)
-        REQUIRE(numbers[i] == 4095 - i);
-
-    for (s32 i = 4095; i > 2048; i--) {
-        REQUIRE(array::contains(numbers, i) == 4095 - i);
+    // N.B. catch2 is unbelievably slow. instead of
+    //      invoking REQUIRE 4096 times, it's far faster
+    //      to wrap it in an if and treat REQUIRE more
+    //      like an assert if the condition fails.
+    for (s32 i = 0; i < 4096; i++) {
+        if (numbers[i] != 4095 - i)
+            REQUIRE(false);
     }
+
+    // N.B. same as above. catch2 is too slow.
+    for (s32 i = 4095; i > 2048; i--) {
+        if (array::contains(numbers, i) != 4095 - i)
+            REQUIRE(false);
+    }
+}
+
+TEST_CASE("basecode::array iterator tests") {
+    auto numbers = array::make<u32>({0, 1, 2, 3, 4, 5, 6, 7, 8});
+    defer(array::free(numbers));
+
+    REQUIRE(!array::empty(numbers));
+    REQUIRE(numbers.size == 9);
+
+    s32 k = 0;
+    for (auto n : numbers)
+        REQUIRE(n == k++);
+
+    k = 8;
+    for (auto it = std::rbegin(numbers); it != std::rend(numbers); --it)
+        REQUIRE(k-- == *it);
 }
 
 TEST_CASE("basecode::array initializer list") {

@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,23 +16,21 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/ffi.h>
-#include <basecode/core/defer.h>
 #include <basecode/core/string.h>
-#include <basecode/core/format.h>
 #include <basecode/core/filesys.h>
 #include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
-TEST_CASE("basecode::ffi basics") {
+TEST_CASE("basecode::ffi basics", "[ffi]") {
 #ifdef _MSC_VER
-    auto lib_filename = "ffi-test-kernel.dll"_path;
+    auto lib_filename = "ffi-test-kernel.dll"_ss;
 #elif _WIN32
-    auto lib_filename = "libffi-test-kernel.dll"_path;
+    auto lib_filename = "libffi-test-kernel.dll"_ss;
 #else
-    auto lib_filename = "lib/libffi-test-kernel.so"_path;
+    auto lib_filename = "lib/libffi-test-kernel.so"_ss;
 #endif
 
     path_t proc_path{};
@@ -45,43 +43,47 @@ TEST_CASE("basecode::ffi basics") {
     path::parent_path(proc_path, proc_path);
 #endif
     path::append(proc_path, lib_filename);
-    format::print_ellipsis("ffi test library path", 40, "{}\n", proc_path.str);
+    format::print_ellipsis("ffi test library path",
+                           60,
+                           "{}\n",
+                           proc_path.str);
 
     lib_t* proc_lib{};
     auto status = ffi::lib::load(proc_path, &proc_lib);
     defer({
         ffi::lib::unload(proc_lib);
         path::free(proc_path);
-        path::free(lib_filename);
     });
-    REQUIRE(OK(status));
-
-    proto_t* simple_proto{};
-    status = ffi::proto::make(proc_lib, "simple"_ss, &simple_proto);
-    REQUIRE(OK(status));
+    if (!OK(status))
+        REQUIRE(OK(status));
 
     auto u32_type = ffi::param::make_type(param_cls_t::int_, param_size_t::dword);
-    simple_proto->ret_type = u32_type;
-    ffi::proto::append(simple_proto, ffi::param::make("a"_ss, u32_type));
-    ffi::proto::append(simple_proto, ffi::param::make("b"_ss, u32_type));
+
+    auto simple_proto = ffi::proto::make("simple"_ss, proc_lib);
+    auto dft_overload = ffi::overload::make("simple"_ss, u32_type);
+    ffi::overload::append(dft_overload, ffi::param::make("a"_ss, u32_type));
+    ffi::overload::append(dft_overload, ffi::param::make("b"_ss, u32_type));
+    status = ffi::proto::append(simple_proto, dft_overload);
+    if (!OK(status))
+        REQUIRE(OK(status));
+    if (!dft_overload->func)
+        REQUIRE(dft_overload->func);
 
     ffi_t vm{};
     ffi::init(vm);
     defer(ffi::free(vm));
 
-    stopwatch_t time{};
-    stopwatch::start(time);
-
-    ffi::reset(vm);
-    ffi::push(vm, 5);
-    ffi::push(vm, 6);
-    param_alias_t ret{};
-    status = ffi::call(vm, simple_proto, ret);
-    REQUIRE(OK(status));
-    REQUIRE(ret.dw == 30);
-
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("ffi call simple function"_ss, 40, time);
+    TIME_BLOCK(
+        "ffi: call simple function"_ss,
+        ffi::reset(vm);
+        ffi::push(vm, 5);
+        ffi::push(vm, 6);
+        param_alias_t ret{};
+        status = ffi::call(vm, dft_overload, ret);
+        if (!OK(status))
+            REQUIRE(OK(status));
+        if (ret.dw != 30)
+            REQUIRE(ret.dw == 30););
 }
 
 TEST_CASE("basecode::ffi status names") {

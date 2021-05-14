@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,16 +18,38 @@
 
 #pragma once
 
-#include <basecode/core/bintree.h>
+#include <basecode/core/types.h>
 
 namespace basecode::memory::meta {
-    u0 fini();
+    namespace system {
+        u0 fini();
 
-    u0 track(alloc_t* alloc);
+        u0 update(f32 dt);
 
-    u0 untrack(alloc_t* alloc);
+        u0 track(alloc_t* alloc);
 
-    const bintree_t<alloc_t*>& tree();
+        u0 untrack(alloc_t* alloc);
 
-    u0 init(alloc_t* alloc = context::top()->alloc);
+        u0 stop_plot(alloc_info_t* info);
+
+        const alloc_info_array_t& infos();
+
+        const alloc_info_array_t& roots();
+
+        u0 start_plot(alloc_info_t* info, plot_mode_t mode);
+
+        u0 init(alloc_t* alloc = context::top()->alloc.main);
+    }
+
+    namespace alloc_info {
+        u0 free(alloc_info_t& info);
+
+        b8 stop_plot(alloc_info_t& info);
+
+        u0 init(alloc_info_t& info, alloc_t* alloc);
+
+        u0 append_point(alloc_info_t& info, f32 x, f32 y);
+
+        b8 start_plot(alloc_info_t& info, plot_mode_t mode);
+    }
 }

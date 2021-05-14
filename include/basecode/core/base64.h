@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <basecode/core/str.h>
-#include <basecode/core/context.h>
+#include <basecode/core/types.h>
 
 namespace basecode::base64 {
     b8 encode(str::slice_t src, str_t& buf);

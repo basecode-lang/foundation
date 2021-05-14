@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -84,10 +84,12 @@ namespace basecode::log {
             array::init(g_log_system.loggers, g_log_system.alloc);
 
             slab_config_t slab_config{};
-            slab_config.backing   = g_log_system.alloc;
-            slab_config.buf_size  = sizeof(logger_t);
-            slab_config.buf_align = alignof(logger_t);
-            memory::init(&g_log_system.slab_alloc, alloc_type_t::slab, &slab_config);
+            slab_config.name          = "log::logger_slab";
+            slab_config.buf_size      = sizeof(logger_t);
+            slab_config.buf_align     = alignof(logger_t);
+            slab_config.num_pages     = DEFAULT_NUM_PAGES;
+            slab_config.backing.alloc = g_log_system.alloc;
+            memory::init(&g_log_system.slab_alloc, &slab_config);
 
             return make(&g_log_system.default_logger, type, config, mask);
         }
@@ -120,8 +122,10 @@ namespace basecode::log {
     }
 
     u0 fini(logger_t* logger) {
-        for (auto child_logger : logger->children)
-            fini(child_logger);
+        for (auto child_logger : logger->children) {
+            if (child_logger)
+                fini(child_logger);
+        }
         if (logger->system && logger->system->fini)
             logger->system->fini(logger);
         array::free(logger->children);
@@ -154,9 +158,9 @@ namespace basecode::log {
     }
 
     str::slice_t type_name(logger_type_t type) {
-        str::slice_t* s{};
-        string::localized::find(u32(type), &s);
-        return *s;
+        str::slice_t s{};
+        string::localized::find(u32(type), s);
+        return s;
     }
 
     str::slice_t level_name(log_level_t level) {

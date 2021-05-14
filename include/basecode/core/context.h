@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/core/assert.h>
 
 #define WITH_ALLOC(Alloc, Code)                                     \
         do {                                                        \
-            if (context::top()->alloc != Alloc) {                   \
+            if (context::top()->alloc.main != Alloc) {              \
                 auto ctx = *context::top();                         \
-                ctx.alloc = Alloc;                                  \
+                ctx.alloc.main = Alloc;                             \
                 context::push(&ctx);                                \
                 Code                                                \
                 context::pop();                                     \
@@ -45,25 +45,28 @@
             }                                                       \
         } while (false)
 
-namespace basecode {
-    struct alloc_t;
-    struct logger_t;
+namespace basecode::context {
+    constexpr u32 stack_size = 512;
 
-    struct context_t {
-        alloc_t*            alloc;
-        logger_t*           logger;
-        u0*                 user;
-        const s8**          argv;
-        s32                 argc;
-    };
+    extern thread_local u32             t_index;
+    extern thread_local context_t*      t_stack[stack_size];
 
-    namespace context {
-        u0 pop();
+    inline u0 pop() {
+        BC_ASSERT_MSG(t_index < stack_size, "context stack underflow");
+        t_index++;
+    }
 
-        context_t* top();
+    inline context_t* top() {
+        BC_ASSERT_MSG(t_index < stack_size, "context stack underflow");
+        return t_stack[t_index];
+    }
 
-        u0 push(context_t* ctx);
+    inline u0 push(context_t* ctx) {
+        BC_ASSERT_MSG(t_index > 0, "context stack overflow");
+        t_stack[--t_index] = ctx;
+    }
 
-        context_t make(s32 argc, const s8** argv, alloc_t* alloc, logger_t* logger);
+    inline context_t make(s32 argc, const s8** argv) {
+        return {.argv = argv, .argc = argc};
     }
 }

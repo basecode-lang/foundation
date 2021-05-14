@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -26,94 +26,63 @@
 #include <basecode/core/types.h>
 #include <basecode/core/memory.h>
 
-#ifndef INVALID_SOCKET
-#   define INVALID_SOCKET   (-1)
-#   define SOCKET           s32
-#endif
-#ifndef MSG_NOSIGNAL
-#  define MSG_NOSIGNAL 0
-#endif
+namespace basecode::network {
+    namespace udp {
+        u8* read(socket_t& sock,
+                 ssize& len,
+                 ip_address_t& addr,
+                 s32 timeout = 10);
 
-namespace basecode {
-    struct ip_address_t final {
-        u32                         number;
-        s8                          text[17];
-    };
+        status_t listen(socket_t& sock, u16 port);
 
-    struct socket_t;
+        s32 send(socket_t& sock, u16 port, const u0* data, u32 len);
+    }
 
-    using socket_read_callback_t    = b8 (*)(socket_t&, u0*);
-    using socket_close_callback_t   = u0 (*)(socket_t&);
+    namespace tcp {
+        b8 read(socket_t& sock,
+                u0* buf,
+                s32 len,
+                s32 timeout,
+                socket_read_callback_t read_cb,
+                u0* user = {});
 
-    struct socket_t final {
-        alloc_t*                    alloc;
-        u8*                         buf;
-        u8*                         buf_cur;
-        u0*                         user;
-        socket_close_callback_t     close_cb;
-        SOCKET                      socket;
-        u32                         buf_free;
-        u32                         buf_size;
-    };
+        b8 accept(socket_t& listen_sock,
+                  socket_t& client_sock,
+                  s32 timeout = 10);
 
-    namespace network {
-        enum class status_t : u8 {
-            ok                              = 0,
-            bind_failure                    = 150,
-            listen_failure                  = 151,
-            connect_failure                 = 152,
-            socket_dgram_error              = 153,
-            socket_already_open             = 154,
-            winsock_init_failure            = 155,
-            socket_already_closed           = 156,
-            invalid_address_and_port        = 157,
-            socket_option_broadcast_error   = 158,
-        };
+        s32 send(socket_t& sock, const u0* buf, s32 len);
 
-        namespace udp {
-            status_t listen(socket_t& sock, u16 port);
+        status_t listen(socket_t& sock, u16 port, s32 backlog);
 
-            s32 send(socket_t& sock, u16 port, const u0* data, u32 len);
+        b8 read_raw(socket_t& sock, u0* buf, s32 len, s32 timeout);
 
-            u8* read(socket_t& sock, ssize& len, ip_address_t& addr, s32 timeout = 10);
-        }
+        status_t connect(socket_t& sock, str::slice_t addr, u16 port);
+    }
 
-        namespace tcp {
-            s32 send(socket_t& sock, const u0* buf, s32 len);
+    namespace system {
+        u0 fini();
 
-            status_t listen(socket_t& sock, u16 port, s32 backlog);
+        status_t init();
+    }
 
-            b8 read_raw(socket_t& sock, u0* buf, s32 len, s32 timeout);
+    namespace socket {
+        u0 init(socket_t& sock,
+                u32 buf_size = 2 * 1024,
+                socket_close_callback_t close_cb = {},
+                alloc_t* alloc = context::top()->alloc.main);
 
-            status_t connect(socket_t& sock, str::slice_t addr, u16 port);
+        u0 free(socket_t& sock);
 
-            b8 accept(socket_t& listen_sock, socket_t& client_sock, s32 timeout = 10);
+        b8 has_data(socket_t& sock);
 
-            b8 read(socket_t& sock, u0* buf, s32 len, s32 timeout, socket_read_callback_t read_cb, u0* user = {});
-        }
+        status_t close(socket_t& sock);
 
-        namespace system {
-            u0 fini();
+        s32 send_buf_size(socket_t& sock);
+    }
 
-            status_t init();
-        }
+    namespace ip_address {
+        u0 set(ip_address_t& ip, const struct sockaddr* addr);
 
-        namespace socket {
-            u0 free(socket_t& sock);
-
-            b8 has_data(socket_t& sock);
-
-            status_t close(socket_t& sock);
-
-            s32 send_buf_size(socket_t& sock);
-
-            u0 init(socket_t& sock, u32 buf_size = 2 * 1024, socket_close_callback_t close_cb = {}, alloc_t* alloc = context::top()->alloc);
-        }
-
-        namespace ip_address {
-            u0 set(ip_address_t& ip, const struct sockaddr* addr);
-
-            u0 init(ip_address_t& ip, const struct sockaddr* addr = {});
-        }
+        u0 init(ip_address_t& ip, const struct sockaddr* addr = {});
     }
 }

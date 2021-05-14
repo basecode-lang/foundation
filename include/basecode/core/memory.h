@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,48 +18,50 @@
 
 #pragma once
 
-#include <basecode/core/slice.h>
+#include <basecode/core/types.h>
 
-#define IS_PROXY(a)     (a->system && a->system->type == alloc_type_t::proxy)
+#define IS_PROXY(a)                 ((a)->system                                \
+                                     && (a)->system->type == alloc_type_t::proxy)
 
 namespace basecode {
-    static constexpr u32 header_pad_value   = 0xffffffffu;
-    using mspace                            = u0*;
+    struct alloc_config_t {
+        alloc_config_t(alloc_type_t _type) : backing(),
+                                             name(nullptr),
+                                             type(_type) {}
 
-    struct slab_t;
-    struct alloc_t;
-    struct proxy_pair_t;
-    struct page_header_t;
-    struct alloc_config_t {};
-
-    enum class alloc_type_t : u8 {
-        default_,
-        bump,
-        page,
-        slab,
-        proxy,
-        trace,
-        stack,
-        dlmalloc,
+        union {
+            u0*                 buf;
+            alloc_t*            alloc;
+        }                       backing;
+        const s8*               name;
+        alloc_type_t            type;
     };
 
-    using alloc_init_callback_t     = u0  (*)(alloc_t*, alloc_config_t*);
-    using alloc_free_callback_t     = u0  (*)(alloc_t*, u0* mem, u32& freed_size);
-    using alloc_fini_callback_t     = u0  (*)(alloc_t*, b8 enforce, u32* freed_size);
-    using alloc_alloc_callback_t    = u0* (*)(alloc_t*, u32 size, u32 align, u32& allocated_size);
-    using alloc_realloc_callback_t  = u0* (*)(alloc_t*, u0* mem, u32 size, u32 align, u32& old_size);
+    struct system_config_t : alloc_config_t {
+        system_config_t() : alloc_config_t(alloc_type_t::none),
+                            temp(),
+                            main(),
+                            scratch() {
+        }
+
+        alloc_config_t*         temp;
+        alloc_config_t*         main;
+        alloc_config_t*         scratch;
+    };
+
+    struct mem_result_t final {
+        u0*                     mem;
+        s32                     size;
+    } __attribute__((aligned(16)));
 
     struct alloc_system_t final {
-        alloc_init_callback_t       init;
-        alloc_fini_callback_t       fini;
-        alloc_free_callback_t       free;
-        alloc_alloc_callback_t      alloc;
-        alloc_realloc_callback_t    realloc;
+        mem_size_callback_t         size;
+        mem_init_callback_t         init;
+        mem_fini_callback_t         fini;
+        mem_free_callback_t         free;
+        mem_alloc_callback_t        alloc;
+        mem_realloc_callback_t      realloc;
         alloc_type_t                type;
-    };
-
-    struct alloc_header_t final {
-        u32                         size;
     };
 
     union alloc_subclass_t final {
@@ -70,16 +72,34 @@ namespace basecode {
         }                           dl;
         struct {
             u0*                     buf;
+            u0*                     free;
+            u32                     max_size;
+        }                           stack;
+        struct {
+            u8*                     begin;
+            u8*                     end;
+            u8*                     alloc;
+            u8*                     free;
+            u32                     size;
+        }                           scratch;
+        struct {
+            u0*                     buf;
             u32                     offset;
             u32                     end_offset;
         }                           bump;
         struct {
+            u8*                     buf;
+            u8*                     last_alloc;
+            u32                     offset;
+            u32                     end_offset;
+        }                           temp;
+        struct {
             slab_t*                 tail;
             slab_t*                 head;
             u32                     count;
-            u32                     buf_size;
             u32                     page_size;
-            u32                     buf_max_count;
+            u16                     buf_size;
+            u16                     buf_max_count;
             u8                      num_pages;
             u8                      buf_align;
         }                           slab;
@@ -87,31 +107,38 @@ namespace basecode {
             page_header_t*          cursor;
             page_header_t*          tail;
             page_header_t*          head;
-            u32                     page_size;
             u32                     count;
-            u8                      num_pages;
+            u16                     page_size;
+            u16                     num_pages;
         }                           page;
         struct {
-            proxy_pair_t*           pair;
-            b8                      owner;
+            u32                     owner:      1;
+            u32                     pad:        31;
         }                           proxy;
+        struct buddy_t {
+            u0*                     heap;
+            u32*                    block_index;
+            buddy_block_t*          free_blocks;
+            u32                     size;
+            u32                     max_indexes;
+            u32                     metadata_size;
+            u32                     min_allocation;
+            u16                     max_level;
+            u16                     total_levels;
+        }                           buddy;
     };
 
     struct alloc_t final {
         alloc_system_t*             system;
         alloc_t*                    backing;
         alloc_subclass_t            subclass;
+        intern_id                   name;
         u32                         total_allocated;
     };
+    static_assert(sizeof(alloc_t) <= 72,
+                  "alloc_t is now larger than 72 bytes!");
 
     namespace memory {
-        enum class status_t : u8 {
-            ok,
-            invalid_allocator,
-            invalid_default_allocator,
-            invalid_allocation_system,
-        };
-
         namespace system {
             u0 fini();
 
@@ -119,20 +146,23 @@ namespace basecode {
 
             u0 print_allocators();
 
-            alloc_t* default_alloc();
+            alloc_t* temp_alloc();
 
-            inline alloc_header_t* header(u0* data) {
-                auto p = static_cast<u32*>(data);
-                while (p[-1] == header_pad_value)
-                    --p;
-                return reinterpret_cast<alloc_header_t*>(p - 1);
-            }
+            alloc_t* main_alloc();
+
+            u0 mark_initialized();
+
+            alloc_t* scratch_alloc();
+
+            u32 free(alloc_t* alloc);
+
+            usize os_alloc_granularity();
+
+            status_t init(alloc_config_t* cfg);
+
+            alloc_t* make(alloc_config_t* config);
 
             b8 set_page_executable(u0* ptr, usize size);
-
-            inline u32 size_with_padding(u32 size, u32 align) {
-                return size + align + sizeof(alloc_header_t);
-            }
 
             inline u0* align_forward(u0* p, u32 align, u32& adjust) {
                 const auto pi = uintptr_t(p);
@@ -140,44 +170,65 @@ namespace basecode {
                 adjust = aligned - pi;
                 return (u0*) aligned;
             }
-
-            inline u0 fill(alloc_header_t* header, u0* data, u32 size) {
-                header->size = size;
-                auto p = (u32*) header + 1;
-                while (p < data)
-                    *p++ = header_pad_value;
-            }
-
-            inline u0* data_pointer(alloc_header_t* header, u32 align) {
-                u0* p = header + 1;
-                u32 adjust{};
-                return align_forward(p, align, adjust);
-            }
-
-            alloc_t* make(alloc_type_t type, alloc_config_t* config = {});
-
-            u0 free(alloc_t* alloc, b8 enforce = true, u32* freed_size = {});
-
-            status_t init(alloc_type_t type, u32 heap_size = 32 * 1024 * 1024, u0* base = {});
         }
+
+        namespace internal {
+            u32 fini(alloc_t* alloc);
+
+            u32 size(alloc_t* alloc, u0* mem);
+
+            u32 free(alloc_t* alloc, u0* mem);
+
+            mem_result_t alloc(alloc_t* alloc, u32 size, u32 align);
+
+            mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align);
+        }
+
+        u0 set_name(alloc_t* alloc,
+                    const s8* name,
+                    s32 len = -1);
+
+        const s8* name(alloc_t* alloc);
 
         alloc_t* unwrap(alloc_t* alloc);
 
-        str::slice_t type_name(alloc_type_t type);
+        inline u32 fini(alloc_t* alloc) {
+            return internal::fini(alloc);
+        }
 
-        str::slice_t status_name(status_t status);
+        inline u0* alloc(alloc_t* alloc) {
+            return internal::alloc(alloc, 0, 0).mem;
+        }
 
-        u0* alloc(alloc_t* alloc, u32* alloc_size = {});
+        template <String_Concept T>
+        u0 set_name(alloc_t* alloc, const T& name) {
+            set_name(alloc, (const s8*) name.data, name.length);
+        }
 
-        u0 free(alloc_t* alloc, u0* mem, u32* freed_size = {});
+        const s8* type_name(alloc_type_t type);
 
-        u0 fini(alloc_t* alloc, b8 enforce = true, u32* freed_size = {});
+        const s8* status_name(status_t status);
 
-        u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align = sizeof(u32));
+        inline u32 size(alloc_t* alloc, u0* mem) {
+            return internal::size(alloc, mem);
+        }
 
-        status_t init(alloc_t* alloc, alloc_type_t type, alloc_config_t* config = {});
+        inline u32 free(alloc_t* alloc, u0* mem) {
+            return internal::free(alloc, mem);
+        }
 
-        u0* alloc(alloc_t* alloc, u32 size, u32 align = sizeof(u32), u32* alloc_size = {});
+        inline u0* realloc(alloc_t* alloc,
+                           u0* mem,
+                           u32 size,
+                           u32 align = sizeof(u64)) {
+            return internal::realloc(alloc, mem, size, align).mem;
+        }
+
+        status_t init(alloc_t* alloc, alloc_config_t* config);
+
+        inline u0* alloc(alloc_t* alloc, u32 size, u32 align = sizeof(u64)) {
+            return internal::alloc(alloc, size, align).mem;
+        }
     }
 }
 

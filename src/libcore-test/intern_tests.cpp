@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,11 +16,11 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/defer.h>
 #include <basecode/core/array.h>
 #include <basecode/core/intern.h>
-#include <basecode/core/profiler.h>
+#include <basecode/core/format.h>
 #include <basecode/core/str_array.h>
 #include <basecode/core/stopwatch.h>
 
@@ -68,8 +68,7 @@ TEST_CASE("basecode::intern") {
 
     str_array_t strings{};
     str_array::init(strings);
-    str_array::reserve_index(strings, expected_intern_count);
-    str_array::reserve_data(strings, expected_intern_count * 65);
+    str_array::reserve(strings, expected_intern_count);
 
     str_t temp{};
     str::init(temp);
@@ -83,21 +82,20 @@ TEST_CASE("basecode::intern") {
         str::reset(temp);
     }
 
-    const auto allocated_before = context::top()->alloc->total_allocated;
-    stopwatch_t intern_time{};
-    stopwatch::start(intern_time);
+    const auto allocated_before = context::top()->alloc.main->total_allocated;
 
-    for (u32 i = 0; i < expected_intern_count; ++i) {
-        auto r = intern::fold(pool, strings[i]);
-        REQUIRE(r.status == intern::status_t::ok);
-        REQUIRE(r.slice.data);
-        REQUIRE(r.slice.length > 0);
-        array::append(interned_list, r);
-    }
+    TIME_BLOCK(
+        "intern: total time"_ss,
+        for (u32 i = 0; i < expected_intern_count; ++i) {
+            auto r = intern::fold(pool, strings[i]);
+            if (r.status != intern::status_t::ok)   REQUIRE(false);
+            if (!r.slice.data)                      REQUIRE(false);
+            if (r.slice.length == 0)                REQUIRE(false);
+            array::append(interned_list, r);
+        });
 
-    stopwatch::stop(intern_time);
-    stopwatch::print_elapsed("total intern time"_ss, 40, intern_time);
-    const auto memory_used = context::top()->alloc->total_allocated - allocated_before;
+    const auto memory_used = context::top()->alloc.main->total_allocated
+                             - allocated_before;
     format::print("memory_used = {}\n", memory_used);
 
     REQUIRE(interned_list.size == expected_intern_count);
@@ -111,17 +109,17 @@ TEST_CASE("basecode::intern") {
 
     u32 last_id{};
     for (const auto& r : interned_list) {
-        REQUIRE(last_id <= r.id);
+        if (last_id > r.id) REQUIRE(false);
         auto existing_slice = intern::fold(pool, r.slice);
-        REQUIRE(existing_slice.slice == r.slice);
+        if (existing_slice.slice != r.slice) REQUIRE(false);
         last_id = r.id;
     }
 
     for (const auto& r : interned_list) {
         auto get_result = intern::get(pool, r.id);
-        REQUIRE(get_result.status == intern::status_t::ok);
-        REQUIRE(get_result.id == r.id);
-        REQUIRE(get_result.hash == r.hash);
-        REQUIRE(get_result.slice == r.slice);
+        if (get_result.status != intern::status_t::ok)  REQUIRE(false);
+        if (get_result.id != r.id)                      REQUIRE(false);
+        if (get_result.hash != r.hash)                  REQUIRE(false);
+        if (get_result.slice != r.slice)                REQUIRE(false);
     }
 }

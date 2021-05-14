@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -19,23 +19,14 @@
 #pragma once
 
 #include <pthread.h>
-#include <basecode/core/array.h>
+#include <basecode/core/memory.h>
 
 namespace basecode {
-    struct  event_t_;
-    using   event_t = event_t_*;
-
     namespace event {
-        enum class status_t : u8 {
-            ok                  = 0,
-            error               = 106,
-            timeout             = 107,
-        };
-
         namespace system {
             u0 fini();
 
-            status_t init(alloc_t* alloc = context::top()->alloc);
+            status_t init(alloc_t* alloc = context::top()->alloc.main);
         }
 
         u0 free(event_t event);

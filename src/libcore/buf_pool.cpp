@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -17,18 +17,25 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/bits.h>
+#include <basecode/core/format.h>
 #include <basecode/core/hashtab.h>
 #include <basecode/core/buf_pool.h>
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode::buf_pool {
-    constexpr u32 max_pool_count = 4;
+    constexpr u32 max_pool_count            = 10;
 
     static u32 s_pool_sizes[max_pool_count] = {
+        16,
         32,
+        64,
         128,
+        256,
         512,
-        2048
+        1024,
+        2048,
+        4096,
+        8192,
     };
 
     using lease_map_t           = hashtab_t<u64, lease_t>;
@@ -53,17 +60,16 @@ namespace basecode::buf_pool {
             hashtab::init(g_system.leases, g_system.alloc);
 
             slab_config_t slab_config{};
-#ifdef _WIN32
-            slab_config.num_pages = 1;
-#else
-            slab_config.num_pages = 15;
-#endif
-            slab_config.backing   = g_system.alloc;
-            slab_config.buf_align = alignof(u0*);
+            slab_config.num_pages     = DEFAULT_NUM_PAGES;
+            slab_config.buf_align     = alignof(u0*);
+            slab_config.backing.alloc = g_system.alloc;
 
             for (u32 i = 0; i < max_pool_count; ++i) {
+                auto slab_name = format::format("buf_pool<{}>::slab\0",
+                                                s_pool_sizes[i]);
+                slab_config.name     = (const s8*) slab_name.data;
                 slab_config.buf_size = s_pool_sizes[i];
-                g_system.pools[i] = memory::system::make(alloc_type_t::slab, &slab_config);
+                g_system.pools[i] = memory::system::make(&slab_config);
             }
 
             return status_t::ok;
@@ -80,19 +86,18 @@ namespace basecode::buf_pool {
     }
 
     u8* retain(u32 size) {
-        for (u32 i = 0 ; i < max_pool_count; ++i) {
-            if (size <= s_pool_sizes[i]) {
-                auto alloc = g_system.pools[i];
-                auto buf   = (u8*) memory::alloc(alloc);
-                const auto key = (u64) buf;
-                auto lease = hashtab::emplace(g_system.leases, key);
-                lease->buf   = buf;
-                lease->size  = size;
-                lease->alloc = alloc;
-                return buf;
-            }
-        }
-        return nullptr;
+        const auto np2 = std::max<u32>(16, next_power_of_two(size));
+        const auto idx = 31U - __builtin_clz(np2);
+        if (idx > 13)
+            return nullptr;
+        auto alloc = g_system.pools[idx - 4];
+        auto buf   = (u8*) memory::alloc(alloc);
+        const auto key = (u64) buf;
+        auto lease = hashtab::emplace(g_system.leases, key);
+        lease->buf   = buf;
+        lease->size  = size;
+        lease->alloc = alloc;
+        return buf;
     }
 
     const lease_t* lease_for(const u8* buf) {

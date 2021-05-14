@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,6 +18,7 @@
 
 #include <basecode/core/str.h>
 #include <basecode/core/intern.h>
+#include <basecode/core/hashtab.h>
 #include <basecode/core/memory/system/trace.h>
 
 namespace basecode::memory::trace {
@@ -55,10 +56,21 @@ namespace basecode::memory::trace {
         memory_event_map_t          memory_events;
     };
 
-    static u0 fini(alloc_t* alloc, b8 enforce, u32* freed_size) {
+    static u32 fini(alloc_t* alloc) {
         UNUSED(alloc);
-        UNUSED(enforce);
-        *freed_size = 0;
+        return 0;
+    }
+
+    static u32 size(alloc_t* alloc, u0* mem) {
+        UNUSED(alloc);
+        UNUSED(mem);
+        return 0;
+    }
+
+    static u32 free(alloc_t* alloc, u0* mem) {
+        UNUSED(alloc);
+        UNUSED(mem);
+        return 0;
     }
 
     static u0 init(alloc_t* alloc, alloc_config_t* config) {
@@ -66,30 +78,23 @@ namespace basecode::memory::trace {
         UNUSED(config);
     }
 
-    static u0 free(alloc_t* alloc, u0* mem, u32& freed_size) {
-        UNUSED(alloc);
-        UNUSED(mem);
-        freed_size = 0;
-    }
-
-    static u0* alloc(alloc_t* alloc, u32 size, u32 align, u32& allocated_size) {
+    static mem_result_t alloc(alloc_t* alloc, u32 size, u32 align) {
         UNUSED(alloc);
         UNUSED(size);
         UNUSED(align);
-        allocated_size = 0;
         return {};
     }
 
-    static u0* realloc(alloc_t* alloc, u0* mem, u32 size, u32 align, u32& old_size) {
+    static mem_result_t realloc(alloc_t* alloc, u0* mem, u32 size, u32 align) {
         UNUSED(alloc);
         UNUSED(mem);
         UNUSED(size);
         UNUSED(align);
-        old_size = {};
         return {};
     }
 
     alloc_system_t g_system{
+        .size       = size,
         .init       = init,
         .fini       = fini,
         .free       = free,

@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,6 +18,7 @@
 
 #pragma once
 
-#define VERSION_MAJOR (@VERSION_MAJOR@)
-#define VERSION_MINOR (@VERSION_MINOR@)
-#define PRODUCT_NAME  ("@PRODUCT_NAME@")
+#define GFX_VERSION_MAJOR (@VERSION_MAJOR@)
+#define GFX_VERSION_MINOR (@VERSION_MINOR@)
+#define GFX_PRODUCT_NAME  ("@PRODUCT_NAME@")
+#define GFX_BUILD_TYPE    ("@CMAKE_BUILD_TYPE@")

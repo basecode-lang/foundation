@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,6 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/str.h>
 #include <basecode/core/bass.h>
 #include <basecode/core/memory/system/bump.h>
 #include <basecode/core/memory/system/page.h>
@@ -141,17 +142,22 @@ namespace basecode {
             storage.id    = 1;
             storage.alloc = memory::proxy::make(alloc, "bass"_ss);
 
-            array::init(storage.index, memory::proxy::make(storage.alloc, "bass::index"_ss));
+            array::init(storage.index,
+                        memory::proxy::make(storage.alloc, "bass::index"_ss));
 
             page_config_t page_config{};
-            page_config.num_pages = num_pages;
-            page_config.backing   = storage.alloc;
-            storage.page_alloc    = memory::proxy::make(memory::system::make(alloc_type_t::page, &page_config), "bass::page"_ss, true);
+            page_config.name          = "bass::page_alloc";
+            page_config.num_pages     = num_pages;
+            page_config.backing.alloc = storage.alloc;
+            storage.page_alloc = memory::proxy::make(memory::system::make(&page_config),
+                                                     "bass::page"_ss,
+                                                     true);
 
             bump_config_t bump_config{};
+            bump_config.name          = "bass::bump_alloc";
             bump_config.type          = bump_type_t::allocator;
             bump_config.backing.alloc = storage.page_alloc;
-            storage.bump_alloc        = memory::system::make(alloc_type_t::bump, &bump_config);
+            storage.bump_alloc        = memory::system::make(&bump_config);
         }
 
         b8 seek_record(bass_t& storage, u32 id, cursor_t& cursor) {
@@ -182,9 +188,9 @@ namespace basecode {
             cursor.header->value = record_size;
             cursor.header->kind  = kind::header;
 
-            ++cursor.storage->index.size;
             if (cursor.storage->index.capacity <= cursor.id)
                 array::grow(cursor.storage->index);
+            ++cursor.storage->index.size;
             auto& index  = cursor.storage->index[cursor.id - 1];
             index.page   = cursor.page;
             index.offset = cursor.offset;
@@ -193,20 +199,6 @@ namespace basecode {
             if (!next_field(cursor, value))
                 return false;
             return write_field(cursor, field::id, cursor.id);
-        }
-
-        b8 format_record(bass_t& ast, fmt_buf_t& buf, u32 id, format_record_callback_t record_cb, u0* ctx) {
-            u32 value{};
-            cursor_t cursor{};
-            if (!bass::seek_record(ast, id, cursor))
-                return false;
-            if (!record_cb(format_type_t::header, cursor, buf, ctx))
-                return false;
-            while (bass::next_field(cursor, value)) {
-                if (!record_cb(format_type_t::field, cursor, buf, ctx))
-                    return false;
-            }
-            return true;
         }
     }
 }

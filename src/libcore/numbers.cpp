@@ -6,9 +6,9 @@
 // | |_)| (_| \__ \  __/ (_| (_) | (_| |  __/
 // |____/\__,_|___/\___|\___\___/ \__,_|\___|
 //
-// V I R T U A L  M A C H I N E  P R O J E C T
+//      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -21,62 +21,83 @@
 #include <cstdlib>
 #include <basecode/core/numbers.h>
 
+#define VALIDATE_INT_PARSE(sn, sx, ux)          SAFE_SCOPE({    \
+    if ((errno == ERANGE && out == (sx))                        \
+    ||   out > (ux)) {                                          \
+        return status_t::overflow;                              \
+    }                                                           \
+    if ((errno == ERANGE && out == (sn))) {                     \
+        return status_t::underflow;                             \
+    }                                                           \
+    if (*begin == '\0') return status_t::not_convertible;       \
+    if ((radix != 16 && !isspace(*end) && *end != '\0')         \
+    ||  (!isspace(*end) && !isalpha(*end) && *end != '\0')) {   \
+        return status_t::not_convertible;                       \
+    }                                                           \
+    return status_t::ok; })
+
 namespace basecode::numbers {
     namespace fp {
-        result_t parse(str::slice_t value, f32& out) {
+        status_t parse(str::slice_t value, f32& out) {
             const s8* begin = (const s8*) value.data;
             s8* end{};
             errno = 0;
             out = strtof(begin, &end);
             if (errno == ERANGE)
-                return result_t::overflow;
-            if (*begin == '\0' || *end != '\0')
-                return result_t::not_convertible;
-            return result_t::ok;
+                return status_t::overflow;
+            if (*begin == '\0'
+            || (!isspace(*end) && !isalpha(*end) && *end != '\0')) {
+                return status_t::not_convertible;
+            }
+            return status_t::ok;
         }
 
-        result_t parse(str::slice_t value, f64& out) {
+        status_t parse(str::slice_t value, f64& out) {
             const s8* begin = (const s8*) value.data;
             s8* end{};
             errno = 0;
             out = strtod(begin, &end);
             if (errno == ERANGE)
-                return result_t::overflow;
-            if (*begin == '\0' || *end != '\0')
-                return result_t::not_convertible;
-            return result_t::ok;
+                return status_t::overflow;
+            if (*begin == '\0'
+            || (!isspace(*end) && !isalpha(*end) && *end != '\0')) {
+                return status_t::not_convertible;
+            }
+            return status_t::ok;
         }
     }
 
     namespace integer {
-        result_t parse(str::slice_t value, u8 radix, s32& out) {
+        status_t parse(str::slice_t value, u8 radix, u32& out) {
+            const s8* begin = (const s8*) value.data;
+            s8* end;
+            errno = 0;
+            out = strtoul(begin, &end, radix);
+            VALIDATE_INT_PARSE(INT_MIN, INT_MAX, UINT_MAX);
+        }
+
+        status_t parse(str::slice_t value, u8 radix, s32& out) {
             const s8* begin = (const s8*) value.data;
             s8* end;
             errno = 0;
             out = strtol(begin, &end, radix);
-            if ((errno == ERANGE && out == INT_MAX)
-                ||   out > UINT_MAX)
-                return result_t::overflow;
-            if ((errno == ERANGE && out == INT_MIN))
-                return result_t::underflow;
-            if (*begin == '\0' || *end != '\0')
-                return result_t::not_convertible;
-            return result_t::ok;
+            VALIDATE_INT_PARSE(INT_MIN, INT_MAX, UINT_MAX);
         }
 
-        result_t parse(str::slice_t value, u8 radix, s64& out) {
+        status_t parse(str::slice_t value, u8 radix, u64& out) {
+            const s8* begin = (const s8*) value.data;
+            s8* end;
+            errno = 0;
+            out = strtoull(begin, &end, radix);
+            VALIDATE_INT_PARSE(LONG_MIN, LONG_MAX, ULONG_MAX);
+        }
+
+        status_t parse(str::slice_t value, u8 radix, s64& out) {
             const s8* begin = (const s8*) value.data;
             s8* end;
             errno = 0;
             out = strtoll(begin, &end, radix);
-            if ((errno == ERANGE && out == LONG_MAX)
-                ||   out > UINT_MAX)
-                return result_t::overflow;
-            if ((errno == ERANGE && out == LONG_MIN))
-                return result_t::underflow;
-            if (*begin == '\0' || *end != '\0')
-                return result_t::not_convertible;
-            return result_t::ok;
+            VALIDATE_INT_PARSE(LONG_MIN, LONG_MAX, ULONG_MAX);
         }
     }
 }

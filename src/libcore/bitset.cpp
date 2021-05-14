@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,9 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <cstring>
-#include <algorithm>
 #include <basecode/core/bits.h>
+#include <basecode/core/memory.h>
 #include <basecode/core/bitset.h>
 
 namespace basecode {
@@ -64,10 +63,6 @@ namespace basecode {
     }
 
     namespace bitset {
-        u0 free(bitset_t& set) {
-            clear(set);
-        }
-
         u32 min(bitset_t& set) {
             for (u32 i = 0; i < set.capacity; i++) {
                 auto word = set.data[i];
@@ -86,6 +81,10 @@ namespace basecode {
             return 0;
         }
 
+        u0 free(bitset_t& set) {
+            clear(set);
+        }
+
         u0 trim(bitset_t& set) {
             auto new_capacity = set.capacity;
             while (new_capacity > 0) {
@@ -96,22 +95,24 @@ namespace basecode {
             }
             if (set.capacity == new_capacity)
                 return;
-            auto new_data = (u64*) memory::alloc(set.allocator, new_capacity * sizeof(u64), alignof(u64));
+            auto new_data = (u64*) memory::alloc(set.alloc,
+                                                 new_capacity * sizeof(u64),
+                                                 alignof(u64));
             if (set.data)
                 std::memcpy(new_data, set.data, set.capacity * sizeof(u64));
-            memory::free(set.allocator, set.data);
-            set.data = new_data;
+            memory::free(set.alloc, set.data);
+            set.data     = new_data;
             set.capacity = new_capacity;
-        }
-
-        u0 clear(bitset_t& set) {
-            memory::free(set.allocator, set.data);
-            set.data     = {};
-            set.capacity = {};
         }
 
         b8 empty(bitset_t& set) {
             return count(set) == 0;
+        }
+
+        u0 clear(bitset_t& set) {
+            memory::free(set.alloc, set.data);
+            set.data     = {};
+            set.capacity = {};
         }
 
         u0 reset(bitset_t& set) {
@@ -142,11 +143,17 @@ namespace basecode {
             return c;
         }
 
+        bitset_t make(alloc_t* alloc) {
+            bitset_t set{};
+            init(set, alloc);
+            return set;
+        }
+
         b8 read(bitset_t& set, u32 bit) {
-            const auto shifted_bit = bit >> (u32) 6;
+            const auto shifted_bit = bit >> 6U;
             if (shifted_bit >= set.capacity)
                 return false;
-            return (set.data[shifted_bit] & (((u64) 1) << (bit % 64))) != 0;
+            return (set.data[shifted_bit] & (1ULL << (bit % 64))) != 0;
         }
 
         u32 size_in_bits(bitset_t& set) {
@@ -161,14 +168,20 @@ namespace basecode {
             return set.capacity * sizeof(u64);
         }
 
+        u0 init(bitset_t& set, alloc_t* alloc) {
+            set.alloc    = alloc;
+            set.data     = {};
+            set.capacity = {};
+        }
+
         b8 next_set_bit(bitset_t& set, u32& bit) {
-            u32 word_index = bit >> (u32) 6;
+            u32 word_index = bit >> 6U;
             if (word_index >= set.capacity) {
-                bit = set.capacity << (u32) 6;
+                bit = set.capacity << 6U;
                 return false;
             }
             u64 word = set.data[word_index];
-            word >>= (bit & (u32) 63);
+            word >>= bit & 63U;
             if (word != 0) {
                 bit += __builtin_ctzll(word);
                 return true;
@@ -177,26 +190,38 @@ namespace basecode {
             while (word_index < set.capacity) {
                 word = set.data[word_index];
                 if (word != 0) {
-                    bit = (word_index << (u32) 6) + __builtin_ctzll(word);
+                    bit = (word_index << 6U) + __builtin_ctzll(word);
                     return true;
                 }
                 word_index++;
             }
-            bit = set.capacity << (u32) 6;
+            bit = set.capacity << 6U;
             return false;
+        }
+
+        u0 write(bitset_t& set, u32 bit, b8 flag) {
+            const auto shifted_bit = bit >> 6U;
+            const auto mask        = 1ULL << (bit % 64);
+            const auto new_mask    = ((u64) flag) << (bit % 64);
+            if (shifted_bit >= set.capacity)
+                resize(set, (set.capacity * 2) * 64);
+            auto word = set.data[shifted_bit];
+            word &= ~mask;
+            word |= new_mask;
+            set.data[shifted_bit] = word;
         }
 
         b8 next_clear_bit(bitset_t& set, u32& bit) {
             constexpr u64 high_mask = 1ULL + ~1ULL;
-            u32 word_index = bit >> (u32) 6;
+            u32 word_index = bit >> 6U;
             if (word_index >= set.capacity) {
-                bit = set.capacity << (u32) 6;
+                bit = set.capacity << 6U;
                 return false;
             }
             u64 word = ~set.data[word_index];
             if (word == high_mask)
                 return true;
-            word >>= (bit & (u32) 63);
+            word >>= bit & 63U;
             if (word != 0) {
                 bit += __builtin_ctzll(word);
                 return true;
@@ -205,72 +230,13 @@ namespace basecode {
             while (word_index < set.capacity) {
                 word = ~set.data[word_index];
                 if (word != 0) {
-                    bit = (word_index << (u32) 6) + __builtin_ctzll(word);
+                    bit = (word_index << 6U) + __builtin_ctzll(word);
                     return true;
                 }
                 word_index++;
             }
-            bit = set.capacity << (u32) 6;
+            bit = set.capacity << 6U;
             return false;
-        }
-
-        u0 init(bitset_t& set, alloc_t* allocator) {
-            set.data = {};
-            set.allocator = allocator;
-            set.capacity = {};
-        }
-
-        u0 resize(bitset_t& set, u32 new_capacity, b8 pad_with_zeros) {
-            new_capacity = std::max<u32>(next_power_of_two(new_capacity), 64);
-            const auto capacity_in_words = std::max<u32>(new_capacity / 64, 1);
-            const auto smallest = new_capacity < set.capacity ? new_capacity : set.capacity;
-            if (set.capacity < new_capacity) {
-                u64* new_data{};
-                new_data = (u64*) memory::alloc(set.allocator, capacity_in_words * sizeof(u64), alignof(u64));
-                if (set.data)
-                    std::memcpy(new_data, set.data, sizeof(u64) * set.capacity);
-                memory::free(set.allocator, set.data);
-                set.data = new_data;
-                set.capacity = capacity_in_words;
-            }
-            if (pad_with_zeros && (capacity_in_words > smallest)) {
-                std::memset(
-                    set.data + smallest,
-                    0,
-                    sizeof(u64) * (capacity_in_words - smallest));
-            }
-        }
-
-        bitset_t make(alloc_t* allocator) {
-            bitset_t set{};
-            init(set, allocator);
-            return set;
-        }
-
-        u0 write(bitset_t& set, u32 bit, b8 flag) {
-            const auto shifted_bit = bit >> (u32) 6;
-            const auto mask = ((u64) 1) << (bit % 64);
-            const auto new_mask = ((u64) flag) << (bit % 64);
-            if (shifted_bit >= set.capacity)
-                resize(set, shifted_bit + 1);
-            auto word = set.data[shifted_bit];
-            word &= ~mask;
-            word |= new_mask;
-            set.data[shifted_bit] = word;
-        }
-
-        u0 union_of(bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
-            for (size_t i = 0; i < min_length; ++i)
-                lhs.data[i] |= rhs.data[i];
-            if (rhs.capacity > lhs.capacity) {
-                auto old_capacity = lhs.capacity;
-                resize(lhs, rhs.capacity, false);
-                std::memcpy(
-                    lhs.data + old_capacity,
-                    rhs.data + old_capacity,
-                    (rhs.capacity - old_capacity) * sizeof(u64));
-            }
         }
 
         b8 any_set(const bitset_t& set, u32 start_bit) {
@@ -283,14 +249,49 @@ namespace basecode {
             return true;
         }
 
+        u0 union_of(bitset_t& lhs, const bitset_t& rhs) {
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
+            for (size_t i = 0; i < min_length; ++i)
+                lhs.data[i] |= rhs.data[i];
+            if (rhs.capacity > lhs.capacity) {
+                auto old_capacity = lhs.capacity;
+                resize(lhs, rhs.capacity, false);
+                std::memcpy(
+                    lhs.data + old_capacity,
+                    rhs.data + old_capacity,
+                    (rhs.capacity - old_capacity) * sizeof(u64));
+            }
+        }
+
+        u32 symmetric_difference_count(const bitset_t& lhs,
+                                       const bitset_t& rhs) {
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
+            u32 i{};
+            u32 c{};
+            for (; i < min_length; ++i)
+                c += __builtin_popcountll(lhs.data[i] ^ rhs.data[i]);
+            if (rhs.capacity > lhs.capacity) {
+                for (; i < rhs.capacity; ++i)
+                    c += __builtin_popcountll(rhs.data[i]);
+            } else {
+                for (; i < lhs.capacity; ++i)
+                    c += __builtin_popcountll(lhs.data[i]);
+            }
+            return c;
+        }
+
         u0 difference_of(bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (auto i = 0; i < min_length; ++i)
                 lhs.data[i] &= ~(rhs.data[i]);
         }
 
         b8 disjoint(const bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (auto i = 0; i < min_length; i++) {
                 if ((lhs.data[i] & rhs.data[i]) != 0)
                     return false;
@@ -299,7 +300,8 @@ namespace basecode {
         }
 
         u0 intersection_of(bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             u32 i{};
             for (; i < min_length; ++i)
                 lhs.data[i] &= rhs.data[i];
@@ -320,7 +322,8 @@ namespace basecode {
         u32 union_count(const bitset_t& lhs, const bitset_t& rhs) {
             u32 i{};
             u32 c{};
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (; i + 3 < min_length; i += 4) {
                 c += __builtin_popcountll(lhs.data[i]     | rhs.data[i]);
                 c += __builtin_popcountll(lhs.data[i + 1] | rhs.data[i + 1]);
@@ -352,7 +355,8 @@ namespace basecode {
         }
 
         b8 intersection_of(const bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (auto i = 0; i < min_length; i++) {
                 if ((lhs.data[i] & rhs.data[i]) != 0)
                     return true;
@@ -360,8 +364,33 @@ namespace basecode {
             return false;
         }
 
+        u0 resize(bitset_t& set, u32 new_capacity, b8 pad_with_zeros) {
+            new_capacity = std::max<u32>(next_power_of_two(new_capacity), 64);
+            const auto capacity_in_words = std::max<u32>(new_capacity / 64, 1);
+            const auto smallest = new_capacity < set.capacity ?
+                                  new_capacity : set.capacity;
+            if (set.capacity < new_capacity) {
+                u64* new_data;
+                new_data = (u64*) memory::alloc(set.alloc,
+                                                capacity_in_words * sizeof(u64),
+                                                alignof(u64));
+                if (set.data)
+                    std::memcpy(new_data, set.data, sizeof(u64) * set.capacity);
+                memory::free(set.alloc, set.data);
+                set.data     = new_data;
+                set.capacity = capacity_in_words;
+            }
+            if (pad_with_zeros && (capacity_in_words > smallest)) {
+                std::memset(
+                    set.data + smallest,
+                    0,
+                    sizeof(u64) * (capacity_in_words - smallest));
+            }
+        }
+
         u0 symmetric_difference_of(bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             u32 i{};
             for (; i < min_length; ++i)
                 lhs.data[i] ^= rhs.data[i];
@@ -378,7 +407,8 @@ namespace basecode {
         u32 difference_count(const bitset_t& lhs, const bitset_t& rhs) {
             u32 i{};
             u32 c{};
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const auto min_length = lhs.capacity < rhs.capacity ?
+                                    lhs.capacity : rhs.capacity;
             for (; i < min_length; ++i)
                 c += __builtin_popcountll(lhs.data[i] & ~(rhs.data[i]));
             for (; i < lhs.capacity; ++i)
@@ -388,25 +418,10 @@ namespace basecode {
 
         u32 intersection_count(const bitset_t& lhs, const bitset_t& rhs) {
             u32 c{};
-            const size_t min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
+            const size_t min_length = lhs.capacity < rhs.capacity ?
+                                      lhs.capacity : rhs.capacity;
             for (auto i = 0; i < min_length; ++i)
                 c += __builtin_popcountll(lhs.data[i] & rhs.data[i]);
-            return c;
-        }
-
-        u32 symmetric_difference_count(const bitset_t& lhs, const bitset_t& rhs) {
-            const auto min_length = lhs.capacity < rhs.capacity ? lhs.capacity : rhs.capacity;
-            u32 i{};
-            u32 c{};
-            for (; i < min_length; ++i)
-                c += __builtin_popcountll(lhs.data[i] ^ rhs.data[i]);
-            if (rhs.capacity > lhs.capacity) {
-                for (; i < rhs.capacity; ++i)
-                    c += __builtin_popcountll(rhs.data[i]);
-            } else {
-                for (; i < lhs.capacity; ++i)
-                    c += __builtin_popcountll(lhs.data[i]);
-            }
             return c;
         }
     }

@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,12 +16,10 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/buf.h>
 #include <basecode/core/error.h>
-#include <basecode/core/config.h>
 #include <basecode/core/string.h>
-#include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
@@ -47,13 +45,21 @@ TEST_CASE("basecode::error add & find") {
     REQUIRE(def->code == test_code);
     REQUIRE(def->locale == en_gb_lc);
 
-    error::report::add(error_id, error_report_level_t::error, "hello world!", 13, "foo"_ss);
-    error::report::add(error_id, error_report_level_t::error, "test", 42.111, "bar"_ss);
+    error::report::add(error_id,
+                       error_report_level_t::error,
+                       "hello world!",
+                       13,
+                       "foo"_ss);
+    error::report::add(error_id,
+                       error_report_level_t::error,
+                       "test",
+                       42.111,
+                       "bar"_ss);
 
     error::report::print_range(0, error::report::count());
 }
 
-TEST_CASE("basecode::error source formatted") {
+TEST_CASE("basecode::error source formatted", "[source_formatted]") {
     const auto source = R"(core :: module("../modules/core");
 
 #run {
@@ -83,7 +89,11 @@ TEST_CASE("basecode::error source formatted") {
         src_info.pos   = source_pos_t{150, 148};
         src_info.start = source_loc_t{7, 24};
         src_info.end   = source_loc_t{7, 26};
-        error::report::add_src(5000, error_report_level_t::error, &buf, src_info, "foo"_ss);
+        error::report::add_src(5000,
+                               error_report_level_t::error,
+                               &buf,
+                               src_info,
+                               "foo");
     }
     auto start_id = error::report::count() - 1;
 
@@ -92,7 +102,11 @@ TEST_CASE("basecode::error source formatted") {
         src_info.pos   = source_pos_t{303, 211};
         src_info.start = source_loc_t{11, 8};
         src_info.end   = source_loc_t{13, 33};
-        error::report::add_src(5000, error_report_level_t::error, &buf, src_info, "defer"_ss);
+        error::report::add_src(5000,
+                               error_report_level_t::error,
+                               &buf,
+                               src_info,
+                               "defer");
     }
 
     str_t fmt_buf{};

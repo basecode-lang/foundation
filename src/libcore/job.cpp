@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -19,11 +19,12 @@
 #include <atomic>
 #include <basecode/core/log.h>
 #include <basecode/core/job.h>
-#include <basecode/core/queue.h>
 #include <basecode/core/thread.h>
 #include <basecode/core/string.h>
+#include <basecode/core/memory/system/dl.h>
 #include <basecode/core/memory/system/slab.h>
 #include <basecode/core/memory/system/proxy.h>
+#include <basecode/core/memory/system/scratch.h>
 
 namespace basecode::job {
     struct worker_t final {
@@ -74,12 +75,28 @@ namespace basecode::job {
         }
 
         static u0 run(worker_t& worker) {
-            memory::system::init(alloc_type_t::dlmalloc, 4 * 1024 * 1024);
+            dl_config_t dl_cfg{};
+            dl_cfg.name      = "main heap";
+            dl_cfg.heap_size = 4 * 1024 * 1024;
+
+            scratch_config_t scratch_cfg{};
+            scratch_cfg.name     = "scratch heap";
+            scratch_cfg.buf_size = 256 * 1024;
+
+            system_config_t sys_cfg{};
+            sys_cfg.main = &dl_cfg;
+            sys_cfg.scratch = &scratch_cfg;
+
+            memory::system::init(&sys_cfg);
             auto ctx = context::make(worker.parent_ctx->argc,
-                                     worker.parent_ctx->argv,
-                                     memory::system::default_alloc(),
-                                     worker.parent_ctx->logger);
+                                     worker.parent_ctx->argv);
+            ctx.logger        = worker.parent_ctx->logger;
+            ctx.alloc.main    = memory::system::main_alloc();
+            ctx.alloc.temp    = memory::system::temp_alloc();
+            ctx.alloc.scratch = memory::system::scratch_alloc();
             context::push(&ctx);
+            memory::proxy::init();
+            memory::system::mark_initialized();
             array::init(worker.active);
             array::reserve(worker.active, 128);
             array::init(worker.pending);
@@ -152,11 +169,12 @@ namespace basecode::job {
             g_job_sys.worker_idx  = {};
 
             slab_config_t slab_config{};
-            slab_config.backing   = g_job_sys.alloc;
-            slab_config.buf_size  = job_task_buffer_size;
-            slab_config.buf_align = alignof(job_task_base_t*);
-            slab_config.num_pages = 1;
-            g_job_sys.task_pool = memory::system::make(alloc_type_t::slab, &slab_config);
+            slab_config.name          = "job::task_slab";
+            slab_config.buf_size      = job_task_buffer_size;
+            slab_config.buf_align     = alignof(job_task_base_t*);
+            slab_config.num_pages     = DEFAULT_NUM_PAGES;
+            slab_config.backing.alloc = g_job_sys.alloc;
+            g_job_sys.task_pool = memory::system::make(&slab_config);
 
             mutex::init(g_job_sys.jobs_mutex);
             stable_array::init(g_job_sys.jobs, g_job_sys.alloc);
@@ -164,27 +182,51 @@ namespace basecode::job {
             g_job_sys.num_cores   = thread::system::num_cores();
             g_job_sys.num_workers = std::max<s32>(g_job_sys.num_cores - 2, 2);
             array::reserve(g_job_sys.workers, g_job_sys.num_workers);
-            log::debug("job::system, number of worker threads: {}", g_job_sys.num_workers);
-            str_t temp{};
-            str::init(temp, g_job_sys.alloc);
-            str::reserve(temp, 32);
+            log::debug("job::system, number of worker threads: {}",
+                       g_job_sys.num_workers);
             for (u32 i = 0; i < g_job_sys.num_workers; ++i) {
                 auto& worker = array::append(g_job_sys.workers);
                 worker.id         = i + 1;
-                worker.flags      = worker::none;
-                worker.parent_ctx = context::top();
-                worker.started    = event::make(true);
                 worker.wake       = event::make(false);
+                worker.flags      = worker::none;
+                worker.started    = event::make(true);
+                worker.parent_ctx = context::top();
                 mutex::init(worker.pending_mutex);
-                str::reset(temp);
-                {
+                str_t temp{};
+                str::init(temp, context::top()->alloc.temp);
+                str::reserve(temp, 256); {
                     str_buf_t buf(&temp);
                     format::format_to(buf, "job worker:{}", worker.id);
                 }
                 thread::init(worker.thread, string::interned::fold(temp));
                 thread::start(worker.thread, &worker::run, worker);
             }
-            str::free(temp);
+            return status_t::ok;
+        }
+
+        status_t make(const s8* label,
+                      s32 len,
+                      job_id& id,
+                      job_id parent_id) {
+            scoped_lock_t lock(&g_job_sys.jobs_mutex);
+            job_t* parent_job{};
+            if (parent_id) {
+                if (parent_id > g_job_sys.jobs.size)
+                    return status_t::invalid_job_id;
+                parent_job = &g_job_sys.jobs[parent_id - 1];
+            }
+            intern::result_t ir{};
+            if (label) {
+                ir = string::interned::fold_for_result(slice::make(label,
+                                                                   len));
+                if (!OK(ir.status))
+                    return status_t::label_intern_failure;
+            }
+            auto job = &stable_array::append(g_job_sys.jobs);
+            id = g_job_sys.jobs.size;
+            job::init(*job, id, ir.id, parent_id);
+            if (parent_job)
+                array::append(parent_job->children, id);
             return status_t::ok;
         }
 
@@ -203,34 +245,14 @@ namespace basecode::job {
             job->task  = task;
             job->state = job_state_t::queued;
             g_job_sys.worker_idx++;
-            auto& worker = g_job_sys.workers[g_job_sys.worker_idx % g_job_sys.num_workers];
+            const auto worker_idx = g_job_sys.worker_idx
+                                    % g_job_sys.num_workers;
+            auto& worker = g_job_sys.workers[worker_idx];
             scoped_lock_t pending_lock(&worker.pending_mutex);
             event::wait(worker.started);
             array::append(worker.pending, id);
             worker::flag(worker, worker::has_pending, true);
             event::set(worker.wake);
-            return status_t::ok;
-        }
-
-        status_t make(const s8* label, s32 len, job_id& id, job_id parent_id) {
-            scoped_lock_t lock(&g_job_sys.jobs_mutex);
-            job_t* parent_job{};
-            if (parent_id) {
-                if (parent_id > g_job_sys.jobs.size)
-                    return status_t::invalid_job_id;
-                parent_job = &g_job_sys.jobs[parent_id - 1];
-            }
-            intern::result_t ir{};
-            if (label) {
-                ir = string::interned::fold_for_result(slice::make(label, len));
-                if (!OK(ir.status))
-                    return status_t::label_intern_failure;
-            }
-            auto job = &stable_array::append(g_job_sys.jobs);
-            id = g_job_sys.jobs.size;
-            job::init(*job, id, ir.id, parent_id);
-            if (parent_job)
-                array::append(parent_job->children, id);
             return status_t::ok;
         }
     }
@@ -257,20 +279,21 @@ namespace basecode::job {
         return status_t::ok;
     }
 
-    u0 all(array_t<const job_t*>& list) {
-        scoped_lock_t lock(&g_job_sys.jobs_mutex);
-        array::reset(list);
-        for (const auto job : g_job_sys.jobs)
-            array::append(list, job);
-    }
-
     str::slice_t label(job_id id) {
         scoped_lock_t lock(&g_job_sys.jobs_mutex);
         if (id == 0 || id > g_job_sys.jobs.size)
             return {};
         const auto& job = g_job_sys.jobs[id - 1];
         auto result = string::interned::get(job.label_id);
-        return OK(result.status) ? result.slice : string::localized::status_name(result.status);
+        return OK(result.status) ? result.slice :
+               string::localized::status_name(result.status);
+    }
+
+    u0 all(array_t<const job_t*>& list) {
+        scoped_lock_t lock(&g_job_sys.jobs_mutex);
+        array::reset(list);
+        for (const auto job : g_job_sys.jobs)
+            array::append(list, job);
     }
 
     status_t get(job_id id, job_t** job) {
@@ -282,30 +305,30 @@ namespace basecode::job {
     }
 
     status_t wait(job_id id, s64 timeout) {
-        event_t e;
-        {
+        event_t e; {
             scoped_lock_t lock(&g_job_sys.jobs_mutex);
             if (id == 0 || id > g_job_sys.jobs.size)
                 return status_t::invalid_job_id;
             const auto& job = g_job_sys.jobs[id - 1];
             e = job.finished;
         }
-        return OK(event::wait(e, timeout)) ? status_t::ok : status_t::busy;
+        return OK(event::wait(e, timeout)) ? status_t::ok :
+               status_t::busy;
     }
 
     str::slice_t state_name(job_state_t state) {
-        str::slice_t* s{};
-        string::localized::find(u32(state), &s);
-        return *s;
+        str::slice_t s{};
+        string::localized::find(u32(state), s);
+        return s;
     }
 
     u0 init(job_t& job, job_id id, u32 label_id, job_id parent_id) {
-        job.id         = id;
-        job.task       = {};
-        job.label_id   = label_id;
-        job.parent     = parent_id;
-        job.finished   = event::make();
-        job.state      = job_state_t::created;
+        job.id       = id;
+        job.task     = {};
+        job.state    = job_state_t::created;
+        job.parent   = parent_id;
+        job.label_id = label_id;
+        job.finished = event::make();
         stopwatch::init(job.time);
         array::init(job.children, g_job_sys.alloc);
     }

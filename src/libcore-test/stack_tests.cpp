@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,9 +16,11 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
+#include <basecode/core/str.h>
 #include <basecode/core/defer.h>
 #include <basecode/core/stack.h>
+#include <basecode/core/stopwatch.h>
 
 using namespace basecode;
 
@@ -57,45 +59,66 @@ TEST_CASE("basecode::stack basics") {
 
 TEST_CASE("basecode::stack force grow multiple times") {
     basecode::stack_t<s32> numbers{};
-    stack::init(numbers, context::top()->alloc);
+    stack::init(numbers, context::top()->alloc.main);
     defer(stack::free(numbers));
 
-    REQUIRE(stack::empty(numbers));
+    if (!stack::empty(numbers))
+        REQUIRE(stack::empty(numbers));
 
-    for (s32 i = 0; i < 1000; ++i)
-        stack::push(numbers, i);
+    TIME_BLOCK(
+        "stack: push 1000 s32 integers"_ss,
+        for (s32 i = 0; i < 1000; ++i) {
+            stack::push(numbers, i);
+        });
 
-    REQUIRE(numbers.size == 1000);
+    if (numbers.size != 1000)
+        REQUIRE(numbers.size == 1000);
 
     auto n = 999;
-    while (!stack::empty(numbers)) {
-        auto top = *stack::top(numbers);
-        REQUIRE(top == n--);
-        stack::pop(numbers);
-    }
+    b8 mismatch{};
+    TIME_BLOCK(
+        "stack: pop & match 1000 s32 integers"_ss,
+        while (!stack::empty(numbers)) {
+            auto top = *stack::top(numbers);
+            if (top != n--) {
+                mismatch = true;
+                break;
+            }
+            stack::pop(numbers);
+        });
+    REQUIRE(!mismatch);
 
-    REQUIRE(stack::empty(numbers));
+    if (!stack::empty(numbers))
+        REQUIRE(stack::empty(numbers));
 
     stack::push(numbers, 100);
     stack::push(numbers, 200);
     stack::push(numbers, 300);
-    REQUIRE(numbers.size == 3);
+    if (numbers.size != 3)
+        REQUIRE(numbers.size == 3);
 
     n = 300;
-    while (!stack::empty(numbers)) {
-        auto top = *stack::top(numbers);
-        REQUIRE(top == n);
-        n -= 100;
-        stack::pop(numbers);
-    }
+    TIME_BLOCK(
+        "stack: pop & match 3 more s32 integers"_ss,
+        while (!stack::empty(numbers)) {
+            auto top = *stack::top(numbers);
+            if (top != n) {
+                mismatch = true;
+                break;
+            }
+            n -= 100;
+            stack::pop(numbers);
+        });
+    REQUIRE(!mismatch);
 
     stack::reset(numbers);
-    REQUIRE(stack::empty(numbers));
+    if (!stack::empty(numbers))
+        REQUIRE(stack::empty(numbers));
 }
 
 TEST_CASE("basecode::stack insert") {
     basecode::stack_t<s32> numbers{};
-    stack::init(numbers, context::top()->alloc);
+    stack::init(numbers, context::top()->alloc.main);
     defer(stack::free(numbers));
 
     REQUIRE(stack::empty(numbers));

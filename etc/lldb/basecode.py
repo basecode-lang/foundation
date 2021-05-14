@@ -90,12 +90,19 @@ class Array_Provider(lldb.SBSyntheticValueProvider):
 
 def __lldb_init_module(debugger, dict):
     log("in __lldb_init_module")
-    debugger.HandleCommand("type synthetic add -x \"basecode::array_t<.+>\" --python-class basecode.Array_Provider")
-    debugger.HandleCommand("type synthetic add -x \"basecode::stack_t<.+>\" --python-class basecode.Stack_Provider")
+    debugger.HandleCommand("type synthetic add -x \"basecode::array_t<.+>\" "
+                           "--python-class basecode.Array_Provider")
+    debugger.HandleCommand("type synthetic add -x \"basecode::stack_t<.+>\" "
+                           "--python-class basecode.Stack_Provider")
+    debugger.HandleCommand("type synthetic add -x \"basecode::stable_array_t<.+>\" "
+                           "--python-class basecode.Array_Provider")
     debugger.HandleCommand("type summary add -e -h --summary-string "
                            "\"alloc=${var.alloc} capacity=${var.capacity} size=${svar%#}\" "
                            " -w basecode -x \"basecode::stack_t<.+>\"")
     debugger.HandleCommand("type summary add -e -h --summary-string "
                            "\"alloc=${var.alloc} capacity=${var.capacity} size=${svar%#}\" "
                            " -w basecode -x \"basecode::array_t<.+>\"")
+    debugger.HandleCommand("type summary add -e -h --summary-string "
+                           "\"alloc=${var.alloc} capacity=${var.capacity} size=${svar%#}\" "
+                           " -w basecode -x \"basecode::stable_array_t<.+>\"")
     debugger.HandleCommand("type category enable basecode")

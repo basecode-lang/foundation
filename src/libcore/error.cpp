@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -21,22 +21,38 @@
 #include <basecode/core/mutex.h>
 #include <basecode/core/locale.h>
 #include <basecode/core/string.h>
-#include <basecode/core/hashtab.h>
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode::error {
-    using error_report_list_t   = array_t<error_report_t>;
-    using localized_error_map_t = hashtab_t<locale_key_t, error_def_t*>;
-
     struct system_t final {
         alloc_t*                alloc;
         alloc_t*                error_slab;
         localized_error_map_t   errors;
         error_report_list_t     reports;
+        term_t                  term;
         mutex_t                 lock;
     };
 
     system_t                    g_err_sys;
+
+    struct fmt_visitor_t : variant_visitor_t {
+        fmt_dyn_args_t          args{};
+
+        u0 accept(s8 value) override            { args.push_back(value); }
+        u0 accept(u8 value) override            { args.push_back(value); }
+        u0 accept(s16 value) override           { args.push_back(value); }
+        u0 accept(u16 value) override           { args.push_back(value); }
+        u0 accept(s32 value) override           { args.push_back(value); }
+        u0 accept(u32 value) override           { args.push_back(value); }
+        u0 accept(s64 value) override           { args.push_back(value); }
+        u0 accept(u64 value) override           { args.push_back(value); }
+        u0 accept(f32 value) override           { args.push_back(value); }
+        u0 accept(f64 value) override           { args.push_back(value); }
+        u0 accept(str_t& value) override        { args.push_back(value); }
+        u0 accept(const u0* value) override     { args.push_back(value); }
+        u0 accept(const s8* value) override     { args.push_back(value); }
+        u0 accept(str::slice_t& value) override { args.push_back(value); }
+    };
 
     static u0 format_report_header(const error_report_t& report,
                                    error_def_t* def,
@@ -51,9 +67,9 @@ namespace basecode::error {
                 format::format_to(str_buf, "ERROR: ");
                 break;
         }
-        fmt::vformat_to(str_buf,
-                        fmt_msg,
-                        fmt_args_t(report.args, report.args_size));
+        fmt_visitor_t visitor{};
+        variant::visit(report.args, visitor);
+        fmt::vformat_to(str_buf, fmt_msg, visitor.args);
         format::format_to(str_buf, "\n");
     }
 
@@ -74,10 +90,12 @@ namespace basecode::error {
                 const auto& line = report.buf->lines[i];
                 format::format_to(str_buf, "{:8d}: ", line_number);
 
-                const auto this_line_end = std::min(line.pos + line.len, report.src_info.pos.end);
-                term::colorize_range(str_buf,
-                                     term_color_t::yellow,
-                                     term_color_t::blue,
+                const auto this_line_end = std::min(line.pos + line.len,
+                                                    report.src_info.pos.end);
+                term::colorize_range(g_err_sys.term,
+                                     str_buf,
+                                     term::color_t::yellow,
+                                     term::color_t::blue,
                                      report.buf,
                                      i,
                                      start_pos,
@@ -85,21 +103,24 @@ namespace basecode::error {
                 start_pos += line.len + 1;
 
                 if (line_number > report.src_info.end.line) {
-                    term::emit_color_code(str_buf, term_color_t::red, term_color_t::default_);
+                    fmt_visitor_t visitor{};
+                    variant::visit(report.args, visitor);
+                    term::set_fg(g_err_sys.term, term::color_t::red);
+                    term::refresh(g_err_sys.term, str_buf);
                     format::format_to(str_buf,
                                       "\n{:<{}}^ ",
                                       " ",
                                       10 + report.src_info.start.column);
-                    fmt::vformat_to(str_buf,
-                                    fmt_msg,
-                                    fmt_args_t(report.args, report.args_size));
-                    term::emit_color_reset(str_buf);
+                    fmt::vformat_to(str_buf, fmt_msg, visitor.args);
+                    term::reset_all(g_err_sys.term);
+                    term::refresh(g_err_sys.term, str_buf);
                 }
             } else {
+                const auto& line = buf::line(*report.buf, i);
                 format::format_to(str_buf,
                                   "{:8d}: {}",
                                   line_number,
-                                  buf::line(*report.buf, i));
+                                  line);
             }
             format::format_to(str_buf, "\n");
         }
@@ -107,10 +128,13 @@ namespace basecode::error {
 
     namespace system {
         u0 fini() {
+            for (auto& report : g_err_sys.reports)
+                variant::free(report.args);
             array::free(g_err_sys.reports);
             hashtab::free(g_err_sys.errors);
             memory::system::free(g_err_sys.error_slab);
             mutex::free(g_err_sys.lock);
+            term::free(g_err_sys.term);
         }
 
         status_t init(alloc_t* alloc) {
@@ -119,11 +143,13 @@ namespace basecode::error {
             hashtab::init(g_err_sys.errors, g_err_sys.alloc);
             mutex::init(g_err_sys.lock);
             slab_config_t slab_config{};
-            slab_config.backing   = g_err_sys.alloc;
-            slab_config.buf_size  = sizeof(error_def_t);
-            slab_config.buf_align = alignof(error_def_t);
-            slab_config.num_pages = 1;
-            g_err_sys.error_slab = memory::system::make(alloc_type_t::slab, &slab_config);
+            slab_config.name          = "error::def_slab";
+            slab_config.buf_size      = sizeof(error_def_t);
+            slab_config.buf_align     = alignof(error_def_t);
+            slab_config.num_pages     = DEFAULT_NUM_PAGES;
+            slab_config.backing.alloc = g_err_sys.alloc;
+            g_err_sys.error_slab = memory::system::make(&slab_config);
+            term::init(g_err_sys.term, g_err_sys.alloc);
             return status_t::ok;
         }
     }
@@ -145,7 +171,9 @@ namespace basecode::error {
 
         error_report_t* append() {
             scoped_lock_t lock(&g_err_sys.lock);
-            return &array::append(g_err_sys.reports);
+            auto report = &array::append(g_err_sys.reports);
+            variant::init(report->args, g_err_sys.alloc);
+            return report;
         }
 
         b8 format(str_t& buf, u32 id) {
@@ -160,21 +188,31 @@ namespace basecode::error {
                 return false;
             }
 
-            str::slice_t* fmt_msg{};
-            if (!OK(string::localized::find(def->lc_str_id, &fmt_msg))) {
-                format::print(stderr, "localized string not found: {}\n", def->lc_str_id);
+            str::slice_t fmt_msg{};
+            if (!OK(string::localized::find(def->lc_str_id, fmt_msg))) {
+                format::print(stderr,
+                              "localized string not found: {}\n",
+                              def->lc_str_id);
                 return false;
             }
 
             str_buf_t str_buf{&buf};
             switch (report.type) {
                 case error_report_type_t::default_: {
-                    format_report_header(report, def, (const s8*) fmt_msg->data, str_buf);
+                    format_report_header(report,
+                                         def,
+                                         (const s8*) fmt_msg.data,
+                                         str_buf);
                     break;
                 }
                 case error_report_type_t::source: {
-                    format_report_header(report, def, (const s8*) fmt_msg->data, str_buf);
-                    format_source_body(report, (const s8*) fmt_msg->data, str_buf);
+                    format_report_header(report,
+                                         def,
+                                         (const s8*) fmt_msg.data,
+                                         str_buf);
+                    format_source_body(report,
+                                       (const s8*) fmt_msg.data,
+                                       str_buf);
                     break;
                 }
                 default:
@@ -195,13 +233,20 @@ namespace basecode::error {
 
         b8 format_range(str_t& buf, u32 start_id, u32 end_id) {
             scoped_lock_t lock(&g_err_sys.lock);
-            if (start_id > g_err_sys.reports.size || end_id > g_err_sys.reports.size) {
-                format::print(stderr, "range outside of bounds: {}-{}\n", start_id, end_id);
+            if (start_id > g_err_sys.reports.size
+            ||  end_id > g_err_sys.reports.size) {
+                format::print(stderr,
+                              "range outside of bounds: {}-{}\n",
+                              start_id,
+                              end_id);
                 return false;
             }
 
             if (start_id > end_id) {
-                format::print(stderr, "start_id ({}) > end_if ({})\n", start_id, end_id);
+                format::print(stderr,
+                              "start_id ({}) > end_if ({})\n",
+                              start_id,
+                              end_id);
                 return false;
             }
 
@@ -211,24 +256,36 @@ namespace basecode::error {
 
                 error_def_t* def{};
                 if (!OK(localized::find(report.id, &def))) {
-                    format::print(stderr, "error def not found: {}\n", report.id);
+                    format::print(stderr,
+                                  "error def not found: {}\n",
+                                  report.id);
                     continue;
                 }
 
-                str::slice_t* fmt_msg{};
-                if (!OK(string::localized::find(def->lc_str_id, &fmt_msg))) {
-                    format::print(stderr, "localized string not found: {}\n", def->lc_str_id);
+                str::slice_t fmt_msg{};
+                if (!OK(string::localized::find(def->lc_str_id, fmt_msg))) {
+                    format::print(stderr,
+                                  "localized string not found: {}\n",
+                                  def->lc_str_id);
                     continue;
                 }
 
                 switch (report.type) {
                     case error_report_type_t::default_: {
-                        format_report_header(report, def, (const s8*) fmt_msg->data, str_buf);
+                        format_report_header(report,
+                                             def,
+                                             (const s8*) fmt_msg.data,
+                                             str_buf);
                         break;
                     }
                     case error_report_type_t::source: {
-                        format_report_header(report, def, (const s8*) fmt_msg->data, str_buf);
-                        format_source_body(report, (const s8*) fmt_msg->data, str_buf);
+                        format_report_header(report,
+                                             def,
+                                             (const s8*) fmt_msg.data,
+                                             str_buf);
+                        format_source_body(report,
+                                           (const s8*) fmt_msg.data,
+                                           str_buf);
                         break;
                     }
                     default:
@@ -241,25 +298,35 @@ namespace basecode::error {
     }
 
     namespace localized {
-        status_t find(u32 id, error_def_t** def, const s8* locale, s32 len) {
+        status_t find(u32 id,
+                      error_def_t** def,
+                      const s8* locale,
+                      s32 len) {
             *def = nullptr;
             if (!locale) {
                 *def = hashtab::find(g_err_sys.errors, locale::make_key(id));
             } else {
-                const auto lc = slice::make(locale, len == -1 ? strlen(locale) : len);
-                *def = hashtab::find(g_err_sys.errors, locale::make_key(id, lc));
+                const auto lc = slice::make(locale,
+                                            len == -1 ? strlen(locale) : len);
+                *def = hashtab::find(g_err_sys.errors,
+                                     locale::make_key(id, lc));
             }
             return !*def ? status_t::localized_not_found : status_t::ok;
         }
 
-        status_t add(u32 id, u32 str_id, const s8* locale, u32 locale_len, const s8* code, u32 code_len) {
+        status_t add(u32 id,
+                     u32 str_id,
+                     const s8* locale,
+                     u32 locale_len,
+                     const s8* code,
+                     u32 code_len) {
             auto lc    = slice::make(locale, locale_len);
             auto key   = locale::make_key(id, lc);
             auto slice = hashtab::find(g_err_sys.errors, key);
             if (slice)
                 return status_t::localized_dup_key;
             auto def = (error_def_t*) memory::alloc(g_err_sys.error_slab);
-            def->code      = string::interned::fold(slice::make(code, code_len));
+            def->code      = string::interned::fold(code, code_len);
             def->locale    = lc;
             def->id        = id;
             def->lc_str_id = str_id;
