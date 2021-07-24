@@ -22,6 +22,18 @@
 
 namespace basecode::assoc_array {
     template <typename V>
+    u0 grow_keys(assoc_array_t<V>& array, u32 new_capacity = 0);
+
+    template <typename V>
+    u0 grow_values(assoc_array_t<V>& array, u32 new_capacity = 0);
+
+    template <typename V>
+    u0 reserve_keys(assoc_array_t<V>& array, u32 new_capacity);
+
+    template <typename V>
+    u0 reserve_values(assoc_array_t<V>& array, u32 new_capacity);
+
+    template <typename V>
     u0 append(assoc_array_t<V>& array,
               const String_Concept auto& str,
               const V& value) {
@@ -97,6 +109,12 @@ namespace basecode::assoc_array {
     }
 
     template <typename V>
+    u0 grow_keys(assoc_array_t<V>& array, u32 new_capacity) {
+        new_capacity = std::max(new_capacity, array.keys.capacity);
+        reserve_keys(array, new_capacity * 2 + 8);
+    }
+
+    template <typename V>
     u0 reserve_keys(assoc_array_t<V>& array, u32 new_capacity) {
         if (new_capacity == 0) {
             memory::free(array.alloc, array.keys.data);
@@ -113,9 +131,9 @@ namespace basecode::assoc_array {
     }
 
     template <typename V>
-    u0 grow_keys(assoc_array_t<V>& array, u32 new_capacity = 0) {
-        new_capacity = std::max(new_capacity, array.keys.capacity);
-        reserve_keys(array, new_capacity * 2 + 8);
+    u0 grow_values(assoc_array_t<V>& array, u32 new_capacity) {
+        new_capacity = std::max(new_capacity, array.capacity);
+        reserve_values(array, new_capacity * 2 + 8);
     }
 
     template <typename V>
@@ -151,12 +169,6 @@ namespace basecode::assoc_array {
             0,
             size_to_clear * sizeof(assoc_key_idx_t));
         array.capacity = new_capacity;
-    }
-
-    template <typename V>
-    u0 grow_values(assoc_array_t<V>& array, u32 new_capacity = 0) {
-        new_capacity = std::max(new_capacity, array.capacity);
-        reserve_values(array, new_capacity * 2 + 8);
     }
 
     template <typename V>

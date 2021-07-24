@@ -267,7 +267,6 @@ if (WIN32)
         ${PLATFORM_SRC_DIR}/glob.cpp ${PLATFORM_INC_DIR}/glob.h
         ${PLATFORM_SRC_DIR}/poll.cpp ${PLATFORM_INC_DIR}/poll.h
         ${PLATFORM_SRC_DIR}/unistd.cpp ${PLATFORM_INC_DIR}/unistd.h
-        ${PLATFORM_SRC_DIR}/dirent.cpp ${PLATFORM_INC_DIR}/dirent.h
         ${PLATFORM_SRC_DIR}/syslog.cpp ${PLATFORM_INC_DIR}/syslog.h
         ${PLATFORM_SRC_DIR}/win32_locale.cpp ${PLATFORM_INC_DIR}/win32_locale.h
     )
@@ -276,6 +275,7 @@ if (WIN32)
             PLATFORM_SOURCES
 
             ${PLATFORM_SOURCES}
+            ${PLATFORM_SRC_DIR}/dirent.cpp ${PLATFORM_INC_DIR}/dirent.h
             ${PLATFORM_SRC_DIR}/pthread.cpp ${PLATFORM_INC_DIR}/pthread.h
         )
     endif ()

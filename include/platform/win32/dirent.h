@@ -18,6 +18,7 @@
 
 #pragma once
 
+#ifdef _MSC_VER
 #include <io.h>
 #include <unistd.h>
 
@@ -77,3 +78,6 @@ int alphasort(const struct dirent** a, const struct dirent** b);
 int versionsort(const struct dirent** a, const struct dirent** b);
 
 int readdir_r(struct DIR* dir, struct dirent* entry, struct dirent** result);
+#else
+#   include_next <dirent.h>
+#endif

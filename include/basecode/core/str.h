@@ -28,6 +28,9 @@
 namespace basecode::str {
     u8 random_char();
 
+    template <Dynamic_String_Concept T>
+    u0 reserve(T& str, u32 new_capacity);
+
     template <String_Concept T>
     u0 trim(T& str) {
         ltrim(str);

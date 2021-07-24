@@ -545,7 +545,11 @@ static int glob3(Char* pathbuf,
      * and dirent.h as taking pointers to differently typed opaque
      * structures.
      */
+#if __MINGW64__
+    using readdirfunc_t = struct dirent* (*)(DIR*);
+#else
     using readdirfunc_t = struct dirent* (*)(struct DIR*);
+#endif
     readdirfunc_t readdirfunc{};
 
     if (pathend > pathend_last)

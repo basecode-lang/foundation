@@ -167,16 +167,16 @@ namespace basecode::buf {
 
     u0 grow(buf_t& buf, u32 new_capacity = 0);
 
-    template <String_Concept T>
-    status_t load(buf_t& buf, const T& value) {
-        return load(buf, value.data, value.length);
-    }
-
     status_t unmap(buf_t& buf, b8 sync = false);
 
     status_t load(buf_t& buf, const path_t& path);
 
     status_t load(buf_t& buf, const u8* data, u32 size);
+
+    template <String_Concept T>
+    status_t load(buf_t& buf, const T& value) {
+        return load(buf, value.data, value.length);
+    }
 
     status_t map_existing(buf_t& buf, const path_t& path);
 

@@ -140,7 +140,7 @@ option(SPDLOG_FMT_EXTERNAL  ""  ON)
 option(SPDLOG_INSTALL       ""  OFF)
 option(SPDLOG_BUILD_TESTS   ""  OFF)
 option(SPDLOG_BUILD_EXAMPLE ""  OFF)
-add_subdirectory(ext/spdlog-1.8.1 EXCLUDE_FROM_ALL)
+add_subdirectory(ext/spdlog-1.9.0 EXCLUDE_FROM_ALL)
 
 # utf8proc
 add_subdirectory(ext/utf8proc-2.5.0 EXCLUDE_FROM_ALL)

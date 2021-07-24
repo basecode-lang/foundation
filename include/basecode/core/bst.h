@@ -22,6 +22,17 @@
 #include <basecode/core/memory/system/slab.h>
 
 namespace basecode::bst {
+    template <Binary_Tree T,
+              typename Node_Type = typename T::Node_Type>
+    u0 tree_to_vine(T& tree);
+
+    template <Binary_Tree T,
+              typename Node_Type = typename T::Node_Type>
+    u0 vine_to_tree(T& tree);
+    template <Binary_Tree T,
+              typename Node_Type = typename T::Node_Type>
+    u0 update_parents(T& tree);
+
     template <Binary_Tree T>
     u0 free(T& tree) {
         memory::system::free(tree.node_slab);
@@ -61,8 +72,7 @@ namespace basecode::bst {
         }
     }
 
-    template <Binary_Tree T,
-              typename Node_Type = typename T::Node_Type>
+    template <Binary_Tree T, typename Node_Type>
     u0 tree_to_vine(T& tree) {
         auto q = (Node_Type) &tree.root;
         auto p = tree.root;
@@ -81,8 +91,7 @@ namespace basecode::bst {
         }
     }
 
-    template <Binary_Tree T,
-              typename Node_Type = typename T::Node_Type>
+    template <Binary_Tree T, typename Node_Type>
     u0 vine_to_tree(T& tree) {
         auto leaves = tree.size + 1;
         for (;;) {
@@ -101,8 +110,7 @@ namespace basecode::bst {
         }
     }
 
-    template <Binary_Tree T,
-              typename Node_Type = typename T::Node_Type>
+    template <Binary_Tree T, typename Node_Type>
     u0 update_parents(T& tree) {
         if (!tree.root)
             return;

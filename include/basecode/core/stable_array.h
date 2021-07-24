@@ -26,6 +26,9 @@ namespace basecode::stable_array {
     template <Stable_Array T>
     u0 grow(T& array, u32 new_capacity = 16);
 
+    template <Stable_Array T>
+    u0 clear(T& array);
+
     template <Stable_Array T,
               typename Value_Type = typename T::Value_Type>
     u0 reserve(T& array, u32 new_capacity);

@@ -44,9 +44,15 @@
 #include <string_view>
 
 #if defined(WIN32)
+#   include <winsock2.h>
 #   define API_EXPORT           __declspec(dllexport)
 #else
 #   define API_EXPORT
+#   define SOCKET               int
+#   define INVALID_SOCKET       (-1)
+#endif
+#ifndef MSG_NOSIGNAL
+#   define MSG_NOSIGNAL         0
 #endif
 
 #if defined(__GNUC__)
@@ -225,7 +231,7 @@ namespace std {
 // global forward decls
 //
 // ------------------------------------------------------------------------
-#ifdef _WIN32
+#ifdef _MSC_VER
 using pthread_t = void*;
 #endif
 
@@ -2260,15 +2266,6 @@ namespace basecode {
     // network
     //
     // ------------------------------------------------------------------------
-#ifdef _WIN32
-#   define SOCKET                   unsigned __int64
-#else
-#   define INVALID_SOCKET           (-1)
-#   define SOCKET                   s32
-#endif
-#ifndef MSG_NOSIGNAL
-#   define MSG_NOSIGNAL             0
-#endif
     struct socket_t;
 
     using socket_read_callback_t    = b8 (*)(socket_t&, u0*);

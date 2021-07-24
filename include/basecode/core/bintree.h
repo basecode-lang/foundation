@@ -19,6 +19,7 @@
 #pragma once
 
 #include <basecode/core/buf.h>
+#include <basecode/core/path.h>
 #include <basecode/core/types.h>
 #include <basecode/core/format.h>
 #include <basecode/core/graphviz/gv.h>
