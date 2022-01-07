@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -46,9 +46,9 @@ namespace basecode::hash::murmur {
             hash = ((hash << r2) | (hash >> (32 - r2))) * m + n;
         }
 
-        switch (len & 3) {
-            case 3: k1 ^= tail[2] << 16;
-            case 2: k1 ^= tail[1] << 8;
+        switch (len & 3U) {
+            case 3: k1 ^= tail[2] << 16U;
+            case 2: k1 ^= tail[1] << 8U;
             case 1: k1 ^= tail[0];
                 k1 *= c1;
                 k1 = (k1 << r1) | (k1 >> (32 - r1));
@@ -57,11 +57,11 @@ namespace basecode::hash::murmur {
         }
 
         hash ^= len;
-        hash ^= (hash >> 16);
+        hash ^= (hash >> 16U);
         hash *= 0x85ebca6b;
-        hash ^= (hash >> 13);
+        hash ^= (hash >> 13U);
         hash *= 0xc2b2ae35;
-        hash ^= (hash >> 16);
+        hash ^= (hash >> 16U);
 
         return hash;
     }
@@ -72,13 +72,13 @@ namespace basecode::hash::murmur {
 
     u64 hash64(const u0* src, usize len, u64 seed) {
         u64 const m = 0xc6a4a7935bd1e995ULL;
-        s32 const r = 47;
+        u32 const r = 47;
 
-        u64 h = seed ^(len * m);
+        u64 h = seed ^ (len * m);
 
-        auto const* data = static_cast<u64 const*>(src);
-        auto const* data2 = static_cast<u8 const*>(src);
-        u64 const* end = data + (len / 8);
+        const u64* data = (const u64*)(src);
+        const u8* data2 = (const u8*)(src);
+        const u64* end = data + (len / 8);
 
         while (data != end) {
             u64 k = *data++;
@@ -91,14 +91,14 @@ namespace basecode::hash::murmur {
             h *= m;
         }
 
-        switch (len & 7) {
-            case 7: h ^= static_cast<u64>(data2[6]) << 48;
-            case 6: h ^= static_cast<u64>(data2[5]) << 40;
-            case 5: h ^= static_cast<u64>(data2[4]) << 32;
-            case 4: h ^= static_cast<u64>(data2[3]) << 24;
-            case 3: h ^= static_cast<u64>(data2[2]) << 16;
-            case 2: h ^= static_cast<u64>(data2[1]) << 8;
-            case 1: h ^= static_cast<u64>(data2[0]); h *= m;
+        switch (len & 7U) {
+            case 7: h ^= (u64) data2[6] << 48U;
+            case 6: h ^= (u64) data2[5] << 40U;
+            case 5: h ^= (u64) data2[4] << 32U;
+            case 4: h ^= (u64) data2[3] << 24U;
+            case 3: h ^= (u64) data2[2] << 16U;
+            case 2: h ^= (u64) data2[1] << 8U;
+            case 1: h ^= (u64) data2[0]; h *= m;
         }
 
         h ^= h >> r;

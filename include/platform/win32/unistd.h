@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -35,7 +35,9 @@ FILE* fmemopen(void* buf, size_t len, const char* type);
 #include <corecrt_io.h>
 #endif
 
-#define WIN32_LEAN_AND_MEAN
+#ifndef WIN32_LEAN_AND_MEAN
+#   define WIN32_LEAN_AND_MEAN
+#endif
 #include <WinSock2.h>
 #include <winnt.h>
 #include <profileapi.h>
@@ -43,25 +45,25 @@ FILE* fmemopen(void* buf, size_t len, const char* type);
 #include <io.h>
 #include <process.h>
 #include <direct.h>
+#include <fcntl.h>
 #include <sys/sys_types.h>
 #include <sys/stat.h>
 #include <sys/utime.h>
+#include <combaseapi.h>
 
 #define PATH_MAX            260
 
 #define strdup              _strdup
-//#define vsnprintf           _vsnprintf
-#define write               _write
 #define unlink              _unlink
 #define mkdir               _mkdir
 #define rmdir               _rmdir
-#define read                _read
 #define lstat               stat
 #define lseek               _lseek
 #define isatty              _isatty
 #define getcwd              _getcwd
 #define dup2                _dup2
 #define dup                 _dup
+#define open                _open
 #define close               _close
 #define chdir               _chdir
 #define getpid              _getpid
@@ -82,7 +84,15 @@ FILE* fmemopen(void* buf, size_t len, const char* type);
 
 typedef unsigned long long useconds_t;
 
-inline int usleep(useconds_t usec) {
+__forceinline int read(int const fd, void * const buffer, unsigned const buffer_size) {
+    return _read(fd, buffer, buffer_size);
+}
+
+__forceinline int write(int fd, const void* buffer, unsigned int buffer_size) {
+    return _write(fd, buffer, buffer_size);
+}
+
+__forceinline int usleep(useconds_t usec) {
     LARGE_INTEGER time1;
     LARGE_INTEGER time2;
     LARGE_INTEGER freq;

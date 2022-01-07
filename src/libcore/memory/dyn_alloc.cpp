@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -17,15 +17,16 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/memory.h>
+#include <basecode/core/context.h>
 
 using namespace basecode;
 
 extern "C" {
     void dyn_free(void* mem) {
-        memory::free(context::top()->alloc, mem);
+        memory::free(context::top()->alloc.main, mem);
     }
 
     void* dyn_alloc(size_t size) {
-        return memory::alloc(context::top()->alloc, size);
+        return memory::alloc(context::top()->alloc.main, size);
     }
 }

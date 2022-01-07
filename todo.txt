@@ -1,41 +1,162 @@
 HIGH
 ---------
-- locale: localized strings
+- macro: text macro system
 
-- buf: create a Buffer_Concept and rework buf to be based on it
-- buf: pretty formatting for source errors
-- term: module for ANSI output to terminals
+- binfmt: pe/coff backend is missing section name mapping; not sure
+          why but I had commented out looking up the section names with
+          a FIXME.
+- binfmt: slab allocator doesn't zero out memory; not sure if the allocator
+          was once calling memset and i took it out or if it changed moving
+          from macos to windows (probably this).  the section headers in the
+          elf backend were full of garbage as was the strtab in the coff backend.
+- binfmt(ar): write function needs to be written so archives
+          can be round tripped.
+- binfmt(ar): parse_ecoff_symbol_table function is marked as not done.
+          need to review and finish.
+- binfmt(ar): add a hashtab_t to the ar_t struct to index member names
+          to their entries in the array (one-to-many).
+- binfmt(ar_backend): implement the backend and tests for it.
+- binfmt(coff): finish implementation of read & write
+- binfmt(coff_backend): move pretty printer into another file?
+- binfmt(coff_backend): implement write
+- binfmt(codeview): need to finish read/write functionality
+- binfmt(elf): finish read & write functionality
+- binfmt(elf_backend): review & clean up; overall, it looks close
+- binfmt(macho + backend): need to write
+- binfmt(pe): needs attention, several FIXME
+- binfmt(pe_backend): needs attention; read not implemented
+
+- scm: map out closure, continuation, literal frame model
+- scm: compiler should wrap top-level expression in an anonymous lambda
+       that's surfaced as a real proc to scheme.  probably can just recycle
+       the same proc and just replace the bytecode buffer each time.
+- scm: consider a single BOX/UNBOX instruction pair instead of the
+       different FIXNUM/FLONUM/etc.
+- scm: arithmetic ops should compile down to pairwise ADD/ADDF, et al. instead
+       of the high-level LADD/LSUB/LMUL/LDIV/LMOD, etc.
+- scm: extend emitter to support append (default) or insert modes
+
+- libgfx: pull in nfd or rewrite based on nfd_extended
 
 MEDIUM
 ---------
-- add directed_graph_t
-- rework graphviz api
 
 LOW
 ---------
+- review and improve symtab_t if possible
+
+- rename hashtab_t to oa_hashtab_t and set_t to oa_set_t
+    * add ca_hashtab_t and ca_set_t using chaining via linked list?
+
 - abstract: shared memory buffer between processes
+
 - ipc: create an ipc module for low-level base
     ipc_addr_t, ipc_transport_t, ipc_
 
-- buddy allocator
-
-- page allocator: implement free list so pages can recycle
 - page allocator/slab allocator: implement reserve function so n numbers of pages can be allocated at a time.
         this would replace passing num_pages into these up front and makes the interface (perhaps) more consistent
         with other mechanisms in the library.
 
+DONE
+----
+- macro: need an any/variant type that doesn't suck
+- error: once i've written my own any/variant type, revisit this and swap out
+         std::any.
+- binfmt(ar): rework the read + static functions to use the FILE_PTR()
+          interface instead of directly using the buf_crsr_t.
+
 - filesys: implement glob function, which will also touch the init and fini functions for the
             filesys module.
+- error: temporarily switch error_report_t to use an array_t<std::any> for the
+         args.  i don't like this, but it decouples the errors implementation
+         from libfmt at the interface.
+- str_array: refactor to use page + bump allocators to simplify interface with
+    stable pointers to strings.
+- page allocator: implement free list so pages can recycle
+    * fixed the existing implementation so it actually recycles existing pages, though
+      only on an explicit reset call to the allocator. freed pages are simply removed from the
+      page list.
 - filesys: need to open and read the xdg config file (if found) and put into a symtab_t or hashtab_t.
             also, need to read applicable env vars once at module init and put them into the
             same symtab_t/hashtab_t.
 - filesys: once meta data is done (previous task), implement the remaining places::* functions
-
-- libgfx: pull in nfd or rewrite based on nfd_extended
+- scm: map out how to store bytecode & relate it to proc_t
+- scm: add .area directive to emitter
+- scm: add .db, .dw, .dd, .dq directives to emitter
+- scm: add a B instruction and change BR to be only reg1 encoded
+- scm: introduce a new CP (continuation pointer) and LP (literal-frame pointer)
+       register and mem area
+- memory: base allocator doesn't handle alignment properly
+- binfmt: one-pass cleanup & make task notes here
+- memory: make scratch allocator & temp allocator default in the system
+- binfmt: rework test runner main.cpp to match core
+- legal: clean up all file headers
 - libgfx: create test bed application within foundation project
-
-DONE
-----
+- memory: reimplement meta tracking
+- ffi: reimplement match_signature
+- scm: first pass register allocator
+- graphviz: need to add proper support for record fields; i temporarily
+            hacked label serialization to prevent escaping special field
+            characters.
+- memory: run through valgrind on linux
+- term: isatty checks aren't working under linux
+- symtab_t: i did it...i had to rework the entire symtab_t.  when i pulled the latest code
+            down onto a linux machine, i had all sorts of issues.  it took me a lot longer than
+            i would have liked, but i think it's all the better for it now.
+- scm: build intervals of liveliness for virtual variables
+- scm: write, display, print, ports
+    * moving all to kernel functions in basic module
+- memory: ok, i see the issue now and it goes like this...
+    1. the public api of the memory sub-system works the way one would expect based on
+        malloc/free/realloc.
+    2. internally, the api uses mem_result_t to return the pointer and the allocated size.
+    3. the internal allocation systems aren't going through the public api because they need
+        the additional metadata.
+    4. the majority of the implementation in the public api (memory.cpp) is actually doing
+       internal work.  the final bit is returning the pointer to the public caller.
+    5. the memory.cpp module needs to split the details of the public api into an internal:: namespace
+        that the allocation systems can utilize to get the same allocation behavior (proxy, tracking total_allocated, etc.)
+        but also get access to the metadata.
+- cxx kernel: finish wrapping
+- scm: added basic kernel module
+- scm: load kernel function
+- symtab: just ran into a pointer stability issue.  i swapped in
+          stable_array_t easily enough, but now i want do a full review
+          and see if the stable array is really needed.
+    * i swapped back to standard array_t.  the issue appeared to be
+      me being too aggressive in removing the range check in GET_NODE.
+- config: rework kernel funcs to take advantage of ffi based
+          callback mechanism.
+- config: review and clean up
+- config: use memory mapped buf_t for .scm files
+- config: remove cvar: prefix on variable names
+    * changed to classic lisp/scheme global variable name, e.g. *product_name*
+- scm: enhance native func support to accept an ffi_t*
+        and dynamically invoke it.
+- scm: implement tail call optimization
+    * there are few items still not optimized but the groundwork
+      is now in place.  need to dig into do_list again to see if i can
+      get it reworked effectively.
+- scm: add full quasiquote, unquote, unquote-splicing primitive support
+- bag_t: set + counts
+- getopts: finish this!
+- wasm decoder
+- leb_128_t: implement this type
+- hashtab_t: implement basic forward-only iterator
+- hashtab_t/set_t: decide how to handle bucket state flag
+    * repurposed the minimal amount of bitset logic needed
+- hashtab_t: fix load_factor
+- set_t: fix load_factor
+- intern_t: fix load_factor
+- set_t: implement basic forward-only iterator
+- scm: implement eval primitive
+- add digraph_t
+- buddy allocator
+- rework graphviz api
+- buf: create a Buffer_Concept and rework buf to be based on it
+- buf: pretty formatting for source errors
+- term: module for ANSI output to terminals
+- locale: localized strings
 - path: implement replace_extension function
 - path: implement stem function, which returns the file name without the extension
 - add bintree_t

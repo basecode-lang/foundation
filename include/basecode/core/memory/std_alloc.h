@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,12 +18,12 @@
 
 #pragma once
 
-#include <cassert>
-#include <basecode/core/context.h>
+#include <basecode/core/assert.h>
 
 namespace basecode {
     namespace memory::std_alloc {
         u0  free(alloc_t* alloc, u0* mem, u32 size);
+
         u0* alloc(alloc_t* alloc, u32 size, u32 align);
     }
 
@@ -34,20 +34,24 @@ namespace basecode {
         alloc_t*                backing{};
 
         std_alloc_t(const std_alloc_t<T>& other) : backing(other.backing) {
-            assert(backing);
+            BC_ASSERT_NOT_NULL(backing);
         }
 
         template<class U>
-        explicit std_alloc_t(std_alloc_t<U> const& other) noexcept : backing(other.backing) {
-            assert(backing);
+        explicit std_alloc_t(std_alloc_t<U> const& other) noexcept
+            : backing(other.backing) {
+            BC_ASSERT_NOT_NULL(backing);
         }
 
-        explicit std_alloc_t(alloc_t* alloc = context::top()->alloc) noexcept : backing(alloc) {
-            assert(backing);
+        explicit std_alloc_t(alloc_t* alloc = context::top()->alloc.main) noexcept
+            : backing(alloc) {
+            BC_ASSERT_NOT_NULL(backing);
         }
 
         value_type* allocate(std::size_t n) {
-            return (value_type*) memory::std_alloc::alloc(backing, n * sizeof(value_type), alignof(value_type));
+            return (value_type*) memory::std_alloc::alloc(backing,
+                                                          n * sizeof(value_type),
+                                                          alignof(value_type));
         }
 
         u0 deallocate(value_type* mem, std::size_t size) noexcept {
@@ -64,5 +68,4 @@ namespace basecode {
     b8 operator!=(std_alloc_t<T> const& x, std_alloc_t<U> const& y) noexcept {
         return !(x == y);
     }
-
 }

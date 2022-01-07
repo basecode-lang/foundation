@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -24,35 +24,9 @@
 #include <basecode/core/mutex.h>
 #include <basecode/core/format.h>
 
-namespace spdlog {
-    class logger;
-}
-
 namespace basecode {
-    enum class logger_type_t : u8 {
-        default_                = 240,
-        spdlog,
-        syslog,
-    };
-
-    struct logger_t;
-    struct logger_system_t;
     struct logger_config_t {
         str::slice_t            name;
-    };
-
-    using logger_array_t        = array_t<logger_t*>;
-    using shared_logger_t       = std::shared_ptr<::spdlog::logger>;
-
-    enum class log_level_t : u8 {
-        emergency,
-        alert,
-        critical,
-        error,
-        warn,
-        notice,
-        info,
-        debug,
     };
 
     union logger_subclass_t {
@@ -60,6 +34,7 @@ namespace basecode {
             FILE*               file;
             str_t               process_name;
             str_t               buf;
+            b8                  is_redirected;
         }                       default_;
         struct {
             const s8*           ident;
@@ -87,10 +62,6 @@ namespace basecode {
         logger_t()                      {}
     };
 
-    using logger_fini_callback_t = u0 (*)(logger_t*);
-    using logger_init_callback_t = u0 (*)(logger_t*, logger_config_t*);
-    using logger_emit_callback_t = u0 (*)(logger_t*, log_level_t, fmt_str_t, const fmt_args_t&);
-
     struct logger_system_t final {
         logger_init_callback_t  init;
         logger_fini_callback_t  fini;
@@ -99,13 +70,6 @@ namespace basecode {
     };
 
     namespace log {
-        enum class status_t : u8 {
-            ok,
-            invalid_logger,
-            invalid_logger_system,
-            invalid_default_logger,
-        };
-
         namespace system {
             status_t fini();
 
@@ -123,7 +87,7 @@ namespace basecode {
             status_t init(logger_type_t type,
                           logger_config_t* config = {},
                           log_level_t mask = log_level_t::debug,
-                          alloc_t* alloc = context::top()->alloc);
+                          alloc_t* alloc = context::top()->alloc.main);
         }
 
         u0 fini(logger_t* logger);
@@ -137,7 +101,7 @@ namespace basecode {
                       logger_type_t type,
                       logger_config_t* config = {},
                       log_level_t mask = log_level_t::debug,
-                      alloc_t* alloc = context::top()->alloc);
+                      alloc_t* alloc = context::top()->alloc.main);
 
         str::slice_t status_name(status_t status);
 
@@ -149,68 +113,140 @@ namespace basecode {
 
         b8 remove_child(logger_t* logger, logger_t* child);
 
-        template <typename... Args> u0 info(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            emit(log_level_t::info, format_str, fmt::make_format_args(args...), logger);
+        template <typename... Args>
+        u0 info(logger_t* logger,
+                fmt_str_t format_str,
+                const Args&... args) {
+            emit(log_level_t::info,
+                 format_str,
+                 fmt::make_format_args(args...),
+                 logger);
         }
 
-        template <typename... Args> u0 info(fmt_str_t format_str, Args&&... args) {
-            info(context::top()->logger, format_str, std::forward<Args>(args)...);
+        template <typename... Args>
+        u0 info(fmt_str_t format_str, Args&&... args) {
+            info(context::top()->logger,
+                 format_str,
+                 std::forward<Args>(args)...);
         }
 
-        template <typename... Args> u0 warn(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            emit(log_level_t::warn, format_str, fmt::make_format_args(args...), logger);
+        template <typename... Args>
+        u0 warn(logger_t* logger,
+                fmt_str_t format_str,
+                const Args&... args) {
+            emit(log_level_t::warn,
+                 format_str,
+                 fmt::make_format_args(args...),
+                 logger);
         }
 
-        template <typename... Args> u0 warn(fmt_str_t format_str, Args&&... args) {
-            warn(context::top()->logger, format_str, std::forward<Args>(args)...);
+        template <typename... Args>
+        u0 warn(fmt_str_t format_str, Args&&... args) {
+            warn(context::top()->logger,
+                 format_str,
+                 std::forward<Args>(args)...);
         }
 
-        template <typename... Args> u0 debug(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            emit(log_level_t::debug, format_str, fmt::make_format_args(args...), logger);
+        template <typename... Args>
+        u0 debug(logger_t* logger,
+                 fmt_str_t format_str,
+                 const Args&... args) {
+            emit(log_level_t::debug,
+                 format_str,
+                 fmt::make_format_args(args...),
+                 logger);
         }
 
-        template <typename... Args> u0 debug(fmt_str_t format_str, Args&&... args) {
-            debug(context::top()->logger, format_str, std::forward<Args>(args)...);
+        template <typename... Args>
+        u0 debug(fmt_str_t format_str, Args&&... args) {
+            debug(context::top()->logger,
+                  format_str,
+                  std::forward<Args>(args)...);
         }
 
-        template <typename... Args> u0 error(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            emit(log_level_t::error, format_str, fmt::make_format_args(args...), logger);
+        template <typename... Args>
+        u0 error(logger_t* logger,
+                 fmt_str_t format_str,
+                 const Args&... args) {
+            emit(log_level_t::error,
+                 format_str,
+                 fmt::make_format_args(args...),
+                 logger);
         }
 
-        template <typename... Args> u0 error(fmt_str_t format_str, Args&&... args) {
-            error(context::top()->logger, format_str, std::forward<Args>(args)...);
+        template <typename... Args>
+        u0 error(fmt_str_t format_str, Args&&... args) {
+            error(context::top()->logger,
+                  format_str,
+                  std::forward<Args>(args)...);
         }
 
-        template <typename... Args> u0 notice(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            emit(log_level_t::notice, format_str, fmt::make_format_args(args...), logger);
+        template <typename... Args>
+        u0 notice(logger_t* logger,
+                  fmt_str_t format_str,
+                  const Args&... args) {
+            emit(log_level_t::notice,
+                 format_str,
+                 fmt::make_format_args(args...),
+                 logger);
         }
 
-        template <typename... Args> u0 notice(fmt_str_t format_str, Args&&... args) {
-            notice(context::top()->logger, format_str, std::forward<Args>(args)...);
+        template <typename... Args>
+        u0 notice(fmt_str_t format_str, Args&&... args) {
+            notice(context::top()->logger,
+                   format_str,
+                   std::forward<Args>(args)...);
         }
 
-        template <typename... Args> u0 alert(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            emit(log_level_t::alert, format_str, fmt::make_format_args(args...), logger);
+        template <typename... Args>
+        u0 alert(logger_t* logger,
+                 fmt_str_t format_str,
+                 const Args&... args) {
+            emit(log_level_t::alert,
+                 format_str,
+                 fmt::make_format_args(args...),
+                 logger);
         }
 
-        template <typename... Args> u0 alert(fmt_str_t format_str, Args&&... args) {
-            alert(context::top()->logger, format_str, std::forward<Args>(args)...);
+        template <typename... Args>
+        u0 alert(fmt_str_t format_str, Args&&... args) {
+            alert(context::top()->logger,
+                  format_str,
+                  std::forward<Args>(args)...);
         }
 
-        template <typename... Args> u0 critical(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            emit(log_level_t::critical, format_str, fmt::make_format_args(args...), logger);
+        template <typename... Args>
+        u0 critical(logger_t* logger,
+                    fmt_str_t format_str,
+                    const Args&... args) {
+            emit(log_level_t::critical,
+                 format_str,
+                 fmt::make_format_args(args...),
+                 logger);
         }
 
-        template <typename... Args> u0 critical(fmt_str_t format_str, Args&&... args) {
-            critical(context::top()->logger, format_str, std::forward<Args>(args)...);
+        template <typename... Args>
+        u0 critical(fmt_str_t format_str, Args&&... args) {
+            critical(context::top()->logger,
+                     format_str,
+                     std::forward<Args>(args)...);
         }
 
-        template <typename... Args> u0 emergency(logger_t* logger, fmt_str_t format_str, const Args&... args) {
-            emit(log_level_t::emergency, format_str, fmt::make_format_args(args...), logger);
+        template <typename... Args>
+        u0 emergency(logger_t* logger,
+                     fmt_str_t format_str,
+                     const Args&... args) {
+            emit(log_level_t::emergency,
+                 format_str,
+                 fmt::make_format_args(args...),
+                 logger);
         }
 
-        template <typename... Args> u0 emergency(fmt_str_t format_str, Args&&... args) {
-            emergency(context::top()->logger, format_str, std::forward<Args>(args)...);
+        template <typename... Args>
+        u0 emergency(fmt_str_t format_str, Args&&... args) {
+            emergency(context::top()->logger,
+                      format_str,
+                      std::forward<Args>(args)...);
         }
     }
 }

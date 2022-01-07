@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/defer.h>
 #include <basecode/core/format.h>
 #include <basecode/core/str_array.h>
@@ -37,16 +37,15 @@ TEST_CASE("basecode::str_array basics") {
     stopwatch_t time{};
     stopwatch::start(time);
 
-    for (u32 i = 0; i < 100; ++i) {
-        str::random(temp, 32);
-        str_array::append(array, temp);
-        str::reset(temp);
-    }
+    TIME_BLOCK(
+        "str_array: append 100 random strings"_ss,
+        for (u32 i = 0; i < 100; ++i) {
+            str::random(temp, 32);
+            str_array::append(array, temp);
+            str::reset(temp);
+        });
 
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("str_array: append"_ss, 40, time);
-    //format::print("{}\n", array);
+//    format::print("{}\n", array);
 
     REQUIRE(array.size == 100);
-    REQUIRE(array.buf.size == (100 * 33));
 }

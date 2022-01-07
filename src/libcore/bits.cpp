@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -104,14 +104,6 @@ namespace basecode {
         return (*(s8*) & n) == 1;
     }
 
-    u64 align(u64 size, u64 align) {
-        if (align > 0) {
-            auto result = size + align - 1;
-            return result - result % align;
-        }
-        return size;
-    }
-
     u16 endian_swap_word(u16 value) {
         return (value >> u16(8)) | (value << u16(8));
     }
@@ -136,21 +128,21 @@ namespace basecode {
     }
 
     u32 endian_swap_dword(u32 value) {
-        return ((value >> 24) & 0xff)
-               |  ((value << 8) & 0xff0000)
-               |  ((value >> 8) & 0xff00)
-               |  ((value << 24) & 0xff000000);
+        return ((value >> 24U) & 0xffU)
+               |  ((value << 8U) & 0xff0000U)
+               |  ((value >> 8U) & 0xff00U)
+               |  ((value << 24U) & 0xff000000U);
     }
 
     u64 endian_swap_qword(u64 value) {
-        return ((value & 0x00000000000000ffu) << 56) |
-               ((value & 0x000000000000ff00u) << 40) |
-               ((value & 0x0000000000ff0000u) << 24) |
-               ((value & 0x00000000ff000000u) << 8)  |
-               ((value & 0x000000ff00000000u) >> 8)  |
-               ((value & 0x0000ff0000000000u) >> 24) |
-               ((value & 0x00ff000000000000u) >> 40) |
-               ((value & 0xff00000000000000u) >> 56);
+        return ((value & 0x00000000000000ffU) << 56U) |
+               ((value & 0x000000000000ff00U) << 40U) |
+               ((value & 0x0000000000ff0000U) << 24U) |
+               ((value & 0x00000000ff000000U) << 8U)  |
+               ((value & 0x000000ff00000000U) >> 8U)  |
+               ((value & 0x0000ff0000000000U) >> 24U) |
+               ((value & 0x00ff000000000000U) >> 40U) |
+               ((value & 0xff00000000000000U) >> 56U);
     }
 
     u8 lnybble(u8 original, u8 value) {
@@ -165,11 +157,5 @@ namespace basecode {
         res &= u32(0x0f);
         res |= ((value << u32(4)) & u32(0xf0));
         return res;
-    }
-
-    u64 sign_extend(s64 value, u32 bits) {
-        auto shift = sizeof(u64) * CHAR_BIT - bits;
-        auto result = (value << shift) >> shift;
-        return static_cast<u64>(result);
     }
 }

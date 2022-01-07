@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -38,22 +38,5 @@ namespace basecode::stopwatch {
         if (w.start > w.end) return 0;
         f64 delta = w.end - w.start;
         return delta * profiler::calibration_mult();
-    }
-
-    u0 print_elapsed(str::slice_t label, s32 width, stopwatch_t& w) {
-        const auto sv_label = (std::string_view) label;
-        const auto e = elapsed(w);
-        if (e == 0) {
-            format::print_ellipsis(sv_label, width, "---\n");
-        } else if (e < 1000) {
-            format::print_ellipsis(sv_label, width, "{}ns\n", e);
-        } else {
-            const auto us = e / 1000;
-            if (us >= 1000) {
-                format::print_ellipsis(sv_label, width, "{}ms\n", us / 1000);
-            } else {
-                format::print_ellipsis(sv_label, width, "{}us\n", us);
-            }
-        }
     }
 }

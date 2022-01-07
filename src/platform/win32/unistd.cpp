@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -38,7 +38,12 @@ FILE* fmemopen(void* buf, size_t len, const char* type) {
     if (!GetTempFileNameA(tp, "basecode", 0, fn))
         return nullptr;
 
-    fd = _open(fn, _O_CREAT | _O_RDWR | _O_SHORT_LIVED | _O_TEMPORARY | _O_BINARY, _S_IREAD | _S_IWRITE);
+    fd = _open(fn, _O_CREAT
+                   | _O_RDWR
+                   | _O_SHORT_LIVED
+                   | _O_TEMPORARY
+                   | _O_BINARY,
+               _S_IREAD | _S_IWRITE);
     if (fd == -1)
         return nullptr;
 
@@ -58,7 +63,7 @@ long sysconf(int name) {
     SYSTEM_INFO system_info;
     GetSystemInfo(&system_info);
     switch (name) {
-        case _SC_PAGE_SIZE:         return system_info.dwAllocationGranularity;
+        case _SC_PAGE_SIZE:         return system_info.dwPageSize;
         case _SC_NPROCESSORS_ONLN:  return system_info.dwNumberOfProcessors;
         default:                    break;
     }

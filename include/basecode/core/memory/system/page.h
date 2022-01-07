@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -19,6 +19,7 @@
 #pragma once
 
 #include <basecode/core/memory.h>
+#include <basecode/core/assert.h>
 
 namespace basecode {
     struct page_header_t final {
@@ -27,7 +28,8 @@ namespace basecode {
     };
 
     struct page_config_t : alloc_config_t {
-        alloc_t*                backing;
+        page_config_t() : alloc_config_t(alloc_type_t::page) {}
+
         u8                      num_pages;
     };
 
@@ -36,30 +38,30 @@ namespace basecode {
 
         alloc_system_t* system();
 
-        force_inline u0* tail(alloc_t* alloc) {
+        FORCE_INLINE u0* tail(alloc_t* alloc) {
             auto a = unwrap(alloc);
-            assert(a && a->system->type == alloc_type_t::page);
+            BC_ASSERT(a && a->system->type == alloc_type_t::page);
             auto sc = &a->subclass.page;
             return ++sc->tail;
         }
 
-        force_inline u0* head(alloc_t* alloc) {
+        FORCE_INLINE u0* head(alloc_t* alloc) {
             auto a = unwrap(alloc);
-            assert(a && a->system->type == alloc_type_t::page);
+            BC_ASSERT(a && a->system->type == alloc_type_t::page);
             auto sc = &a->subclass.page;
             return ++sc->head;
         }
 
-        force_inline u32 count(alloc_t* alloc) {
+        FORCE_INLINE u32 count(alloc_t* alloc) {
             auto a = unwrap(alloc);
-            assert(a && a->system->type == alloc_type_t::page);
+            BC_ASSERT(a && a->system->type == alloc_type_t::page);
             auto sc = &a->subclass.page;
             return sc->count;
         }
 
-        force_inline u16 page_size(alloc_t* alloc) {
+        FORCE_INLINE u16 page_size(alloc_t* alloc) {
             auto a = unwrap(alloc);
-            assert(a && a->system->type == alloc_type_t::page);
+            BC_ASSERT(a && a->system->type == alloc_type_t::page);
             auto sc = &a->subclass.page;
             return sc->page_size;
         }

@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,10 +16,9 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/list.h>
 #include <basecode/core/defer.h>
-#include <basecode/core/slice.h>
 #include <basecode/core/format.h>
 #include <basecode/core/stopwatch.h>
 #include "test.h"
@@ -29,9 +28,17 @@ using namespace basecode;
 template <typename V>
 static u0 format_nodes(list_t<V>& list) {
     u32 n = 1;
-    format::print("list: size = {}, nodes.size = {}, values.size = {}\n", list.size, list.nodes.size, list.values.size);
+    format::print("list: size = {}, nodes.size = {}, values.size = {}\n",
+                  list.size,
+                  list.nodes.size,
+                  list.values.size);
     for (const auto& node : list.nodes) {
-        format::print("{:>4}: free: {} prev: {} next: {:>4} value: {:>4}\n", n++, node.free, node.prev, node.next, node.value);
+        format::print("{:>4}: free: {} prev: {} next: {:>4} value: {:>4}\n",
+                      n++,
+                      node.free,
+                      node.prev,
+                      node.next,
+                      node.value);
     }
 }
 

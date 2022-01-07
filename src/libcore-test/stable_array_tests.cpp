@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/defer.h>
 #include <basecode/core/format.h>
 #include <basecode/core/stable_array.h>
@@ -39,9 +39,12 @@ TEST_CASE("basecode::stable_array insert") {
     s32 j = 0;
     for (auto n : numbers) {
         if (j == 3) {
-            REQUIRE(*n == 30);
+            if (*n != 30)
+                REQUIRE(*n == 30);
         } else {
-            REQUIRE(*n == k++);
+            if (*n != k)
+                REQUIRE(*n == k);
+            ++k;
         }
         ++j;
     }
@@ -51,22 +54,30 @@ TEST_CASE("basecode::stable_array with 64-bit values") {
     auto numbers = stable_array::make<s64>({0, 1, 2, 3, 4, 5, 6, 7, 8});
     defer(stable_array::free(numbers));
 
-    REQUIRE(!stable_array::empty(numbers));
-    REQUIRE(numbers.size == 9);
+    if (stable_array::empty(numbers))
+        REQUIRE(!stable_array::empty(numbers));
+
+    if (numbers.size != 9)
+        REQUIRE(numbers.size == 9);
 
     stable_array::insert(numbers, s64(3), s64(30));
-    REQUIRE(numbers[3] == 30);
+    if (numbers[3] != 30)
+        REQUIRE(numbers[3] == 30);
 
-    REQUIRE(numbers.size == 10);
+    if (numbers.size != 10)
+        REQUIRE(numbers.size == 10);
 
     s64 k = 0;
     s64 j = 0;
     for (u32 i = 0; i < numbers.size; ++i) {
         auto n = numbers[i];
         if (j == 3) {
-            REQUIRE(n == 30);
+            if (n != 30)
+                REQUIRE(n == 30);
         } else {
-            REQUIRE(n == k++);
+            if (n != k)
+                REQUIRE(n == k);
+            ++k;
         }
         ++j;
     }
@@ -92,10 +103,13 @@ TEST_CASE("basecode::stable_array erase") {
     for (u32 i = 0; i < numbers.size; ++i) {
         auto n = numbers[i];
         if (j == 3) {
-            REQUIRE(n == 4);
+            if (n != 4)
+                REQUIRE(n == 4);
             k = n + 1;
         } else {
-            REQUIRE(n == k++);
+            if (n != k)
+                REQUIRE(n == k);
+            ++k;
         }
         ++j;
     }

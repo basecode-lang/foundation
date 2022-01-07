@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,7 +16,10 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <basecode/core/ast.h>
 #include <basecode/core/pratt.h>
+#include <basecode/core/token.h>
+#include <basecode/core/hashtab.h>
 
 namespace basecode::pratt {
     namespace parser {
@@ -50,6 +53,92 @@ namespace basecode::pratt {
             hashtab::free(grammar.rules);
         }
 
+        rule_t* infix(grammar_t& grammar,
+                      token_type_t type,
+                      u32 bp,
+                      led_t led) {
+            auto rule = terminal(grammar, type, bp);
+            if (led) {
+                rule->led = [](pratt_ctx_t* ctx, ast::node_id_t left) {
+                    auto op_type = ctx->grammar->operator_types[ctx->token->type];
+                    auto expr_id = parser::expression(*ctx, ctx->rule->lbp);
+                    return ast::make_binary_op(*ctx->ast,
+                                               op_type,
+                                               left,
+                                               expr_id,
+                                               ctx->token->id);
+                };
+            } else {
+                rule->led = led;
+            }
+            rule->associativity = associativity::left;
+            return rule;
+        }
+
+        rule_t* infixr(grammar_t& grammar,
+                       token_type_t type,
+                       u32 bp,
+                       led_t led) {
+            auto rule = terminal(grammar, type, bp);
+            if (led) {
+                rule->led = [](pratt_ctx_t* ctx, ast::node_id_t left) {
+                    auto op_type = ctx->grammar->operator_types[ctx->token->type];
+                    auto expr_id = parser::expression(*ctx, ctx->rule->lbp - 1);
+                    return ast::make_binary_op(*ctx->ast,
+                                               op_type,
+                                               left,
+                                               expr_id,
+                                               ctx->token->id);
+                };
+            } else {
+                rule->led = led;
+            }
+            rule->associativity = associativity::right;
+            return rule;
+        }
+
+        rule_t* prefix(grammar_t& grammar,
+                       token_type_t type,
+                       nud_t nud) {
+            auto rule = terminal(grammar, type);
+            if (nud) {
+                rule->nud = [](pratt_ctx_t* ctx) {
+                    auto op_type = ctx->grammar->operator_types[ctx->token->type];
+                    auto expr_id = parser::expression(*ctx,
+                                                      ctx->grammar->default_rbp);
+                    return ast::make_unary_op(*ctx->ast,
+                                              op_type,
+                                              expr_id,
+                                              ctx->token->id);
+                };
+            } else {
+                rule->nud = nud;
+            }
+            rule->associativity = associativity::none;
+            return rule;
+        }
+
+        rule_t* postfix(grammar_t& grammar,
+                        token_type_t type,
+                        u32 bp,
+                        led_t led) {
+            auto rule = terminal(grammar, type, bp);
+            if (led) {
+                rule->led = [](pratt_ctx_t* ctx, ast::node_id_t left) {
+                    auto op_type = ctx->grammar->operator_types[ctx->token->type];
+                    return ast::make_unary_op(*ctx->ast,
+                                              op_type,
+                                              left,
+                                              ctx->token->id);
+                };
+            } else {
+                rule->led = led;
+            }
+            rule->postfix = true;
+            rule->associativity = associativity::left;
+            return rule;
+        }
+
         rule_t* stmt(grammar_t& grammar, token_type_t type, std_t std) {
             auto rule = terminal(grammar, type);
             rule->std = std;
@@ -78,66 +167,6 @@ namespace basecode::pratt {
             grammar.default_rbp    = 100;
             grammar.operator_types = operator_types;
             hashtab::init(grammar.rules, alloc);
-        }
-
-        rule_t* prefix(grammar_t& grammar, token_type_t type, nud_t nud) {
-            auto rule = terminal(grammar, type);
-            if (nud) {
-                rule->nud = [](pratt_ctx_t* ctx) {
-                    auto op_type = ctx->grammar->operator_types[ctx->token->type];
-                    auto expr_id = parser::expression(*ctx, ctx->grammar->default_rbp);
-                    return ast::make_unary_op(*ctx->ast, op_type, expr_id, ctx->token->id);
-                };
-            } else {
-                rule->nud = nud;
-            }
-            rule->associativity = associativity::none;
-            return rule;
-        }
-
-        rule_t* infix(grammar_t& grammar, token_type_t type, u32 bp, led_t led) {
-            auto rule = terminal(grammar, type, bp);
-            if (led) {
-                rule->led = [](pratt_ctx_t* ctx, ast::node_id_t left) {
-                    auto op_type = ctx->grammar->operator_types[ctx->token->type];
-                    auto expr_id = parser::expression(*ctx, ctx->rule->lbp);
-                    return ast::make_binary_op(*ctx->ast, op_type, left, expr_id, ctx->token->id);
-                };
-            } else {
-                rule->led = led;
-            }
-            rule->associativity = associativity::left;
-            return rule;
-        }
-
-        rule_t* infixr(grammar_t& grammar, token_type_t type, u32 bp, led_t led) {
-            auto rule = terminal(grammar, type, bp);
-            if (led) {
-                rule->led = [](pratt_ctx_t* ctx, ast::node_id_t left) {
-                    auto op_type = ctx->grammar->operator_types[ctx->token->type];
-                    auto expr_id = parser::expression(*ctx, ctx->rule->lbp - 1);
-                    return ast::make_binary_op(*ctx->ast, op_type, left, expr_id, ctx->token->id);
-                };
-            } else {
-                rule->led = led;
-            }
-            rule->associativity = associativity::right;
-            return rule;
-        }
-
-        rule_t* postfix(grammar_t& grammar, token_type_t type, u32 bp, led_t led) {
-            auto rule = terminal(grammar, type, bp);
-            if (led) {
-                rule->led = [](pratt_ctx_t* ctx, ast::node_id_t left) {
-                    auto op_type = ctx->grammar->operator_types[ctx->token->type];
-                    return ast::make_unary_op(*ctx->ast, op_type, left, ctx->token->id);
-                };
-            } else {
-                rule->led = led;
-            }
-            rule->postfix = true;
-            rule->associativity = associativity::left;
-            return rule;
         }
     }
 }

@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -17,6 +17,7 @@
 // ----------------------------------------------------------------------------
 
 #include <sys/time.h>
+#include <basecode/core/array.h>
 #include <basecode/core/mutex.h>
 #include <basecode/core/event.h>
 #include <basecode/core/memory/system/slab.h>
@@ -51,8 +52,6 @@ namespace basecode {
     };
     static_assert(sizeof(event_t_) <= 152, "sizeof(event_t_) is now greater than 152 bytes!");
 
-    using event_array_t                 = array_t<event_t>;
-
     namespace event {
         struct system_t final {
             alloc_t*                    alloc;
@@ -64,11 +63,8 @@ namespace basecode {
 
         namespace system {
             u0 fini() {
-                event_array_t temp{};
-                array::copy(temp, g_system.events);
-                for (auto event : temp)
+                for (auto event : g_system.events)
                     event::free(event);
-                array::free(temp);
                 array::free(g_system.events);
                 memory::system::free(g_system.event_pool);
             }
@@ -78,11 +74,12 @@ namespace basecode {
                 array::init(g_system.events, g_system.alloc);
 
                 slab_config_t slab_config{};
-                slab_config.backing   = g_system.alloc;
-                slab_config.buf_size  = sizeof(event_t_);
-                slab_config.buf_align = alignof(event_t_);
-                slab_config.num_pages = 1;
-                g_system.event_pool = memory::system::make(alloc_type_t::slab, &slab_config);
+                slab_config.name          = "event::slab";
+                slab_config.buf_size      = sizeof(event_t_);
+                slab_config.buf_align     = alignof(event_t_);
+                slab_config.num_pages     = DEFAULT_NUM_PAGES;
+                slab_config.backing.alloc = g_system.alloc;
+                g_system.event_pool = memory::system::make(&slab_config);
 
                 return status_t::ok;
             }

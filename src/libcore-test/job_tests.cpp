@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,9 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/job.h>
-#include <basecode/core/array.h>
 #include <basecode/core/format.h>
 
 using namespace basecode;
@@ -39,7 +38,7 @@ TEST_CASE("basecode::job basics") {
     s32    inputs[num_workers];
     s32    n = 2;
     str_t  temp{};
-    str::init(temp);
+    str::init(temp, context::top()->alloc.temp);
     str::reserve(temp, 50);
     for (s32 i = 0; i < num_workers; ++i) {
         str::reset(temp);
@@ -47,21 +46,28 @@ TEST_CASE("basecode::job basics") {
             str_buf_t buf(&temp);
             format::format_to(buf, "fib job {}", i + 1);
         }
-        REQUIRE(OK(job::make(jobs[i], temp)));
+        if (!OK(job::make(jobs[i], temp)))
+            REQUIRE(false);
         inputs[i] = n++;
-        REQUIRE(OK(job::start(jobs[i], fib, inputs[i])));
+        if (!OK(job::start(jobs[i], fib, inputs[i])))
+            REQUIRE(false);
     }
 
     s32 i = 0;
     while (i < num_workers) {
         if (OK(job::wait(jobs[i]))) {
             s32 result{};
-            REQUIRE(OK(job::return_value(jobs[i], result)));
+            if (!OK(job::return_value(jobs[i], result)))
+                REQUIRE(false);
             const auto label = job::label(jobs[i]);
             job_t* job{};
-            REQUIRE(OK(job::get(jobs[i], &job)));
-            stopwatch::print_elapsed(label, 40, job->time);
-            format::print_ellipsis((std::string_view) label, 40, "result: {}\n", result);
+            if (!OK(job::get(jobs[i], &job)))
+                REQUIRE(false);
+            stopwatch::print_elapsed(label, 60, job->time);
+            format::print_ellipsis((std::string_view) label,
+                                   60,
+                                   "result: {}\n",
+                                   result);
             ++i;
         }
     }

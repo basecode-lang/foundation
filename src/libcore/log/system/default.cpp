@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,6 +16,8 @@
 //
 // ----------------------------------------------------------------------------
 
+#include <fmt/chrono.h>
+#include <basecode/core/log.h>
 #include <basecode/core/path.h>
 #include <basecode/core/log/system/default.h>
 
@@ -30,6 +32,7 @@ namespace basecode::log::default_ {
         auto cfg = (default_config_t*) config;
         auto sc  = &logger->subclass.default_;
         sc->file = !cfg->file ? stdout : cfg->file;
+        sc->is_redirected = !isatty(fileno(sc->file));
 
         str::init(sc->buf, logger->alloc);
         str::reserve(sc->buf, 4096);
@@ -58,7 +61,10 @@ namespace basecode::log::default_ {
             fmt::vformat_to(fmt_buf, format_str, args);
             format::format_to(fmt_buf, "\n");
         }
-        std::fwrite(sc->buf.data, 1, sc->buf.length, sc->file);
+        if (sc->is_redirected)
+            format::print("{}", sc->buf);
+        else
+            format::print(sc->file, "{}", sc->buf);
     }
 
     logger_system_t             g_default_system{

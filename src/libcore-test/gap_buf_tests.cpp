@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -16,7 +16,7 @@
 //
 // ----------------------------------------------------------------------------
 
-#include <catch2/catch.hpp>
+#include <catch.hpp>
 #include <basecode/core/defer.h>
 #include <basecode/core/format.h>
 #include <basecode/core/gap_buf.h>
@@ -29,27 +29,25 @@ TEST_CASE("basecode::gap_buf basics") {
     gap_buf::init(buf);
     defer(gap_buf::free(buf));
 
-    stopwatch_t time{};
-    stopwatch::start(time);
-
-    gap_buf::caret_insert(buf, "this is a test of the gap buffer! i'm hoping it works out alright!"_ss);
-    gap_buf::caret_move(buf, 10);
-    gap_buf::gap_to_caret(buf);
-    gap_buf::caret_put(buf, 's');
-    gap_buf::caret_put(buf, 'p');
-    gap_buf::caret_put(buf, 'e');
-    gap_buf::caret_put(buf, 'c');
-    gap_buf::caret_put(buf, 'i');
-    gap_buf::caret_put(buf, 'a');
-    gap_buf::caret_put(buf, 'l');
-    gap_buf::caret_delete(buf, 5);
-    gap_buf::caret_put(buf, ' ');
-    gap_buf::caret_move(buf, 37);
-    gap_buf::gap_to_caret(buf);
-    gap_buf::caret_delete(buf, 4);
-
-    stopwatch::stop(time);
-    stopwatch::print_elapsed("gap_buf edit test"_ss, 40, time);
+    TIME_BLOCK(
+        "gap_buf: edit test"_ss,
+        gap_buf::caret_insert(
+                buf,
+                "this is a test of the gap buffer! i'm hoping it works out alright!"_ss);
+            gap_buf::caret_move(buf, 10);
+            gap_buf::gap_to_caret(buf);
+            gap_buf::caret_put(buf, 's');
+            gap_buf::caret_put(buf, 'p');
+            gap_buf::caret_put(buf, 'e');
+            gap_buf::caret_put(buf, 'c');
+            gap_buf::caret_put(buf, 'i');
+            gap_buf::caret_put(buf, 'a');
+            gap_buf::caret_put(buf, 'l');
+            gap_buf::caret_delete(buf, 5);
+            gap_buf::caret_put(buf, ' ');
+            gap_buf::caret_move(buf, 37);
+            gap_buf::gap_to_caret(buf);
+            gap_buf::caret_delete(buf, 4););
 
     gap_buf::print(buf);
     format::print("\n");

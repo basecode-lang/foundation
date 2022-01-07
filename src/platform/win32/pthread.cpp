@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -33,22 +33,41 @@ static DWORD timespec_to_ms(const timespec* abstime) {
 pthread_t pthread_self() {
     pthread_t self;
     auto proc = GetCurrentProcess();
-    if (!DuplicateHandle(proc, GetCurrentThread(), proc, &self, 0, FALSE, DUPLICATE_SAME_ACCESS))
+    if (!DuplicateHandle(proc,
+                         GetCurrentThread(),
+                         proc,
+                         &self,
+                         0,
+                         FALSE,
+                         DUPLICATE_SAME_ACCESS)) {
         return nullptr;
+    }
     return self;
+}
+
+int pthread_getthreadid_np() {
+    return GetCurrentThreadId();
 }
 
 int pthread_setname_np(pthread_t thread, const char* name) {
     if (!name) return EINVAL;
     const auto name_len = strlen(name);
-    const auto new_size = MultiByteToWideChar(CP_UTF8, 0, name, name_len, nullptr, 0);
+    const auto new_size = MultiByteToWideChar(CP_UTF8,
+                                              0,
+                                              name,
+                                              name_len,
+                                              nullptr,
+                                              0);
     std::wstring temp(new_size, 0);
     MultiByteToWideChar(CP_UTF8, 0, name, name_len, temp.data(), new_size);
     SetThreadDescription(thread, temp.c_str());
     return 0;
 }
 
-int pthread_create(pthread_t* thread, pthread_attr_t* attr, void* (* start_routine)(void*), void* arg) {
+int pthread_create(pthread_t* thread,
+                   pthread_attr_t* attr,
+                   void* (* start_routine)(void*),
+                   void* arg) {
     UNUSED(attr);
     if (!thread || !start_routine)
         return EINVAL;
@@ -133,7 +152,9 @@ int pthread_cond_wait(pthread_cond_t* cond, pthread_mutex_t* mutex) {
     return pthread_cond_timedwait(cond, mutex, nullptr);
 }
 
-int pthread_cond_timedwait(pthread_cond_t* cond, pthread_mutex_t* mutex, const struct timespec* abstime) {
+int pthread_cond_timedwait(pthread_cond_t* cond,
+                           pthread_mutex_t* mutex,
+                           const struct timespec* abstime) {
     if (!cond || !mutex) return EINVAL;
     const auto sleep_ms = timespec_to_ms(abstime);
     if (!SleepConditionVariableCS(cond, mutex, sleep_ms))
@@ -153,7 +174,8 @@ int pthread_cond_broadcast(pthread_cond_t* cond) {
     return 0;
 }
 
-int pthread_rwlock_init(pthread_rwlock_t* rwlock, const pthread_rwlockattr_t* attr) {
+int pthread_rwlock_init(pthread_rwlock_t* rwlock,
+                        const pthread_rwlockattr_t* attr) {
     UNUSED(attr);
     if (!rwlock) return EINVAL;
     InitializeSRWLock(&(rwlock->lock));

@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,179 +18,249 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
+#include <basecode/core/array.h>
 #include <basecode/core/memory.h>
-#include <basecode/core/hashable.h>
 
-namespace basecode {
-    template <typename T> requires hash::Hashable<T>
-    struct set_t final {
-        alloc_t*                alloc;
-        u64*                    hashes;
-        T*                      values;
-        u32                     size;
-        u32                     capacity;
-        f32                     load_factor;
-    };
+namespace basecode::set {
+    template <Hash_Set T>
+    u0 init(T& set,
+            alloc_t* alloc = context::top()->alloc.main,
+            f32 load_factor = .75f);
 
-    namespace set {
-        template <typename T> u0 rehash(set_t<T>& set, u32 new_capacity = 16);
-        template <typename T> b8 find_value(set_t<T>& set, u32 start, u64 hash, const T& value, u32* found);
-        template <typename T> u0 init(set_t<T>& set, alloc_t* alloc = context::top()->alloc, f32 load_factor = .5f);
+    template <Hash_Set T,
+              typename Value_Type = typename T::Value_Type>
+    b8 find_value(T& set,
+                  u32 start,
+                  u64 hash,
+                  const Value_Type& value,
+                  u32* found);
 
-        inline b8 requires_rehash(u32 size, u32 capacity, f32 load_factor) {
-            return capacity == 0 || size + 1 > (capacity - 1) * load_factor;
+    template <Hash_Set T,
+              typename Value_Type = typename T::Value_Type>
+    u0 rehash(T& set, s32 new_capacity = -1);
+
+    template <Hash_Set T,
+              typename Value_Type = typename T::Value_Type>
+    inline set_buf_size_t size_of_buffer(T& set, u32 capacity = 0) {
+        if (capacity == 0)
+            capacity = set.capacity;
+        set_buf_size_t size{};
+        size.num_flag_words = hash_common::flag_words_for_capacity(capacity);
+        size.size_of_flags  = size.num_flag_words * sizeof(u64);
+        size.size_of_hashes = capacity * sizeof(u64);
+        size.size_of_values = capacity * sizeof(Value_Type);
+        size.total_size     = size.size_of_flags
+                              + size.size_of_hashes
+                              + alignof(Value_Type)
+                              + size.size_of_values;
+        return size;
+    }
+
+    template <Hash_Set T>
+    u0 free(T& set) {
+        memory::free(set.alloc, set.flags);
+        set.flags    = {};
+        set.values   = {};
+        set.hashes   = {};
+        set.capacity = set.size = {};
+    }
+
+    template <Hash_Set T>
+    u0 clear(T& set) {
+        free(set);
+    }
+
+    template <Hash_Set T>
+    u0 reset(T& set) {
+        if (set.hashes) {
+            const auto set_size = size_of_buffer(set);
+            std::memset(set.flags, 0, set_size.total_size);
+        }
+        set.size = {};
+    }
+
+    template <Hash_Set T,
+              b8 Is_Pointer = T::Is_Pointer::value,
+              typename Value_Type_Base = typename T::Value_Type_Base>
+    auto values(T& set) {
+        using Array = array_t<Value_Type_Base*>;
+
+        Array list{};
+        array::init(list, set.alloc);
+        array::reserve(list, set.size);
+        for (u32 i = 0; i < set.capacity; ++i) {
+            if (!hash_common::read_flag(set.flags, i)) continue;
+            if constexpr (Is_Pointer) {
+                array::append(list, set.values[i]);
+            } else {
+                array::append(list, &set.values[i]);
+            }
+        }
+        return list;
+    }
+
+    template<Hash_Set T>
+    inline b8 empty(T& set) {
+        return set.size == 0;
+    }
+
+    template <Hash_Set T, typename Value_Type>
+    b8 find_value(T& set,
+                  u32 start,
+                  u64 hash,
+                  const Value_Type& value,
+                  u32* found) {
+        for (u32 i = start; i < set.capacity; ++i) {
+            if (!hash_common::read_flag(set.flags, i)) return false;
+            if (hash == set.hashes[i] && value == set.values[i]) {
+                *found = i;
+                return true;
+            }
+        }
+        for (u32 i = 0; i < start; ++i) {
+            if (!hash_common::read_flag(set.flags, i)) return false;
+            if (hash == set.hashes[i] && value == set.values[i]) {
+                *found = i;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    template <Hash_Set T, typename Value_Type>
+    u0 rehash(T& set, s32 new_capacity) {
+        s32 idx = new_capacity == -1 ? set.cap_idx :
+                  hash_common::find_nearest_prime_capacity(new_capacity);
+        f32 lf;
+        do {
+            new_capacity = hash_common::prime_capacity(idx++);
+            lf = f32(set.size) / f32(new_capacity);
+        } while (lf > set.load_factor);
+        set.cap_idx = idx;
+
+        const auto buf_size = size_of_buffer(set, new_capacity);
+        auto buf = (u8*) memory::alloc(set.alloc,
+                                       buf_size.total_size,
+                                       alignof(u64));
+        std::memset(buf, 0, buf_size.total_size);
+
+        u32  align{};
+        auto new_flags  = (u64*) buf;
+        auto new_hashes = (u64*) memory::system::align_forward(
+            new_flags + buf_size.num_flag_words,
+            alignof(u64),
+            align);
+        auto new_values = (Value_Type*) memory::system::align_forward(
+            new_hashes + new_capacity,
+            alignof(Value_Type),
+            align);
+
+        for (u32 i = 0; i < set.capacity; ++i) {
+            if (!hash_common::read_flag(set.flags, i)) continue;
+            u32 bucket_index = hash_common::range_reduction(set.hashes[i],
+                                                            new_capacity);
+            b8  found = hash_common::find_free_bucket2(new_flags,
+                                                       new_capacity,
+                                                       bucket_index);
+            if (found) {
+                hash_common::write_flag(new_flags, bucket_index, true);
+                new_hashes[bucket_index] = set.hashes[i];
+                new_values[bucket_index] = set.values[i];
+            }
         }
 
-        inline b8 find_free_bucket(u64* hashes, u32 size, u32 start, u32* found) {
-            for (u32 i = start; i < size; ++i) {
-                if (!hashes[i]) {
-                    *found = i;
-                    return true;
-                }
-            }
-            for (u32 i = 0; i < start; ++i) {
-                if (!hashes[i]) {
-                    *found = i;
-                    return true;
-                }
-            }
+        memory::free(set.alloc, set.flags);
+
+        set.flags    = new_flags;
+        set.hashes   = new_hashes;
+        set.values   = new_values;
+        set.capacity = new_capacity;
+    }
+
+    template<Hash_Set T>
+    u0 reserve(T& set, u32 new_capacity) {
+        rehash(set, std::max<u32>(17, new_capacity));
+    }
+
+    template <Hash_Set T,
+              typename Value_Type = typename T::Value_Type>
+    b8 remove(T& set, const Value_Type& value) {
+        if (set.size == 0) return false;
+        u64 hash         = hash::hash64(value);
+        u32 bucket_index = hash_common::range_reduction(hash, set.capacity);
+        u32 found_index;
+        if (!find_value(set, bucket_index, hash, value, &found_index))
             return false;
-        }
+        hash_common::write_flag(set.flags, found_index, false);
+        --set.size;
+        return true;
+    }
 
-        template<typename T, typename B = std::remove_pointer_t<T>, b8 IsPtr = std::is_pointer<T>::value>
-        B* find(set_t<T>& set, const T& value) {
-            if (set.size == 0) return nullptr;
+    template <Hash_Set T>
+    u0 init(T& set, alloc_t* alloc, f32 load_factor) {
+        set.size        = set.capacity = {};
+        set.flags       = {};
+        set.alloc       = alloc;
+        set.hashes      = {};
+        set.values      = {};
+        set.cap_idx     = {};
+        set.load_factor = load_factor;
+    }
 
-            u64 hash         = hash::hash64(value);
-            u32 bucket_index = ((u128) hash * (u128) set.capacity) >> 64;
-            u32 found_index;
-            if (find_value(set, bucket_index, hash, value, &found_index)) {
-                if constexpr (IsPtr) {
-                    return set.values[found_index];
-                } else {
-                    return &set.values[found_index];
-                }
-            }
-
+    template <Hash_Set T,
+              b8 Is_Pointer = T::Is_Pointer::value,
+              typename Value_Type = typename T::Value_Type,
+              typename Value_Type_Base = typename T::Value_Type_Base>
+    Value_Type_Base* find(T& set, const Value_Type& value) {
+        if (set.size == 0)
             return nullptr;
-        }
 
-        template<typename T, typename B = std::remove_pointer_t<T>, b8 IsPtr = std::is_pointer<T>::value>
-        B* insert(set_t<T>& set, const T& value) {
-            if (requires_rehash(set.size, set.capacity, set.load_factor))
-                rehash(set, set.capacity << 1);
-
-            u64 hash         = hash::hash64(value);
-            u32 bucket_index = ((u128) hash * (u128) set.capacity) >> 64;
-            u32 found_index;
-
-            if (find_free_bucket(set.hashes, set.capacity, bucket_index, &found_index)) {
-                set.hashes[found_index] = hash;
-                set.values[found_index] = value;
-                ++set.size;
-                if constexpr (IsPtr) {
-                    return set.values[found_index];
-                } else {
-                    return &set.values[found_index];
-                }
+        u64 hash         = hash::hash64(value);
+        u32 bucket_index = hash_common::range_reduction(hash, set.capacity);
+        u32 found_index;
+        if (find_value(set, bucket_index, hash, value, &found_index)) {
+            if constexpr (Is_Pointer) {
+                return set.values[found_index];
+            } else {
+                return &set.values[found_index];
             }
-
-            return nullptr;
         }
 
-        template <typename T> u0 free(set_t<T>& set) {
-            memory::free(set.alloc, set.hashes);
-            set.values   = {};
-            set.hashes   = {};
-            set.capacity = set.size = {};
+        return nullptr;
+    }
+
+    template <Hash_Set T,
+              b8 Is_Pointer = T::Is_Pointer::value,
+              typename Value_Type = typename T::Value_Type,
+              typename Value_Type_Base = typename T::Value_Type_Base>
+    Value_Type_Base* insert(T& set, const Value_Type& value) {
+        auto v = find(set, value);
+        if (v)
+            return v;
+
+        if (hash_common::requires_rehash(set.size,
+                                         set.capacity,
+                                         set.load_factor)) {
+            rehash(set);
         }
 
-        template <typename T> u0 clear(set_t<T>& set) {
-            free(set);
-        }
-
-        template <typename T> u0 reset(set_t<T>& set) {
-            if (set.hashes) std::memset(set.hashes, 0, set.capacity * sizeof(u64));
-            set.size = {};
-        }
-
-        template<typename T> inline b8 empty(set_t<T>& set) {
-            return set.size == 0;
-        }
-
-        template<typename T> b8 remove(set_t<T>& set, const T& value) {
-            if (set.size == 0) return false;
-            u64 hash         = hash::hash64(value);
-            u32 bucket_index = ((u128) hash * (u128) set.capacity) >> 64;
-            u32 found_index;
-            if (!find_value(set, bucket_index, hash, value, &found_index))
-                return false;
-            set.hashes[found_index] = 0;
-            --set.size;
-            return true;
-        }
-
-        template<typename T> u0 rehash(set_t<T>& set, u32 new_capacity) {
-            new_capacity = std::max<u32>(new_capacity, std::ceil(std::max<u32>(16, new_capacity) / set.load_factor));
-
-            const auto size_of_hashes = new_capacity * sizeof(u64);
-            const auto size_of_values = new_capacity * sizeof(T);
-            const auto buf_size       = size_of_hashes + alignof(T) + size_of_values;
-
-            auto buf = (u8*) memory::alloc(set.alloc, buf_size, alignof(u64));
-            std::memset(buf, 0, buf_size);
-
-            u32  values_align{};
-            auto new_hashes = (u64*) buf;
-            auto new_values = (T*) memory::system::align_forward(buf + size_of_hashes, alignof(T), values_align);
-
-            for (u32 i = 0; i < set.capacity; ++i) {
-                if (!set.hashes[i]) continue;
-
-                u32 bucket_index = ((u128) set.hashes[i] * (u128) new_capacity) >> 64;
-                u32 found_index;
-                find_free_bucket(new_hashes, new_capacity, bucket_index, &found_index);
-
-                new_hashes[found_index] = set.hashes[i];
-                new_values[found_index] = set.values[i];
+        u64 hash         = hash::hash64(value);
+        u32 bucket_index = hash_common::range_reduction(hash, set.capacity);
+        b8  found        = hash_common::find_free_bucket2(set.flags,
+                                                          set.capacity,
+                                                          bucket_index);
+        if (found) {
+            hash_common::write_flag(set.flags, bucket_index, true);
+            set.hashes[bucket_index] = hash;
+            set.values[bucket_index] = value;
+            ++set.size;
+            if constexpr (Is_Pointer) {
+                return set.values[bucket_index];
+            } else {
+                return &set.values[bucket_index];
             }
-
-            memory::free(set.alloc, set.hashes);
-
-            set.hashes   = new_hashes;
-            set.values   = new_values;
-            set.capacity = new_capacity;
         }
 
-        template<typename T> u0 reserve(set_t<T>& set, u32 new_capacity) {
-            rehash(set, std::ceil(std::max<u32>(16, new_capacity) / std::min(.5f, set.load_factor)));
-        }
-
-        template <typename T> u0 init(set_t<T>& set, alloc_t* alloc, f32 load_factor) {
-            set.hashes      = {};
-            set.values      = {};
-            set.alloc       = alloc;
-            set.load_factor = load_factor;
-            set.size        = set.capacity = {};
-        }
-
-        template<typename T> b8 find_value(set_t<T>& set, u32 start, u64 hash, const T& value, u32* found) {
-            for (u32 i = start; i < set.capacity; ++i) {
-                if (!set.hashes[i]) return false;
-                if (hash == set.hashes[i] && value == set.values[i]) {
-                    *found = i;
-                    return true;
-                }
-            }
-            for (u32 i = 0; i < start; ++i) {
-                if (!set.hashes[i]) return false;
-                if (hash == set.hashes[i] && value == set.values[i]) {
-                    *found = i;
-                    return true;
-                }
-            }
-            return false;
-        }
+        return (Value_Type_Base*) nullptr;
     }
 }

@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -19,9 +19,6 @@
 #pragma once
 
 #include <basecode/core/types.h>
-
-struct sqlite3;
-struct sqlite3_stmt;
 
 #define SQL_BEGIN(h) SAFE_SCOPE({                                           \
         s32 r;                                                              \

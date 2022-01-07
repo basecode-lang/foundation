@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -20,34 +20,18 @@
 
 #include <basecode/core/types.h>
 
-namespace basecode {
+namespace basecode::timer {
+    u0 fini();
 
-    struct timer_t;
-    using timer_callback_t      = b8 (*)(timer_t*, u0*);
+    status_t init();
 
-    struct timer_t final {
-        u0*                     context;
-        timer_callback_t        callback;
-        s64                     expiry;
-        s64                     duration;
-        b8                      active;
-    };
+    u0 stop(timer_t* timer);
 
-    namespace timer {
-        enum class status_t : u8 {
-            ok                  = 0,
-            error               = 179
-        };
+    timer_t* start(s64 ticks,
+                   s64 duration,
+                   timer_callback_t callback,
+                   u0* user = {});
 
-        u0 fini();
-
-        status_t init();
-
-        u0 stop(timer_t* timer);
-
-        u0 update(s64 ticks, u0* ctx = {});
-
-        timer_t* start(s64 ticks, s64 duration, timer_callback_t callback, u0* context = {});
-    }
+    u0 update(s64 ticks, u0* user = {});
 }
 

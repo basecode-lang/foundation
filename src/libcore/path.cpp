@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -17,15 +17,8 @@
 // ----------------------------------------------------------------------------
 
 #include <basecode/core/path.h>
-#include <basecode/core/string.h>
 
 namespace basecode::path {
-#ifdef _WIN32
-    constexpr s8 path_sep = '\\';
-#else
-    constexpr s8 path_sep = '/';
-#endif
-
     u0 tokenize(path_t& path) {
         array::reset(path.marks);
         if (path.str.length == 0) return;
@@ -85,6 +78,11 @@ namespace basecode::path {
         array::free(path.marks);
     }
 
+    u0 reset(path_t& path) {
+        str::reset(path.str);
+        array::reset(path.marks);
+    }
+
     b8 empty(const path_t& path) {
         return path.str.length == 0;
     }
@@ -104,9 +102,11 @@ namespace basecode::path {
     b8 is_only_root(const path_t& path) {
 #ifdef _WIN32
         return path.marks.size == 1
-            && (path.marks[0].type == path::marks::drive_name || path.marks[0].type == path::marks::root_part);
+               && (path.marks[0].type == path::marks::drive_name
+                   || path.marks[0].type == path::marks::root_part);
 #else
-        return path.marks.size == 1 && path.marks[0].type == path::marks::root_part;
+        return path.marks.size == 1
+               && path.marks[0].type == path::marks::root_part;
 #endif
     }
 
@@ -127,7 +127,8 @@ namespace basecode::path {
         else
             ++last_path_idx;
         auto temp = slice::make(path.str.data + last_path_idx,
-                                u32(ext_idx != -1 ? ext_idx - last_path_idx : path.str.length));
+                                u32(ext_idx != -1 ? ext_idx - last_path_idx :
+                                    path.str.length));
         return temp;
     }
 
@@ -138,13 +139,15 @@ namespace basecode::path {
             last_path_idx = 0;
         else
             ++last_path_idx;
-        auto temp = slice::make(path.str.data + last_path_idx, u32(path.str.length - last_path_idx));
+        auto temp = slice::make(path.str.data + last_path_idx,
+                                u32(path.str.length - last_path_idx));
         return temp;
     }
 
     str::slice_t directory(const path_t& path) {
         if (empty(path)) return {};
-        const auto last_path_idx = find_last_mark_index(path, path::marks::path_part);
+        const auto last_path_idx = find_last_mark_index(path,
+                                                        path::marks::path_part);
         if (last_path_idx == -1)
             return {};
         return str::slice_t{.data = path.str.data, .length = u32(last_path_idx)};
@@ -154,22 +157,22 @@ namespace basecode::path {
         if (empty(path))    return {};
         auto ext_idx = find_mark_index(path, path::marks::extension);
         if (ext_idx == -1)  return {};
-        return str::slice_t{.data = path.str.data + ext_idx, .length = u32(path.str.length - ext_idx)};
+        return str::slice_t{.data = path.str.data + ext_idx,
+                            .length = u32(path.str.length - ext_idx)};
     }
 
-    status_t set(path_t& path, const s8* value) {
-        return set(path, str::slice_t{.data = (const u8*) value, .length = u32(strlen(value))});
-    }
     status_t init(path_t& path, alloc_t* alloc) {
         str::init(path.str, alloc);
         array::init(path.marks, alloc);
         return status_t::ok;
     }
-#ifdef _WIN32
 
+#ifdef _WIN32
     str::slice_t drive_name(const path_t& path) {
-        if (empty(path))            return {};
-        auto drive_name_idx = find_mark_index(path, path::marks::drive_name);
+        if (empty(path))
+            return {};
+        auto drive_name_idx = find_mark_index(path,
+                                              path::marks::drive_name);
         if (drive_name_idx == -1)
             return {};
         return slice::make(path.str.data, drive_name_idx);
@@ -178,9 +181,12 @@ namespace basecode::path {
 #endif
 
     status_t append(path_t& lhs, const path_t& rhs) {
-        if (empty(rhs))                                         return status_t::ok;
-        if (absolute(rhs))                                      return status_t::expected_relative_path;
-        if ((lhs.str.length + rhs.str.length + 2) > PATH_MAX)   return status_t::path_too_long;
+        if (empty(rhs))
+            return status_t::ok;
+        if (absolute(rhs))
+            return status_t::expected_relative_path;
+        if ((lhs.str.length + rhs.str.length + 2) > PATH_MAX)
+            return status_t::path_too_long;
         const auto ch = lhs.str[lhs.str.length - 1];
         if (ch != '/' && ch != '\\') {
             str::append(lhs.str, path_sep);
@@ -198,6 +204,19 @@ namespace basecode::path {
         return -1;
     }
 
+    status_t set(path_t& path, const path_t& new_path) {
+        str::reset(path.str);
+        str::append(path.str, new_path.str);
+        tokenize(path);
+        return status_t::ok;
+    }
+
+    status_t set(path_t& path, const s8* value, s32 len) {
+        return set(path,
+                   slice::make((const u8*) value,
+                               len == -1 ? strlen(value) : len));
+    }
+
     s32 find_last_mark_index(const path_t& path, u8 type) {
         for (s32 i = path.marks.size - 1; i >= 0; --i) {
             if (path.marks[i].type == type)
@@ -207,8 +226,10 @@ namespace basecode::path {
     }
 
     status_t parent_path(const path_t& path, path_t& new_path) {
-        if (empty(path))                                        return status_t::unexpected_empty_path;
-        if (path.str.length == 1 || array::empty(path.marks))   return status_t::no_parent_path;
+        if (empty(path))
+            return status_t::unexpected_empty_path;
+        if (path.str.length == 1 || array::empty(path.marks))
+            return status_t::no_parent_path;
         auto len = find_last_mark_index(path, path::marks::path_part);
         if (len == -1)
             return status_t::no_parent_path;

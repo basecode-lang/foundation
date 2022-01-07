@@ -11,7 +11,7 @@ set(VERSION_MAJOR       0)
 set(VERSION_MINOR       1)
 set(PRODUCT_NAME        "Basecode Foundation Core Library")
 set(LIBRARY_NAME        "basecode-core")
-set(LIBRARY_TARGET      "${PROJECT_NAME}-lib")
+set(LIBRARY_TARGET      "${LIBRARY_NAME}-lib")
 set(CORE_INC_DIR        "${INC_DIR_BASE}/basecode/core")
 if (WIN32)
     set(PLATFORM_INC_DIR    "${INC_DIR_BASE}/platform/win32")
@@ -29,8 +29,24 @@ configure_file(
     "${CMAKE_BINARY_DIR}/include/basecode/core/configure.h"
 )
 configure_file(
-    ${PROJECT_DIR_BASE}/etc/core.fe
-    ${CMAKE_BINARY_DIR}/etc/core.fe COPYONLY
+    ${PROJECT_DIR_BASE}/etc/first.scm
+    ${CMAKE_BINARY_DIR}/etc/first.scm COPYONLY
+)
+configure_file(
+    ${PROJECT_DIR_BASE}/etc/basic.scm
+    ${CMAKE_BINARY_DIR}/etc/basic.scm COPYONLY
+)
+configure_file(
+    ${PROJECT_DIR_BASE}/etc/core.scm
+    ${CMAKE_BINARY_DIR}/etc/core.scm COPYONLY
+)
+configure_file(
+    ${PROJECT_DIR_BASE}/etc/core-tests.scm
+    ${CMAKE_BINARY_DIR}/etc/core-tests.scm COPYONLY
+)
+configure_file(
+    ${PROJECT_DIR_BASE}/etc/core-localization.scm
+    ${CMAKE_BINARY_DIR}/etc/core-localization.scm COPYONLY
 )
 
 # -----------------------------------------------------------------------------
@@ -42,16 +58,21 @@ configure_file(
 set(
     CORE_SOURCES
 
-    ${CORE_INC_DIR}/src_loc.h
+    assert.cpp ${CORE_INC_DIR}/assert.h
+
+    ${CORE_INC_DIR}/avl.h
 
     ast.cpp ${CORE_INC_DIR}/ast.h
 
+    ${CORE_INC_DIR}/array.h
+    ${CORE_INC_DIR}/array_common.h
+
     ${CORE_INC_DIR}/assoc_array.h
+
+    ${CORE_INC_DIR}/bag.h
 
     ${CORE_INC_DIR}/defer.h
     ${CORE_INC_DIR}/types.h
-
-    ${CORE_INC_DIR}/array.h
 
     base64.cpp ${CORE_INC_DIR}/base64.h
 
@@ -63,11 +84,11 @@ set(
 
     bitset.cpp ${CORE_INC_DIR}/bitset.h
 
+    ${CORE_INC_DIR}/bst.h
+
     buf.cpp ${CORE_INC_DIR}/buf.h
 
     buf_pool.cpp ${CORE_INC_DIR}/buf_pool.h
-
-    config.cpp ${CORE_INC_DIR}/config.h
 
     context.cpp ${CORE_INC_DIR}/context.h
 
@@ -77,7 +98,11 @@ set(
     cxx/serializer.cpp
     cxx/cxx.cpp ${CORE_INC_DIR}/cxx/cxx.h
 
+    decimal.cpp ${CORE_INC_DIR}/decimal.h
+
     ${CORE_INC_DIR}/digraph.h
+
+    env.cpp ${CORE_INC_DIR}/env.h
 
     eav.cpp ${CORE_INC_DIR}/eav.h
 
@@ -85,17 +110,20 @@ set(
 
     event.cpp ${CORE_INC_DIR}/event.h
 
-    fe/src/fe.c fe/src/fe.h
-
     filesys.cpp ${CORE_INC_DIR}/filesys.h
 
     ffi.cpp ${CORE_INC_DIR}/ffi.h
 
-    format.cpp ${CORE_INC_DIR}/format.h ${CORE_INC_DIR}/format_types.h
+    ${CORE_INC_DIR}/format_fwd.h
+    format.cpp ${CORE_INC_DIR}/format.h
 
     gap_buf.cpp ${CORE_INC_DIR}/gap_buf.h
 
-    ${CORE_INC_DIR}/hashable.h
+    getopt.cpp ${CORE_INC_DIR}/getopt.h
+
+    graphviz/gv.cpp ${CORE_INC_DIR}/graphviz/gv.h
+
+    hash_common.cpp
 
     hash/crc.cpp ${CORE_INC_DIR}/hash/crc.h
     hash/adler.cpp ${CORE_INC_DIR}/hash/adler.h
@@ -105,13 +133,15 @@ set(
 
     ${CORE_INC_DIR}/hashtab.h
 
+    integer.cpp ${CORE_INC_DIR}/integer.h
+
     intern.cpp ${CORE_INC_DIR}/intern.h
 
     ipc.cpp ${CORE_INC_DIR}/ipc.h
 
-    ${CORE_INC_DIR}/iterator.h
-
     job.cpp ${CORE_INC_DIR}/job.h
+
+    leb128.cpp ${CORE_INC_DIR}/leb128.h
 
     ${CORE_INC_DIR}/list.h
 
@@ -123,8 +153,9 @@ set(
     log/system/spdlog.cpp ${CORE_INC_DIR}/log/system/spdlog.h
     log/system/default.cpp ${CORE_INC_DIR}/log/system/default.h
 
-    memory.cpp ${CORE_INC_DIR}/memory.h
+    macro.cpp ${CORE_INC_DIR}/macro.h
 
+    memory.cpp ${CORE_INC_DIR}/memory.h
     memory/meta.cpp ${CORE_INC_DIR}/memory/meta.h
     memory/dyn_alloc.cpp ${CORE_INC_DIR}/memory/dyn_alloc.h
     memory/std_alloc.cpp ${CORE_INC_DIR}/memory/std_alloc.h
@@ -132,17 +163,23 @@ set(
     memory/system/page.cpp ${CORE_INC_DIR}/memory/system/page.h
     memory/system/slab.cpp ${CORE_INC_DIR}/memory/system/slab.h
     memory/system/bump.cpp ${CORE_INC_DIR}/memory/system/bump.h
+    memory/system/temp.cpp ${CORE_INC_DIR}/memory/system/temp.h
+    memory/system/base.cpp ${CORE_INC_DIR}/memory/system/base.h
     memory/system/trace.cpp ${CORE_INC_DIR}/memory/system/trace.h
     memory/system/proxy.cpp ${CORE_INC_DIR}/memory/system/proxy.h
     memory/system/stack.cpp ${CORE_INC_DIR}/memory/system/stack.h
-    memory/system/default.cpp ${CORE_INC_DIR}/memory/system/default.h
-    memory/system/dlmalloc.c ${CORE_INC_DIR}/memory/system/dlmalloc.h ${CORE_INC_DIR}/memory/system/dlmalloc_config.h
+    memory/system/buddy.cpp ${CORE_INC_DIR}/memory/system/buddy.h
+    memory/system/scratch.cpp ${CORE_INC_DIR}/memory/system/scratch.h
+    memory/system/dlmalloc.c ${CORE_INC_DIR}/memory/system/dlmalloc.h
+                             ${CORE_INC_DIR}/memory/system/dlmalloc_config.h
 
     mutex.cpp ${CORE_INC_DIR}/mutex.h
 
     network.cpp ${CORE_INC_DIR}/network.h
 
     numbers.cpp ${CORE_INC_DIR}/numbers.h
+
+    obj_pool.cpp ${CORE_INC_DIR}/obj_pool.h
 
     path.cpp ${CORE_INC_DIR}/path.h
 
@@ -152,14 +189,33 @@ set(
 
     profiler.cpp ${CORE_INC_DIR}/profiler.h
 
+    ${CORE_INC_DIR}/proxy_array.h
+
     ${CORE_INC_DIR}/queue.h
+
+    ${CORE_INC_DIR}/rbt.h
 
     rpn.cpp ${CORE_INC_DIR}/rpn.h
 
     ${CORE_INC_DIR}/set.h
 
-    ${CORE_INC_DIR}/slice.h
+    ${CORE_INC_DIR}/scm/types.h
+    ${CORE_INC_DIR}/scm/register_pool.h
+    scm/vm.cpp ${CORE_INC_DIR}/scm/vm.h
+    scm/scm.cpp ${CORE_INC_DIR}/scm/scm.h
+    scm/kernel.cpp ${CORE_INC_DIR}/scm/kernel.h
+    scm/system.cpp ${CORE_INC_DIR}/scm/system.h
+    scm/emitter.cpp ${CORE_INC_DIR}/scm/emitter.h
+    scm/compiler.cpp ${CORE_INC_DIR}/scm/compiler.h
+    scm/bytecode.cpp ${CORE_INC_DIR}/scm/bytecode.h
+    scm/basic_block.cpp ${CORE_INC_DIR}/scm/basic_block.h
+    scm/modules/cxx.cpp ${CORE_INC_DIR}/scm/modules/cxx.h
+    scm/modules/log.cpp ${CORE_INC_DIR}/scm/modules/log.h
+    scm/modules/basic.cpp ${CORE_INC_DIR}/scm/modules/basic.h
+    scm/modules/config.cpp ${CORE_INC_DIR}/scm/modules/config.h
+
     slice_utils.cpp ${CORE_INC_DIR}/slice_utils.h
+
     ${CORE_INC_DIR}/sql.h
 
     ${CORE_INC_DIR}/stack.h
@@ -175,6 +231,8 @@ set(
 
     ${CORE_INC_DIR}/symtab.h
 
+    ${CORE_INC_DIR}/test_suite.h
+
     timer.cpp ${CORE_INC_DIR}/timer.h
 
     term.cpp ${CORE_INC_DIR}/term.h
@@ -182,6 +240,17 @@ set(
     thread.cpp ${CORE_INC_DIR}/thread.h
 
     token.cpp ${CORE_INC_DIR}/token.h
+
+    utf.cpp ${CORE_INC_DIR}/utf.h
+
+    uuid.cpp ${CORE_INC_DIR}/uuid.h
+
+    variant.cpp ${CORE_INC_DIR}/variant.h
+
+    wasm/wasm.cpp ${CORE_INC_DIR}/wasm/wasm.h
+    wasm/decoder.cpp ${CORE_INC_DIR}/wasm/decoder.h
+    wasm/encoder.cpp ${CORE_INC_DIR}/wasm/encoder.h
+    wasm/formatter.cpp ${CORE_INC_DIR}/wasm/formatter.h
 )
 if (WIN32)
     set (
@@ -198,16 +267,15 @@ if (WIN32)
         ${PLATFORM_SRC_DIR}/glob.cpp ${PLATFORM_INC_DIR}/glob.h
         ${PLATFORM_SRC_DIR}/poll.cpp ${PLATFORM_INC_DIR}/poll.h
         ${PLATFORM_SRC_DIR}/unistd.cpp ${PLATFORM_INC_DIR}/unistd.h
-        ${PLATFORM_SRC_DIR}/dirent.cpp ${PLATFORM_INC_DIR}/dirent.h
         ${PLATFORM_SRC_DIR}/syslog.cpp ${PLATFORM_INC_DIR}/syslog.h
         ${PLATFORM_SRC_DIR}/win32_locale.cpp ${PLATFORM_INC_DIR}/win32_locale.h
-        #        ${PLATFORM_SRC_DIR}/pthread.cpp ${PLATFORM_INC_DIR}/pthread.h
     )
     if (MSVC)
         set (
             PLATFORM_SOURCES
 
             ${PLATFORM_SOURCES}
+            ${PLATFORM_SRC_DIR}/dirent.cpp ${PLATFORM_INC_DIR}/dirent.h
             ${PLATFORM_SRC_DIR}/pthread.cpp ${PLATFORM_INC_DIR}/pthread.h
         )
     endif ()
@@ -223,9 +291,15 @@ target_include_directories(
 target_include_directories(
     ${LIBRARY_TARGET} PRIVATE
 
-    fe/src)
-target_compile_options(${LIBRARY_TARGET} PUBLIC -march=native PRIVATE -Wno-array-bounds)
-set_target_properties(${LIBRARY_TARGET} PROPERTIES LIBRARY_OUTPUT_NAME ${LIBRARY_NAME})
+    ${PLATFORM_INC_DIR}
+)
+target_compile_options(
+    ${LIBRARY_TARGET}
+
+    PUBLIC  "$<$<COMPILE_LANGUAGE:C,CXX>:-march=native>"
+    PRIVATE "$<$<COMPILE_LANGUAGE:C,CXX>:-Wno-array-bounds>"
+)
+set_target_properties(${LIBRARY_TARGET} PROPERTIES OUTPUT_NAME ${LIBRARY_NAME})
 if (LINUX)
     set_target_properties(${LIBRARY_TARGET} PROPERTIES POSITION_INDEPENDENT_CODE True)
 endif()
@@ -233,7 +307,6 @@ endif()
 target_link_libraries(
     ${LIBRARY_TARGET} PRIVATE
 
-    asmjit
     utf8proc
     blake3
     fmt
@@ -259,13 +332,12 @@ add_library(${PROJECT_NAME} INTERFACE)
 target_include_directories(
     ${PROJECT_NAME} INTERFACE
 
-    fe/src
     ${INC_DIR_BASE}
+    ${PLATFORM_INC_DIR}
     ${CMAKE_BINARY_DIR}/include)
 target_link_libraries(
     ${PROJECT_NAME} INTERFACE
 
-    asmjit
     utf8proc
     blake3
     fmt

@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include <basecode/core/slice.h>
-#include <basecode/core/array.h>
+#include <basecode/core/slice_utils.h>
 
 namespace basecode::slice {
-    b8 to_fields(const str::slice_t& value, array_t<str::slice_t>& fields, s8 sep = ',');
+    b8 to_fields(const str::slice_t& value,
+                 array_t<str::slice_t>& fields,
+                 s8 sep = ',');
 }

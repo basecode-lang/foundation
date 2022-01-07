@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -18,376 +18,493 @@
 
 #pragma once
 
-#include <basecode/core/types.h>
-#include <basecode/core/array.h>
-#include <basecode/core/stack.h>
-#include <basecode/core/defer.h>
+#include <basecode/core/buf.h>
 #include <basecode/core/format.h>
-#include <basecode/core/memory.h>
+#include <basecode/core/context.h>
+#include <basecode/core/graphviz/gv.h>
 #include <basecode/core/assoc_array.h>
+#include <basecode/core/stable_array.h>
 
-namespace basecode {
-    constexpr u8 empty = 0b00;
-    constexpr u8 used  = 0b01;
-    constexpr u8 leaf  = 0b10;
+namespace basecode::symtab {
+    template <Symbol_Table T>
+    u0 free(T& table);
 
-    struct symtab_node_t final {
-        u64                             type:   2;
-        u64                             sym:    8;
-        u64                             next:   18;
-        u64                             child:  18;
-        u64                             value:  18;
-    };
+    template <Symbol_Table T>
+    u0 clear(T& table);
 
-    template <typename V> struct symtab_t final {
-        alloc_t*                        alloc;
-        array_t<symtab_node_t>          nodes;
-        array_t<V>                      values;
-        u32                             size;
-    };
-    static_assert(sizeof(symtab_t<s32>) <= 64, "symtab_t<V> is now larger than 64 bytes!");
+    template <Symbol_Table T>
+    u0 reset(T& table);
 
-    struct find_level_result_t final {
-        symtab_node_t*                  start_node;
-        symtab_node_t*                  match_node;
-        symtab_node_t*                  avail_node;
-        u32                             node_id;
-    };
+    template <Symbol_Table T, typename Node_Type = typename T::Node_Type>
+    Node_Type* make_node(T& table);
 
-    namespace symtab {
-        template <typename V> u0 free(symtab_t<V>& symtab);
-        template <typename V> u0 clear(symtab_t<V>& symtab);
-        template <typename V> u0 reset(symtab_t<V>& symtab);
-        template <typename V> u0 reserve(symtab_t<V>& symtab, u32 capacity);
-        template <typename V> symtab_node_t* get_node(symtab_t<V>& symtab, u32 id);
-        template <typename V> symtab_t<V> make(alloc_t* alloc = context::top()->alloc);
-        template <typename V> const symtab_node_t* get_node(const symtab_t<V>& symtab, u32 id);
-        template <typename V> u0 init(symtab_t<V>& symtab, alloc_t* alloc = context::top()->alloc);
-        template <typename V> b8 find_level_node(const symtab_t<V>& symtab, find_level_result_t& r, u8 sym);
-        template <typename V> const symtab_node_t* find_node(const symtab_t<V>& symtab, str::slice_t prefix);
-        template <typename V> b8 insert_key(symtab_t<V>& symtab, str::slice_t key, symtab_node_t** leaf_node);
-        template <typename V> u32 append_node(symtab_t<V>& symtab, u8 sym = 0, u32 next = 0, u32 child = 0, u8 type = empty);
-        template <typename V> b8 has_children(const symtab_t<V>& symtab, const symtab_node_t* node, const symtab_node_t* end_node = {});
-        template <typename V, typename B=std::remove_pointer_t<V>> u0 find_prefix(const symtab_t<V>& symtab, assoc_array_t<B*>& pairs, str::slice_t prefix = {});
-        template <typename V, typename B=std::remove_pointer_t<V>> u0 walk(const symtab_t<V>& symtab, const symtab_node_t* node, str_t& key, assoc_array_t<B*>& pairs);
+    template <Symbol_Table T>
+    u0 reserve(T& table, u32 capacity);
 
-        template <typename V> u0 free(symtab_t<V>& symtab) {
-            clear(symtab);
+    template <Symbol_Table T,
+              typename Pair_Array = typename T::Pair_Array>
+    u0 find_prefix(const T& table,
+                   Pair_Array& pairs,
+                   str::slice_t prefix = {});
+
+    template <Symbol_Table T, typename Node_Type = typename T::Node_Type>
+    b8 has_children(const T& table,
+                    const Node_Type* node,
+                    const Node_Type* end_node = {});
+
+    template <Symbol_Table T>
+    u0 init(T& table, alloc_t* alloc = context::top()->alloc.main);
+
+    template <Symbol_Table T, typename Node_Type = typename T::Node_Type>
+    std::pair<Node_Type*, b8> find_level_node(const T& table,
+                                              s8 sym,
+                                              Node_Type* node);
+
+    template <Symbol_Table T, typename Node_Type = typename T::Node_Type>
+    const Node_Type* find_node(const T& table, str::slice_t prefix);
+
+    template <Symbol_Table T, typename Node_Type = typename T::Node_Type>
+    Node_Type* insert_key(T& table, str::slice_t key, Node_Type* root);
+
+    template <Symbol_Table T,
+              b8 Is_Pointer = std::is_pointer_v<typename T::Value_Type>,
+              typename Node_Type = typename T::Node_Type,
+              typename Pair_Array = typename T::Pair_Array,
+              typename Base_Value_Type = std::remove_pointer_t<typename T::Value_Type>>
+    u0 walk(const T& table, const Node_Type* node, str_t& key, Pair_Array& pairs);
+
+    inline str::slice_t node_type_name(symtab_node_type_t type) {
+        switch (type) {
+            case symtab_node_type_t::empty:     return "empty"_ss;
+            case symtab_node_type_t::used:      return "used"_ss;;
+            case symtab_node_type_t::leaf:      return "leaf"_ss;
         }
+    }
 
-        template <typename V> u0 reset(symtab_t<V>& symtab) {
-            symtab.size = {};
-            for (auto& node : symtab.nodes) {
-                node.sym   = {};
-                node.type  = empty;
-            }
-            array::reset(symtab.values);
-        }
+    template <Symbol_Table T>
+    u0 free(T& table) {
+        stable_array::free(table.nodes);
+        stable_array::free(table.values);
+        table.size = {};
+    }
 
-        template <typename V> u0 clear(symtab_t<V>& symtab) {
-            array::free(symtab.nodes);
-            array::free(symtab.values);
-            symtab.size = {};
-        }
+    template <Symbol_Table T>
+    u0 reset(T& table) {
+        table.size = {};
+        stable_array::reset(table.nodes);
+        stable_array::reset(table.values);
+        make_node(table);
+    }
 
-        template <typename V> symtab_t<V> make(alloc_t* alloc) {
-            symtab_t<V> symtab{};
-            init(symtab, alloc);
-            return symtab;
-        }
-
-        template <typename V> u0 format_nodes(symtab_t<V>& symtab) {
-            u32 n = 1;
-            format::print("symtab: size = {}, nodes.size = {}, values.size = {}\n", symtab.size, symtab.nodes.size, symtab.values.size);
-            for (const auto& node : symtab.nodes) {
-                s8 c = (s8) node.sym;
-                format::print("{:04}: sym: {} ({:02x}) type: {} next: {:>4} child: {:>4} value: {:>4}\n", n++, isprint(c) ? c : '.', (u32) c, node.type, node.next, node.child, node.value);
-            }
-        }
-
-        template <typename V> u0 init(symtab_t<V>& symtab, alloc_t* alloc) {
-            symtab.size  = {};
-            symtab.alloc = alloc;
-            array::init(symtab.nodes, symtab.alloc);
-            array::init(symtab.values, symtab.alloc);
-            append_node(symtab, 0, 0, 0, empty);
-        }
-
-        template <typename V> u0 reserve(symtab_t<V>& symtab, u32 capacity) {
-            array::reserve(symtab.nodes, capacity);
-            array::reserve(symtab.values, capacity);
-        }
-
-        template <typename V> b8 remove(symtab_t<V>& symtab, str::slice_t prefix) {
-            symtab_node_t* node;
-            u32 prefix_nodes[symtab.nodes.size];
-            u32 prefix_count{};
-            u32 next_node_id = 1;
-            for (u32 i = 0; i < prefix.length; ++i) {
-                node = get_node(symtab, next_node_id);
-                while (node) {
-                    if (i < prefix.length - 1)
-                        prefix_nodes[prefix_count++] = next_node_id;
-                    if (node->sym == prefix[i]) {
-                        next_node_id = node->child;
-                        break;
-                    }
-                    if (!node->next)
-                        return false;
-                    next_node_id = node->next;
-                    node = get_node(symtab, next_node_id);
-                }
-            }
-            if (node && node->type == leaf) {
-                node->value = {};
-                node->type  = used;
-                --symtab.size;
-                b8 parent_cleared{};
-                if (!has_children(symtab, node)) {
-                    node->type      = empty;
-                    node->sym       = {};
-                    parent_cleared  = true;
-                }
-                for (s32 i = prefix_count - 1; i >= 0; --i) {
-                    const auto prefix_node = get_node(symtab, prefix_nodes[i]);
-                    if (!has_children(symtab, prefix_node, node) || parent_cleared) {
-                        prefix_node->type   = empty;
-                        prefix_node->sym    = {};
-                        parent_cleared      = {};
-                    }
-                }
-                return true;
-            }
-            return false;
-        }
-
-        template <typename V> symtab_node_t* get_node(symtab_t<V>& symtab, u32 id) {
-            return id == 0 || id > symtab.nodes.size ? nullptr : &symtab.nodes[id - 1];
-        }
-
-        template <typename V> b8 insert(symtab_t<V>& symtab, str::slice_t key, V& value) {
-            symtab_node_t* leaf_node{};
-            if (!insert_key(symtab, key, &leaf_node))
-                return false;
-            ++symtab.size;
-            array::append(symtab.values, value);
-            leaf_node->type  = leaf;
-            leaf_node->value = symtab.values.size;
-            return true;
-        }
-
-        template <typename V> b8 emplace(symtab_t<V>& symtab, str::slice_t key, V** value) {
-            if (!value) return false;
-            symtab_node_t* leaf_node{};
-            if (!insert_key(symtab, key, &leaf_node))
-                return false;
-            ++symtab.size;
-            *value = &array::append(symtab.values);
-            leaf_node->type  = leaf;
-            leaf_node->value = symtab.values.size;
-            return true;
-        }
-
-        template <typename V> b8 find(const symtab_t<V>& symtab, str::slice_t key, V& value) {
-            u32 next_node_id = 1;
-            const symtab_node_t* level{};
-            for (u32 i = 0; i < key.length; ++i) {
-                level = get_node(symtab, next_node_id);
-                while (level) {
-                    if (level->sym == key[i]) {
-                        next_node_id = level->child;
-                        if (level->type != leaf && !next_node_id)
-                            return false;
-                        break;
-                    }
-                    if (!level->next)
-                        return false;
-                    level = get_node(symtab, level->next);
-                }
-            }
-
-            if (!level || level->type != leaf)
-                return false;
-            value = symtab.values[level->value - 1];
-            return true;
-        }
-
-        template <typename V> const symtab_node_t* get_node(const symtab_t<V>& symtab, u32 id) {
-            return id == 0 || id > symtab.nodes.size ? nullptr : &symtab.nodes[id - 1];
-        }
-
-        template <typename V> b8 insert(symtab_t<V>& symtab, str::slice_t key, const V& value) {
-            symtab_node_t* leaf_node{};
-            if (!insert_key(symtab, key, &leaf_node))
-                return false;
-            ++symtab.size;
-            array::append(symtab.values, value);
-            leaf_node->type  = leaf;
-            leaf_node->value = symtab.values.size;
-            return true;
-        }
-
-        template <typename V> u32 append_node(symtab_t<V>& symtab, u8 sym, u32 next, u32 child, u8 type) {
-            auto& node = array::append(symtab.nodes);
-            node.sym   = sym;
-            node.type  = type;
-            node.next  = next;
-            node.child = child;
-            return symtab.nodes.size;
-        }
-
-        template <typename V> b8 find_level_node(const symtab_t<V>& symtab, find_level_result_t& r, u8 sym) {
-            const symtab_node_t* curr_node = r.start_node;
-            auto curr_id = r.node_id;
-            r.avail_node = r.match_node = {};
-            while (curr_node) {
-                if (curr_node->sym == sym) {
-                    r.node_id    = curr_id;
-                    r.match_node = const_cast<symtab_node_t*>(curr_node);
-                    return true;
-                }
-                if (!curr_node->next)
-                    break;
-                curr_id   = curr_node->next;
-                curr_node = get_node(symtab, curr_id);
-            }
-            r.node_id    = curr_id;
-            r.avail_node = const_cast<symtab_node_t*>(curr_node);
-            return false;
-        }
-
-        template <typename V> const symtab_node_t* find_node(const symtab_t<V>& symtab, str::slice_t prefix) {
-            u32 next_node_id = 1;
-            for (u32 i = 0; i < prefix.length; ++i) {
-                auto node = get_node(symtab, next_node_id);
-                while (node) {
-                    if (node->sym == prefix[i]) {
-                        next_node_id = node->child;
-                        break;
-                    }
-                    if (!node->next)
-                        return nullptr;
-                    node = get_node(symtab, node->next);
-                }
-            }
-            return get_node(symtab, next_node_id);
-        }
-
-        template <typename V> b8 insert_key(symtab_t<V>& symtab, str::slice_t key, symtab_node_t** leaf_node) {
-            if (!leaf_node || key.length == 0)
-                return false;
-            u32 next_node_id = 1;
-            symtab_node_t* node = get_node(symtab, next_node_id);
-            for (u32 i = 0; i < key.length - 1; ++i) {
-                const auto sym = key[i];
-                find_level_result_t r{};
-                r.node_id    = next_node_id;
-                r.start_node = node;
-                if (!find_level_node(symtab, r, sym)) {
-                    node = r.avail_node;
-                    if (node->type == empty) {
-                        node->sym  = key[i];
-                        node->type = used;
-                    } else {
-                        next_node_id = node->next = append_node(symtab, sym, 0, 0, used);
-                        node         = get_node(symtab, next_node_id);
-                    }
+    template <Symbol_Table T,
+              b8 Is_Pointer,
+              typename Node_Type,
+              typename Pair_Array,
+              typename Base_Value_Type>
+    u0 walk(const T& table,
+            const Node_Type* node,
+            str_t& key,
+            Pair_Array& pairs) {
+        if (!node)
+            return;
+        while (true) {
+            str::append(key, node->sym);
+            if (node->type == symtab_node_type_t::leaf) {
+                if constexpr (Is_Pointer) {
+                    assoc_array::append(pairs, key, *node->value);
                 } else {
-                    node             = r.match_node;
-                    next_node_id     = r.node_id;
-                }
-                if (!node->child) {
-                    auto child_node = append_node(symtab);
-                    node = get_node(symtab, next_node_id);
-                    node->child    = child_node;
-                }
-                next_node_id       = node->child;
-                node               = get_node(symtab, next_node_id);
-            }
-            {
-                const auto last_sym = key[key.length - 1];
-                find_level_result_t r{};
-                r.node_id    = next_node_id;
-                r.start_node = node;
-                if (!find_level_node(symtab, r, last_sym)) {
-                    node = r.avail_node;
-                    if (node->type == empty) {
-                        node->type = used;
-                        node->sym  = last_sym;
-                    } else {
-                        node->next = append_node(symtab, last_sym, 0, 0, used);
-                        node       = get_node(symtab, node->next);
-                    }
-                } else {
-                    node = r.match_node;
+                    assoc_array::append(pairs, key, node->value);
                 }
             }
-            *leaf_node = node;
-            return node->type != leaf;
+            if (node->child)
+                walk(table, node->child, key, pairs);
+            str::erase(key, key.length - 1, 1);
+            if (!node->next)
+                break;
+            node = node->next;
         }
+    }
 
-        template <typename V, typename B> u0 find_prefix(const symtab_t<V>& symtab, assoc_array_t<B*>& pairs, str::slice_t prefix) {
-            str_t key{};
-            str::init(key, symtab.alloc);
-            str::reserve(key, 32);
-            defer(str::free(key));
-            if (!slice::empty(prefix)) {
-                auto node = find_node(symtab, prefix);
-                if (node) {
-                    str::append(key, prefix);
-                    walk(symtab, node, key, pairs);
+    template <Symbol_Table T, typename Node_Type>
+    Node_Type* make_node(T& table) {
+        Node_Type* node = &stable_array::append(table.nodes);
+        std::memset(node, 0, sizeof(Node_Type));
+        node->id = table.nodes.size;
+        return node;
+    }
+
+    template <Symbol_Table T>
+    u0 format_nodes(const T& table) {
+        u32 n = 1;
+        format::print("symtab: size = {}, nodes.size = {}, values.size = {}\n",
+                      table.size,
+                      table.nodes.size,
+                      table.values.size);
+        for (auto node : table.nodes) {
+            s8 c = (s8) node->sym;
+            format::print("{:04}: sym: {} ({:02x}) type: {} "
+                          "next: 0x{:016x} child: 0x{:016x} value: 0x{:016x}\n",
+                          n++,
+                          isprint(c) ? c : '.',
+                          (u32) c,
+                          node->type,
+                          (u64) node->next,
+                          (u64) node->child,
+                          (u64) node->value);
+        }
+    }
+
+    template <Symbol_Table T>
+    u0 init(T& table, alloc_t* alloc) {
+        table.size  = {};
+        table.alloc = alloc;
+        stable_array::init(table.nodes, table.alloc);
+        stable_array::init(table.values, table.alloc);
+        make_node(table);
+    }
+
+    template <Symbol_Table T>
+    u0 reserve(T& table, u32 capacity) {
+        stable_array::reserve(table.nodes, capacity);
+        stable_array::reserve(table.values, capacity);
+    }
+
+    template <Symbol_Table T, typename Node_Type>
+    Node_Type* insert_key(T& table,
+                          str::slice_t key,
+                          Node_Type* root) {
+        auto curr = root;
+        const auto short_key_len = key.length - 1;
+        for (u32 i = 0; i < key.length; ++i) {
+            auto [this_level, found] = find_level_node(table,
+                                                       key[i],
+                                                       curr);
+            if (!found) {
+                if (this_level->type == symtab_node_type_t::empty) {
+                    this_level->sym  = key[i];
+                    this_level->type = symtab_node_type_t::used;
+                } else {
+                    auto new_next = make_node(table);
+                    new_next->sym  = key[i];
+                    new_next->type = symtab_node_type_t::used;
+                    this_level = this_level->next = new_next;
                 }
+                if (!this_level->child) {
+                    if (i < short_key_len)
+                        this_level->child = make_node(table);
+                }
+            }
+            if (i < short_key_len && this_level->child) {
+                curr = this_level->child;
             } else {
-                walk(symtab, get_node(symtab, 1), key, pairs);
+                if (this_level->type == symtab_node_type_t::leaf
+                &&  !this_level->child) {
+                    this_level->child = make_node(table);
+                    this_level = this_level->child;
+                }
+                curr = this_level;
             }
         }
+        return curr;
+    }
 
-        template <typename V> b8 has_children(const symtab_t<V>& symtab, const symtab_node_t* node, const symtab_node_t* end_node) {
-            while (true) {
-                if (node->type == leaf) return true;
-                if (node->child) {
-                    auto child_node = get_node(symtab, node->child);
-                    if (has_children(symtab, child_node, end_node))
-                        return true;
-                }
-                if (!node->next)
-                    return false;
-                node = get_node(symtab, node->next);
-                if (end_node && node == end_node)
-                    return false;
-            }
-        }
-
-        template <typename V, typename B=std::remove_pointer_t<V>> u0 format_pairs(symtab_t<V>& symtab, str::slice_t prefix = {}) {
-            assoc_array_t<B*> pairs{};
-            assoc_array::init(pairs);
-            find_prefix(symtab, pairs, prefix);
-            defer(assoc_array::free(pairs));
-            for (u32 i = 0; i < pairs.size; ++i) {
-                auto pair = pairs[i];
-                format::print("{:<20}: {}\n", pair.key, *pair.value);
-            }
-        }
-
-        template <typename V, typename B> u0 walk(const symtab_t<V>& symtab, const symtab_node_t* node, str_t& key, assoc_array_t<B*>& pairs) {
-            while (true) {
-                str::append(key, node->sym);
-                if (node->type == leaf) {
-                    if constexpr (std::is_pointer_v<V>) {
-                        assoc_array::append(pairs, key, (B*) symtab.values[node->value - 1]);
-                    } else {
-                        assoc_array::append(pairs, key, (B*) &symtab.values[node->value - 1]);
-                    }
-                }
-                if (node->child) {
-                    auto child_node = get_node(symtab, node->child);
-                    walk(symtab, child_node, key, pairs);
-                }
-                str::erase(key, key.length - 1, 1);
-                if (!node->next)
+    template <Symbol_Table T, typename Node_Type = typename T::Node_Type>
+    b8 remove(T& table, str::slice_t prefix) {
+        array_t<Node_Type*> prefix_nodes{};
+        array::init(prefix_nodes, table.alloc);
+        defer(array::free(prefix_nodes));
+        Node_Type* node = &table.nodes[0];
+        for (u32 i = 0; i < prefix.length; ++i) {
+            while (node) {
+                if (i < prefix.length - 1)
+                    array::append(prefix_nodes, node);
+                if (node->sym == prefix[i]) {
+                    if (node->child && i < prefix.length - 1)
+                        node = node->child;
                     break;
-                node = get_node(symtab, node->next);
+                }
+                if (!node->next)
+                    return false;
+                node = node->next;
             }
+        }
+        if (node && node->type == symtab_node_type_t::leaf) {
+            stable_array::erase(table.values, node->value);
+            node->value = {};
+            node->type  = symtab_node_type_t::used;
+            --table.size;
+            b8 parent_cleared{};
+            if (!has_children(table, node)) {
+                node->type = symtab_node_type_t::empty;
+                node->sym  = {};
+                parent_cleared = true;
+            }
+            for (s32 i = s32(prefix_nodes.size) - 1; i >= 0; --i) {
+                auto prefix_node = prefix_nodes[i];
+                if (parent_cleared || !has_children(table, prefix_node, node)) {
+                    prefix_node->type = symtab_node_type_t::empty;
+                    prefix_node->sym  = {};
+                    parent_cleared    = {};
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    template <Symbol_Table T, typename Node_Type>
+    b8 has_children(const T& table,
+                    const Node_Type* node,
+                    const Node_Type* end_node) {
+        while (true) {
+            if (node->type == symtab_node_type_t::leaf)
+                return true;
+            if (node->child) {
+                if (has_children(table, node->child, end_node))
+                    return true;
+            }
+            if (!node->next)
+                return false;
+            node = node->next;
+            if (end_node && node->next == end_node)
+                return false;
+        }
+    }
+
+    template <Symbol_Table T>
+    b8 create_dot_file(T& table, const path_t& path) {
+        using namespace basecode::graphviz;
+
+        buf_t buf{};
+        buf.mode = buf_mode_t::alloc;
+        buf::init(buf, table.alloc);
+
+        graph_t g{};
+        graph::init(g,
+                    graph_type_t::directed,
+                    "symtab"_ss,
+                    table.alloc);
+        graph::node_sep(g, 1);
+        graph::rank(g, rank_type_t::same);
+        graph::label(g, "symtab_t"_ss);
+        defer(
+            buf::free(buf);
+            graph::free(g));
+
+        u32 idx{};
+        u32 node_ids[table.nodes.size];
+        for (auto node : table.nodes) {
+            auto trie_node  = graph::make_node(g);
+            u32  id_field   = node::make_field(*trie_node);
+            u32  sym_field  = node::make_field(*trie_node);
+            u32  type_field = node::make_field(*trie_node);
+            node::set_field_label(*trie_node,
+                                  id_field,
+                                  format::format("id: {}", node->id));
+            node::set_field_label(*trie_node,
+                                  sym_field,
+                                  format::format("sym: {}",
+                                                 isprint(node->sym) ? node->sym : '.'));
+            node::set_field_label(*trie_node,
+                                  type_field,
+                                  format::format("type: {}",
+                                                 symtab::node_type_name(node->type)));
+            node::shape(*trie_node, shape_t::record);
+            node::style(*trie_node, node_style_t::filled);
+            node::fill_color(*trie_node, graphviz::color_t::aliceblue);
+            node_ids[idx] = trie_node->id;
+            ++idx;
+        }
+
+        for (auto node : table.nodes) {
+            if (node->next) {
+                auto edge = graph::make_edge(g);
+                edge->first  = graph::node_ref(&g,
+                                               node_ids[node->id - 1],
+                                               3,
+                                               compass_point_t::e);
+                edge->second = graph::node_ref(&g,
+                                               node_ids[node->next->id - 1],
+                                               1,
+                                               compass_point_t::w);
+                edge::label(*edge, "next"_ss);
+                edge::dir(*edge, dir_type_t::both);
+                edge::arrow_tail(*edge, arrow_type_t::dot);
+                edge::arrow_head(*edge, arrow_type_t::normal);
+            }
+
+            if (node->child) {
+                auto edge = graph::make_edge(g);
+                edge->first  = graph::node_ref(&g,
+                                               node_ids[node->id - 1],
+                                               2,
+                                               compass_point_t::s);
+                edge->second = graph::node_ref(&g,
+                                               node_ids[node->child->id - 1],
+                                               2,
+                                               compass_point_t::n);
+                edge::label(*edge, "child"_ss);
+                edge::dir(*edge, dir_type_t::both);
+                edge::arrow_tail(*edge, arrow_type_t::dot);
+                edge::arrow_head(*edge, arrow_type_t::normal);
+            }
+        }
+
+        {
+            auto status = graphviz::graph::serialize(g, buf);
+            if (!OK(status))
+                return false;
+        }
+        {
+            auto status = buf::save(buf, path);
+            if (!OK(status))
+                return false;
+        }
+
+        return true;
+    }
+
+    template <Symbol_Table T,
+              typename Node_Type = typename T::Node_Type,
+              typename Value_Type = typename T::Value_Type>
+    b8 set(T& table, str::slice_t key, Value_Type& value) {
+        const Node_Type* level = find_node(table, key);
+        if (!level || level->type != symtab_node_type_t::leaf)
+            return false;
+        *level->value = value;
+        return true;
+    }
+
+    template <Symbol_Table T,
+              typename Node_Type = typename T::Node_Type,
+              typename Value_Type = typename T::Value_Type>
+    b8 insert(T& table, str::slice_t key, auto& value) {
+        auto leaf_node = insert_key(table,
+                                    key,
+                                    &table.nodes[0]);
+        if (!leaf_node)
+            return false;
+        ++table.size;
+        leaf_node->type  = symtab_node_type_t::leaf;
+        leaf_node->value = &stable_array::append(table.values);
+        *(leaf_node->value) = Value_Type(value);
+        return true;
+    }
+
+    template <Symbol_Table T,
+              typename Pair_Array = typename T::Pair_Array>
+    u0 format_pairs(const T& table, str::slice_t prefix = {}) {
+        Pair_Array pairs{};
+        assoc_array::init(pairs);
+        find_prefix(table, pairs, prefix);
+        defer(assoc_array::free(pairs));
+        for (u32 i = 0; i < pairs.size; ++i) {
+            auto pair = pairs[i];
+            format::print("{:<20}: {}\n", pair.key, *pair.value);
+        }
+    }
+
+    template <Symbol_Table T,
+              typename Node_Type = typename T::Node_Type,
+              typename Value_Type = typename T::Value_Type>
+    b8 emplace(T& table, str::slice_t key, Value_Type** value) {
+        if (!value)
+            return false;
+        auto leaf_node = insert_key(table,
+                                    key,
+                                    &table.nodes[0]);
+        if (!leaf_node)
+            return false;
+        ++table.size;
+        leaf_node->type  = symtab_node_type_t::leaf;
+        leaf_node->value = &stable_array::append(table.values);
+        *value = leaf_node->value;
+        return true;
+    }
+
+    template <Symbol_Table T, typename Node_Type>
+    std::pair<Node_Type*, b8> find_level_node(const T& table,
+                                              s8 sym,
+                                              Node_Type* node) {
+        while (node) {
+            if (node->sym == sym)
+                return std::make_pair(node, true);
+            if (!node->next)
+                return std::make_pair(node, false);
+            node = node->next;
+        }
+        return std::make_pair(nullptr, false);
+    }
+
+    template <Symbol_Table T,
+              typename Node_Type = typename T::Node_Type,
+              typename Value_Type = typename T::Value_Type>
+    b8 find(const T& table, str::slice_t key, Value_Type& value) {
+        const Node_Type* level = &table.nodes[0];
+        for (u32 i = 0; i < key.length; ++i) {
+            auto [this_level, found] = find_level_node(table,
+                                                       key[i],
+                                                       level);
+            if (!found)
+                return false;
+            if (this_level->type == symtab_node_type_t::leaf
+            &&  i == key.length - 1) {
+                level = this_level;
+                break;
+            }
+            level = this_level->child;
+        }
+        if (!level || level->type != symtab_node_type_t::leaf)
+            return false;
+        value = *level->value;
+        return true;
+    }
+
+    template <Symbol_Table T,
+              typename Node_Type = typename T::Node_Type,
+              typename Value_Type = typename T::Value_Type>
+    b8 insert(T& table, str::slice_t key, const auto& value) {
+        auto leaf_node = insert_key(table,
+                                    key,
+                                    &table.nodes[0]);
+        if (!leaf_node)
+            return false;
+        ++table.size;
+        leaf_node->type = symtab_node_type_t::leaf;
+        leaf_node->value = &stable_array::append(table.values,
+                                                 Value_Type(value));
+        return true;
+    }
+
+    template <Symbol_Table T, typename Node_Type>
+    const Node_Type* find_node(const T& table, str::slice_t prefix) {
+        auto node = &table.nodes[0];
+        for (u32 i = 0; i < prefix.length; ++i) {
+            auto [this_level, found] = find_level_node(table,
+                                                       prefix[i],
+                                                       node);
+            if (!found)
+                break;
+            if (i < prefix.length - 1)
+                node = this_level->child;
+        }
+        return node;
+    }
+
+    template <Symbol_Table T, typename Pair_Array>
+    u0 find_prefix(const T& table, Pair_Array& pairs, str::slice_t prefix) {
+        str_t key{};
+        str::init(key, table.alloc);
+        str::reserve(key, 64);
+        defer(str::free(key));
+        if (!slice::empty(prefix)) {
+            auto node = find_node(table, prefix);
+            if (node) {
+                str::append(key, prefix);
+                walk(table, node, key, pairs);
+            }
+        } else {
+            walk(table, &table.nodes[0], key, pairs);
         }
     }
 }

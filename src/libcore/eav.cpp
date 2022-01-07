@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -17,9 +17,12 @@
 // ----------------------------------------------------------------------------
 
 #include <sqlite3.h>
+#include <basecode/core/sql.h>
 #include <basecode/core/log.h>
 #include <basecode/core/eav.h>
+#include <basecode/core/path.h>
 #include <basecode/core/defer.h>
+#include <basecode/core/stable_array.h>
 
 namespace basecode {
     [[maybe_unused]] static const s8* s_schema_sql =
@@ -60,7 +63,8 @@ namespace basecode {
     [[maybe_unused]] static const s8* s_upsert_config =
         "insert into config (name, value) values (?, ?) "
         "on conflict (name) do "
-        "update set value = excluded.value, updated_at = strftime('%s', 'now');"
+        "update set value = excluded.value, "
+        "updated_at = strftime('%s', 'now');"
         ;
 
     [[maybe_unused]] static const s8* s_select_symbol =
@@ -70,7 +74,8 @@ namespace basecode {
     [[maybe_unused]] static const s8* s_upsert_symbol =
         "insert into symbol (name, entity) values (?, ?) "
         "on conflict (name) do "
-        "update set entity = excluded.entity, updated_at = strftime('%s', 'now');"
+        "update set entity = excluded.entity, "
+        "updated_at = strftime('%s', 'now');"
         ;
 
     [[maybe_unused]] static const s8* s_delete_symbol =
@@ -86,7 +91,8 @@ namespace basecode {
         ;
 
     [[maybe_unused]] static const s8* s_update_entity =
-        "update entity set status = ?, updated_at = strftime('%s', 'now') where id = ?;"
+        "update entity set status = ?, "
+        "updated_at = strftime('%s', 'now') where id = ?;"
         ;
 
     [[maybe_unused]] static const s8* s_select_tuple_all =
@@ -94,7 +100,8 @@ namespace basecode {
         ;
 
     [[maybe_unused]] static const s8* s_select_tuple_one =
-        "select rowid, value from tuple where entity = ? and attr = ? and status = 1;"
+        "select rowid, value from tuple where entity = ? "
+        "and attr = ? and status = 1;"
         ;
 
     [[maybe_unused]] static const s8* s_insert_tuple =
@@ -102,12 +109,48 @@ namespace basecode {
         ;
 
     [[maybe_unused]] static const s8* s_update_tuple_one =
-        "update tuple set status = ?, updated_at = strftime('%s', 'now') where rowid = ?;"
+        "update tuple set status = ?, updated_at = strftime('%s', 'now') "
+        "where rowid = ?;"
         ;
 
     [[maybe_unused]] static const s8* s_update_tuple_all =
-        "update tuple set status = ?, updated_at = strftime('%s', 'now') where entity = ?;"
+        "update tuple set status = ?, updated_at = strftime('%s', 'now') "
+        "where entity = ?;"
         ;
+
+    value_t& value_t::operator=(const basecode::value_t& other) {
+        if (this != &other) {
+            type = other.type;
+            switch (type) {
+                case value_type_t::list: {
+                    if (&data.list != &other.data.list) {
+                        if (!data.list.alloc)
+                            data.list.alloc = other.data.list.alloc;
+                        const auto n = other.data.list.size;
+                        array::grow(data.list, n);
+                        std::memcpy(data.list.data,
+                                    other.data.list.data,
+                                    n * sizeof(entity_t));
+                        data.list.size = n;
+                    }
+                    break;
+                }
+                case value_type_t::entity:
+                    data.entity = other.data.entity;
+                    break;
+                case value_type_t::string:
+                    data.string = other.data.string;
+                    break;
+                case value_type_t::nil:
+                case value_type_t::boolean:
+                case value_type_t::integer:
+                case value_type_t::floating_point:
+                    data.number = other.data.number;
+                    break;
+            }
+        }
+        return *this;
+    }
 
     namespace eav {
         namespace txn {
@@ -175,6 +218,24 @@ namespace basecode {
                 return value_t(value);
             }
 
+            u0 list(value_t& value,
+                    const entity_t* data,
+                    u32 len,
+                    alloc_t* alloc) {
+                array::init(value.data.list, alloc);
+                array::resize(value.data.list, len);
+                std::memcpy(value.data.list.data, data, sizeof(entity_t) * len);
+            }
+
+            u0 string(value_t& value,
+                      const s8* data,
+                      u32 len,
+                      alloc_t* alloc) {
+                str::init(value.data.string, alloc);
+                str::resize(value.data.string, len);
+                std::memcpy(value.data.string.data, data, len);
+            }
+
             value_t list(alloc_t* alloc) {
                 value_t value(value_type_t::list);
                 array::init(value.data.list, alloc);
@@ -189,18 +250,6 @@ namespace basecode {
                 value_t value(value_type_t::string);
                 str::init(value.data.string, alloc);
                 return value;
-            }
-
-            u0 string(value_t& value, const s8* data, u32 len, alloc_t* alloc) {
-                str::init(value.data.string, alloc);
-                str::resize(value.data.string, len);
-                std::memcpy(value.data.string.data, data, len);
-            }
-
-            u0 list(value_t& value, const entity_t* data, u32 len, alloc_t* alloc) {
-                array::init(value.data.list, alloc);
-                array::resize(value.data.list, len);
-                std::memcpy(value.data.list.data, data, sizeof(entity_t) * len);
             }
         }
 
@@ -278,7 +327,9 @@ namespace basecode {
                         str::resize(buf, buf_size);
                         *buf.data = u8(tuple.value.type);
                         std::memcpy(buf.data + 1, &size, sizeof(u64));
-                        std::memcpy(buf.data + 1 + sizeof(u64), list.data, size * sizeof(entity_t));
+                        std::memcpy(buf.data + 1 + sizeof(u64),
+                                    list.data,
+                                    size * sizeof(entity_t));
                         break;
                     }
                     case value_type_t::string: {
@@ -288,19 +339,25 @@ namespace basecode {
                         str::resize(buf, buf_size);
                         *buf.data = u8(tuple.value.type);
                         std::memcpy(buf.data + 1, &size, sizeof(u64));
-                        std::memcpy(buf.data + 1 + sizeof(u64), string.data, size);
+                        std::memcpy(buf.data + 1 + sizeof(u64),
+                                    string.data,
+                                    size);
                         break;
                     }
                     case value_type_t::entity: {
                         str::resize(buf, buf_size);
                         *buf.data = u8(tuple.value.type);
-                        std::memcpy(buf.data + 1, &tuple.value.data.entity, sizeof(entity_t));
+                        std::memcpy(buf.data + 1,
+                                    &tuple.value.data.entity,
+                                    sizeof(entity_t));
                         break;
                     }
                     default: {
                         str::resize(buf, buf_size);
                         *buf.data = u8(tuple.value.type);
-                        std::memcpy(buf.data + 1, &tuple.value.data.number.u, sizeof(u64));
+                        std::memcpy(buf.data + 1,
+                                    &tuple.value.data.number.u,
+                                    sizeof(u64));
                         break;
                     }
                 }
@@ -338,21 +395,31 @@ namespace basecode {
                                 case value_type_t::list: {
                                     u64 size{};
                                     std::memcpy(&size, blob + 1, sizeof(u64));
-                                    value::list(tuple.value, (const entity_t*) blob + 1 + sizeof(u64), size, txn.db->alloc);
+                                    value::list(tuple.value,
+                                                (const entity_t*) blob + 1 + sizeof(u64),
+                                                size,
+                                                txn.db->alloc);
                                     break;
                                 }
                                 case value_type_t::string: {
                                     u64 size{};
                                     std::memcpy(&size, blob + 1, sizeof(u64));
-                                    value::string(tuple.value, (const s8*) blob + 1 + sizeof(u64), size, txn.db->alloc);
+                                    value::string(tuple.value,
+                                                  (const s8*) blob + 1 + sizeof(u64),
+                                                  size,
+                                                  txn.db->alloc);
                                     break;
                                 }
                                 case value_type_t::entity: {
-                                    std::memcpy(&tuple.value.data.entity, blob + 1, sizeof(u64));
+                                    std::memcpy(&tuple.value.data.entity,
+                                                blob + 1,
+                                                sizeof(u64));
                                     break;
                                 }
                                 default: {
-                                    std::memcpy(&tuple.value.data.number.u, blob + 1, sizeof(u64));
+                                    std::memcpy(&tuple.value.data.number.u,
+                                                blob + 1,
+                                                sizeof(u64));
                                     break;
                                 }
                             }
@@ -391,21 +458,31 @@ namespace basecode {
                                 case value_type_t::list: {
                                     u64 size{};
                                     std::memcpy(&size, blob + 1, sizeof(u64));
-                                    value::list(tuple.value, (const entity_t*) blob + 1 + sizeof(u64), size, txn.db->alloc);
+                                    value::list(tuple.value,
+                                                (const entity_t*) blob + 1 + sizeof(u64),
+                                                size,
+                                                txn.db->alloc);
                                     break;
                                 }
                                 case value_type_t::string: {
                                     u64 size{};
                                     std::memcpy(&size, blob + 1, sizeof(u64));
-                                    value::string(tuple.value, (const s8*) blob + 1 + sizeof(u64), size, txn.db->alloc);
+                                    value::string(tuple.value,
+                                                  (const s8*) blob + 1 + sizeof(u64),
+                                                  size,
+                                                  txn.db->alloc);
                                     break;
                                 }
                                 case value_type_t::entity: {
-                                    std::memcpy(&tuple.value.data.entity, blob + 1, sizeof(u64));
+                                    std::memcpy(&tuple.value.data.entity,
+                                                blob + 1,
+                                                sizeof(u64));
                                     break;
                                 }
                                 default: {
-                                    std::memcpy(&tuple.value.data.number.u, blob + 1, sizeof(u64));
+                                    std::memcpy(&tuple.value.data.number.u,
+                                                blob + 1,
+                                                sizeof(u64));
                                     break;
                                 }
                             }
@@ -473,6 +550,33 @@ namespace basecode {
         }
 
         namespace entity {
+            status_t find(txn_t& txn,
+                          entity_t id,
+                          entity_t& type_id,
+                          u8& status) {
+                if (id.empty()) return status_t::invalid_entity;
+                status_t result{};
+                auto     stmt = txn.db->entity.select;
+                sqlite3_bind_int64(stmt, 1, id);
+                while (true) {
+                    auto rc = sqlite3_step(stmt);
+                    if (rc == SQLITE_DONE) {
+                        result = status_t::not_found;
+                        break;
+                    } else if (rc == SQLITE_ROW) {
+                        type_id = sqlite3_column_int64(stmt, 0);
+                        status  = sqlite3_column_int(stmt, 1);
+                        break;
+                    } else {
+                        result = status_t::sql_error;
+                        break;
+                    }
+                }
+                sqlite3_clear_bindings(stmt);
+                sqlite3_reset(stmt);
+                return result;
+            }
+
             status_t remove(txn_t& txn, entity_t id) {
                 status_t status{};
                 auto stmt = txn.db->entity.update;
@@ -498,30 +602,6 @@ namespace basecode {
                 sqlite3_clear_bindings(stmt);
                 sqlite3_reset(stmt);
                 return status;
-            }
-
-            status_t find(txn_t& txn, entity_t id, entity_t& type_id, u8& status) {
-                if (id.empty()) return status_t::invalid_entity;
-                status_t result{};
-                auto     stmt = txn.db->entity.select;
-                sqlite3_bind_int64(stmt, 1, id);
-                while (true) {
-                    auto rc = sqlite3_step(stmt);
-                    if (rc == SQLITE_DONE) {
-                        result = status_t::not_found;
-                        break;
-                    } else if (rc == SQLITE_ROW) {
-                        type_id = sqlite3_column_int64(stmt, 0);
-                        status  = sqlite3_column_int(stmt, 1);
-                        break;
-                    } else {
-                        result = status_t::sql_error;
-                        break;
-                    }
-                }
-                sqlite3_clear_bindings(stmt);
-                sqlite3_reset(stmt);
-                return result;
             }
         }
 
@@ -573,8 +653,7 @@ namespace basecode {
         }
 
         str::slice_t intern_label(db_t& db, u32 id) {
-            str::reset(db.buf);
-            {
+            str::reset(db.buf); {
                 str_buf_t fmt_buf(&db.buf);
                 format::format_to(fmt_buf, "SP_{}", id);
             }
@@ -592,7 +671,8 @@ namespace basecode {
             status_t status{};
             defer({
                 if (!OK(status))
-                    log::error("eav::init failed with sql error: {}", sqlite3_errmsg(db.handle));
+                    log::error("eav::init failed with sql error: {}",
+                               sqlite3_errmsg(db.handle));
             });
 
             auto rc = sqlite3_open_v2(path::c_str(db.path),

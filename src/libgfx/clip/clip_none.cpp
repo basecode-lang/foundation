@@ -4,8 +4,8 @@
 // This file is released under the terms of the MIT license.
 // Read LICENSE.txt for more information.
 
-#include "clip.h"
-#include "clip_lock_impl.h"
+#include <basecode/gfx/clip/clip.h>
+#include <basecode/gfx/clip/clip_lock_impl.h>
 
 #include <cassert>
 #include <map>

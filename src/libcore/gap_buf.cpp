@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -77,10 +77,6 @@ namespace basecode::gap_buf {
         }
     }
 
-    u32 caret_offset(gap_buf_t& buf) {
-        return buf.caret > buf.gap.end ? buf.caret - gap_size(buf) : buf.caret;
-    }
-
     u0 gap_to_caret(gap_buf_t& buf) {
         if (buf.caret == buf.gap.start) return;
         if (buf.caret == buf.gap.end) {
@@ -89,15 +85,25 @@ namespace basecode::gap_buf {
         }
 
         if (buf.caret < buf.gap.start) {
-            copy(buf, buf.caret + (buf.gap.end - buf.gap.start), buf.caret, buf.gap.start - buf.caret);
+            copy(buf,
+                 buf.caret + (buf.gap.end - buf.gap.start),
+                 buf.caret,
+                 buf.gap.start - buf.caret);
             buf.gap.end -= (buf.gap.start - buf.caret);
             buf.gap.start = buf.caret;
         } else {
-            copy(buf, buf.gap.start, buf.gap.end, buf.caret - buf.gap.end);
+            copy(buf,
+                 buf.gap.start,
+                 buf.gap.end,
+                 buf.caret - buf.gap.end);
             buf.gap.start += buf.caret - buf.gap.end;
             buf.gap.end = buf.caret;
             buf.caret   = buf.gap.start;
         }
+    }
+
+    u32 caret_offset(gap_buf_t& buf) {
+        return buf.caret > buf.gap.end ? buf.caret - gap_size(buf) : buf.caret;
     }
 
     u32 gap_size(const gap_buf_t& buf) {
@@ -134,8 +140,12 @@ namespace basecode::gap_buf {
     u0 gap_expand(gap_buf_t& buf, u32 new_size) {
         if (new_size <= gap_size(buf)) return;
         grow(buf, new_size);
-        if (buf.size > 0)
-            copy(buf, buf.gap.end + new_size, buf.gap.end, buf.size - buf.gap.end);
+        if (buf.size > 0) {
+            copy(buf,
+                 buf.gap.end + new_size,
+                 buf.gap.end,
+                 buf.size - buf.gap.end);
+        }
         buf.gap.end += new_size;
     }
 

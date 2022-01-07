@@ -8,7 +8,7 @@
 //
 //      F O U N D A T I O N   P R O J E C T
 //
-// Copyright (C) 2020 Jeff Panici
+// Copyright (C) 2017-2021 Jeff Panici
 // All rights reserved.
 //
 // This software source file is licensed under the terms of MIT license.
@@ -22,156 +22,215 @@
 #include <io.h>
 #include <sys/mman.h>
 
-#ifndef FILE_MAP_EXECUTE
-#   define FILE_MAP_EXECUTE    0x0020
-#endif
+#define DWORD_HI(x)             ((x) >> 32U)
+#define DWORD_LO(x)             ((x) & 0xffffffffU)
 
-static int __map_mman_error(const DWORD err, const int deferrer) {
-    if (err == 0)
-        return 0;
-    //TODO: implement
-    return err;
+struct mmap_tag_t final {
+    HANDLE                      fdh     {};
+    HANDLE                      fmh     {};
+    void*                       addr    {};
+    mmap_tag_t*                 next    {};
+    bool                        free    {true};
+};
+
+thread_local mmap_tag_t         s_tags[256] {};
+thread_local mmap_tag_t*        s_head_tag  {};
+
+static mmap_tag_t* tag_alloc() {
+    for (auto& s_tag : s_tags) {
+        if (s_tag.free) {
+            s_tag.free = false;
+            return &s_tag;
+        }
+    }
+    return nullptr;
 }
 
-static DWORD __map_mmap_prot_page(const int prot) {
-    DWORD protect = 0;
-
-    if (prot == PROT_NONE)
-        return protect;
-
-    if ((prot & PROT_EXEC) != 0) {
-        protect = ((prot & PROT_WRITE) != 0) ?
-                  PAGE_EXECUTE_READWRITE : PAGE_EXECUTE_READ;
-    } else {
-        protect = ((prot & PROT_WRITE) != 0) ?
-                  PAGE_READWRITE : PAGE_READONLY;
+static void tag_free(void* addr) {
+    mmap_tag_t** prev = &s_head_tag;
+    for (auto tag = *prev;
+         tag != nullptr;
+         prev = &tag->next, tag = *prev) {
+        if (tag->addr == addr) {
+            CloseHandle(tag->fmh);
+            *prev = tag->next;
+            tag->free = true;
+            break;
+        }
     }
-
-    return protect;
 }
 
-static DWORD __map_mmap_prot_file(const int prot) {
-    DWORD desiredAccess = 0;
-
-    if (prot == PROT_NONE)
-        return desiredAccess;
-
-    if ((prot & PROT_READ) != 0)
-        desiredAccess |= FILE_MAP_READ;
-    if ((prot & PROT_WRITE) != 0)
-        desiredAccess |= FILE_MAP_WRITE;
-    if ((prot & PROT_EXEC) != 0)
-        desiredAccess |= FILE_MAP_EXECUTE;
-
-    return desiredAccess;
-}
-
-void* mmap(void* addr, size_t len, int prot, int flags, int fields, OffsetType off) {
-    HANDLE fm, h;
-
-    void* map = MAP_FAILED;
-
-#ifdef _MSC_VER
-#pragma warning(push)
-#pragma warning(disable: 4293)
-#endif
-
-    const auto dwFileOffsetLow  = (DWORD) (off & 0xFFFFFFFFL);
-    const auto dwFileOffsetHigh = (DWORD) ((off >> 32) & 0xFFFFFFFFL);
-    const DWORD protect          = __map_mmap_prot_page(prot);
-    const DWORD desiredAccess    = __map_mmap_prot_file(prot);
-
-    const OffsetType maxSize = off + (OffsetType) len;
-
-    const auto dwMaxSizeLow  = (DWORD) (maxSize & 0xFFFFFFFFL);
-    const auto dwMaxSizeHigh = (DWORD) ((maxSize >> 32) & 0xFFFFFFFFL);
-
-#ifdef _MSC_VER
-#pragma warning(pop)
-#endif
-
-    errno = 0;
-
-    if (len == 0 || prot == PROT_EXEC) {
-        errno = EINVAL;
-        return MAP_FAILED;
+static mmap_tag_t* tag_find(void* addr) {
+    mmap_tag_t** prev = &s_head_tag;
+    for (auto tag = *prev;
+         tag != nullptr;
+         prev = &tag->next, tag = *prev) {
+        if (tag->addr == addr)
+            return tag;
     }
-
-    h = ((flags & MAP_ANONYMOUS) == 0) ?
-        (HANDLE) _get_osfhandle(fields) : INVALID_HANDLE_VALUE;
-
-    if ((flags & MAP_ANONYMOUS) == 0 && h == INVALID_HANDLE_VALUE) {
-        errno = EBADF;
-        return MAP_FAILED;
-    }
-
-    fm = CreateFileMapping(h, nullptr, protect, dwMaxSizeHigh, dwMaxSizeLow, nullptr);
-
-    if (fm == nullptr) {
-        errno = __map_mman_error(GetLastError(), EPERM);
-        return MAP_FAILED;
-    }
-
-    if ((flags & MAP_FIXED) == 0) {
-        map = MapViewOfFile(fm, desiredAccess, dwFileOffsetHigh, dwFileOffsetLow, len);
-    } else {
-        map = MapViewOfFileEx(fm, desiredAccess, dwFileOffsetHigh, dwFileOffsetLow, len, addr);
-    }
-
-    CloseHandle(fm);
-
-    if (map == nullptr) {
-        errno = __map_mman_error(GetLastError(), EPERM);
-        return MAP_FAILED;
-    }
-
-    return map;
+    return nullptr;
 }
 
 int munmap(void* addr, size_t len) {
-    if (UnmapViewOfFile(addr))
+    (void) len;
+    if (UnmapViewOfFile(addr)) {
+        tag_free(addr);
         return 0;
-
-    errno = __map_mman_error(GetLastError(), EPERM);
-
-    return -1;
-}
-
-int mprotect(void* addr, size_t len, int prot) {
-    DWORD newProtect = __map_mmap_prot_page(prot);
-    DWORD oldProtect = 0;
-
-    if (VirtualProtect(addr, len, newProtect, &oldProtect))
-        return 0;
-
-    errno = __map_mman_error(GetLastError(), EPERM);
-
-    return -1;
-}
-
-int msync(void* addr, size_t len, int flags) {
-    if (FlushViewOfFile(addr, len))
-        return 0;
-
-    errno = __map_mman_error(GetLastError(), EPERM);
-
+    }
+    errno = EPERM;
     return -1;
 }
 
 int mlock(const void* addr, size_t len) {
     if (VirtualLock((LPVOID) addr, len))
         return 0;
-
-    errno = __map_mman_error(GetLastError(), EPERM);
-
+    errno = EPERM;
     return -1;
 }
 
 int munlock(const void* addr, size_t len) {
     if (VirtualUnlock((LPVOID) addr, len))
         return 0;
-
-    errno = __map_mman_error(GetLastError(), EPERM);
-
+    errno = EPERM;
     return -1;
+}
+
+int msync(void* addr, size_t len, int flags) {
+    DWORD fFlags = flags;
+    if (FlushViewOfFile(addr, len)) {
+        if ((fFlags & MS_SYNC) == MS_SYNC) {
+            auto tag = tag_find(addr);
+            if (tag) {
+                if (!FlushFileBuffers(tag->fdh)) {
+                    errno = EPERM;
+                    return -1;
+                }
+            }
+        }
+        return 0;
+    }
+    errno = EPERM;
+    return -1;
+}
+
+int mprotect(void* addr, size_t len, int prot) {
+    DWORD flOldProtect{};
+    DWORD flProtect;
+    DWORD fProt = prot;
+    if (fProt & PROT_WRITE) {
+        if (fProt & PROT_EXEC)
+            flProtect = PAGE_EXECUTE_READWRITE;
+        else
+            flProtect = PAGE_READWRITE;
+    } else if (fProt & PROT_EXEC) {
+        if (fProt & PROT_READ)
+            flProtect = PAGE_EXECUTE_READ;
+        else
+            flProtect = PAGE_EXECUTE;
+    } else {
+        flProtect = PAGE_READONLY;
+    }
+
+    if (VirtualProtect(addr, len, flProtect, &flOldProtect))
+        return 0;
+
+    errno = EPERM;
+    return -1;
+}
+
+void* mmap(void* addr, size_t len, int prot, int flags, int fd, uint64_t offset) {
+    DWORD fProt  = prot;
+    DWORD fFlags = flags;
+
+    errno = 0;
+
+    if (fProt & ~(PROT_READ | PROT_WRITE | PROT_EXEC)) {
+        errno = EINVAL;
+        return MAP_FAILED;
+    }
+
+    if (fd == -1) {
+        if (!(fFlags & MAP_ANON) || offset) {
+            errno = EINVAL;
+            return MAP_FAILED;
+        }
+    } else if (fFlags & MAP_ANON) {
+        errno = EINVAL;
+        return MAP_FAILED;
+    }
+
+    DWORD flProtect;
+    if (fProt & PROT_WRITE) {
+        if (fProt & PROT_EXEC)
+            flProtect = PAGE_EXECUTE_READWRITE;
+        else
+            flProtect = PAGE_READWRITE;
+    } else if (fProt & PROT_EXEC) {
+        if (fProt & PROT_READ)
+            flProtect = PAGE_EXECUTE_READ;
+        else
+            flProtect = PAGE_EXECUTE;
+    } else {
+        flProtect = PAGE_READONLY;
+    }
+
+    uint64_t end = len + offset;
+    HANDLE fdh, fmh;
+    if (fd == -1)
+        fdh = INVALID_HANDLE_VALUE;
+    else
+        fdh = (HANDLE) _get_osfhandle(fd);
+    fmh = CreateFileMapping(fdh,
+                          nullptr,
+                          flProtect,
+                          DWORD_HI(end),
+                          DWORD_LO(end),
+                          nullptr);
+    if (fmh == nullptr) {
+        errno = EPERM;
+        return MAP_FAILED;
+    }
+
+    DWORD dwDesiredAccess;
+    if (fProt & PROT_WRITE)
+        dwDesiredAccess = DWORD(FILE_MAP_WRITE);
+    else
+        dwDesiredAccess = DWORD(FILE_MAP_READ);
+
+    if (fProt & PROT_EXEC)
+        dwDesiredAccess |= DWORD(FILE_MAP_EXECUTE);
+
+    if (fFlags & MAP_PRIVATE)
+        dwDesiredAccess |= DWORD(FILE_MAP_COPY);
+
+    void* ret = MAP_FAILED;
+    if (fFlags & MAP_FIXED) {
+        ret = MapViewOfFileEx(fmh,
+                              dwDesiredAccess,
+                              DWORD_HI(offset),
+                              DWORD_LO(offset),
+                              len,
+                              addr);
+    } else {
+        ret = MapViewOfFile(fmh,
+                            dwDesiredAccess,
+                            DWORD_HI(offset),
+                            DWORD_LO(offset),
+                            len);
+    }
+    if (ret == nullptr) {
+        CloseHandle(fmh);
+        errno = EPERM;
+    } else {
+        auto tag = tag_alloc();
+        if (tag) {
+            tag->fdh  = fdh;
+            tag->fmh  = fmh;
+            tag->addr = ret;
+            tag->next = s_head_tag;
+            s_head_tag = tag;
+        }
+    }
+
+    return ret;
 }
